@@ -1,0 +1,1145 @@
+<head>
+    <title>TOPT personal report</title>
+
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
+        integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm"
+        crossorigin="anonymous">
+
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
+        integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN" crossorigin="anonymous">
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"
+        integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous">
+    </script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"
+        integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous">
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/moment@2.26.0/moment.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.3/dist/Chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@0.7.0"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/vue"></script>
+    <script src="https://unpkg.com/@sgratzl/chartjs-chart-boxplot"></script>
+
+    <style>
+        .table.table-sm td {
+            padding: 0.25rem;
+        }
+        .list-group.list-group-small .list-group-item {
+            padding: 0.25rem 0.5rem;
+        }
+        .table.table-sm {
+            line-height: 1.2;
+        }
+        .table-striped tbody tr:nth-of-type(even) {
+            background-color: rgba(0, 0, 0, 0.15);
+        }
+        .table-striped tbody tr:nth-of-type(odd) {
+            background-color: unset !important;
+        }
+
+        [v-cloak] {
+            display: none;
+        }
+
+        .header {
+            margin-left: -15px;
+            margin-right: -15px;
+            padding-left: 15px;
+            font-weight: 400;
+            padding-bottom: 4px;
+            padding-top: 4px;
+            background-color: rgba(0,0,0,0.15);
+        }
+
+        .strike {
+            margin-top: 1rem;
+            display: flex;
+            align-items: center;
+            text-align: center;
+            font-weight: 400;
+        }
+        .strike::before, .strike::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+        }
+        .strike::before {
+            margin-right: 0.25rem;
+            max-width: 1rem;
+        }
+        .strike::after {
+            margin-left: 0.25rem;
+        }
+    </style>
+
+    <script>
+        Chart.plugins.unregister(ChartDataLabels);
+
+        Vue.component("breakdown-box", {
+            props: {
+                src: { type: Array, required: true },
+                ShowLabel: { type: Boolean, required: false, default: false }
+            },
+
+            template: `
+                <div :id="'breakdown-box-' + ID + '-parent'">
+                    <canvas :id="'breakdown-box-' + ID"></canvas>
+                </div>
+            `,
+
+            data: function() {
+                return {
+                    ID: Math.round(Math.random() * 100000),
+
+                    array: [],
+
+                    chart: {
+                        instance: {},
+                        elem: {},
+                        labels: [],
+                        data: [],
+                        colors: []
+                    }
+                }
+            },
+
+            created: function() {
+                this.array = this.src;
+                this.setup();
+            },
+
+            mounted: function() {
+                this.draw();
+            },
+
+            methods: {
+                setup: function() {
+                    this.chart.labels = this.array.map(iter => moment(iter.timestamp).format("YYYY-MM-DD"));
+
+                    this.chart.data = this.array.map(iter => iter.values);
+                },
+
+                draw: function() {
+                    this.$nextTick(() => {
+                        (document.getElementById(`breakdown-box-${this.ID}-parent`))
+                            .style.height = `${(this.src).length * 40 + 20}px`;
+
+                        const ctx = (document.getElementById(`breakdown-box-${this.ID}`)).getContext("2d");
+                        new Chart(ctx, {
+                            type: "horizontalBoxplot",
+                            data: {
+                                labels: (this.ShowLabel == true) ? this.chart.labels : this.chart.data.map(iter => ""),
+                                datasets: [{
+                                    backgroundColor: "#6c6c6c55",
+                                    borderColor: "#111111",
+                                    borderWidth: 2,
+                                    //padding: 10,
+                                    //itemRadius: 0,
+                                    data: (this.chart.data)
+                                //}]
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                title: {
+                                    display: false
+                                },
+                                legend: {
+                                    display: false
+                                },
+                                scales: {
+                                    xAxes: [{
+                                        // Options added by the boxplot plugin which aren't added to the interface correctly
+                                        ticks: {
+                                            minStats: "whiskerMin",
+                                            maxStats: "whiskerMax"
+                                        }
+                                    }],
+                                    yAxes: [{
+                                        gridLines: {
+                                            display: false
+                                        }
+                                    }]
+                                }
+                            }
+                        });
+                    });
+                }
+            },
+
+            watch: {
+                src: function() {
+                    this.setup();
+                    this.draw();
+                },
+
+                "src.data": function() {
+                    this.setup();
+                    this.draw();
+                }
+            }
+        });
+
+        Vue.component("breakdown-chart", {
+            props: {
+                src: { type: Object, required: true },
+                ShowAll: { type: Boolean, required: false, default: false },
+                ClippedAmount: { type: Number, required: false, default: 8 },
+                ShowPercent: { type: Boolean, required: false, default: false },
+                PercentPrecision: { type: Number, required: false, default: 0},
+                ShowTotal: { type: Boolean, required: false, default: false },
+            },
+
+            template: `
+                <canvas :id="'breakdown-chart-' + ID"></canvas>
+            `,
+
+            data: function() {
+                return {
+                    ID: Math.round(Math.random() * 100000),
+
+                    chart: {
+                        instance: {},
+                        elem: {},
+                        labels: [],
+                        data: [],
+                        colors: []
+                    }
+                }
+            },
+
+            created: function() {
+                this.setup();
+            },
+
+            mounted: function() {
+                this.draw();
+            },
+
+            methods: {
+                setup: function() {
+                    const shown = (this.ShowAll == true)
+                        ? this.src.data
+                        : this.src.data.slice(0, this.ClippedAmount);
+
+                    const colorHue = Math.random();
+                    let colorLen = Math.min(this.src.data.length, this.ClippedAmount);
+                    if (this.ShowAll == false && this.src.data.length > this.ClippedAmount) {
+                        ++colorLen;
+                    }
+
+                    let colorsProvided = false;
+
+                    this.chart.labels = shown.map((iter) => iter.display);
+                    this.chart.data = shown.map((iter) => iter.amount);
+                    this.chart.colors = shown.map((iter, index) => {
+                        if (iter.color != undefined) {
+                            colorsProvided = true;
+                            return iter.color;
+                        }
+                        return randomColor(colorHue, colorLen, index);
+                    });
+
+                    if (this.ShowAll == false && this.src.data.length > this.ClippedAmount) {
+                        const hidden = this.src.data.slice(this.ClippedAmount);
+
+                        this.chart.labels.push("Other");
+                        this.chart.data.push(hidden.reduce((acc, val) => acc += val.amount, 0));
+                        this.chart.colors.push(randomColor(colorHue, colorLen, colorLen - 1));
+                    }
+
+                    if (colorsProvided == false) {
+                        this.chart.colors = shuffleArray(this.chart.colors);
+                    }
+                },
+
+                draw: function() {
+                    this.$nextTick(() => {
+                        const ctx = (document.getElementById(`breakdown-chart-${this.ID}`)).getContext("2d");
+                        new Chart(ctx, {
+                            type: "pie",
+                            data: {
+                                labels: this.chart.labels,
+                                datasets: [{
+                                    data: this.chart.data,
+                                    backgroundColor: this.chart.colors
+                                }]
+                            },
+                            options: {
+                                animation: {
+                                    duration: 0
+                                },
+                                hover: {
+                                    animationDuration: 0
+                                },
+                                responsiveAnimationDuration: 0,
+                                legend: {
+                                    display: true,
+                                    position: "right",
+                                    align: "center",
+                                    labels: {
+                                        generateLabels: (chart) => {
+                                            const dataset = chart.data.datasets[0];
+                                            let sum = 0;
+                                            for (const datum of dataset.data) {
+                                                if (typeof(datum) == "number"){
+                                                    sum += datum;
+                                                }
+                                            }
+
+                                            return chart.data.labels?.map((label, index) => {
+                                                const datum = dataset.data[index];
+                                                if (typeof(datum) == "number") {
+                                                    return {
+                                                        text: `${label.toString()} - ${datum} ${this.ShowPercent == true ? `(${(datum / sum * 100).toFixed(this.PercentPrecision)}%)` : ""}`,
+                                                        fillStyle: this.chart.colors[index]
+                                                    }
+                                                }
+                                                throw `Invalid type of data '${typeof(datum)}': ${datum}`;
+                                            }) ?? [];
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    });
+                }
+            },
+
+            watch: {
+                src: function() {
+                    this.setup();
+                    this.draw();
+                },
+
+                "src.data": function() {
+                    this.setup();
+                    this.draw();
+                }
+            }
+
+        });
+
+        function shuffleArray(array) {
+            let currentIndex = array.length;
+            let temporaryValue;
+            let randomIndex = 0;
+
+            let arr = [...array];
+
+            while (0 != currentIndex) {
+                // Pick a remaining element...
+                randomIndex = Math.floor(Math.random() * currentIndex);
+                currentIndex -= 1;
+                // And swap it with the current element.
+                temporaryValue = arr[currentIndex];
+                arr[currentIndex] = arr[randomIndex];
+                arr[randomIndex] = temporaryValue;
+            }
+
+            return arr;
+        }
+
+        function randomColor(hue, total, index) {
+            const diff = 0.618033988749895;
+            //let hue: number = Math.random();
+            hue += index / total;
+            hue += diff;
+            hue %= 1;
+            let sat = 0.5;
+            let val = 0.95;
+
+            let r = 0;
+            let g = 0;
+            let b = 0;
+
+            let i = ~~(hue * 6);
+            let f = hue * 6 - i;
+
+            let p = val * (1 - sat);
+            let q = val * (1 - f * sat);
+            let t = val * (1 - (1 - f) * sat);
+            switch (i % 6) {
+                case 0: r = val; g = t; b = p; break;
+                case 1: r = q; g = val; b = p; break;
+                case 2: r = p; g = val; b = t; break;
+                case 3: r = p; g = q; b = val; break;
+                case 4: r = t; g = p; b = val; break;
+                case 5: r = val; g = p; b = q; break;
+            }
+
+            return `rgba(${~~(r * 256)}, ${~~(g * 256)}, ${~~(b * 256)}, 1)`;
+        }
+        (window).randomColor = randomColor;
+
+        Vue.component("breakdown", {
+            props: {
+                LeftTitle: { type: String, required: false, default: "" },
+                RightTitle: { type: String, required: false, default: "" },
+                data: { type: Object, required: true },
+                ShowAll: { type: Boolean, required: false, default: true },
+                ClippedAmount: { type: Number, required: false, default: 5 },
+                ShowPercent: { type: Boolean, required: false, default: false },
+                ShowTotal: { type: Boolean, required: false, default: false }
+            },
+
+            template: `
+                <div class="list-group list-group-small">
+                    <div class="list-group-item list-group-item-secondary">
+                        <div class="row">
+                            <div class="col-8"><b>{{LeftTitle}}</b></div>
+                            <div class="col-4"><b>{{RightTitle}}</b></div>
+                        </div>
+                    </div>
+                    <div v-for="datum in entries" class="list-group-item">
+                        <div class="row">
+                            <div class="col-8 text-truncate">{{datum.display}}</div>
+                            <div class="col-4">
+                                {{datum.amount}}
+                                <span v-if="ShowPercent == true">
+                                    ({{(datum.amount / data.total * 100).toFixed(0)}}%)
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-if="ShowTotal == true" class="list-group-item list-group-item-secondary">
+                        <div class="row">
+                            <div class="col-8 text-truncate"><b>Total: </b></div>
+                            <div class="col-4">{{total}}</div>
+                        </div>
+                    </div>
+                </div>
+            `,
+
+            computed: {
+                entries: function() {
+                    if (this.ShowAll) {
+                        return this.data.data;
+                    }
+                    return this.data.data.slice(0, this.ClippedAmount);
+                },
+
+                total: function() {
+                    let amt = 0;
+                    for (const datum of this.data.data) {
+                        amt += datum.amount;
+                    }
+                    return amt;
+                }
+            }
+        });
+
+        Vue.component("breakdown-interval", {
+            props: {
+                src: { type: Array, required: true },
+                MaxHeight: { type: Number, required: false, default: 200 },
+                ShowLabels: { type: Boolean, required: false, default: true },
+                ShowXAxis: { type: Boolean, required: false, default: false },
+                ShowYAxis: { type: Boolean, required: false, default: true },
+                YAxisTickStep: { type: Number, required: false, default: 0.5 },
+                YAxisMin: { type: Number, required: false, default: 0 }
+            },
+
+            template: `
+                <canvas :id="'breakdown-interval-' + ID" :style="{ 'max-height': MaxHeight + 'px' }"></canvas>
+            `,
+
+            data: function() {
+                return {
+                    ID: Math.round(Math.random() * 100000),
+
+                    data: [],
+
+                    chart: {
+                        instance: {},
+                        options: {},
+                        labels: [],
+                        data: []
+                    }
+                }
+            },
+
+            created: function() {
+                this.setup();
+            },
+
+            mounted: function() {
+                this.$nextTick(() => {
+                    this.draw();
+                });
+            },
+
+            methods: {
+                setup: function() {
+                    this.data = [...this.src];
+                    this.chart.data = this.data.map(iter => { return { t: new Date(iter.startTime), y: iter.value }; });
+
+                    this.chart.options = {
+                        plugins: {
+                            datalabels: {
+                                textAlign: "center",
+                                font: {
+                                    size: 18,
+                                    lineHeight: 2
+                                },
+                                offset: 10,
+                                padding: {
+                                    bottom: 10
+                                },
+                            }
+                        },
+                        maintainAspectRatio: false,
+                        scales: {
+                            yAxes: [{
+                                ticks: {
+                                    min: this.YAxisMin,
+                                    stepSize: this.YAxisTickStep
+                                },
+                                gridLines: {
+                                    display: this.ShowYAxis
+                                }
+                            }],
+                            xAxes: [{
+                                type: "time",
+                                distribution: "linear",
+                                time: {
+                                    unit: "minute"
+                                },
+                                gridLines: {
+                                    display: this.ShowXAxis
+                                }
+                            }]
+                        },
+                        elements: {
+                            line: {
+                                tension: 0
+                            }
+                        },
+                        legend: {
+                            display: false
+                        }
+                    };
+                },
+
+                draw: function() {
+                    this.$nextTick(() => {
+                        if (this.chart.instance != null && this.chart.instance.destroy) {
+                            this.chart.instance.destroy();
+                        }
+
+                        this.chart.instance = new Chart(document.getElementById(`breakdown-interval-${this.ID}`), {
+                            type: "line",
+                            //plugins: this.ShowLabels == true ? [ChartDataLabels] : [],
+                            data: {
+                                labels: this.chart.labels,
+                                datasets: [{
+                                    data: this.chart.data
+                                }]
+                            },
+                            options: this.chart.options
+                        });
+                    });
+                }
+            },
+
+            watch: {
+                src: function() {
+                    this.setup();
+                    this.draw();
+                }
+            }
+        });
+    </script>
+
+    <script>
+        setTimeout(() => {
+            const vm = new Vue({
+                el: "#app",
+
+                data: {
+                    report: REPORT_HERE_REPLACE_ME,
+                }
+            });
+            window.vm = vm;
+
+            vm.report.stats = new Map(vm.report.stats);
+        }, 0);
+    </script>
+</head>
+
+<body>
+    <div id="app" v-cloak>
+        <div class="col-12">
+            <div class="d-flex flex-row">
+                <div style="flex-grow: 1">
+                    <h2>Tide OP Tracker (TOPT)</h2>
+                    <h5 class="text-muted">Personal report</h5>
+                    <h5>
+                        <a href="#">https://github.com/Varunda/topt/</a>
+                    </h5>
+                </div>
+
+                <div style="flex-grow: 1">
+                    <div><b>Player: </b> [{{report.player.outfitTag}}] {{report.player.name}}</div>
+                    <div>
+                        <b>Faction: </b> 
+                        <span v-if="report.player.faction == '1'">VS</span>
+                        <span v-else-if="report.player.faction == '2'">NC</span>
+                        <span v-else-if="report.player.faction == '3'">TR</span>
+                        <span v-else>Unknown: {{report.player.faction}}</span>
+                    </div>
+                    <div><b>Duration: </b> {{(report.player.secondsOnline / 60).toFixed(0)}} mins</div>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="report.player != null" class="col-12">
+            <div class="row">
+                <div class="col-4">
+                    <h3>Metrics</h3>
+
+                    <div class="list-group list-group-small" style="line-height: 1.2">
+                        <div class="list-group-item list-group-item-secondary">
+                            <div class="row">
+                                <div class="col-6"><b>Metric</b></div>
+                                <div class="col-6"><b>Count</b></div>
+                            </div>
+                        </div>
+
+                        <div v-for="stat in [
+                            'Kill', 'Kill assist', 'Teamkilled', 'Revived', 'Death', 'K/D', 'KA/D', 'KPM', 'HSR', 'Spot kill',
+                            'Capture point', 'Base capture', 'Base defend',
+                            'Squad spawn', 'Transport assist', 'Sundy'
+                        ]" class="list-group-item">
+
+                            <div class="row">
+                                <div class="col-6"><b>{{stat}}</b></div>
+                                <div class="col-6">{{report.stats.get(stat) || 0}}</div>
+                            </div>
+                        </div>
+
+                        <template v-if="report.classBreakdown.medic.secondsAs > 10">
+                            <div class="list-group-item list-group-item-secondary">
+                                <div class="row">
+                                    <div class="col-12" style="text-align: center;"><b>Medic</b></div>
+                                </div>
+                            </div>
+
+                            <div v-for="stat in [
+                                'Heal', 'Revive', 'KR/D', 'R/D', 'RPM', 'Shield repair'
+                            ]" class="list-group-item">
+
+                                <div class="row">
+                                    <div class="col-6"><b>{{stat}}</b></div>
+                                    <div class="col-6">{{report.stats.get(stat) || 0}}</div>
+                                </div>
+                            </div>
+                        </template>
+
+                        <template v-if="report.classBreakdown.engineer.secondsAs > 10">
+                            <div class="list-group-item list-group-item-secondary">
+                                <div class="row">
+                                    <div class="col-12" style="text-align: center;"><b>Engineer</b></div>
+                                </div>
+                            </div>
+
+                            <div v-for="stat in [
+                                'Resupply', 'MAX repair', 'Hardlight cover'
+                            ]" class="list-group-item">
+
+                                <div class="row">
+                                    <div class="col-6"><b>{{stat}}</b></div>
+                                    <div class="col-6">{{report.stats.get(stat) || 0}}</div>
+                                </div>
+                            </div>
+                        </template>
+
+                    </div>
+                </div>
+
+                <div class="col-8">
+                    <h3>
+                        Score: {{report.player.score}} -
+                        {{(report.player.score / (report.player.secondsOnline / 60)).toFixed(0)}} SPM
+                    </h3>
+
+                    <h5>
+                        Class breakdown:
+                        {{report.classBreakdown.mostPlayed.name}}
+                        ({{(report.classBreakdown.mostPlayed.secondsAs / 60).toFixed(0)}}m)
+                    </h5>
+
+                    <table class="table table-sm table-bordered">
+                        <thead class="table-secondary">
+                            <tr>
+                                <th>Metric</th>
+                                <th>Infil</th>
+                                <th>LA</th>
+                                <th>Medic</th>
+                                <th>Eng</th>
+                                <th>Heavy</th>
+                                <th>Max</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            <tr>
+                                <td><b>Time as</b></td>
+                                <td>{{(report.classBreakdown.infil.secondsAs / 60).toFixed(0)}}m</td>
+                                <td>{{(report.classBreakdown.lightAssault.secondsAs / 60).toFixed(0)}}m</td>
+                                <td>{{(report.classBreakdown.medic.secondsAs / 60).toFixed(0)}}m</td>
+                                <td>{{(report.classBreakdown.engineer.secondsAs / 60).toFixed(0)}}m</td>
+                                <td>{{(report.classBreakdown.heavy.secondsAs / 60).toFixed(0)}}m</td>
+                                <td>{{(report.classBreakdown.max.secondsAs / 60).toFixed(0)}}m</td>
+                            </tr>
+                            <tr>
+                                <td><b>Score</b></td>
+                                <td>
+                                    {{report.classBreakdown.infil.score}}
+                                    ({{(report.classBreakdown.infil.score / report.player.score * 100).toFixed(0)}}%)
+                                </td>
+                                <td>
+                                    {{report.classBreakdown.lightAssault.score}}
+                                    ({{(report.classBreakdown.lightAssault.score / report.player.score * 100).toFixed(0)}}%)
+                                </td>
+                                <td>
+                                    {{report.classBreakdown.medic.score}}
+                                    ({{(report.classBreakdown.medic.score / report.player.score * 100).toFixed(0)}}%)
+                                </td>
+                                <td>
+                                    {{report.classBreakdown.engineer.score}}
+                                    ({{(report.classBreakdown.engineer.score / report.player.score * 100).toFixed(0)}}%)
+                                </td>
+                                <td>
+                                    {{report.classBreakdown.heavy.score}}
+                                    ({{(report.classBreakdown.heavy.score / report.player.score * 100).toFixed(0)}}%)
+                                </td>
+                                <td>
+                                    {{report.classBreakdown.max.score}}
+                                    ({{(report.classBreakdown.max.score / report.player.score * 100).toFixed(0)}}%)
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><b>Kills</b></td>
+                                <td>{{report.classBreakdown.infil.kills}}</td>
+                                <td>{{report.classBreakdown.lightAssault.kills}}</td>
+                                <td>{{report.classBreakdown.medic.kills}}</td>
+                                <td>{{report.classBreakdown.engineer.kills}}</td>
+                                <td>{{report.classBreakdown.heavy.kills}}</td>
+                                <td>{{report.classBreakdown.max.kills}}</td>
+                            </tr>
+                            <tr>
+                                <td><b>Deaths</b></td>
+                                <td>{{report.classBreakdown.infil.deaths}}</td>
+                                <td>{{report.classBreakdown.lightAssault.deaths}}</td>
+                                <td>{{report.classBreakdown.medic.deaths}}</td>
+                                <td>{{report.classBreakdown.engineer.deaths}}</td>
+                                <td>{{report.classBreakdown.heavy.deaths}}</td>
+                                <td>{{report.classBreakdown.max.deaths}}</td>
+                            </tr>
+                            <tr>
+                                <td><b>K/D</b></td>
+                                <td>
+                                    <span v-if="report.classBreakdown.infil.score > 0">
+                                        {{(report.classBreakdown.infil.kills / (report.classBreakdown.infil.deaths || 1)).toFixed(2)}}
+                                    </span>
+                                    <span v-else>
+                                        --
+                                    </span>
+                                </td>
+                                <td>
+                                    <span v-if="report.classBreakdown.lightAssault.score > 0">
+                                        {{(report.classBreakdown.lightAssault.kills / (report.classBreakdown.lightAssault.deaths || 1)).toFixed(2)}}
+                                    </span>
+                                    <span v-else>
+                                        --
+                                    </span>
+                                </td>
+                                <td>
+                                    <span v-if="report.classBreakdown.medic.score > 0">
+                                        {{(report.classBreakdown.medic.kills / (report.classBreakdown.medic.deaths || 1)).toFixed(2)}}
+                                    </span>
+                                    <span v-else>
+                                        --
+                                    </span>
+                                </td>
+                                <td>
+                                    <span v-if="report.classBreakdown.engineer.score > 0">
+                                        {{(report.classBreakdown.engineer.kills / (report.classBreakdown.engineer.deaths || 1)).toFixed(2)}}
+                                    </span>
+                                    <span v-else>
+                                        --
+                                    </span>
+                                </td>
+                                <td>
+                                    <span v-if="report.classBreakdown.heavy.score > 0">
+                                        {{(report.classBreakdown.heavy.kills / (report.classBreakdown.heavy.deaths || 1)).toFixed(2)}}
+                                    </span>
+                                    <span v-else>
+                                        --
+                                    </span>
+                                </td>
+                                <td>
+                                    <span v-if="report.classBreakdown.max.score > 0">
+                                        {{(report.classBreakdown.max.kills / (report.classBreakdown.max.deaths || 1)).toFixed(2)}}
+                                    </span>
+                                    <span v-else>
+                                        --
+                                    </span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h5>Class kills</h5>
+                    <table class="table table-sm table-striped">
+                        <thead class="table-secondary">
+                            <tr>
+                                <th></th>
+                                <th>Infil</th>
+                                <th>LA</th>
+                                <th>Medic</th>
+                                <th>Heavy</th>
+                                <th>Engineer</th>
+                                <th>MAX</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            <tr>
+                                <td><b>Kills</b></td>
+                                <td>{{report.classKd.infil.kills}}</td>
+                                <td>{{report.classKd.lightAssault.kills}}</td>
+                                <td>{{report.classKd.medic.kills}}</td>
+                                <td>{{report.classKd.engineer.kills}}</td>
+                                <td>{{report.classKd.heavy.kills}}</td>
+                                <td>{{report.classKd.max.kills}}</td>
+                            </tr>
+                            <tr>
+                                <td><b>Deaths</b></td>
+                                <td>{{report.classKd.infil.deaths}}</td>
+                                <td>{{report.classKd.lightAssault.deaths}}</td>
+                                <td>{{report.classKd.medic.deaths}}</td>
+                                <td>{{report.classKd.engineer.deaths}}</td>
+                                <td>{{report.classKd.heavy.deaths}}</td>
+                                <td>{{report.classKd.max.deaths}}</td>
+                            </tr>
+                            <tr>
+                                <td><b>K/D</b></td>
+                                <td>{{(report.classKd.infil.kills / (report.classKd.infil.deaths || 1)).toFixed(2)}}</td>
+                                <td>{{(report.classKd.lightAssault.kills / (report.classKd.lightAssault.deaths || 1)).toFixed(2)}}</td>
+                                <td>{{(report.classKd.medic.kills / (report.classKd.medic.deaths || 1)).toFixed(2)}}</td>
+                                <td>{{(report.classKd.engineer.kills / (report.classKd.engineer.deaths || 1)).toFixed(2)}}</td>
+                                <td>{{(report.classKd.heavy.kills / (report.classKd.heavy.deaths || 1)).toFixed(2)}}</td>
+                                <td>{{(report.classKd.max.kills / (report.classKd.max.deaths || 1)).toFixed(2)}}</td>
+                            </tr>
+                            <tr>
+                                <td><b>Rezzed deaths</b></td>
+                                <td>
+                                    {{report.classKd.infil.score}}
+                                    ({{(report.classKd.infil.score / (report.classKd.infil.score + report.classKd.infil.deaths) * 100).toFixed(2)}}%)
+                                </td>
+                                <td>
+                                    {{report.classKd.lightAssault.score}}
+                                    ({{(report.classKd.lightAssault.score / (report.classKd.lightAssault.score + report.classKd.lightAssault.deaths) * 100).toFixed(2)}}%)
+                                </td>
+                                <td>
+                                    {{report.classKd.medic.score}}
+                                    ({{(report.classKd.medic.score / (report.classKd.medic.score + report.classKd.medic.deaths) * 100).toFixed(2)}}%)
+                                </td>
+                                <td>
+                                    {{report.classKd.engineer.score}}
+                                    ({{(report.classKd.engineer.score / (report.classKd.engineer.score + report.classKd.engineer.deaths) * 100).toFixed(2)}}%)
+                                </td>
+                                <td>
+                                    {{report.classKd.heavy.score}}
+                                    ({{(report.classKd.heavy.score / (report.classKd.heavy.score + report.classKd.heavy.deaths) * 100).toFixed(2)}}%)
+                                </td>
+                                <td>
+                                    {{report.classKd.max.score}}
+                                    ({{(report.classKd.max.score / (report.classKd.max.score + report.classKd.max.deaths) * 100).toFixed(2)}}%)
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h5>Source breakdown</h5>
+                    <table class="table table-sm table-striped">
+                        <thead class="table-secondary">
+                            <tr>
+                                <th>Experience</th>
+                                <th>Score</th>
+                                <th>Percent</th>
+                                <th>Ticks</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            <tr v-for="exp in report.scoreBreakdown">
+                                <td>{{exp.name}}</td>
+                                <td>{{exp.score}}</td>
+                                <td>{{(exp.score / report.player.score * 100).toFixed(0)}}%</td>
+                                <td>{{exp.amount}}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="col-12">
+                    <h4 class="strike">Ribbons</h4>
+                    <div class="list-group list-group-small">
+                        <div class="list-group-item list-group-item-secondary">
+                            <div class="row">
+                                <div class="col-8"><b>Ribbon</b></div>
+                                <div class="col-2"><b>Amount</b></div>
+                                <div class="col-2"><b>Percent</b></div>
+                            </div>
+                        </div>
+                        <div v-for="ribbon in report.ribbons" class="list-group-item">
+                            <div class="row align-items-center">
+                                <div class="col-2">
+                                    <img v-if="ribbon.imageUrl.length > 0" style="height: 3rem;"
+                                        :src="'https://census.daybreakgames.com' + ribbon.imageUrl">
+                                </div>
+                                <div class="col-6">
+                                    {{ribbon.name}}
+                                    <br>
+                                    <span class="text-muted" style="font-size: small">
+                                        {{ribbon.description}}
+                                    </span>
+                                </div>
+                                <div class="col-2">
+                                    {{ribbon.amount}}
+                                </div>
+                                <div class="col-2">
+                                    {{(ribbon.amount / report.ribbonCount * 100).toFixed(2)}}%
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h2 class="strike">Weapon kill breakdown</h2>
+                    <div class="row mb-2">
+                        <div class="col-3">
+                            <breakdown :data="report.weaponKillBreakdown" :show-all="false"
+                                left-title="Weapon" right-title="Amount" :show-percent="true" :show-total="true">
+                            </breakdown>
+                        </div>
+                        <div class="col-3">
+                            <breakdown-chart :src="report.weaponKillBreakdown"
+                                :show-percent="true">
+                            </breakdown-chart>
+                        </div>
+
+                        <div class="col-3">
+                            <breakdown :data="report.weaponKillTypeBreakdown" :show-all="false"
+                                left-title="Weapon kills" right-title="Amount" :show-percent="true" :show-total="true">
+                            </breakdown>
+                        </div>
+                        <div class="col-3">
+                            <breakdown-chart :src="report.weaponKillTypeBreakdown"
+                                :show-percent="true">
+                            </breakdown-chart>
+                        </div>
+                    </div>
+
+                    <h2 class="strike">Weapon death breakdown</h2>
+                    <div class="row mb-2">
+                        <div class="col-3">
+                            <breakdown :data="report.weaponDeathBreakdown" :show-all="false"
+                                left-title="Weapon" right-title="Amount" :show-percent="true" :show-total="true">
+                            </breakdown>
+                        </div>
+                        <div class="col-3">
+                            <breakdown-chart :src="report.weaponDeathBreakdown"
+                                :show-percent="true">
+                            </breakdown-chart>
+                        </div>
+
+                        <div class="col-3">
+                            <breakdown :data="report.weaponDeathTypeBreakdown" :show-all="false"
+                                left-title="Weapon type" right-title="Amount" :show-percent="true" :show-total="true">
+                            </breakdown>
+                        </div>
+                        <div class="col-3">
+                            <breakdown-chart :src="report.weaponDeathTypeBreakdown"
+                                :show-percent="true">
+                            </breakdown-chart>
+                        </div>
+                    </div>
+
+                    <h2 class="strike">Interval metrics</h2>
+                    <div class="row">
+                        <div class="col-12">
+                            <h4 class="strike">KPM per 5 minutes</h4>
+                            <breakdown-interval :src="report.overtime.kpm"
+                                :show-x-axis="false" :show-labels="false">
+                            </breakdown-interval>
+
+                            <h4 class="strike">K/D per 5 minutes</h4>
+                            <breakdown-interval :src="report.overtime.kd"
+                                :show-labels="false">
+                            </breakdown-interval>
+
+                            <h4 class="strike">RPM per 5 minutes</h4>
+                            <breakdown-interval :src="report.overtime.rpm"
+                                :show-labels="false">
+                            </breakdown-interval>
+                        </div>
+                    </div>
+
+                    <h2 class="strike">Continuous metrics</h2>
+                    <div class="row">
+                        <div class="col-12">
+                            <h4 class="strike">K/D per kill/death</h4>
+                            <breakdown-interval :src="report.perUpdate.kd" :show-labels="false"></breakdown-interval>
+                        </div>
+                    </div>
+
+                    <template v-for="breakdown in report.breakdowns">
+                        <h2 class="strike">{{breakdown.title}}</h2>
+                        <div>
+                            <template v-for="section in breakdown.sections">
+                                <h4 class="strike">{{section.title}}</h4>
+                                <div class="row mb-2">
+                                    <div class="col-3">
+                                        <breakdown v-if="section.left != null" :data="section.left.data"
+                                            :show-all="false" :show-percent="section.showPercent" :show-total="section.showTotal"
+                                            :left-title="section.left.title" :right-title="section.left.altTitle">
+                                        </breakdown>
+                                    </div>
+                                    <div class="col-3">
+                                        <breakdown-chart v-if="section.left != null" :src="section.left.data"
+                                            :show-percent="section.showPercent">
+                                        </breakdown-chart>
+                                    </div>
+                                    <div class="col-3">
+                                        <breakdown v-if="section.right != null" :data="section.right.data"
+                                            :show-all="false" :show-percent="section.showPercent" :show-total="section.showTotal"
+                                            :left-title="section.right.title" :right-title="section.right.altTitle">
+                                        </breakdown>
+                                    </div>
+                                    <div class="col-3">
+                                        <breakdown-chart v-if="section.right != null" :src="section.right.data"
+                                            :show-percent="section.showPercent">
+                                        </breakdown-chart>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </template>
+
+                    <template v-if="report.logistics.show == true">
+                        <h2 class="strike">Logistics</h2>
+
+                        <template v-if="report.logistics.routers.length > 0">
+                            <h4 class="strike">Router spawns</h4>
+                            <table class="table table-sm table-striped">
+                                <thead class="table-secondary">
+                                    <tr>
+                                        <th>Pulled at</th>
+                                        <th>First spawn</th>
+                                        <th>Destroyed</th>
+                                        <th>Time alive</th>
+                                        <th>Idle</th>
+                                        <th>Active</th>
+                                        <th>Spawn count</th>
+                                        <th>Spawns/Min</th>
+                                        <th>Active S/M</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody>
+                                    <tr v-for="rt in report.logistics.routers">
+                                        <td>{{rt.pulledAt | moment}}</td>
+                                        <td>{{rt.firstSpawn | moment}}</td>
+                                        <td>{{rt.destroyed | moment}}</td>
+                                        <td>
+                                            <span v-if="rt.destroyed != undefined">
+                                                {{rt.pulledAt | between(rt.destroyed)}}
+                                            </span>
+                                            <span v-else>
+                                                Still alive
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span v-if="rt.firstSpawn != undefined">
+                                                {{rt.pulledAt | between(rt.firstSpawn)}}
+                                            </span>
+                                            <span v-else>
+                                                Never used
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span v-if="rt.firstSpawn != undefined && rt.destroyed != undefined">
+                                                {{rt.firstSpawn | between(rt.destroyed)}}
+                                            </span>
+                                            <span v-else>
+                                                Not active
+                                            </span>
+                                        </td>
+                                        <td>{{rt.count}}</td>
+                                        <td>{{(rt.count / (((rt.destroyed || new Date().getTime()) - rt.pulledAt) / 60000)).toFixed(2)}}</td>
+                                        <td>
+                                            <span v-if="rt.firstSpawn != undefined">
+                                                {{(rt.count / (((rt.destroyed || new Date().getTime()) - rt.firstSpawn) / 60000)).toFixed(2)}}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <small class="text-muted">
+                                A router is idle until a player spawns on it, after that it is active
+                            </small>
+                        </template>
+
+                        <div v-if="report.logistics.metas.length > 0" class="row">
+                            <div v-for="meta in report.logistics.metas" class="col-6">
+                                <h4 class="strike">{{meta.title}}</h4>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <breakdown :data="meta.data"
+                                            :show-all="false" :show-percent="true" :show-total="true"
+                                            left-title="Player" right-title="Count">
+                                        </breakdown>
+                                    </div>
+                                    <div class="col-6">
+                                        <breakdown-chart :src="meta.data"
+                                            :show-percent="true">
+                                        </breakdown-chart>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+
+                    <template v-for="coll in report.collections">
+                        <h2 class="strike">{{coll.header}}</h2>
+                        <div class="row">
+                            <div v-for="meta in coll.metas" class="col-6">
+                                <h4 class="strike">{{meta.title}}</h4>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <breakdown :data="meta.data"
+                                            :show-all="false" :show-percent="true" :show-total="meta.showTotal"
+                                            :left-title="meta.altTitle" right-title="Count">
+                                        </breakdown>
+                                    </div>
+                                    <div class="col-6">
+                                        <breakdown-chart :src="meta.data"
+                                            :show-percent="true">
+                                        </breakdown-chart>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
