@@ -59035,8 +59035,9 @@ class IndividualReporter {
             return response;
         }
         const report = new Report();
-        let opsLeft = 1 // Transport assists
-            + 1 // Supported by
+        let opsLeft = 
+        //1       // Transport assists
+        +1 // Supported by
             + 1 // Misc collection
             + 1 // Weapon kills
             + 1 // Weapon type kills
@@ -59075,14 +59076,12 @@ class IndividualReporter {
         report.logistics.routers = IndividualReporter.routerBreakdown(parameters);
         const callback = (step) => {
             return () => {
-                //console.log(`Finished ${step}: Have ${opsLeft - 1} ops left outta ${totalOps}`);
+                console.log(`Finished ${step}: Have ${opsLeft - 1} ops left outta ${totalOps}`);
                 if (--opsLeft == 0) {
                     response.resolveOk(report);
                 }
             };
         };
-        IndividualReporter.transportAssists(parameters)
-            .ok(data => report.logistics.metas.push(data)).always(callback("Transport assists"));
         IndividualReporter.supportedBy(parameters)
             .ok(data => report.collections.push(data)).always(callback("Supported by"));
         IndividualReporter.miscCollection(parameters)
@@ -59109,19 +59108,25 @@ class IndividualReporter {
         EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].kdPerUpdate(parameters.player.events)
             .ok(data => report.perUpdate.kd = data).always(callback("KD per update"));
         const ribbonIDs = Array.from(parameters.player.ribbons.getMap().keys());
-        census_AchievementAPI__WEBPACK_IMPORTED_MODULE_3__["AchievementAPI"].getByIDs(ribbonIDs).ok((data) => {
-            var _a;
-            (_a = report.player) === null || _a === void 0 ? void 0 : _a.ribbons.getMap().forEach((amount, achivID) => {
-                const achiv = data.find((iter) => iter.ID == achivID) || census_AchievementAPI__WEBPACK_IMPORTED_MODULE_3__["AchievementAPI"].unknown;
-                const entry = Object.assign(Object.assign({}, achiv), { amount: amount });
-                report.ribbonCount += amount;
-                report.ribbons.push(entry);
+        if (ribbonIDs.length > 0) {
+            census_AchievementAPI__WEBPACK_IMPORTED_MODULE_3__["AchievementAPI"].getByIDs(ribbonIDs).ok((data) => {
+                var _a;
+                (_a = report.player) === null || _a === void 0 ? void 0 : _a.ribbons.getMap().forEach((amount, achivID) => {
+                    const achiv = data.find((iter) => iter.ID == achivID) || census_AchievementAPI__WEBPACK_IMPORTED_MODULE_3__["AchievementAPI"].unknown;
+                    const entry = Object.assign(Object.assign({}, achiv), { amount: amount });
+                    report.ribbonCount += amount;
+                    report.ribbons.push(entry);
+                });
+                report.ribbons.sort((a, b) => {
+                    return (b.amount - a.amount) || b.name.localeCompare(a.name);
+                });
+            }).always(() => {
+                callback("Ribbons")();
             });
-            report.ribbons.sort((a, b) => {
-                return (b.amount - a.amount) || b.name.localeCompare(a.name);
-            });
+        }
+        else {
             callback("Ribbons")();
-        });
+        }
         if (report.classBreakdown.medic.secondsAs > 10) {
             IndividualReporter.medicBreakdown(parameters)
                 .ok(data => report.breakdowns.push(data)).always(callback("Medic breakdown"));
@@ -60652,14 +60657,16 @@ class AchievementAPI {
     }
     static getByIDs(weaponIDs) {
         const response = new _ApiWrapper__WEBPACK_IMPORTED_MODULE_1__["ApiResponse"]();
+        if (weaponIDs.length == 0) {
+            response.resolveOk([]);
+            return response;
+        }
         const weapons = [];
         const requestIDs = [];
         for (const weaponID of weaponIDs) {
             if (AchievementAPI._cache.has(weaponID)) {
                 const wep = AchievementAPI._cache.get(weaponID);
-                if (wep != null) {
-                    weapons.push(wep);
-                }
+                weapons.push(wep);
             }
             else {
                 requestIDs.push(weaponID);
@@ -60681,6 +60688,7 @@ class AchievementAPI {
                         const wep = AchievementAPI.parseCharacter(datum);
                         weapons.push(wep);
                         AchievementAPI._cache.set(wep.ID, wep);
+                        console.log(`Cached ${wep.ID}`);
                     }
                     response.resolveOk(weapons);
                 }
@@ -61319,7 +61327,11 @@ class CharacterAPI {
         };
     }
     static getByID(charID) {
+        if (CharacterAPI._pending.has(charID)) {
+            return CharacterAPI._pending.get(charID);
+        }
         const response = new _ApiWrapper__WEBPACK_IMPORTED_MODULE_1__["ApiResponse"]();
+        CharacterAPI._pending.set(charID, response);
         if (CharacterAPI._cache.has(charID)) {
             response.resolveOk(CharacterAPI._cache.get(charID));
         }
@@ -61332,6 +61344,8 @@ class CharacterAPI {
                 else {
                     response.resolveOk(CharacterAPI.parseCharacter(data.character_list[0]));
                 }
+            }).always(() => {
+                CharacterAPI._pending.delete(charID);
             });
         }
         return response;
@@ -61354,6 +61368,10 @@ class CharacterAPI {
     }
     static getByIDs(charIDs) {
         const response = new _ApiWrapper__WEBPACK_IMPORTED_MODULE_1__["ApiResponse"]();
+        if (charIDs.length == 0) {
+            response.resolveOk([]);
+            return response;
+        }
         const chars = [];
         const requestIDs = [];
         for (const charID of charIDs) {
@@ -61370,13 +61388,19 @@ class CharacterAPI {
         if (requestIDs.length > 0) {
             const sliceSize = 50;
             let slicesLeft = Math.ceil(requestIDs.length / sliceSize);
-            console.log(`Have ${slicesLeft} slices to do. size of ${sliceSize}, data of ${requestIDs.length}`);
+            //console.log(`Have ${slicesLeft} slices to do. size of ${sliceSize}, data of ${requestIDs.length}`);
             for (let i = 0; i < requestIDs.length; i += sliceSize) {
                 const slice = requestIDs.slice(i, i + sliceSize);
                 //console.log(`Slice ${i}: ${i} - ${i + sliceSize - 1}: [${slice.join(",")}]`);
                 const request = _CensusAPI__WEBPACK_IMPORTED_MODULE_0__["default"].get(`/character/?character_id=${slice.join(",")}&c:resolve=outfit,online_status`);
                 request.ok((data) => {
                     if (data.returned == 0) {
+                        if (chars.length == 0) {
+                            response.resolve({ code: 404, data: `Missing characters: ${charIDs.join(",")}` });
+                        }
+                        else {
+                            response.resolveOk(chars);
+                        }
                     }
                     else {
                         for (const datum of data.character_list) {
@@ -61416,6 +61440,7 @@ class CharacterAPI {
     }
 }
 CharacterAPI._cache = new Map();
+CharacterAPI._pending = new Map();
 CharacterAPI._pendingIDs = [];
 CharacterAPI._pendingResolveID = 0;
 window.CharacterAPI = CharacterAPI;
@@ -62499,7 +62524,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             this.sockets.facility.onopen = this.onFacilityOpen;
             this.sockets.facility.onmessage = this.onFacilityMessage;
             this.sockets.facility.onerror = this.onTestError;
-            if (this.storage.pendingTrend != null) {
+            if (this.storage.pendingTrend !== null && this.storage.pendingTrend !== undefined) {
                 console.log(`Loading trends from storage: ${this.storage.pendingTrend}`);
                 const trend = Storage__WEBPACK_IMPORTED_MODULE_30__["StorageHelper"].getTrend(this.storage.pendingTrend);
                 if (trend != null) {
@@ -62511,11 +62536,17 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                     throw `Failed to load trends file for ${this.storage.pendingTrend}`;
                 }
             }
-            else {
+            else if (this.storage.pendingTrend === null) {
                 Storage__WEBPACK_IMPORTED_MODULE_30__["StorageHelper"].setTrends(this.storage.newTrendFile, new OutfitTrends__WEBPACK_IMPORTED_MODULE_29__["OutfitTrendsV1"]());
                 this.storage.trendFileName = this.storage.newTrendFile;
                 this.outfitTrends = new OutfitTrends__WEBPACK_IMPORTED_MODULE_29__["OutfitTrendsV1"]();
                 console.log(`Created new trends file named ${this.storage.trendFileName}`);
+            }
+            else if (this.storage.pendingTrend === undefined) {
+                this.storage.enabled = false;
+            }
+            else {
+                throw `Messed up logic: storage.pendingTrends is null or undefined, and not null, and not undefined`;
             }
         },
         disconnect: function () {
@@ -62992,8 +63023,10 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             const generateReport = () => {
                 if (left.length == 0) {
                     if (--opsLeft == 0) {
+                        console.log(`opsLeft is 0, performing done`);
                         done();
                     }
+                    console.log(`No reports left`);
                     return;
                 }
                 const char = left.shift();
@@ -63008,6 +63041,8 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                         reports.push(report);
                         this.generation.state[index] = "Done";
                         generateReport();
+                    }).always(() => {
+                        console.log(`Finished ${char.name} generation`);
                     });
                 }
                 catch (_a) {
@@ -63023,18 +63058,22 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 }
             });
             const done = () => {
-                var _a;
+                var _a, _b;
                 jquery__WEBPACK_IMPORTED_MODULE_7__("#generation-modal").modal("hide");
                 const zip = new jszip__WEBPACK_IMPORTED_MODULE_8__();
                 const timestamp = moment__WEBPACK_IMPORTED_MODULE_6__(new Date()).format("YYYY-MM-DD");
                 for (const report of reports) {
                     const str = PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_19__["PersonalReportGenerator"].generate(html, report);
                     zip.file(`topt_report_${(_a = report.player) === null || _a === void 0 ? void 0 : _a.name}_${timestamp}.html`, str);
+                    console.log(`Added ${(_b = report.player) === null || _b === void 0 ? void 0 : _b.name} to zip file`);
                 }
+                console.log(`Generating zip file`);
                 zip.generateAsync({
                     type: "blob"
                 }).then((content) => {
+                    console.log(`Generated zip file`);
                     _node_modules_file_saver_dist_FileSaver_js__WEBPACK_IMPORTED_MODULE_20__["saveAs"](content, `topt_ops_${timestamp}_all.zip`);
+                    console.log(`FileSaver performed save of zip`);
                 });
             };
             generateReport();
@@ -63739,7 +63778,9 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
     computed: {
         canConnect: function () {
             return this.settings.serviceToken.trim().length > 0
-                && (this.storage.pendingTrend != null || this.storage.newTrendFile.length > 0);
+                && (this.storage.pendingTrend != null
+                    || this.storage.newTrendFile.length > 0
+                    || this.storage.pendingTrend == undefined);
         },
         totalBytes: function () {
             if (this.totalLength < 1024) {

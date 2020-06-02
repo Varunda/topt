@@ -17,6 +17,8 @@ export class CharacterAPI {
 
     private static _cache: Map<string, Character | null> = new Map();
 
+    private static _pending: Map<string, ApiResponse<Character | null>> = new Map();
+
     public static parseCharacter(elem: any): Character {
         return {
             ID: elem.character_id,
@@ -32,7 +34,13 @@ export class CharacterAPI {
     }
 
     public static getByID(charID: string): ApiResponse<Character | null> {
+        if (CharacterAPI._pending.has(charID)) {
+            return CharacterAPI._pending.get(charID)!;
+        }
+
         const response: ApiResponse<Character | null> = new ApiResponse();
+
+        CharacterAPI._pending.set(charID, response);
 
         if (CharacterAPI._cache.has(charID)) {
             response.resolveOk(CharacterAPI._cache.get(charID)!);
@@ -47,6 +55,8 @@ export class CharacterAPI {
                 } else {
                     response.resolveOk(CharacterAPI.parseCharacter(data.character_list[0]));
                 }
+            }).always(() => {
+                CharacterAPI._pending.delete(charID);
             });
         }
 
@@ -79,6 +89,11 @@ export class CharacterAPI {
     public static getByIDs(charIDs: string[]): ApiResponse<Character[]> {
         const response: ApiResponse<Character[]> = new ApiResponse();
 
+        if (charIDs.length == 0) {
+            response.resolveOk([]);
+            return response;
+        }
+
         const chars: Character[] = [];
         const requestIDs: string[] = [];
 
@@ -96,7 +111,7 @@ export class CharacterAPI {
         if (requestIDs.length > 0) {
             const sliceSize: number = 50;
             let slicesLeft: number = Math.ceil(requestIDs.length / sliceSize);
-            console.log(`Have ${slicesLeft} slices to do. size of ${sliceSize}, data of ${requestIDs.length}`);
+            //console.log(`Have ${slicesLeft} slices to do. size of ${sliceSize}, data of ${requestIDs.length}`);
 
             for (let i = 0; i < requestIDs.length; i += sliceSize) {
                 const slice: string[] = requestIDs.slice(i, i + sliceSize);
@@ -108,6 +123,11 @@ export class CharacterAPI {
 
                 request.ok((data: any) => {
                     if (data.returned == 0) {
+                        if (chars.length == 0) {
+                            response.resolve({ code: 404, data: `Missing characters: ${charIDs.join(",")}` });
+                        } else {
+                            response.resolveOk(chars);
+                        }
                     } else {
                         for (const datum of data.character_list) {
                             const char: Character = CharacterAPI.parseCharacter(datum);

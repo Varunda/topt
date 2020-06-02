@@ -228,7 +228,7 @@ export const vm = new Vue({
             this.sockets.facility.onmessage = this.onFacilityMessage;
             this.sockets.facility.onerror = this.onTestError;
 
-            if (this.storage.pendingTrend != null) {
+            if (this.storage.pendingTrend !== null && this.storage.pendingTrend !== undefined) {
                 console.log(`Loading trends from storage: ${this.storage.pendingTrend}`);
 
                 const trend: OutfitTrendsV1 | null = StorageHelper.getTrend(this.storage.pendingTrend);
@@ -240,13 +240,17 @@ export const vm = new Vue({
                 } else {
                     throw `Failed to load trends file for ${this.storage.pendingTrend}`;
                 }
-            } else {
+            } else if (this.storage.pendingTrend === null) {
                 StorageHelper.setTrends(this.storage.newTrendFile, new OutfitTrendsV1());
                 this.storage.trendFileName = this.storage.newTrendFile;
 
                 this.outfitTrends = new OutfitTrendsV1();
 
                 console.log(`Created new trends file named ${this.storage.trendFileName}`);
+            } else if (this.storage.pendingTrend === undefined) {
+                this.storage.enabled = false;
+            } else {
+                throw `Messed up logic: storage.pendingTrends is null or undefined, and not null, and not undefined`;
             }
         },
 
@@ -782,8 +786,10 @@ export const vm = new Vue({
             const generateReport = () => {
                 if (left.length == 0) {
                     if (--opsLeft == 0) {
+                        console.log(`opsLeft is 0, performing done`);
                         done();
                     }
+                    console.log(`No reports left`);
                     return;
                 }
 
@@ -802,6 +808,8 @@ export const vm = new Vue({
                         this.generation.state[index] = "Done";
 
                         generateReport();
+                    }).always(() => {
+                        console.log(`Finished ${char.name} generation`);
                     });
                 } catch {
                     this.generation.state[index] = "Error";
@@ -828,12 +836,17 @@ export const vm = new Vue({
                     const str = PersonalReportGenerator.generate(html, report);
 
                     zip.file(`topt_report_${report.player?.name}_${timestamp}.html`, str);
+                    console.log(`Added ${report.player?.name} to zip file`);
                 }
+
+                console.log(`Generating zip file`);
 
                 zip.generateAsync({
                     type: "blob"
                 }).then((content: Blob) => {
+                    console.log(`Generated zip file`);
                     FileSaver.saveAs(content, `topt_ops_${timestamp}_all.zip`);
+                    console.log(`FileSaver performed save of zip`);
                 });
             };
 
@@ -1624,7 +1637,11 @@ export const vm = new Vue({
     computed: {
         canConnect: function(): boolean {
             return this.settings.serviceToken.trim().length > 0
-                && (this.storage.pendingTrend != null || this.storage.newTrendFile.length > 0);
+                && (
+                    this.storage.pendingTrend != null
+                    || this.storage.newTrendFile.length > 0
+                    || this.storage.pendingTrend == undefined
+                );
         },
 
         totalBytes: function(): string {

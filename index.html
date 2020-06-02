@@ -131,12 +131,13 @@
 
                     <select class="form-control mb-2" v-model="storage.pendingTrend">
                         <option :value="null">New trends file</option>
+                        <option :value="undefined">Skip</option>
                         <option v-for="trend in storage.trends" :value="trend.name">
                             {{trend.name}}
                         </option>
                     </select>
 
-                    <input v-if="storage.pendingTrend == null" v-model="storage.newTrendFile"
+                    <input v-if="storage.pendingTrend === null" v-model="storage.newTrendFile"
                         class="form-control" type="text" placeholder="New trend file name">
                 </div>
 

@@ -382,7 +382,7 @@ export class IndividualReporter {
         const report: Report = new Report();
 
         let opsLeft: number = 
-            1       // Transport assists
+            //1       // Transport assists
             + 1     // Supported by
             + 1     // Misc collection
             + 1     // Weapon kills
@@ -430,15 +430,13 @@ export class IndividualReporter {
 
         const callback = (step: string) => {
             return () => {
-                //console.log(`Finished ${step}: Have ${opsLeft - 1} ops left outta ${totalOps}`);
+                console.log(`Finished ${step}: Have ${opsLeft - 1} ops left outta ${totalOps}`);
                 if (--opsLeft == 0) {
                     response.resolveOk(report);
                 }
             }
         }
 
-        IndividualReporter.transportAssists(parameters)
-            .ok(data => report.logistics.metas.push(data)).always(callback("Transport assists"));
         IndividualReporter.supportedBy(parameters)
             .ok(data => report.collections.push(data)).always(callback("Supported by"));
         IndividualReporter.miscCollection(parameters)   
@@ -469,24 +467,28 @@ export class IndividualReporter {
             .ok(data => report.perUpdate.kd = data).always(callback("KD per update"));
 
         const ribbonIDs: string[] = Array.from(parameters.player.ribbons.getMap().keys());
-        AchievementAPI.getByIDs(ribbonIDs).ok((data: Achievement[]) => {
-            report.player?.ribbons.getMap().forEach((amount: number, achivID: string) => {
-                const achiv = data.find((iter: Achievement) => iter.ID == achivID) || AchievementAPI.unknown;
-                const entry: CountedRibbon = {
-                    ...achiv,
-                    amount: amount
-                };
+        if (ribbonIDs.length > 0) {
+            AchievementAPI.getByIDs(ribbonIDs).ok((data: Achievement[]) => {
+                report.player?.ribbons.getMap().forEach((amount: number, achivID: string) => {
+                    const achiv = data.find((iter: Achievement) => iter.ID == achivID) || AchievementAPI.unknown;
+                    const entry: CountedRibbon = {
+                        ...achiv,
+                        amount: amount
+                    };
 
-                report.ribbonCount += amount;
-                report.ribbons.push(entry);
+                    report.ribbonCount += amount;
+                    report.ribbons.push(entry);
+                });
+
+                report.ribbons.sort((a, b) => {
+                    return (b.amount - a.amount) || b.name.localeCompare(a.name);
+                });
+            }).always(() => {
+                callback("Ribbons")();
             });
-
-            report.ribbons.sort((a, b) => {
-                return (b.amount - a.amount) || b.name.localeCompare(a.name);
-            });
-
+        } else {
             callback("Ribbons")();
-        });
+        }
 
         if (report.classBreakdown.medic.secondsAs > 10) {
             IndividualReporter.medicBreakdown(parameters)

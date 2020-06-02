@@ -60,15 +60,18 @@ export class AchievementAPI {
     public static getByIDs(weaponIDs: string[]): ApiResponse<Achievement[]> {
         const response: ApiResponse<Achievement[]> = new ApiResponse();
 
+        if (weaponIDs.length == 0) {
+            response.resolveOk([]);
+            return response;
+        }
+
         const weapons: Achievement[] = [];
         const requestIDs: string[] = [];
 
         for (const weaponID of weaponIDs) {
             if (AchievementAPI._cache.has(weaponID)) {
-                const wep: Achievement | null = AchievementAPI._cache.get(weaponID)!;
-                if (wep != null) {
-                    weapons.push(wep);
-                }
+                const wep: Achievement = AchievementAPI._cache.get(weaponID)!;
+                weapons.push(wep);
             } else {
                 requestIDs.push(weaponID);
             }
@@ -91,6 +94,7 @@ export class AchievementAPI {
                         const wep: Achievement = AchievementAPI.parseCharacter(datum);
                         weapons.push(wep);
                         AchievementAPI._cache.set(wep.ID, wep);
+                        console.log(`Cached ${wep.ID}`);
                     }
                     response.resolveOk(weapons);
                 }
