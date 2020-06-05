@@ -20,7 +20,7 @@ export class CharacterAPI {
     private static _pending: Map<string, ApiResponse<Character | null>> = new Map();
 
     public static parseCharacter(elem: any): Character {
-        return {
+        const char: Character = {
             ID: elem.character_id,
             name: elem.name.first,
             faction: elem.faction_id,
@@ -31,6 +31,10 @@ export class CharacterAPI {
             joinTime: (new Date()).getTime(),
             secondsPlayed: 0
         };
+
+        CharacterAPI._cache.set(char.ID, char);
+
+        return char;
     }
 
     public static getByID(charID: string): ApiResponse<Character | null> {
@@ -99,10 +103,8 @@ export class CharacterAPI {
 
         for (const charID of charIDs) {
             if (CharacterAPI._cache.has(charID)) {
-                const char: Character | null = CharacterAPI._cache.get(charID)!;
-                if (char != null) {
-                    chars.push(char);
-                }
+                const char: Character = CharacterAPI._cache.get(charID)!;
+                chars.push(char);
             } else {
                 requestIDs.push(charID);
             }
@@ -132,8 +134,6 @@ export class CharacterAPI {
                         for (const datum of data.character_list) {
                             const char: Character = CharacterAPI.parseCharacter(datum);
                             chars.push(char);
-
-                            CharacterAPI._cache.set(char.ID, char);
                         }
                     }
 

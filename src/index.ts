@@ -54,10 +54,12 @@ import "BreakdownChart";
 import "BreakdownInterval";
 import "BreakdownBox";
 import "MomentFilter";
+import "KillfeedSquad";
 
 import { BaseReport, BaseGenerator } from "BaseGenerator";
 import { OutfitTrendsV1, OutfitTrends, SessionV1 } from "OutfitTrends";
 import { StorageHelper, StorageSession, StorageTrend } from "Storage";
+import { KillfeedGeneration, KillfeedEntry, KillfeedOptions, Killfeed } from "Killfeed";
 
 class OpReportSettings {
     public zoneID: string | null = null;
@@ -81,6 +83,8 @@ export const vm = new Vue({
             logistics: null as WebSocket | null,
             logins: null as WebSocket | null,
             facility: null as WebSocket | null,
+
+            queue: [] as string[]
         },
 
         routerTracking: {
@@ -93,7 +97,7 @@ export const vm = new Vue({
 
         data: [] as any[], // Collection of all messages from all sockets, used for exporting
 
-        view: "setup" as "setup" | "realtime" | "ops" | "personal" | "base",
+        view: "setup" as "setup" | "realtime" | "ops" | "personal" | "base" | "killfeed",
 
         // Field related to settings about how TOPT runs
         settings: {
@@ -132,6 +136,11 @@ export const vm = new Vue({
         generation: {
             names: [] as string[],
             state: [] as string[]
+        },
+
+        killfeed: {
+            entry: new Killfeed() as Killfeed,
+            options: new KillfeedOptions() as KillfeedOptions
         },
 
         // Fields related to the current state of tracking
@@ -183,6 +192,8 @@ export const vm = new Vue({
 
         this.storage.enabled = StorageHelper.isEnabled();
 
+        this.sockets.queue.length = 5;
+
         WeaponAPI.loadJson();
         FacilityAPI.loadJson();
     },
@@ -195,6 +206,8 @@ export const vm = new Vue({
         window.onbeforeunload = (ev: BeforeUnloadEvent) => {
             this.disconnect();
         };
+
+        document.addEventListener("keyup", this.squadKeyEvent);
     },
 
     methods: {
@@ -392,6 +405,18 @@ export const vm = new Vue({
         updateDisplay: function(): void {
             //console.time("update display");
 
+            if (this.view == "realtime") {
+                this.updateRealtimeDisplay();
+            } else if (this.view == "killfeed") {
+                this.updateKillfeedDisplay();
+            }
+        },
+
+        updateKillfeedDisplay: function(): void {
+            this.killfeed.entry = KillfeedGeneration.generate(this.killfeed.options);
+        },
+
+        updateRealtimeDisplay: function(): void {
             const nowMs: number = new Date().getTime();
 
             this.display = [];
@@ -454,6 +479,28 @@ export const vm = new Vue({
 
             this.display.sort(sortFunc);
             //console.timeEnd("update display");
+        },
+
+        trap: function(ev: any): void {
+            debugger;
+        },
+
+        squadKeyEvent(ev: KeyboardEvent): void {
+            if (this.view != "killfeed") {
+                return;
+            }
+
+            const whatHovered = KillfeedGeneration.getHovered();
+
+            if (whatHovered == "squad") {
+                KillfeedGeneration.mergeSquads(ev.key);
+                this.updateDisplay();
+            } else if (whatHovered == "member") {
+                KillfeedGeneration.moveMember(ev.key);
+                this.updateDisplay();
+            } else {
+
+            }
         },
 
         generateReport: function(): void {
@@ -940,6 +987,9 @@ export const vm = new Vue({
             OutfitAPI.getCharactersByTag(this.parameters.outfitTag).ok((data: Character[]) => {
                 this.parameters.outfitRequest = Loadable.loaded("");
                 this.subscribeToExpGains(data);
+
+                KillfeedGeneration.addCharacters(data);
+
                 this.parameters.outfitTag = "";
             });
         },
@@ -955,12 +1005,6 @@ export const vm = new Vue({
             });
         },
 
-        removePlayer: function(charID: string): void {
-            this.characters = this.characters.filter((char: Character) => {
-                return char.ID != charID;
-            });
-        },
-
         clearEvents: function(): void {
             const conf = confirm(`Are you sure you want to remove all events?`);
             if (conf == true) {
@@ -973,19 +1017,6 @@ export const vm = new Vue({
                 this.updateDisplay();
                 this.totalTicks = 0;
             }
-        },
-
-        clearPlayers: function(): void {
-            this.characters = [];
-            this.stats.clear();
-            this.totalTicks = 0;
-
-            const unsubscribeMsg: object = {
-                "action": "clearSubscribe",
-                "all": "true",
-                "service": "event"
-            };
-            this.sendMessage(unsubscribeMsg);
         },
 
         subscribeToExpGains: function(chars: Character[]): void {
@@ -1198,6 +1229,8 @@ export const vm = new Vue({
                         }
                     }
 
+                    KillfeedGeneration.exp(ev);
+
                     save = true;
                 } else if (event == "Death") {
                     const targetID: string = msg.payload.character_id;
@@ -1243,6 +1276,11 @@ export const vm = new Vue({
                         targetTicks.recentDeath = ev;
 
                         WeaponAPI.precache(ev.weaponID);
+
+                        if (this.view == "killfeed") {
+                            KillfeedGeneration.add(ev);
+                        }
+
                         save = true;
                     }
 
@@ -1277,6 +1315,10 @@ export const vm = new Vue({
                             sourceTicks.events.push(ev);
 
                             WeaponAPI.precache(ev.weaponID);
+
+                            if (this.view == "killfeed") {
+                                KillfeedGeneration.add(ev);
+                            }
                         }
                         save = true;
                     }
@@ -1429,6 +1471,16 @@ export const vm = new Vue({
             if (typeof ev.data == "string") {
                 this.totalLength += ev.data.length;
             }
+
+            for (const message of this.sockets.queue) {
+                if (ev.data == message) {
+                    //console.log(`Duplicate message found: ${ev.data}`);
+                    return;
+                }
+            }
+
+            this.sockets.queue.push(ev.data);
+            this.sockets.queue.shift();
 
             this.processMessage(ev.data);
         },

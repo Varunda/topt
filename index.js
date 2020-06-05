@@ -59723,6 +59723,465 @@ class IndividualReporter {
 
 /***/ }),
 
+/***/ "./src/Killfeed.ts":
+/*!*************************!*\
+  !*** ./src/Killfeed.ts ***!
+  \*************************/
+/*! exports provided: KillfeedEntry, Killfeed, KillfeedOptions, KillfeedMember, KillfeedSquad, KillfeedGeneration */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "KillfeedEntry", function() { return KillfeedEntry; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Killfeed", function() { return Killfeed; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "KillfeedOptions", function() { return KillfeedOptions; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "KillfeedMember", function() { return KillfeedMember; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "KillfeedSquad", function() { return KillfeedSquad; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "KillfeedGeneration", function() { return KillfeedGeneration; });
+/* harmony import */ var Loadable__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! Loadable */ "./src/Loadable.ts");
+/* harmony import */ var census_CharacterAPI__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! census/CharacterAPI */ "./src/census/CharacterAPI.ts");
+/* harmony import */ var census_WeaponAPI__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! census/WeaponAPI */ "./src/census/WeaponAPI.ts");
+/* harmony import */ var census_PsLoadout__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! census/PsLoadout */ "./src/census/PsLoadout.ts");
+/* harmony import */ var PsEvent__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! PsEvent */ "./src/PsEvent.ts");
+
+
+
+
+
+class KillfeedEntry {
+    constructor() {
+        this.name = "";
+        this.type = "unknown";
+        this.loadout = census_PsLoadout__WEBPACK_IMPORTED_MODULE_3__["PsLoadout"].default;
+        this.timestamp = 0;
+        this.weapon = Loadable__WEBPACK_IMPORTED_MODULE_0__["Loadable"].idle();
+    }
+}
+class Killfeed {
+    constructor() {
+        this.entries = [];
+        this.squad1 = new KillfeedSquad();
+        this.squad2 = new KillfeedSquad();
+        this.squad3 = new KillfeedSquad();
+        this.squad4 = new KillfeedSquad();
+        this.otherSquads = [];
+    }
+}
+class KillfeedOptions {
+    constructor() {
+        this.max = 25;
+        this.viewKills = true;
+        this.viewDeaths = true;
+    }
+}
+class KillfeedMember {
+    constructor() {
+        this.name = "";
+        this.charID = "";
+        this.class = "";
+        this.state = "alive";
+        this.timeDead = 0;
+        this.weapon = "";
+    }
+}
+class KillfeedSquad {
+    constructor() {
+        this.name = "";
+        this.members = [];
+        this.guess = true;
+        this.hovered = false;
+        this.ID = ++KillfeedSquad._previousID;
+        this.name = KillfeedSquad.squadNames[(KillfeedSquad.squadNameIndex++) % 26];
+    }
+    isMember(charID) {
+        return this.members.find(iter => iter.charID == charID) != null;
+    }
+}
+KillfeedSquad._previousID = 0;
+KillfeedSquad.squadNameIndex = 0;
+KillfeedSquad.squadNames = [
+    "q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "a", "s", "d",
+    "f", "g", "h", "j", "k", "l", "z", "x", "c", "v", "b", "n", "m"
+];
+class KillfeedGeneration {
+    static generate(options) {
+        let src = this._entries;
+        if (options.viewKills == false) {
+            src = src.filter(iter => iter.type != "kill");
+        }
+        if (options.viewDeaths == false) {
+            src = src.filter(iter => iter.type != "death");
+        }
+        return {
+            entries: src.slice(0, options.max),
+            squad1: this._squad1,
+            squad2: this._squad2,
+            squad3: this._squad3,
+            squad4: this._squad4,
+            otherSquads: this._squads
+        };
+    }
+    static setHoveredSquad(name) {
+        if (this._squad1.name == name) {
+            this._hoveredSquad = this._squad1;
+        }
+        else if (this._squad2.name == name) {
+            this._hoveredSquad = this._squad2;
+        }
+        else if (this._squad3.name == name) {
+            this._hoveredSquad = this._squad3;
+        }
+        else if (this._squad4.name == name) {
+            this._hoveredSquad = this._squad4;
+        }
+        else {
+            let found = false;
+            for (const squad of this._squads) {
+                if (squad.name == name) {
+                    this._hoveredSquad = squad;
+                    found = true;
+                    break;
+                }
+            }
+            if (found == false) {
+                console.error(`Failed to find squad named ${name}`);
+            }
+        }
+        if (this._hoveredSquad != null) {
+            this._hoveredSquad.hovered = true;
+        }
+    }
+    static clearHoveredSquad() {
+        if (this._hoveredSquad != null) {
+            this._hoveredSquad.hovered = false;
+        }
+        this._hoveredSquad = null;
+    }
+    static setHoveredMember(memberID) {
+        if (this._members.has(memberID)) {
+            const member = this._members.get(memberID);
+            this._hoveredMember = member;
+        }
+    }
+    static clearHoveredMember() {
+        this._hoveredMember = null;
+    }
+    static add(event) {
+        const entry = new KillfeedEntry();
+        entry.timestamp = event.timestamp;
+        census_CharacterAPI__WEBPACK_IMPORTED_MODULE_1__["CharacterAPI"].getByID(event.sourceID).ok((data) => {
+            entry.name = data.name;
+        });
+        if (event.weaponID != "0") {
+            entry.weapon = Loadable__WEBPACK_IMPORTED_MODULE_0__["Loadable"].loading();
+            census_WeaponAPI__WEBPACK_IMPORTED_MODULE_2__["WeaponAPI"].getByID(event.weaponID).ok((data) => {
+                entry.weapon = Loadable__WEBPACK_IMPORTED_MODULE_0__["Loadable"].loaded(data);
+            });
+        }
+        if (event.type == "kill") {
+            entry.type = "kill";
+            if (this._members.has(event.sourceID)) {
+                const member = this._members.get(event.sourceID);
+                member.state = "alive";
+            }
+        }
+        else if (event.type == "death") {
+            entry.type = "death";
+            if (this._members.has(event.sourceID)) {
+                const member = this._members.get(event.sourceID);
+                member.state = "dead";
+            }
+        }
+        this._entries.unshift(entry);
+    }
+    static exp(event) {
+        if (event.expID == PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].revive || event.expID == PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadRevive) {
+            if (this._members.has(event.targetID)) {
+                const member = this._members.get(event.targetID);
+                member.state = "alive";
+                member.timeDead = 0;
+                member.weapon = "";
+            }
+        }
+        if (this._members.has(event.sourceID)) {
+            const member = this._members.get(event.sourceID);
+            member.state = "alive";
+        }
+        const sourceMember = this._members.get(event.sourceID);
+        const targetMember = this._members.get(event.targetID);
+        if (sourceMember == undefined || targetMember == undefined) {
+            return;
+        }
+        let sourceSquad = this.getSquadOfMember(event.sourceID);
+        let targetSquad = this.getSquadOfMember(event.targetID);
+        if (sourceSquad == null) {
+            sourceSquad = new KillfeedSquad();
+            sourceSquad.members.push(sourceMember);
+        }
+        if (targetSquad == null) {
+            targetSquad = new KillfeedSquad();
+            targetSquad.members.push(targetMember);
+        }
+        // Check if the squads need to be merged into one another if this was a squad exp source
+        if (this.squadEvents.indexOf(event.trueExpID) > -1) {
+            if (sourceSquad.ID == targetSquad.ID) {
+                //console.log(`${sourceMember.name} // ${targetMember.name} are already in a squad`);
+            }
+            else {
+                for (const member of targetSquad.members) {
+                    sourceSquad.members.push(member);
+                }
+                // Remove any references in or to the removed squad so it can be garbage collected
+                targetSquad.members = [];
+                this._squads = this._squads.filter(iter => iter.ID != targetSquad.ID);
+                console.log(`Merged ${targetMember.name}'s squad with ${sourceMember.name}'s squad`);
+            }
+        }
+        // Check if the squad is no longer valid and needs to be removed, i.e. moved squads
+        if (this.nonSquadEvents.indexOf(event.trueExpID) > -1) {
+            //console.log(`Non squad event: ${event.trueExpID}`);
+            if (sourceSquad.ID == targetSquad.ID) {
+                console.log(`${sourceMember.name} was in squad with ${targetMember.name}, but didn't get an expect squad exp event`);
+                targetSquad.members = targetSquad.members.filter(iter => iter.charID != sourceMember.charID);
+                const squad = new KillfeedSquad();
+                squad.members.push(sourceMember);
+                this._squads.push(squad);
+            }
+        }
+    }
+    static moveMember(squadName) {
+        if (this._hoveredMember == null) {
+            return;
+        }
+        let currentSquad = null;
+        const memberID = this._hoveredMember.charID;
+        if (this._squad1.isMember(memberID)) {
+            currentSquad = this._squad1;
+        }
+        else if (this._squad2.isMember(memberID)) {
+            currentSquad = this._squad2;
+        }
+        else if (this._squad3.isMember(memberID)) {
+            currentSquad = this._squad3;
+        }
+        else if (this._squad4.isMember(memberID)) {
+            currentSquad = this._squad4;
+        }
+        else {
+            for (const iter of this._squads) {
+                if (iter.isMember(memberID)) {
+                    currentSquad = iter;
+                    break;
+                }
+            }
+        }
+        if (currentSquad == null) {
+            return console.error(`Failed to find the squad ${this._hoveredMember.name} was in`);
+        }
+        const squad = this.getSquad(squadName);
+        if (squad == null) {
+            return console.error(`Cannot move ${this._hoveredMember.name} into ${squadName}: Does not exist`);
+        }
+        currentSquad.members = currentSquad.members.filter(iter => iter.charID != memberID);
+        if (currentSquad.members.length == 0) {
+            this._squads = this._squads.filter(iter => iter.ID != currentSquad.ID);
+        }
+        squad.members.push(this._hoveredMember);
+    }
+    static mergeSquads(squadName) {
+        if (this._hoveredSquad == null) {
+            return;
+        }
+        if (this._hoveredSquad.name == squadName) {
+            return;
+        }
+        const squad = this.getSquad(squadName);
+        if (squad == null) {
+            return;
+        }
+        for (const member of this._hoveredSquad.members) {
+            squad.members.push(member);
+        }
+        this._hoveredSquad.members = [];
+        this._squads = this._squads.filter(iter => iter.ID != this._hoveredSquad.ID);
+    }
+    static addCharacters(characters) {
+        for (const char of characters) {
+            const member = this.toMember(char);
+            this._members.set(char.ID, member);
+            if (char.online == true) {
+                const squad = new KillfeedSquad();
+                squad.members.push(member);
+                this._squads.push(squad);
+            }
+        }
+    }
+    static getHovered() {
+        if (this._hoveredSquad != null) {
+            return "squad";
+        }
+        if (this._hoveredMember != null) {
+            return "member";
+        }
+        return null;
+    }
+    static init() {
+        this._squad1.name = "1";
+        this._squad2.name = "2";
+        this._squad3.name = "3";
+        this._squad4.name = "4";
+    }
+    static getSquadOfMember(charID) {
+        if (this._squad1.isMember(charID)) {
+            return this._squad1;
+        }
+        if (this._squad2.isMember(charID)) {
+            return this._squad2;
+        }
+        if (this._squad3.isMember(charID)) {
+            return this._squad3;
+        }
+        if (this._squad4.isMember(charID)) {
+            return this._squad4;
+        }
+        return this._squads.find((iter) => {
+            return iter.members.find(elem => elem.charID == charID) != null;
+        }) || null;
+    }
+    static toMember(char) {
+        return {
+            name: char.name,
+            charID: char.ID,
+            class: "",
+            state: "alive",
+            timeDead: 0,
+            weapon: ""
+        };
+    }
+    static getSquad(squadName) {
+        if (squadName == "1") {
+            return this._squad1;
+        }
+        else if (squadName == "2") {
+            return this._squad2;
+        }
+        else if (squadName == "3") {
+            return this._squad3;
+        }
+        else if (squadName == "4") {
+            return this._squad4;
+        }
+        else {
+            return this._squads.find(iter => iter.name == squadName) || null;
+        }
+    }
+}
+/**
+ * All entries that exist in the killfeed system
+ */
+KillfeedGeneration._entries = [];
+/**
+ * List of squads that are being tracked and guessed on
+ */
+KillfeedGeneration._squads = [];
+KillfeedGeneration._squad1 = new KillfeedSquad();
+KillfeedGeneration._squad2 = new KillfeedSquad();
+KillfeedGeneration._squad3 = new KillfeedSquad();
+KillfeedGeneration._squad4 = new KillfeedSquad();
+KillfeedGeneration._members = new Map();
+KillfeedGeneration._hoveredSquad = null;
+KillfeedGeneration._hoveredMember = null;
+KillfeedGeneration.squadEvents = [
+    PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadResupply,
+    PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadHeal,
+    PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadMaxRepair,
+    PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadMotionDetect,
+    PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadRadarDetect,
+    PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadRevive,
+    PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadShieldRepair,
+    PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadSpawn,
+    PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadSpotKill
+];
+KillfeedGeneration.nonSquadEvents = [
+    PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].heal,
+    PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].revive,
+    PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].resupply,
+    PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].shieldRepair,
+    PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].motionDetect,
+    PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].radarDetect,
+    PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].spotKill,
+];
+window.KillfeedGeneration = KillfeedGeneration;
+KillfeedGeneration.init();
+
+
+/***/ }),
+
+/***/ "./src/KillfeedSquad.ts":
+/*!******************************!*\
+  !*** ./src/KillfeedSquad.ts ***!
+  \******************************/
+/*! no exports provided */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var vue__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! vue */ "./node_modules/vue/dist/vue.esm.js");
+/* harmony import */ var Killfeed__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! Killfeed */ "./src/Killfeed.ts");
+
+
+vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("killfeed-squad", {
+    props: {
+        squad: { type: Object, required: true }
+    },
+    data: function () {
+        return {};
+    },
+    methods: {
+        squadMouseOver: function (ev) {
+            var _a;
+            const elem = ev.currentTarget;
+            if (elem) {
+                const squadName = (_a = elem.dataset["squadName"], (_a !== null && _a !== void 0 ? _a : ""));
+                Killfeed__WEBPACK_IMPORTED_MODULE_1__["KillfeedGeneration"].setHoveredSquad(squadName);
+            }
+        },
+        squadMouseLeave: function (ev) {
+            Killfeed__WEBPACK_IMPORTED_MODULE_1__["KillfeedGeneration"].clearHoveredSquad();
+        },
+        memberMouseOver: function (ev) {
+            var _a;
+            const elem = ev.currentTarget;
+            if (elem) {
+                const memberID = (_a = elem.dataset["memberId"], (_a !== null && _a !== void 0 ? _a : ""));
+                Killfeed__WEBPACK_IMPORTED_MODULE_1__["KillfeedGeneration"].setHoveredMember(memberID);
+            }
+        },
+        memberMouseLeave: function (ev) {
+            Killfeed__WEBPACK_IMPORTED_MODULE_1__["KillfeedGeneration"].clearHoveredMember();
+        }
+    },
+    template: `
+        <span class="list-group list-group-small" :data-squad-name="squad.name">
+            <div class="list-group-item list-group-item-secondary"
+                @mouseover="squadMouseOver" @mouseleave="squadMouseLeave"
+                :data-squad-name="squad.name">
+
+                {{squad.name}}
+            </div>
+            <div v-for="member in squad.members" :key="member.charID"
+                @mouseover="memberMouseOver" @mouseleave="memberMouseLeave"
+                class="list-group-item" :data-member-id="member.charID">
+
+                {{member.name}} / {{member.state == "alive" ? 'A' : 'D'}}
+            </div>
+        </span>
+    `
+});
+
+
+/***/ }),
+
 /***/ "./src/Loadable.ts":
 /*!*************************!*\
   !*** ./src/Loadable.ts ***!
@@ -61314,7 +61773,7 @@ class Character {
 }
 class CharacterAPI {
     static parseCharacter(elem) {
-        return {
+        const char = {
             ID: elem.character_id,
             name: elem.name.first,
             faction: elem.faction_id,
@@ -61325,6 +61784,8 @@ class CharacterAPI {
             joinTime: (new Date()).getTime(),
             secondsPlayed: 0
         };
+        CharacterAPI._cache.set(char.ID, char);
+        return char;
     }
     static getByID(charID) {
         if (CharacterAPI._pending.has(charID)) {
@@ -61377,9 +61838,7 @@ class CharacterAPI {
         for (const charID of charIDs) {
             if (CharacterAPI._cache.has(charID)) {
                 const char = CharacterAPI._cache.get(charID);
-                if (char != null) {
-                    chars.push(char);
-                }
+                chars.push(char);
             }
             else {
                 requestIDs.push(charID);
@@ -61406,7 +61865,6 @@ class CharacterAPI {
                         for (const datum of data.character_list) {
                             const char = CharacterAPI.parseCharacter(datum);
                             chars.push(char);
-                            CharacterAPI._cache.set(char.ID, char);
                         }
                     }
                     --slicesLeft;
@@ -62358,8 +62816,10 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var BreakdownInterval__WEBPACK_IMPORTED_MODULE_26__ = __webpack_require__(/*! BreakdownInterval */ "./src/BreakdownInterval.ts");
 /* harmony import */ var BreakdownBox__WEBPACK_IMPORTED_MODULE_27__ = __webpack_require__(/*! BreakdownBox */ "./src/BreakdownBox.ts");
 /* harmony import */ var MomentFilter__WEBPACK_IMPORTED_MODULE_28__ = __webpack_require__(/*! MomentFilter */ "./src/MomentFilter.ts");
-/* harmony import */ var OutfitTrends__WEBPACK_IMPORTED_MODULE_29__ = __webpack_require__(/*! OutfitTrends */ "./src/OutfitTrends.ts");
-/* harmony import */ var Storage__WEBPACK_IMPORTED_MODULE_30__ = __webpack_require__(/*! Storage */ "./src/Storage.ts");
+/* harmony import */ var KillfeedSquad__WEBPACK_IMPORTED_MODULE_29__ = __webpack_require__(/*! KillfeedSquad */ "./src/KillfeedSquad.ts");
+/* harmony import */ var OutfitTrends__WEBPACK_IMPORTED_MODULE_30__ = __webpack_require__(/*! OutfitTrends */ "./src/OutfitTrends.ts");
+/* harmony import */ var Storage__WEBPACK_IMPORTED_MODULE_31__ = __webpack_require__(/*! Storage */ "./src/Storage.ts");
+/* harmony import */ var Killfeed__WEBPACK_IMPORTED_MODULE_32__ = __webpack_require__(/*! Killfeed */ "./src/Killfeed.ts");
 
 
 
@@ -62395,6 +62855,8 @@ chart_js__WEBPACK_IMPORTED_MODULE_22__["Chart"].plugins.unregister(_node_modules
 
 
 
+
+
 class OpReportSettings {
     constructor() {
         this.zoneID = null;
@@ -62416,6 +62878,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             logistics: null,
             logins: null,
             facility: null,
+            queue: []
         },
         routerTracking: {
             // key - Who placed the router
@@ -62453,6 +62916,10 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             names: [],
             state: []
         },
+        killfeed: {
+            entry: new Killfeed__WEBPACK_IMPORTED_MODULE_32__["Killfeed"](),
+            options: new Killfeed__WEBPACK_IMPORTED_MODULE_32__["KillfeedOptions"]()
+        },
         // Fields related to the current state of tracking
         tracking: {
             running: false,
@@ -62470,7 +62937,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
         ],
         outfitReport: new InvididualGenerator__WEBPACK_IMPORTED_MODULE_18__["OutfitReport"](),
         opsReportSettings: new OpReportSettings(),
-        outfitTrends: new OutfitTrends__WEBPACK_IMPORTED_MODULE_29__["OutfitTrendsV1"](),
+        outfitTrends: new OutfitTrends__WEBPACK_IMPORTED_MODULE_30__["OutfitTrendsV1"](),
         refreshIntervalID: -1,
         characters: [],
         outfits: [],
@@ -62488,17 +62955,19 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
     },
     created: function () {
         this.refreshIntervalID = setInterval(this.updateDisplay, this.settings.updateRate * 1000);
-        this.storage.enabled = Storage__WEBPACK_IMPORTED_MODULE_30__["StorageHelper"].isEnabled();
+        this.storage.enabled = Storage__WEBPACK_IMPORTED_MODULE_31__["StorageHelper"].isEnabled();
+        this.sockets.queue.length = 5;
         census_WeaponAPI__WEBPACK_IMPORTED_MODULE_12__["WeaponAPI"].loadJson();
         census_FacilityAPI__WEBPACK_IMPORTED_MODULE_13__["FacilityAPI"].loadJson();
     },
     mounted: function () {
         if (this.storage.enabled == true) {
-            this.storage.trends = Storage__WEBPACK_IMPORTED_MODULE_30__["StorageHelper"].getTrends();
+            this.storage.trends = Storage__WEBPACK_IMPORTED_MODULE_31__["StorageHelper"].getTrends();
         }
         window.onbeforeunload = (ev) => {
             this.disconnect();
         };
+        document.addEventListener("keyup", this.squadKeyEvent);
     },
     methods: {
         connect: function () {
@@ -62526,7 +62995,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             this.sockets.facility.onerror = this.onTestError;
             if (this.storage.pendingTrend !== null && this.storage.pendingTrend !== undefined) {
                 console.log(`Loading trends from storage: ${this.storage.pendingTrend}`);
-                const trend = Storage__WEBPACK_IMPORTED_MODULE_30__["StorageHelper"].getTrend(this.storage.pendingTrend);
+                const trend = Storage__WEBPACK_IMPORTED_MODULE_31__["StorageHelper"].getTrend(this.storage.pendingTrend);
                 if (trend != null) {
                     console.log(`Successfully loaded trends file for ${this.storage.pendingTrend}`);
                     this.outfitTrends = Object.assign({}, trend);
@@ -62537,9 +63006,9 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 }
             }
             else if (this.storage.pendingTrend === null) {
-                Storage__WEBPACK_IMPORTED_MODULE_30__["StorageHelper"].setTrends(this.storage.newTrendFile, new OutfitTrends__WEBPACK_IMPORTED_MODULE_29__["OutfitTrendsV1"]());
+                Storage__WEBPACK_IMPORTED_MODULE_31__["StorageHelper"].setTrends(this.storage.newTrendFile, new OutfitTrends__WEBPACK_IMPORTED_MODULE_30__["OutfitTrendsV1"]());
                 this.storage.trendFileName = this.storage.newTrendFile;
-                this.outfitTrends = new OutfitTrends__WEBPACK_IMPORTED_MODULE_29__["OutfitTrendsV1"]();
+                this.outfitTrends = new OutfitTrends__WEBPACK_IMPORTED_MODULE_30__["OutfitTrendsV1"]();
                 console.log(`Created new trends file named ${this.storage.trendFileName}`);
             }
             else if (this.storage.pendingTrend === undefined) {
@@ -62659,10 +63128,21 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             if (name == null || name.length == 0) {
                 return;
             }
-            Storage__WEBPACK_IMPORTED_MODULE_30__["StorageHelper"].setTrends(name, this.outfitTrends);
+            Storage__WEBPACK_IMPORTED_MODULE_31__["StorageHelper"].setTrends(name, this.outfitTrends);
         },
         updateDisplay: function () {
             //console.time("update display");
+            if (this.view == "realtime") {
+                this.updateRealtimeDisplay();
+            }
+            else if (this.view == "killfeed") {
+                this.updateKillfeedDisplay();
+            }
+        },
+        updateKillfeedDisplay: function () {
+            this.killfeed.entry = Killfeed__WEBPACK_IMPORTED_MODULE_32__["KillfeedGeneration"].generate(this.killfeed.options);
+        },
+        updateRealtimeDisplay: function () {
             const nowMs = new Date().getTime();
             this.display = [];
             this.stats.forEach((char, charID) => {
@@ -62719,6 +63199,25 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             }
             this.display.sort(sortFunc);
             //console.timeEnd("update display");
+        },
+        trap: function (ev) {
+            debugger;
+        },
+        squadKeyEvent(ev) {
+            if (this.view != "killfeed") {
+                return;
+            }
+            const whatHovered = Killfeed__WEBPACK_IMPORTED_MODULE_32__["KillfeedGeneration"].getHovered();
+            if (whatHovered == "squad") {
+                Killfeed__WEBPACK_IMPORTED_MODULE_32__["KillfeedGeneration"].mergeSquads(ev.key);
+                this.updateDisplay();
+            }
+            else if (whatHovered == "member") {
+                Killfeed__WEBPACK_IMPORTED_MODULE_32__["KillfeedGeneration"].moveMember(ev.key);
+                this.updateDisplay();
+            }
+            else {
+            }
         },
         generateReport: function () {
             if (this.parameters.report == "ops") {
@@ -62980,7 +63479,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 return;
             }
             this.outfitTrends.sessions.splice(index, 1);
-            Storage__WEBPACK_IMPORTED_MODULE_30__["StorageHelper"].setTrends(this.storage.trendFileName, this.outfitTrends);
+            Storage__WEBPACK_IMPORTED_MODULE_31__["StorageHelper"].setTrends(this.storage.trendFileName, this.outfitTrends);
         },
         generatePlayerReport: function (charID) {
             const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_4__["ApiResponse"]();
@@ -63135,7 +63634,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                     }
                 });
                 if (this.storage.enabled == true) {
-                    Storage__WEBPACK_IMPORTED_MODULE_30__["StorageHelper"].setTrends(this.storage.newTrendFile, this.outfitTrends);
+                    Storage__WEBPACK_IMPORTED_MODULE_31__["StorageHelper"].setTrends(this.storage.newTrendFile, this.outfitTrends);
                 }
             }
             this.tracking.running = save;
@@ -63155,6 +63654,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             census_OutfitAPI__WEBPACK_IMPORTED_MODULE_10__["default"].getCharactersByTag(this.parameters.outfitTag).ok((data) => {
                 this.parameters.outfitRequest = Loadable__WEBPACK_IMPORTED_MODULE_5__["Loadable"].loaded("");
                 this.subscribeToExpGains(data);
+                Killfeed__WEBPACK_IMPORTED_MODULE_32__["KillfeedGeneration"].addCharacters(data);
                 this.parameters.outfitTag = "";
             });
         },
@@ -63165,11 +63665,6 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             census_CharacterAPI__WEBPACK_IMPORTED_MODULE_11__["CharacterAPI"].getByName(this.parameters.playerName).ok((data) => {
                 this.subscribeToExpGains([data]);
                 this.parameters.playerName = "";
-            });
-        },
-        removePlayer: function (charID) {
-            this.characters = this.characters.filter((char) => {
-                return char.ID != charID;
             });
         },
         clearEvents: function () {
@@ -63184,17 +63679,6 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 this.updateDisplay();
                 this.totalTicks = 0;
             }
-        },
-        clearPlayers: function () {
-            this.characters = [];
-            this.stats.clear();
-            this.totalTicks = 0;
-            const unsubscribeMsg = {
-                "action": "clearSubscribe",
-                "all": "true",
-                "service": "event"
-            };
-            this.sendMessage(unsubscribeMsg);
         },
         subscribeToExpGains: function (chars) {
             // No duplicates
@@ -63377,6 +63861,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                             this.statTotals.increment(PsEvent__WEBPACK_IMPORTED_MODULE_15__["PsEvent"].revived);
                         }
                     }
+                    Killfeed__WEBPACK_IMPORTED_MODULE_32__["KillfeedGeneration"].exp(ev);
                     save = true;
                 }
                 else if (event == "Death") {
@@ -63417,6 +63902,9 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                         targetTicks.events.push(ev);
                         targetTicks.recentDeath = ev;
                         census_WeaponAPI__WEBPACK_IMPORTED_MODULE_12__["WeaponAPI"].precache(ev.weaponID);
+                        if (this.view == "killfeed") {
+                            Killfeed__WEBPACK_IMPORTED_MODULE_32__["KillfeedGeneration"].add(ev);
+                        }
                         save = true;
                     }
                     let sourceTicks = this.stats.get(sourceID);
@@ -63447,6 +63935,9 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                             };
                             sourceTicks.events.push(ev);
                             census_WeaponAPI__WEBPACK_IMPORTED_MODULE_12__["WeaponAPI"].precache(ev.weaponID);
+                            if (this.view == "killfeed") {
+                                Killfeed__WEBPACK_IMPORTED_MODULE_32__["KillfeedGeneration"].add(ev);
+                            }
                         }
                         save = true;
                     }
@@ -63594,6 +64085,14 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             if (typeof ev.data == "string") {
                 this.totalLength += ev.data.length;
             }
+            for (const message of this.sockets.queue) {
+                if (ev.data == message) {
+                    //console.log(`Duplicate message found: ${ev.data}`);
+                    return;
+                }
+            }
+            this.sockets.queue.push(ev.data);
+            this.sockets.queue.shift();
             this.processMessage(ev.data);
         },
         onTestOpen: function (ev) {
