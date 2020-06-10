@@ -53,6 +53,7 @@ import "BreakdownList";
 import "BreakdownChart";
 import "BreakdownInterval";
 import "BreakdownBox";
+import "BreakdownBar";
 import "MomentFilter";
 import "KillfeedSquad";
 
@@ -659,6 +660,9 @@ export const vm = new Vue({
             EventReporter.weaponTypeDeaths(this.outfitReport.events, false).ok(data => this.outfitReport.deathKilledTypeBreakdown = data);
 
             EventReporter.weaponDeathBreakdown(this.outfitReport.events).ok(data => this.outfitReport.weaponTypeDeathBreakdown = data);
+
+            this.outfitReport.timeUnrevived = IndividualReporter.unrevivedTime(this.outfitReport.events);
+            this.outfitReport.revivedLifeExpectance = IndividualReporter.reviveLifeExpectance(this.outfitReport.events);
 
             const classFilter: (iter: Event, type: "kill" | "death", loadouts: string[]) => boolean = (iter, type, loadouts) => {
                 if (iter.type == type) {

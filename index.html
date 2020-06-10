@@ -989,6 +989,27 @@
                 </breakdown-interval>
             </div>
 
+            <div class="col-12"> <!-- Time spend unrevived -->
+                <h2 class="strike">Revive metrics</h2>
+
+                <h4 class="strike">Life expectance after being revived</h4>
+                <breakdown-bar :src="outfitReport.revivedLifeExpectance">
+                </breakdown-bar>
+                <span class="text-muted">
+                    This only includes revives with deaths that occur within 20 seconds. 
+                    Revives and then the revived person lives longer than 20 seconds is not counted
+                </span>
+
+                <h4 class="strike">Seconds between death and being revived</h4>
+                <breakdown-bar :src="outfitReport.timeUnrevived">
+                </breakdown-bar>
+                <span class="text-muted">
+                    This includes the time it takes for a revive to be completed,
+                    making it possible to be longer than 30 seconds,
+                    as the revive timer stops while being revived
+                </text>
+            </div>
+
             <div class="col-12"> <!-- Weapon breakdown -->
                 <h2 class="strike">Weapons</h2>
 

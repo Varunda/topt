@@ -57311,6 +57311,98 @@ class BaseGenerator {
 
 /***/ }),
 
+/***/ "./src/BreakdownBar.ts":
+/*!*****************************!*\
+  !*** ./src/BreakdownBar.ts ***!
+  \*****************************/
+/*! no exports provided */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var vue__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! vue */ "./node_modules/vue/dist/vue.esm.js");
+/* harmony import */ var chart_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! chart.js */ "./node_modules/chart.js/dist/Chart.js");
+/* harmony import */ var chart_js__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(chart_js__WEBPACK_IMPORTED_MODULE_1__);
+
+
+vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("breakdown-bar", {
+    props: {
+        src: { type: Array, required: true },
+        MaxHeight: { type: Number, required: false, default: 200 }
+    },
+    template: `
+        <canvas :id="'breakdown-bar-' + ID" :style="{ 'max-height': MaxHeight + 'px' }"></canvas>
+    `,
+    data: function () {
+        return {
+            ID: Math.round(Math.random() * 100000),
+            data: [],
+            chart: {
+                instance: {},
+                options: {},
+                labels: [],
+                data: []
+            }
+        };
+    },
+    created: function () {
+        this.setup();
+    },
+    mounted: function () {
+        this.$nextTick(() => {
+            this.draw();
+        });
+    },
+    methods: {
+        setup: function () {
+            this.chart.data = this.src;
+            this.chart.options = {
+                legend: {
+                    display: false
+                },
+                maintainAspectRatio: false,
+                scales: {
+                    xAxes: [{
+                            gridLines: {
+                                display: false
+                            }
+                        }]
+                }
+            };
+        },
+        draw: function () {
+            this.$nextTick(() => {
+                if (this.chart.instance != null && this.chart.instance.destroy) {
+                    this.chart.instance.destroy();
+                }
+                this.chart.instance = new chart_js__WEBPACK_IMPORTED_MODULE_1__["Chart"](document.getElementById(`breakdown-bar-${this.ID}`), {
+                    type: "bar",
+                    data: {
+                        labels: this.chart.data.map((iter, index) => ""),
+                        datasets: [{
+                                barPercentage: 1.0,
+                                barThickness: "flex",
+                                data: this.chart.data,
+                                borderWidth: 0,
+                                hoverBorderWidth: 0
+                            }]
+                    },
+                    options: this.chart.options
+                });
+            });
+        }
+    },
+    watch: {
+        src: function () {
+            this.setup();
+            this.draw();
+        }
+    }
+});
+
+
+/***/ }),
+
 /***/ "./src/BreakdownBox.ts":
 /*!*****************************!*\
   !*** ./src/BreakdownBox.ts ***!
@@ -58851,6 +58943,8 @@ class OutfitReport {
         this.weaponTypeDeathBreakdown = [];
         this.vehicleKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
         this.vehicleKillWeaponBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+        this.timeUnrevived = [];
+        this.revivedLifeExpectance = [];
         this.factionKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
         this.factionDeathBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
         this.continentKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
@@ -59674,6 +59768,50 @@ class IndividualReporter {
         }
         usage.mostPlayed.secondsAs = maxTime;
         return usage;
+    }
+    static unrevivedTime(events) {
+        const array = [];
+        for (const ev of events) {
+            if (ev.type != "death") {
+                continue;
+            }
+            if (ev.revivedEvent != null) {
+                array.push((ev.revivedEvent.timestamp - ev.timestamp) / 1000);
+            }
+        }
+        return array.sort((a, b) => b - a);
+    }
+    static reviveLifeExpectance(events) {
+        const array = [];
+        for (const ev of events) {
+            if (ev.type != "death" || ev.revivedEvent == null) {
+                continue;
+            }
+            const charEvents = events.filter(iter => iter.sourceID == ev.sourceID);
+            const index = charEvents.findIndex(iter => {
+                return iter.type == "death" && iter.timestamp == ev.timestamp && iter.targetID == ev.targetID;
+            });
+            if (index == -1) {
+                console.error(`Failed to find a death for ${ev.sourceID} at ${ev.timestamp} but wasn't found in charEvents`);
+                continue;
+            }
+            let nextDeath = null;
+            for (let i = index + 1; i < charEvents.length; ++i) {
+                if (charEvents[i].type == "death") {
+                    nextDeath = charEvents[i];
+                    break;
+                }
+            }
+            if (nextDeath == null) {
+                console.error(`Failed to find the next death for ${ev.sourceID} at ${ev.timestamp}`);
+                continue;
+            }
+            const diff = (nextDeath.timestamp - ev.revivedEvent.timestamp) / 1000;
+            if (diff <= 20) {
+                array.push(diff);
+            }
+        }
+        return array.sort((a, b) => b - a);
     }
     static generateContinentPlayedOn(events) {
         let indar = 0;
@@ -62815,11 +62953,12 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var BreakdownChart__WEBPACK_IMPORTED_MODULE_25__ = __webpack_require__(/*! BreakdownChart */ "./src/BreakdownChart.ts");
 /* harmony import */ var BreakdownInterval__WEBPACK_IMPORTED_MODULE_26__ = __webpack_require__(/*! BreakdownInterval */ "./src/BreakdownInterval.ts");
 /* harmony import */ var BreakdownBox__WEBPACK_IMPORTED_MODULE_27__ = __webpack_require__(/*! BreakdownBox */ "./src/BreakdownBox.ts");
-/* harmony import */ var MomentFilter__WEBPACK_IMPORTED_MODULE_28__ = __webpack_require__(/*! MomentFilter */ "./src/MomentFilter.ts");
-/* harmony import */ var KillfeedSquad__WEBPACK_IMPORTED_MODULE_29__ = __webpack_require__(/*! KillfeedSquad */ "./src/KillfeedSquad.ts");
-/* harmony import */ var OutfitTrends__WEBPACK_IMPORTED_MODULE_30__ = __webpack_require__(/*! OutfitTrends */ "./src/OutfitTrends.ts");
-/* harmony import */ var Storage__WEBPACK_IMPORTED_MODULE_31__ = __webpack_require__(/*! Storage */ "./src/Storage.ts");
-/* harmony import */ var Killfeed__WEBPACK_IMPORTED_MODULE_32__ = __webpack_require__(/*! Killfeed */ "./src/Killfeed.ts");
+/* harmony import */ var BreakdownBar__WEBPACK_IMPORTED_MODULE_28__ = __webpack_require__(/*! BreakdownBar */ "./src/BreakdownBar.ts");
+/* harmony import */ var MomentFilter__WEBPACK_IMPORTED_MODULE_29__ = __webpack_require__(/*! MomentFilter */ "./src/MomentFilter.ts");
+/* harmony import */ var KillfeedSquad__WEBPACK_IMPORTED_MODULE_30__ = __webpack_require__(/*! KillfeedSquad */ "./src/KillfeedSquad.ts");
+/* harmony import */ var OutfitTrends__WEBPACK_IMPORTED_MODULE_31__ = __webpack_require__(/*! OutfitTrends */ "./src/OutfitTrends.ts");
+/* harmony import */ var Storage__WEBPACK_IMPORTED_MODULE_32__ = __webpack_require__(/*! Storage */ "./src/Storage.ts");
+/* harmony import */ var Killfeed__WEBPACK_IMPORTED_MODULE_33__ = __webpack_require__(/*! Killfeed */ "./src/Killfeed.ts");
 
 
 
@@ -62847,6 +62986,7 @@ __webpack_require__.r(__webpack_exports__);
 chart_js__WEBPACK_IMPORTED_MODULE_22__["Chart"].plugins.unregister(_node_modules_chartjs_plugin_datalabels_dist_chartjs_plugin_datalabels_js__WEBPACK_IMPORTED_MODULE_21___default.a);
 
 // @ts-ignore
+
 
 
 
@@ -62917,8 +63057,8 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             state: []
         },
         killfeed: {
-            entry: new Killfeed__WEBPACK_IMPORTED_MODULE_32__["Killfeed"](),
-            options: new Killfeed__WEBPACK_IMPORTED_MODULE_32__["KillfeedOptions"]()
+            entry: new Killfeed__WEBPACK_IMPORTED_MODULE_33__["Killfeed"](),
+            options: new Killfeed__WEBPACK_IMPORTED_MODULE_33__["KillfeedOptions"]()
         },
         // Fields related to the current state of tracking
         tracking: {
@@ -62937,7 +63077,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
         ],
         outfitReport: new InvididualGenerator__WEBPACK_IMPORTED_MODULE_18__["OutfitReport"](),
         opsReportSettings: new OpReportSettings(),
-        outfitTrends: new OutfitTrends__WEBPACK_IMPORTED_MODULE_30__["OutfitTrendsV1"](),
+        outfitTrends: new OutfitTrends__WEBPACK_IMPORTED_MODULE_31__["OutfitTrendsV1"](),
         refreshIntervalID: -1,
         characters: [],
         outfits: [],
@@ -62955,14 +63095,14 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
     },
     created: function () {
         this.refreshIntervalID = setInterval(this.updateDisplay, this.settings.updateRate * 1000);
-        this.storage.enabled = Storage__WEBPACK_IMPORTED_MODULE_31__["StorageHelper"].isEnabled();
+        this.storage.enabled = Storage__WEBPACK_IMPORTED_MODULE_32__["StorageHelper"].isEnabled();
         this.sockets.queue.length = 5;
         census_WeaponAPI__WEBPACK_IMPORTED_MODULE_12__["WeaponAPI"].loadJson();
         census_FacilityAPI__WEBPACK_IMPORTED_MODULE_13__["FacilityAPI"].loadJson();
     },
     mounted: function () {
         if (this.storage.enabled == true) {
-            this.storage.trends = Storage__WEBPACK_IMPORTED_MODULE_31__["StorageHelper"].getTrends();
+            this.storage.trends = Storage__WEBPACK_IMPORTED_MODULE_32__["StorageHelper"].getTrends();
         }
         window.onbeforeunload = (ev) => {
             this.disconnect();
@@ -62995,7 +63135,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             this.sockets.facility.onerror = this.onTestError;
             if (this.storage.pendingTrend !== null && this.storage.pendingTrend !== undefined) {
                 console.log(`Loading trends from storage: ${this.storage.pendingTrend}`);
-                const trend = Storage__WEBPACK_IMPORTED_MODULE_31__["StorageHelper"].getTrend(this.storage.pendingTrend);
+                const trend = Storage__WEBPACK_IMPORTED_MODULE_32__["StorageHelper"].getTrend(this.storage.pendingTrend);
                 if (trend != null) {
                     console.log(`Successfully loaded trends file for ${this.storage.pendingTrend}`);
                     this.outfitTrends = Object.assign({}, trend);
@@ -63006,9 +63146,9 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 }
             }
             else if (this.storage.pendingTrend === null) {
-                Storage__WEBPACK_IMPORTED_MODULE_31__["StorageHelper"].setTrends(this.storage.newTrendFile, new OutfitTrends__WEBPACK_IMPORTED_MODULE_30__["OutfitTrendsV1"]());
+                Storage__WEBPACK_IMPORTED_MODULE_32__["StorageHelper"].setTrends(this.storage.newTrendFile, new OutfitTrends__WEBPACK_IMPORTED_MODULE_31__["OutfitTrendsV1"]());
                 this.storage.trendFileName = this.storage.newTrendFile;
-                this.outfitTrends = new OutfitTrends__WEBPACK_IMPORTED_MODULE_30__["OutfitTrendsV1"]();
+                this.outfitTrends = new OutfitTrends__WEBPACK_IMPORTED_MODULE_31__["OutfitTrendsV1"]();
                 console.log(`Created new trends file named ${this.storage.trendFileName}`);
             }
             else if (this.storage.pendingTrend === undefined) {
@@ -63128,7 +63268,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             if (name == null || name.length == 0) {
                 return;
             }
-            Storage__WEBPACK_IMPORTED_MODULE_31__["StorageHelper"].setTrends(name, this.outfitTrends);
+            Storage__WEBPACK_IMPORTED_MODULE_32__["StorageHelper"].setTrends(name, this.outfitTrends);
         },
         updateDisplay: function () {
             //console.time("update display");
@@ -63140,7 +63280,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             }
         },
         updateKillfeedDisplay: function () {
-            this.killfeed.entry = Killfeed__WEBPACK_IMPORTED_MODULE_32__["KillfeedGeneration"].generate(this.killfeed.options);
+            this.killfeed.entry = Killfeed__WEBPACK_IMPORTED_MODULE_33__["KillfeedGeneration"].generate(this.killfeed.options);
         },
         updateRealtimeDisplay: function () {
             const nowMs = new Date().getTime();
@@ -63207,13 +63347,13 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             if (this.view != "killfeed") {
                 return;
             }
-            const whatHovered = Killfeed__WEBPACK_IMPORTED_MODULE_32__["KillfeedGeneration"].getHovered();
+            const whatHovered = Killfeed__WEBPACK_IMPORTED_MODULE_33__["KillfeedGeneration"].getHovered();
             if (whatHovered == "squad") {
-                Killfeed__WEBPACK_IMPORTED_MODULE_32__["KillfeedGeneration"].mergeSquads(ev.key);
+                Killfeed__WEBPACK_IMPORTED_MODULE_33__["KillfeedGeneration"].mergeSquads(ev.key);
                 this.updateDisplay();
             }
             else if (whatHovered == "member") {
-                Killfeed__WEBPACK_IMPORTED_MODULE_32__["KillfeedGeneration"].moveMember(ev.key);
+                Killfeed__WEBPACK_IMPORTED_MODULE_33__["KillfeedGeneration"].moveMember(ev.key);
                 this.updateDisplay();
             }
             else {
@@ -63380,6 +63520,8 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].weaponTypeDeaths(this.outfitReport.events, true).ok(data => this.outfitReport.deathRevivedTypeBreakdown = data);
             EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].weaponTypeDeaths(this.outfitReport.events, false).ok(data => this.outfitReport.deathKilledTypeBreakdown = data);
             EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].weaponDeathBreakdown(this.outfitReport.events).ok(data => this.outfitReport.weaponTypeDeathBreakdown = data);
+            this.outfitReport.timeUnrevived = InvididualGenerator__WEBPACK_IMPORTED_MODULE_18__["IndividualReporter"].unrevivedTime(this.outfitReport.events);
+            this.outfitReport.revivedLifeExpectance = InvididualGenerator__WEBPACK_IMPORTED_MODULE_18__["IndividualReporter"].reviveLifeExpectance(this.outfitReport.events);
             const classFilter = (iter, type, loadouts) => {
                 if (iter.type == type) {
                     return loadouts.indexOf(iter.loadoutID) > -1;
@@ -63479,7 +63621,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 return;
             }
             this.outfitTrends.sessions.splice(index, 1);
-            Storage__WEBPACK_IMPORTED_MODULE_31__["StorageHelper"].setTrends(this.storage.trendFileName, this.outfitTrends);
+            Storage__WEBPACK_IMPORTED_MODULE_32__["StorageHelper"].setTrends(this.storage.trendFileName, this.outfitTrends);
         },
         generatePlayerReport: function (charID) {
             const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_4__["ApiResponse"]();
@@ -63634,7 +63776,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                     }
                 });
                 if (this.storage.enabled == true) {
-                    Storage__WEBPACK_IMPORTED_MODULE_31__["StorageHelper"].setTrends(this.storage.newTrendFile, this.outfitTrends);
+                    Storage__WEBPACK_IMPORTED_MODULE_32__["StorageHelper"].setTrends(this.storage.newTrendFile, this.outfitTrends);
                 }
             }
             this.tracking.running = save;
@@ -63654,7 +63796,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             census_OutfitAPI__WEBPACK_IMPORTED_MODULE_10__["default"].getCharactersByTag(this.parameters.outfitTag).ok((data) => {
                 this.parameters.outfitRequest = Loadable__WEBPACK_IMPORTED_MODULE_5__["Loadable"].loaded("");
                 this.subscribeToExpGains(data);
-                Killfeed__WEBPACK_IMPORTED_MODULE_32__["KillfeedGeneration"].addCharacters(data);
+                Killfeed__WEBPACK_IMPORTED_MODULE_33__["KillfeedGeneration"].addCharacters(data);
                 this.parameters.outfitTag = "";
             });
         },
@@ -63861,7 +64003,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                             this.statTotals.increment(PsEvent__WEBPACK_IMPORTED_MODULE_15__["PsEvent"].revived);
                         }
                     }
-                    Killfeed__WEBPACK_IMPORTED_MODULE_32__["KillfeedGeneration"].exp(ev);
+                    Killfeed__WEBPACK_IMPORTED_MODULE_33__["KillfeedGeneration"].exp(ev);
                     save = true;
                 }
                 else if (event == "Death") {
@@ -63903,7 +64045,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                         targetTicks.recentDeath = ev;
                         census_WeaponAPI__WEBPACK_IMPORTED_MODULE_12__["WeaponAPI"].precache(ev.weaponID);
                         if (this.view == "killfeed") {
-                            Killfeed__WEBPACK_IMPORTED_MODULE_32__["KillfeedGeneration"].add(ev);
+                            Killfeed__WEBPACK_IMPORTED_MODULE_33__["KillfeedGeneration"].add(ev);
                         }
                         save = true;
                     }
@@ -63936,7 +64078,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                             sourceTicks.events.push(ev);
                             census_WeaponAPI__WEBPACK_IMPORTED_MODULE_12__["WeaponAPI"].precache(ev.weaponID);
                             if (this.view == "killfeed") {
-                                Killfeed__WEBPACK_IMPORTED_MODULE_32__["KillfeedGeneration"].add(ev);
+                                Killfeed__WEBPACK_IMPORTED_MODULE_33__["KillfeedGeneration"].add(ev);
                             }
                         }
                         save = true;

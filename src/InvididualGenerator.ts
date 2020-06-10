@@ -174,6 +174,9 @@ export class OutfitReport {
     vehicleKillBreakdown: BreakdownArray = new BreakdownArray();
     vehicleKillWeaponBreakdown: BreakdownArray = new BreakdownArray();
 
+    timeUnrevived: number[] = [];
+    revivedLifeExpectance: number[] = [];
+
     factionKillBreakdown: BreakdownArray = new BreakdownArray();
     factionDeathBreakdown: BreakdownArray = new BreakdownArray();
 
@@ -1043,6 +1046,63 @@ export class IndividualReporter {
         usage.mostPlayed.secondsAs = maxTime;
 
         return usage;
+    }
+
+    public static unrevivedTime(events: Event[]): number[] {
+        const array: number[] = [];
+
+        for (const ev of events) {
+            if (ev.type != "death") {
+                continue;
+            }
+
+            if (ev.revivedEvent != null) {
+                array.push((ev.revivedEvent.timestamp - ev.timestamp) / 1000);
+            }
+        }
+
+        return array.sort((a, b) => b - a);
+    }
+
+    public static reviveLifeExpectance(events: Event[]): number[] {
+        const array: number[] = [];
+
+        for (const ev of events) {
+            if (ev.type != "death" || ev.revivedEvent == null) {
+                continue;
+            }
+
+            const charEvents: Event[] = events.filter(iter => iter.sourceID == ev.sourceID);
+
+            const index: number = charEvents.findIndex(iter => {
+                return iter.type == "death" && iter.timestamp == ev.timestamp && iter.targetID == ev.targetID;
+            });
+
+            if (index == -1) {
+                console.error(`Failed to find a death for ${ev.sourceID} at ${ev.timestamp} but wasn't found in charEvents`);
+                continue;
+            }
+
+            let nextDeath: EventDeath | null = null;
+            for (let i = index + 1; i < charEvents.length; ++i) {
+                if (charEvents[i].type == "death") {
+                    nextDeath = charEvents[i] as EventDeath;
+                    break;
+                }
+            }
+
+            if (nextDeath == null) {
+                console.error(`Failed to find the next death for ${ev.sourceID} at ${ev.timestamp}`);
+                continue;
+            }
+
+            const diff: number = (nextDeath.timestamp - ev.revivedEvent.timestamp) / 1000;
+            if (diff <= 20) {
+                array.push(diff);
+            }
+        }
+
+        return array.sort((a, b) => b - a);
     }
 
     public static generateContinentPlayedOn(events: Event[]): string {
