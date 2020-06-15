@@ -992,6 +992,29 @@
             <div class="col-12"> <!-- Time spend unrevived -->
                 <h2 class="strike">Revive metrics</h2>
 
+                <div class="row">
+                    <div class="col-6">
+                        <h4 class="strike">Probability when you are revived the percent chance you'll live that many seconds</h4>
+                        <breakdown-bar :src="outfitReport.kmLifeExpectance"
+                            :show-x-axis="true">
+                        </breakdown-bar>
+                        <span class="text-muted">
+                            Each drop corresponds to a probabilty someone revived will die
+                        </span>
+                    </div>
+
+                    <div class="col-6">
+                        <h4 class="strike">Probablity of being unrevived after n seconds</h4>
+                        <breakdown-bar :src="outfitReport.kmTimeDead"
+                            :show-x-axis="true">
+                        </breakdown-bar>
+                        <span class="text-muted">
+                            Percent chance that after n seconds an individual has yet to be revived.
+                            Does not include deaths that were not revived
+                        </span>
+                    </div>
+                </div>
+
                 <h4 class="strike">Life expectance after being revived</h4>
                 <breakdown-bar :src="outfitReport.revivedLifeExpectance">
                 </breakdown-bar>
@@ -1437,9 +1460,6 @@
                             <td>{{player.name}}</td>
                             <td>{{(player.secondsOnline / 60).toFixed(0)}} minutes</td>
                             <td>{{player.mostPlayed.name}}</td>
-                            <td>
-                                <a href="#" @click="generatePlayerReport(player.characterID); view = 'personal'">Generate</a>
-                            </td>
                         </tr>
                     </tbody>
                 </table>

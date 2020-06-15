@@ -57328,7 +57328,8 @@ __webpack_require__.r(__webpack_exports__);
 vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("breakdown-bar", {
     props: {
         src: { type: Array, required: true },
-        MaxHeight: { type: Number, required: false, default: 200 }
+        MaxHeight: { type: Number, required: false, default: 200 },
+        ShowXAxis: { type: Boolean, required: false, default: false }
     },
     template: `
         <canvas :id="'breakdown-bar-' + ID" :style="{ 'max-height': MaxHeight + 'px' }"></canvas>
@@ -57362,9 +57363,14 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("breakdown-bar", {
                 },
                 maintainAspectRatio: false,
                 scales: {
+                    yAxes: [{
+                            ticks: {
+                                suggestedMin: 0
+                            }
+                        }],
                     xAxes: [{
                             gridLines: {
-                                display: false
+                                display: this.ShowXAxis,
                             }
                         }]
                 }
@@ -57376,15 +57382,13 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("breakdown-bar", {
                     this.chart.instance.destroy();
                 }
                 this.chart.instance = new chart_js__WEBPACK_IMPORTED_MODULE_1__["Chart"](document.getElementById(`breakdown-bar-${this.ID}`), {
-                    type: "bar",
+                    type: "line",
                     data: {
                         labels: this.chart.data.map((iter, index) => ""),
                         datasets: [{
-                                barPercentage: 1.0,
-                                barThickness: "flex",
+                                steppedLine: true,
                                 data: this.chart.data,
-                                borderWidth: 0,
-                                hoverBorderWidth: 0
+                                pointStyle: "line"
                             }]
                     },
                     options: this.chart.options
@@ -58945,6 +58949,8 @@ class OutfitReport {
         this.vehicleKillWeaponBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
         this.timeUnrevived = [];
         this.revivedLifeExpectance = [];
+        this.kmLifeExpectance = [];
+        this.kmTimeDead = [];
         this.factionKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
         this.factionDeathBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
         this.continentKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
@@ -59776,7 +59782,11 @@ class IndividualReporter {
                 continue;
             }
             if (ev.revivedEvent != null) {
-                array.push((ev.revivedEvent.timestamp - ev.timestamp) / 1000);
+                const diff = (ev.revivedEvent.timestamp - ev.timestamp) / 1000;
+                if (diff > 40) {
+                    continue; // Somehow death events are missed and a revive event is linked to the wrong death
+                }
+                array.push(diff);
             }
         }
         return array.sort((a, b) => b - a);
@@ -59812,6 +59822,70 @@ class IndividualReporter {
             }
         }
         return array.sort((a, b) => b - a);
+    }
+    static lifeExpectanceRate(events) {
+        const array = [];
+        for (const ev of events) {
+            if (ev.type != "death" || ev.revivedEvent == null) {
+                continue;
+            }
+            const charEvents = events.filter(iter => iter.sourceID == ev.sourceID);
+            const index = charEvents.findIndex(iter => {
+                return iter.type == "death" && iter.timestamp == ev.timestamp && iter.targetID == ev.targetID;
+            });
+            if (index == -1) {
+                console.error(`Failed to find a death for ${ev.sourceID} at ${ev.timestamp} but wasn't found in charEvents`);
+                continue;
+            }
+            let nextDeath = null;
+            for (let i = index + 1; i < charEvents.length; ++i) {
+                if (charEvents[i].type == "death") {
+                    nextDeath = charEvents[i];
+                    break;
+                }
+            }
+            if (nextDeath == null) {
+                console.error(`Failed to find the next death for ${ev.sourceID} at ${ev.timestamp}`);
+                continue;
+            }
+            const diff = (nextDeath.timestamp - ev.revivedEvent.timestamp) / 1000;
+            array.push(diff);
+        }
+        const probs = this.kaplanMeier(array, 20);
+        return probs;
+    }
+    static timeUntilReviveRate(events) {
+        const array = [];
+        for (const ev of events) {
+            if (ev.type != "death") {
+                continue;
+            }
+            if (ev.revivedEvent != null) {
+                const diff = (ev.revivedEvent.timestamp - ev.timestamp) / 1000;
+                if (diff > 40) {
+                    continue; // Somehow death events are missed and a revive event is linked to the wrong death
+                }
+                array.push(diff);
+            }
+        }
+        const probs = this.kaplanMeier(array);
+        return probs;
+    }
+    static kaplanMeier(data, max) {
+        const ticks = [...Array((max !== null && max !== void 0 ? max : Math.max(...data))).keys()];
+        const probs = [];
+        let cur_pop = [...Array(data.length).keys()];
+        for (const tick of ticks) {
+            const survived = data.filter(iter => iter > tick).length;
+            probs.push(survived / cur_pop.length);
+            cur_pop = data.filter(iter => iter > tick);
+        }
+        let cumul = 1;
+        for (let i = 0; i < probs.length; ++i) {
+            probs[i] = cumul * probs[i];
+            cumul = probs[i];
+        }
+        return probs;
     }
     static generateContinentPlayedOn(events) {
         let indar = 0;
@@ -59857,6 +59931,7 @@ class IndividualReporter {
         return cont;
     }
 }
+window.IndividualReporter = IndividualReporter;
 
 
 /***/ }),
@@ -60582,12 +60657,18 @@ class SessionV1 {
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "PersonalReportGenerator", function() { return PersonalReportGenerator; });
+/* harmony import */ var census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! census/ApiWrapper */ "./src/census/ApiWrapper.ts");
+
 class PersonalReportGenerator {
     static generate(html, report) {
         let anyReport = Object.assign({}, report);
         anyReport.stats = Array.from(report.stats.entries());
         const personalReport = html.replace("REPORT_HERE_REPLACE_ME", JSON.stringify(anyReport));
         return personalReport;
+    }
+    static getTemplate() {
+        const page = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]($.get(`./personal/index.html?q=${new Date().getTime()}`), (iter) => iter);
+        return page;
     }
 }
 
@@ -61017,6 +61098,58 @@ const PsEvents = new Map([
         "129", "130", "131", "132", "133", "134", "135", "136", "137", "138", "139", "141", "302", "505", "584", "656", "1378" // Squad
     ].map((expID) => remap(expID, PsEvent.vehicleRepair))
 ]);
+
+
+/***/ }),
+
+/***/ "./src/Quartile.ts":
+/*!*************************!*\
+  !*** ./src/Quartile.ts ***!
+  \*************************/
+/*! exports provided: Quartile */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Quartile", function() { return Quartile; });
+class Quartile {
+    constructor() {
+        this.min = 0;
+        this.q1 = 0;
+        this.median = 0;
+        this.q3 = 0;
+        this.max = 0;
+    }
+    static get(data) {
+        const quart = new Quartile();
+        const sorted = data.sort((a, b) => a - b);
+        quart.q1 = this.quartile(data, 0.25);
+        quart.median = this.quartile(data, 0.5);
+        quart.q3 = this.quartile(data, 0.75);
+        const stdDev = this.standardDeviation(data);
+        return quart;
+    }
+    static sum(data) {
+        return data.reduce((a, b) => a + b, 0);
+    }
+    static standardDeviation(data) {
+        const mean = this.sum(data) / data.length;
+        const diff = data.map(a => Math.pow((a - mean), 2));
+        return Math.sqrt(this.sum(diff) / (data.length - 1));
+    }
+    static quartile(data, q) {
+        const sorted = data.sort((a, b) => a - b);
+        const pos = (sorted.length - 1) * q;
+        const base = Math.floor(pos);
+        const rest = pos - base;
+        if (sorted[base + 1] !== undefined) {
+            return sorted[base] + rest * (sorted[base - 1] - sorted[base]);
+        }
+        else {
+            return sorted[base];
+        }
+    }
+}
 
 
 /***/ }),
@@ -63522,6 +63655,8 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].weaponDeathBreakdown(this.outfitReport.events).ok(data => this.outfitReport.weaponTypeDeathBreakdown = data);
             this.outfitReport.timeUnrevived = InvididualGenerator__WEBPACK_IMPORTED_MODULE_18__["IndividualReporter"].unrevivedTime(this.outfitReport.events);
             this.outfitReport.revivedLifeExpectance = InvididualGenerator__WEBPACK_IMPORTED_MODULE_18__["IndividualReporter"].reviveLifeExpectance(this.outfitReport.events);
+            this.outfitReport.kmLifeExpectance = InvididualGenerator__WEBPACK_IMPORTED_MODULE_18__["IndividualReporter"].lifeExpectanceRate(this.outfitReport.events);
+            this.outfitReport.kmTimeDead = InvididualGenerator__WEBPACK_IMPORTED_MODULE_18__["IndividualReporter"].timeUntilReviveRate(this.outfitReport.events);
             const classFilter = (iter, type, loadouts) => {
                 if (iter.type == type) {
                     return loadouts.indexOf(iter.loadoutID) > -1;
@@ -63596,8 +63731,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             let opsLeft = 2;
             let html = "";
             let report = new InvididualGenerator__WEBPACK_IMPORTED_MODULE_18__["Report"]();
-            const page = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_4__["ApiResponse"](jquery__WEBPACK_IMPORTED_MODULE_7__["get"](`./personal.html?q=${new Date().getTime()}`), (iter) => iter);
-            page.ok((type) => {
+            PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_19__["PersonalReportGenerator"].getTemplate().ok((type) => {
                 html = type;
                 if (--opsLeft == 0) {
                     done();
@@ -63691,8 +63825,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                     generateReport();
                 }
             };
-            const page = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_4__["ApiResponse"](jquery__WEBPACK_IMPORTED_MODULE_7__["get"](`./personal.html?q=${new Date().getTime()}`), (iter) => iter);
-            page.ok((type) => {
+            PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_19__["PersonalReportGenerator"].getTemplate().ok((type) => {
                 html = type;
                 if (--opsLeft == 0) {
                     done();
@@ -64449,13 +64582,14 @@ window.vm = vm;
 /***/ }),
 
 /***/ 0:
-/*!*******************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
-  !*** multi ./src/BaseGenerator.ts ./src/BreakdownBox.ts ./src/BreakdownChart.ts ./src/BreakdownInterval.ts ./src/BreakdownList.ts ./src/census/AchievementAPI.ts ./src/census/ApiWrapper.ts ./src/census/CensusAPI.ts ./src/census/CharacterAPI.ts ./src/census/EventAPI.ts ./src/census/FacilityAPI.ts ./src/census/OutfitAPI.ts ./src/census/PsLoadout.ts ./src/census/VehicleAPI.ts ./src/census/WeaponAPI.ts ./src/Event.ts ./src/EventReporter.ts ./src/index.ts ./src/InvididualGenerator.ts ./src/Loadable.ts ./src/MomentFilter.ts ./src/OutfitTrends.ts ./src/PersonalReportGenerator.ts ./src/PsEvent.ts ./src/StatMap.ts ./src/Storage.ts ***!
-  \*******************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+/*!****************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** multi ./src/BaseGenerator.ts ./src/BreakdownBar.ts ./src/BreakdownBox.ts ./src/BreakdownChart.ts ./src/BreakdownInterval.ts ./src/BreakdownList.ts ./src/census/AchievementAPI.ts ./src/census/ApiWrapper.ts ./src/census/CensusAPI.ts ./src/census/CharacterAPI.ts ./src/census/EventAPI.ts ./src/census/FacilityAPI.ts ./src/census/OutfitAPI.ts ./src/census/PsLoadout.ts ./src/census/VehicleAPI.ts ./src/census/WeaponAPI.ts ./src/Event.ts ./src/EventReporter.ts ./src/index.ts ./src/InvididualGenerator.ts ./src/Killfeed.ts ./src/KillfeedSquad.ts ./src/Loadable.ts ./src/MomentFilter.ts ./src/OutfitTrends.ts ./src/PersonalReportGenerator.ts ./src/PsEvent.ts ./src/Quartile.ts ./src/StatMap.ts ./src/Storage.ts ***!
+  \****************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
 __webpack_require__(/*! ./src/BaseGenerator.ts */"./src/BaseGenerator.ts");
+__webpack_require__(/*! ./src/BreakdownBar.ts */"./src/BreakdownBar.ts");
 __webpack_require__(/*! ./src/BreakdownBox.ts */"./src/BreakdownBox.ts");
 __webpack_require__(/*! ./src/BreakdownChart.ts */"./src/BreakdownChart.ts");
 __webpack_require__(/*! ./src/BreakdownInterval.ts */"./src/BreakdownInterval.ts");
@@ -64474,11 +64608,14 @@ __webpack_require__(/*! ./src/Event.ts */"./src/Event.ts");
 __webpack_require__(/*! ./src/EventReporter.ts */"./src/EventReporter.ts");
 __webpack_require__(/*! ./src/index.ts */"./src/index.ts");
 __webpack_require__(/*! ./src/InvididualGenerator.ts */"./src/InvididualGenerator.ts");
+__webpack_require__(/*! ./src/Killfeed.ts */"./src/Killfeed.ts");
+__webpack_require__(/*! ./src/KillfeedSquad.ts */"./src/KillfeedSquad.ts");
 __webpack_require__(/*! ./src/Loadable.ts */"./src/Loadable.ts");
 __webpack_require__(/*! ./src/MomentFilter.ts */"./src/MomentFilter.ts");
 __webpack_require__(/*! ./src/OutfitTrends.ts */"./src/OutfitTrends.ts");
 __webpack_require__(/*! ./src/PersonalReportGenerator.ts */"./src/PersonalReportGenerator.ts");
 __webpack_require__(/*! ./src/PsEvent.ts */"./src/PsEvent.ts");
+__webpack_require__(/*! ./src/Quartile.ts */"./src/Quartile.ts");
 __webpack_require__(/*! ./src/StatMap.ts */"./src/StatMap.ts");
 module.exports = __webpack_require__(/*! ./src/Storage.ts */"./src/Storage.ts");
 

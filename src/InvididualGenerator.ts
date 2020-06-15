@@ -176,6 +176,8 @@ export class OutfitReport {
 
     timeUnrevived: number[] = [];
     revivedLifeExpectance: number[] = [];
+    kmLifeExpectance: number[] = [];
+    kmTimeDead: number[] = [];
 
     factionKillBreakdown: BreakdownArray = new BreakdownArray();
     factionDeathBreakdown: BreakdownArray = new BreakdownArray();
@@ -1057,7 +1059,11 @@ export class IndividualReporter {
             }
 
             if (ev.revivedEvent != null) {
-                array.push((ev.revivedEvent.timestamp - ev.timestamp) / 1000);
+                const diff: number = (ev.revivedEvent.timestamp - ev.timestamp) / 1000;
+                if (diff > 40) {
+                    continue; // Somehow death events are missed and a revive event is linked to the wrong death
+                }
+                array.push(diff);
             }
         }
 
@@ -1105,6 +1111,90 @@ export class IndividualReporter {
         return array.sort((a, b) => b - a);
     }
 
+    public static lifeExpectanceRate(events: Event[]): number[] {
+        const array: number[] = [];
+
+        for (const ev of events) {
+            if (ev.type != "death" || ev.revivedEvent == null) {
+                continue;
+            }
+
+            const charEvents: Event[] = events.filter(iter => iter.sourceID == ev.sourceID);
+
+            const index: number = charEvents.findIndex(iter => {
+                return iter.type == "death" && iter.timestamp == ev.timestamp && iter.targetID == ev.targetID;
+            });
+
+            if (index == -1) {
+                console.error(`Failed to find a death for ${ev.sourceID} at ${ev.timestamp} but wasn't found in charEvents`);
+                continue;
+            }
+
+            let nextDeath: EventDeath | null = null;
+            for (let i = index + 1; i < charEvents.length; ++i) {
+                if (charEvents[i].type == "death") {
+                    nextDeath = charEvents[i] as EventDeath;
+                    break;
+                }
+            }
+
+            if (nextDeath == null) {
+                console.error(`Failed to find the next death for ${ev.sourceID} at ${ev.timestamp}`);
+                continue;
+            }
+
+            const diff: number = (nextDeath.timestamp - ev.revivedEvent.timestamp) / 1000;
+            array.push(diff);
+        }
+
+        const probs: number[] = this.kaplanMeier(array, 20);
+
+        return probs;
+    }
+
+    public static timeUntilReviveRate(events: Event[]): number[] {
+        const array: number[] = [];
+
+        for (const ev of events) {
+            if (ev.type != "death") {
+                continue;
+            }
+
+            if (ev.revivedEvent != null) {
+                const diff: number = (ev.revivedEvent.timestamp - ev.timestamp) / 1000;
+                if (diff > 40) {
+                    continue; // Somehow death events are missed and a revive event is linked to the wrong death
+                }
+                array.push(diff);
+            }
+        }
+
+        const probs: number[] = this.kaplanMeier(array);
+
+        return probs;
+    }
+
+    private static kaplanMeier(data: number[], max?: number): number[] {
+        const ticks: number[] = [...Array(max ?? Math.max(...data)).keys()];
+        const probs: number[] = [];
+
+        let cur_pop: number[] = [...Array(data.length).keys()];
+        for (const tick of ticks) {
+            const survived = data.filter(iter => iter > tick).length;
+
+            probs.push(survived / cur_pop.length);
+            cur_pop = data.filter(iter => iter > tick);
+        }
+
+        let cumul: number = 1;
+        for (let i = 0; i < probs.length; ++i) {
+            probs[i] = cumul * probs[i];
+            cumul = probs[i];
+        }
+
+        return probs;
+    }
+
     public static generateContinentPlayedOn(events: Event[]): string {
         let indar: number = 0;
         let esamir: number = 0;
@@ -1145,3 +1235,4 @@ export class IndividualReporter {
     }
 
 }
+(window as any).IndividualReporter = IndividualReporter;

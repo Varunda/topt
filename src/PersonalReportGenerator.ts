@@ -1,4 +1,5 @@
 import { Report } from "InvididualGenerator";
+import { ApiResponse } from "census/ApiWrapper";
 
 export class PersonalReportGenerator {
 
@@ -9,6 +10,14 @@ export class PersonalReportGenerator {
         const personalReport = html.replace("REPORT_HERE_REPLACE_ME", JSON.stringify(anyReport));
 
         return personalReport;
+    }
+
+    public static getTemplate(): ApiResponse<string> {
+        const page: ApiResponse<string> = new ApiResponse(
+            $.get(`./personal/index.html?q=${new Date().getTime()}`),
+            (iter: any) => iter as string
+        );
+        return page;
     }
 
 }

@@ -1,4 +1,3 @@
-
 import Vue from "vue";
 import { BreakdownTimeslot } from "EventReporter";
 
@@ -7,7 +6,8 @@ import { Chart } from "chart.js";
 Vue.component("breakdown-bar", {
     props: {
         src: { type: Array, required: true },
-        MaxHeight: { type: Number, required: false, default: 200 }
+        MaxHeight: { type: Number, required: false, default: 200 },
+        ShowXAxis: { type: Boolean, required: false, default: false }
     },
 
     template: `
@@ -49,9 +49,14 @@ Vue.component("breakdown-bar", {
                 },
                 maintainAspectRatio: false,
                 scales: {
+                    yAxes: [{
+                        ticks: {
+                            suggestedMin: 0
+                        }
+                    }],
                     xAxes: [{
                         gridLines: {
-                            display: false
+                            display: this.ShowXAxis,
                         }
                     }]
                 }
@@ -65,15 +70,13 @@ Vue.component("breakdown-bar", {
                 }
 
                 this.chart.instance = new Chart(document.getElementById(`breakdown-bar-${this.ID}`)! as HTMLCanvasElement, {
-                    type: "bar",
+                    type: "line",
                     data: {
                         labels: this.chart.data.map((iter, index: number) => ""),
                         datasets: [{
-                            barPercentage: 1.0,
-                            barThickness: "flex",
+                            steppedLine: true,
                             data: this.chart.data,
-                            borderWidth: 0,
-                            hoverBorderWidth: 0
+                            pointStyle: "line"
                         }]
                     },
                     options: this.chart.options

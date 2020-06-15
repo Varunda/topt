@@ -663,6 +663,8 @@ export const vm = new Vue({
 
             this.outfitReport.timeUnrevived = IndividualReporter.unrevivedTime(this.outfitReport.events);
             this.outfitReport.revivedLifeExpectance = IndividualReporter.reviveLifeExpectance(this.outfitReport.events);
+            this.outfitReport.kmLifeExpectance = IndividualReporter.lifeExpectanceRate(this.outfitReport.events);
+            this.outfitReport.kmTimeDead = IndividualReporter.timeUntilReviveRate(this.outfitReport.events);
 
             const classFilter: (iter: Event, type: "kill" | "death", loadouts: string[]) => boolean = (iter, type, loadouts) => {
                 if (iter.type == type) {
@@ -753,8 +755,7 @@ export const vm = new Vue({
             let html: string = "";
             let report: Report = new Report();
 
-            const page = new ApiResponse($.get(`./personal.html?q=${new Date().getTime()}`), (iter: any) => iter);
-            page.ok((type: string) => {
+            PersonalReportGenerator.getTemplate().ok((type: string) => {
                 html = type;
                 if (--opsLeft == 0) {
                     done();
@@ -868,8 +869,7 @@ export const vm = new Vue({
                 }
             };
 
-            const page = new ApiResponse($.get(`./personal.html?q=${new Date().getTime()}`), (iter: any) => iter);
-            page.ok((type: string) => {
+            PersonalReportGenerator.getTemplate().ok((type: string) => {
                 html = type;
                 if (--opsLeft == 0) {
                     done();
