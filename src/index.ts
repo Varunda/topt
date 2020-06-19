@@ -62,6 +62,10 @@ import { OutfitTrendsV1, OutfitTrends, SessionV1 } from "OutfitTrends";
 import { StorageHelper, StorageSession, StorageTrend } from "Storage";
 import { KillfeedGeneration, KillfeedEntry, KillfeedOptions, Killfeed } from "Killfeed";
 
+import { WinterReportGenerator } from "winter/WinterReportGenerator";
+import { WinterReport } from "winter/WinterReport";
+import { WinterReportParameters, WinterReportSettings } from "winter/WinterReportParameters";
+
 class OpReportSettings {
     public zoneID: string | null = null;
 }
@@ -98,7 +102,7 @@ export const vm = new Vue({
 
         data: [] as any[], // Collection of all messages from all sockets, used for exporting
 
-        view: "setup" as "setup" | "realtime" | "ops" | "personal" | "base" | "killfeed",
+        view: "setup" as "setup" | "realtime" | "ops" | "personal" | "base" | "killfeed" | "winter",
 
         // Field related to settings about how TOPT runs
         settings: {
@@ -160,6 +164,11 @@ export const vm = new Vue({
             { title: "Heavy", name: "heavy" },
             { title: "Max", name: "max" },
         ],
+
+        winter: {
+            report: Loadable.idle() as Loading<WinterReport>,
+            settings: new WinterReportSettings() as WinterReportSettings,
+        },
 
         outfitReport: new OutfitReport() as OutfitReport,
         opsReportSettings: new OpReportSettings() as OpReportSettings,
@@ -508,6 +517,9 @@ export const vm = new Vue({
             if (this.parameters.report == "ops") {
                 this.generateOutfitReport();
                 this.view = "ops";
+            } else if (this.parameters.report == "winter") {
+                this.generateWinterReport();
+                this.view = "winter";
             }
 
             this.parameters.report = "";
@@ -747,6 +759,23 @@ export const vm = new Vue({
             EventReporter.revivesOverTime(this.outfitReport.events).ok(data => this.outfitReport.overtime.rpm = data);
 
             EventReporter.kdPerUpdate(this.outfitReport.events).ok(data => this.outfitReport.perUpdate.kd = data);
+        },
+
+        generateWinterReport: function(): void {
+            const params: WinterReportParameters = new WinterReportParameters();
+            params.players = Array.from(this.stats.values());
+            params.timeTracking = this.tracking;
+
+            this.stats.forEach((player: TrackedPlayer, charID: string) => {
+                if (player.events.length == 0) { return; }
+
+                params.events.push(...player.events);
+            });
+
+            this.winter.report = Loadable.loading();
+            WinterReportGenerator.generate(params).ok((data: WinterReport) => {
+                this.winter.report = Loadable.loaded(data);
+            });
         },
 
         generatePersonalReport: function(charID: string): void {

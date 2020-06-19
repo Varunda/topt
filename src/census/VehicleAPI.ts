@@ -23,6 +23,27 @@ export class VehicleTypes {
 
 }
 
+export class Vehicles {
+    public static flash: string = "1";
+    public static sunderer: string = "2";
+    public static lightning: string = "3";
+    public static magrider: string = "4";
+    public static vanguard: string = "5";
+    public static prowler: string = "6";
+    public static scythe: string = "7";
+    public static reaver: string = "8";
+    public static mosquito: string = "9";
+    public static liberator: string = "10";
+    public static galaxy: string = "11";
+    public static harasser: string = "12";
+    public static dropPod: string = "13";
+    public static valkyrie: string = "14";
+    public static ant: string = "15";
+    public static bastionMosquite: string = "2122";
+    public static bastionReaver: string = "2123";
+    public static bastionScythe: string = "2124";
+}
+
 export class VehicleAPI {
 
     private static _cache: ApiResponse<Vehicle[]> | null = null;

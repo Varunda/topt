@@ -63,6 +63,16 @@ export class PsEvent {
     public static radarDetect: string = "353";
     public static squadRadarDetect: string = "354";
 
+    public static transportAssists: string = "30";
+
+    public static concAssist: string = "550";
+    public static squadConcAssist: string = "551";
+    public static empAssist: string = "552";
+    public static squadEmpAssist: string = "553";
+    public static flashAssist: string = "554";
+    public static squadFlashAssist: string = "555";
+    public static savior: string = "335";
+
 }
 
 const remap: ((expID: string, toID: string) => [string, PsEvent]) = (expID, toID) => {
@@ -166,7 +176,7 @@ export const PsEvents: Map<string, PsEvent> = new Map<string, PsEvent>([
         track: true,
         alsoIncrement: PsEvent.kill
     }],
-    ["30", {
+    [PsEvent.transportAssists, {
         name: "Transport assist",
         types: ["logistics"],
         track: true,
@@ -300,6 +310,12 @@ export const PsEvents: Map<string, PsEvent> = new Map<string, PsEvent>([
         track: true,
         alsoIncrement: PsEvent.radarDetect
     }],
+    [PsEvent.savior, {
+        name: "Savior kill",
+        types: [],
+        track: true,
+        alsoIncrement: undefined
+    }],
     ["355", {
         name: "Squad vehicle spawn",
         types: ["logistics"],
@@ -318,37 +334,37 @@ export const PsEvents: Map<string, PsEvent> = new Map<string, PsEvent>([
         track: true,
         alsoIncrement: PsEvent.shieldRepair
     }],
-    ["550", {
+    [PsEvent.concAssist, {
         name: "Conc assist",
         types: ["versus"],
         track: true,
         alsoIncrement: undefined
     }],
-    ["551", {
+    [PsEvent.squadConcAssist, {
         name: "Squad conc assist",
         types: ["versus"],
         track: true,
         alsoIncrement: "550" // Conc assist
     }],
-    ["552", {
+    [PsEvent.empAssist, {
         name: "EMP assist",
         types: ["versus"],
         track: true,
         alsoIncrement: undefined
     }],
-    ["553", {
+    [PsEvent.squadEmpAssist, {
         name: "Squad EMP assist",
         types: ["versus"],
         track: true,
         alsoIncrement: "552" // EMP assist
     }],
-    ["554", {
+    [PsEvent.flashAssist, {
         name: "Flash assist",
         types: ["versus"],
         track: true,
         alsoIncrement: undefined
     }],
-    ["555", {
+    [PsEvent.squadFlashAssist, {
         name: "Squad flash assist",
         types: ["versus"],
         track: true,

@@ -44,7 +44,7 @@ export class WeaponAPI {
         const response = new ApiResponse(
             $.get("/weapons.json"),
             ((data: any) => {
-                const weapons: any[] = JSON.parse(data);
+                const weapons: any[] = Array.isArray(data) ? data : JSON.parse(data);
                 for (const datum of weapons) {
                     const wep: Weapon = WeaponAPI.parseCharacter(datum);
                     this._cache.set(wep.ID, wep);

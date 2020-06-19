@@ -60740,6 +60740,14 @@ PsEvent.motionDetect = "293";
 PsEvent.squadMotionDetect = "294";
 PsEvent.radarDetect = "353";
 PsEvent.squadRadarDetect = "354";
+PsEvent.transportAssists = "30";
+PsEvent.concAssist = "550";
+PsEvent.squadConcAssist = "551";
+PsEvent.empAssist = "552";
+PsEvent.squadEmpAssist = "553";
+PsEvent.flashAssist = "554";
+PsEvent.squadFlashAssist = "555";
+PsEvent.savior = "335";
 const remap = (expID, toID) => {
     return [expID, { name: "", types: [], track: true, alsoIncrement: toID }];
 };
@@ -60840,7 +60848,7 @@ const PsEvents = new Map([
             track: true,
             alsoIncrement: PsEvent.kill
         }],
-    ["30", {
+    [PsEvent.transportAssists, {
             name: "Transport assist",
             types: ["logistics"],
             track: true,
@@ -60973,6 +60981,12 @@ const PsEvents = new Map([
             track: true,
             alsoIncrement: PsEvent.radarDetect
         }],
+    [PsEvent.savior, {
+            name: "Savior kill",
+            types: [],
+            track: true,
+            alsoIncrement: undefined
+        }],
     ["355", {
             name: "Squad vehicle spawn",
             types: ["logistics"],
@@ -60991,37 +61005,37 @@ const PsEvents = new Map([
             track: true,
             alsoIncrement: PsEvent.shieldRepair
         }],
-    ["550", {
+    [PsEvent.concAssist, {
             name: "Conc assist",
             types: ["versus"],
             track: true,
             alsoIncrement: undefined
         }],
-    ["551", {
+    [PsEvent.squadConcAssist, {
             name: "Squad conc assist",
             types: ["versus"],
             track: true,
             alsoIncrement: "550" // Conc assist
         }],
-    ["552", {
+    [PsEvent.empAssist, {
             name: "EMP assist",
             types: ["versus"],
             track: true,
             alsoIncrement: undefined
         }],
-    ["553", {
+    [PsEvent.squadEmpAssist, {
             name: "Squad EMP assist",
             types: ["versus"],
             track: true,
             alsoIncrement: "552" // EMP assist
         }],
-    ["554", {
+    [PsEvent.flashAssist, {
             name: "Flash assist",
             types: ["versus"],
             track: true,
             alsoIncrement: undefined
         }],
-    ["555", {
+    [PsEvent.squadFlashAssist, {
             name: "Squad flash assist",
             types: ["versus"],
             track: true,
@@ -62315,7 +62329,7 @@ class FacilityAPI {
     }
     static loadJson() {
         new _ApiWrapper__WEBPACK_IMPORTED_MODULE_1__["ApiResponse"](jquery__WEBPACK_IMPORTED_MODULE_2__["get"]("/bases.json"), ((data) => {
-            const bs = JSON.parse(data);
+            const bs = Array.isArray(data) ? data : JSON.parse(data);
             for (const datum of bs) {
                 const wep = FacilityAPI.parse(datum);
                 this._cache.set(wep.ID, wep);
@@ -62821,13 +62835,14 @@ const PsLoadouts = new Map([
 /*!**********************************!*\
   !*** ./src/census/VehicleAPI.ts ***!
   \**********************************/
-/*! exports provided: Vehicle, VehicleTypes, VehicleAPI */
+/*! exports provided: Vehicle, VehicleTypes, Vehicles, VehicleAPI */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Vehicle", function() { return Vehicle; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "VehicleTypes", function() { return VehicleTypes; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Vehicles", function() { return Vehicles; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "VehicleAPI", function() { return VehicleAPI; });
 /* harmony import */ var _CensusAPI__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./CensusAPI */ "./src/census/CensusAPI.ts");
 /* harmony import */ var _ApiWrapper__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./ApiWrapper */ "./src/census/ApiWrapper.ts");
@@ -62848,6 +62863,26 @@ VehicleTypes.magrider = "2";
 VehicleTypes.turret = "7";
 VehicleTypes.air = "1";
 VehicleTypes.spawn = "8";
+class Vehicles {
+}
+Vehicles.flash = "1";
+Vehicles.sunderer = "2";
+Vehicles.lightning = "3";
+Vehicles.magrider = "4";
+Vehicles.vanguard = "5";
+Vehicles.prowler = "6";
+Vehicles.scythe = "7";
+Vehicles.reaver = "8";
+Vehicles.mosquito = "9";
+Vehicles.liberator = "10";
+Vehicles.galaxy = "11";
+Vehicles.harasser = "12";
+Vehicles.dropPod = "13";
+Vehicles.valkyrie = "14";
+Vehicles.ant = "15";
+Vehicles.bastionMosquite = "2122";
+Vehicles.bastionReaver = "2123";
+Vehicles.bastionScythe = "2124";
 class VehicleAPI {
     static parse(elem) {
         return {
@@ -62943,7 +62978,7 @@ class WeaponAPI {
     }
     static loadJson() {
         const response = new _ApiWrapper__WEBPACK_IMPORTED_MODULE_1__["ApiResponse"](jquery__WEBPACK_IMPORTED_MODULE_2__["get"]("/weapons.json"), ((data) => {
-            const weapons = JSON.parse(data);
+            const weapons = Array.isArray(data) ? data : JSON.parse(data);
             for (const datum of weapons) {
                 const wep = WeaponAPI.parseCharacter(datum);
                 this._cache.set(wep.ID, wep);
@@ -63092,6 +63127,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var OutfitTrends__WEBPACK_IMPORTED_MODULE_31__ = __webpack_require__(/*! OutfitTrends */ "./src/OutfitTrends.ts");
 /* harmony import */ var Storage__WEBPACK_IMPORTED_MODULE_32__ = __webpack_require__(/*! Storage */ "./src/Storage.ts");
 /* harmony import */ var Killfeed__WEBPACK_IMPORTED_MODULE_33__ = __webpack_require__(/*! Killfeed */ "./src/Killfeed.ts");
+/* harmony import */ var winter_WinterReportGenerator__WEBPACK_IMPORTED_MODULE_34__ = __webpack_require__(/*! winter/WinterReportGenerator */ "./src/winter/WinterReportGenerator.ts");
+/* harmony import */ var winter_WinterReportParameters__WEBPACK_IMPORTED_MODULE_35__ = __webpack_require__(/*! winter/WinterReportParameters */ "./src/winter/WinterReportParameters.ts");
 
 
 
@@ -63119,6 +63156,8 @@ __webpack_require__.r(__webpack_exports__);
 chart_js__WEBPACK_IMPORTED_MODULE_22__["Chart"].plugins.unregister(_node_modules_chartjs_plugin_datalabels_dist_chartjs_plugin_datalabels_js__WEBPACK_IMPORTED_MODULE_21___default.a);
 
 // @ts-ignore
+
+
 
 
 
@@ -63208,6 +63247,10 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             { title: "Heavy", name: "heavy" },
             { title: "Max", name: "max" },
         ],
+        winter: {
+            report: Loadable__WEBPACK_IMPORTED_MODULE_5__["Loadable"].idle(),
+            settings: new winter_WinterReportParameters__WEBPACK_IMPORTED_MODULE_35__["WinterReportSettings"](),
+        },
         outfitReport: new InvididualGenerator__WEBPACK_IMPORTED_MODULE_18__["OutfitReport"](),
         opsReportSettings: new OpReportSettings(),
         outfitTrends: new OutfitTrends__WEBPACK_IMPORTED_MODULE_31__["OutfitTrendsV1"](),
@@ -63497,6 +63540,10 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 this.generateOutfitReport();
                 this.view = "ops";
             }
+            else if (this.parameters.report == "winter") {
+                this.generateWinterReport();
+                this.view = "winter";
+            }
             this.parameters.report = "";
         },
         generateOutfitReport: function () {
@@ -63726,6 +63773,21 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].kdOverTime(this.outfitReport.events).ok(data => this.outfitReport.overtime.kd = data);
             EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].revivesOverTime(this.outfitReport.events).ok(data => this.outfitReport.overtime.rpm = data);
             EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].kdPerUpdate(this.outfitReport.events).ok(data => this.outfitReport.perUpdate.kd = data);
+        },
+        generateWinterReport: function () {
+            const params = new winter_WinterReportParameters__WEBPACK_IMPORTED_MODULE_35__["WinterReportParameters"]();
+            params.players = Array.from(this.stats.values());
+            params.timeTracking = this.tracking;
+            this.stats.forEach((player, charID) => {
+                if (player.events.length == 0) {
+                    return;
+                }
+                params.events.push(...player.events);
+            });
+            this.winter.report = Loadable__WEBPACK_IMPORTED_MODULE_5__["Loadable"].loading();
+            winter_WinterReportGenerator__WEBPACK_IMPORTED_MODULE_34__["WinterReportGenerator"].generate(params).ok((data) => {
+                this.winter.report = Loadable__WEBPACK_IMPORTED_MODULE_5__["Loadable"].loaded(data);
+            });
         },
         generatePersonalReport: function (charID) {
             let opsLeft = 2;
@@ -64577,6 +64639,386 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
     }
 });
 window.vm = vm;
+
+
+/***/ }),
+
+/***/ "./src/winter/WinterMetric.ts":
+/*!************************************!*\
+  !*** ./src/winter/WinterMetric.ts ***!
+  \************************************/
+/*! exports provided: WinterMetric, WinterMetricEntry */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "WinterMetric", function() { return WinterMetric; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "WinterMetricEntry", function() { return WinterMetricEntry; });
+class WinterMetric {
+    constructor() {
+        this.name = "";
+        this.funName = "";
+        this.description = "";
+        this.entries = [];
+    }
+}
+class WinterMetricEntry {
+    constructor() {
+        this.name = "";
+        this.value = 0;
+        this.display = null;
+    }
+}
+
+
+/***/ }),
+
+/***/ "./src/winter/WinterReport.ts":
+/*!************************************!*\
+  !*** ./src/winter/WinterReport.ts ***!
+  \************************************/
+/*! exports provided: WinterReport */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "WinterReport", function() { return WinterReport; });
+class WinterReport {
+    constructor() {
+        this.start = new Date();
+        this.end = new Date();
+        this.essential = [];
+        this.fun = [];
+    }
+}
+
+
+/***/ }),
+
+/***/ "./src/winter/WinterReportGenerator.ts":
+/*!*********************************************!*\
+  !*** ./src/winter/WinterReportGenerator.ts ***!
+  \*********************************************/
+/*! exports provided: WinterMetricIndex, WinterReportGenerator */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "WinterMetricIndex", function() { return WinterMetricIndex; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "WinterReportGenerator", function() { return WinterReportGenerator; });
+/* harmony import */ var census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! census/ApiWrapper */ "./src/census/ApiWrapper.ts");
+/* harmony import */ var _WinterReport__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./WinterReport */ "./src/winter/WinterReport.ts");
+/* harmony import */ var _WinterMetric__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./WinterMetric */ "./src/winter/WinterMetric.ts");
+/* harmony import */ var StatMap__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! StatMap */ "./src/StatMap.ts");
+/* harmony import */ var PsEvent__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! PsEvent */ "./src/PsEvent.ts");
+/* harmony import */ var census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! census/VehicleAPI */ "./src/census/VehicleAPI.ts");
+
+
+
+
+
+
+class WinterMetricIndex {
+}
+WinterMetricIndex.KILLS = 0;
+WinterMetricIndex.KD = 1;
+WinterMetricIndex.REVIVES = 2;
+WinterMetricIndex.HEALS = 3;
+WinterMetricIndex.RESUPPLIES = 4;
+WinterMetricIndex.REPAIRS = 5;
+class WinterReportGenerator {
+    static generate(parameters) {
+        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        const report = new _WinterReport__WEBPACK_IMPORTED_MODULE_1__["WinterReport"]();
+        report.start = new Date(parameters.events[0].timestamp);
+        report.end = new Date(parameters.events[parameters.events.length - 1].timestamp);
+        report.essential.length = 6;
+        report.essential[WinterMetricIndex.KILLS] = this.kills(parameters);
+        report.essential[WinterMetricIndex.KD] = this.kds(parameters);
+        report.essential[WinterMetricIndex.HEALS] = this.heals(parameters);
+        report.essential[WinterMetricIndex.REVIVES] = this.revives(parameters);
+        report.essential[WinterMetricIndex.REPAIRS] = this.repairs(parameters);
+        report.essential[WinterMetricIndex.RESUPPLIES] = this.resupplies(parameters);
+        report.fun.push(this.mostRevived(parameters));
+        report.fun.push(this.mostTransportAssists(parameters));
+        report.fun.push(this.mostReconAssists(parameters));
+        report.fun.push(this.mostConcAssists(parameters));
+        report.fun.push(this.mostEMPAssist(parameters));
+        report.fun.push(this.mostFlashAssists(parameters));
+        report.fun.push(this.mostSaviors(parameters));
+        report.fun.push(this.longestKillStreak(parameters));
+        report.fun.push(this.highestHSR(parameters));
+        report.fun.push(this.getDifferentWeapons(parameters));
+        report.fun.push(this.mostESFSKills(parameters));
+        report.fun.push(this.mostSunderersKilled(parameters));
+        response.resolveOk(report);
+        return response;
+    }
+    static revives(parameters) {
+        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].revive, PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadResupply], {
+            name: "Revives",
+            funName: "Necromancer",
+            description: "Players with the most revives",
+            entries: []
+        });
+    }
+    static heals(parameters) {
+        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].heal, PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadHeal], {
+            name: "Heals",
+            funName: "Green Wizard",
+            description: "Players with the most heals",
+            entries: []
+        });
+    }
+    static repairs(parameters) {
+        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].maxRepair, PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadMaxRepair], {
+            name: "MAX Repairs",
+            funName: "Welder",
+            description: "Players with the most repairs",
+            entries: []
+        });
+    }
+    static resupplies(parameters) {
+        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].resupply, PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadResupply], {
+            name: "Resupply",
+            funName: "Ammo printer",
+            description: "Players with the most resupplies",
+            entries: []
+        });
+    }
+    static kills(parameters) {
+        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].kill], {
+            name: "Kills",
+            funName: "Kills",
+            description: "Players with the most kills",
+            entries: []
+        });
+    }
+    static kds(parameters) {
+        const metric = new _WinterMetric__WEBPACK_IMPORTED_MODULE_2__["WinterMetric"]();
+        metric.name = "K/D";
+        metric.funName = "K/D";
+        metric.description = "Players with the highest K/D";
+        const entries = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        for (const player of parameters.players) {
+            entries.set(player.name, player.stats.get(PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].kill) / player.stats.get(PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].death, 1));
+        }
+        metric.entries = this.statMapToEntires(parameters, entries, (value) => value.toFixed(2));
+        return metric;
+    }
+    static mostRevived(parameters) {
+        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].revived], {
+            name: "Revived",
+            funName: "Zombie",
+            description: "Players who were revived the most",
+            entries: []
+        });
+    }
+    static mostTransportAssists(parameters) {
+        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].transportAssists], {
+            name: "Transport assists",
+            funName: "Logistics Specialists",
+            description: "Players with the most transport assists",
+            entries: []
+        });
+    }
+    static mostReconAssists(parameters) {
+        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].motionDetect, PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadMotionDetect], {
+            name: "Recon detections",
+            funName: "Flies on the Wall",
+            description: "Players with the most recon detection ticks",
+            entries: []
+        });
+    }
+    static mostConcAssists(parameters) {
+        return this.metric(parameters, ["550", "551"], {
+            name: "Conc assists",
+            funName: "Concussive Maintenance",
+            description: "Players with the most conc assists",
+            entries: []
+        });
+    }
+    static mostFlashAssists(parameters) {
+        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].flashAssist, PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadFlashAssist], {
+            name: "Flash assists",
+            funName: "Flasher",
+            description: "Players with the most flash assists",
+            entries: []
+        });
+    }
+    static mostEMPAssist(parameters) {
+        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].empAssist, PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadEmpAssist], {
+            name: "EMP assists",
+            funName: "Sparky Sparky Boom",
+            description: "Players with the most emp assists",
+            entries: []
+        });
+    }
+    static mostSaviors(parameters) {
+        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].savior], {
+            name: "Savior",
+            funName: "Savior",
+            description: "Players with the most savior kills",
+            entries: []
+        });
+    }
+    static longestKillStreak(parameters) {
+        const metric = new _WinterMetric__WEBPACK_IMPORTED_MODULE_2__["WinterMetric"]();
+        metric.name = "Kill streaks";
+        metric.funName = "Big fish";
+        metric.description = "Players with the longest kill streak";
+        const amounts = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        for (const player of parameters.players) {
+            let currentStreak = 0;
+            let longestStreak = 0;
+            for (const ev of player.events) {
+                if (ev.type != "kill" && ev.type != "death") {
+                    continue;
+                }
+                if (ev.type == "kill") {
+                    ++currentStreak;
+                }
+                else if (ev.type == "death" && ev.revivedEvent == null) {
+                    if (currentStreak > longestStreak) {
+                        longestStreak = currentStreak;
+                        amounts.set(player.name, longestStreak);
+                    }
+                    currentStreak = 0;
+                }
+            }
+        }
+        metric.entries = this.statMapToEntires(parameters, amounts);
+        return metric;
+    }
+    static highestHSR(parameters) {
+        const metric = new _WinterMetric__WEBPACK_IMPORTED_MODULE_2__["WinterMetric"]();
+        metric.name = "HSR";
+        metric.funName = "Head poppers";
+        metric.description = "Players with the highest headshot ratio";
+        const map = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        for (const player of parameters.players) {
+            const kills = player.events.filter(iter => iter.type == "kill").length || 1;
+            const hsKills = player.events.filter(iter => iter.type == "kill" && iter.isHeadshot == true).length || 1;
+            if (player.secondsOnline < 10) {
+                continue;
+            }
+            if (kills == 1 || hsKills == 1) {
+                continue;
+            }
+            map.set(player.name, hsKills / kills);
+        }
+        metric.entries = this.statMapToEntires(parameters, map, (iter) => `${(iter * 100).toFixed(2)}%`);
+        return metric;
+    }
+    static getDifferentWeapons(parameters) {
+        const metric = new _WinterMetric__WEBPACK_IMPORTED_MODULE_2__["WinterMetric"]();
+        metric.name = "Different weapons";
+        metric.funName = "Diverse Skillset";
+        metric.description = "Players with the most amount of unique weapons";
+        const stats = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        for (const player of parameters.players) {
+            const set = new Set();
+            for (const ev of player.events) {
+                if (ev.type != "kill") {
+                    continue;
+                }
+                set.add(ev.weaponID);
+            }
+            stats.set(player.name, set.size);
+        }
+        metric.entries = this.statMapToEntires(parameters, stats);
+        return metric;
+    }
+    static mostESFSKills(parameters) {
+        return this.vehicle(parameters, [census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].mosquito, census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].reaver, census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].scythe], {
+            name: "ESFs destroyed",
+            funName: "Fly Swatter",
+            description: "Players with the most ESFs destroyed",
+            entries: []
+        });
+    }
+    static mostSunderersKilled(parameters) {
+        return this.vehicle(parameters, [census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].sunderer], {
+            name: "Sunderes killed",
+            funName: "Bus Bully",
+            description: "Players with the most sundies destroyed",
+            entries: []
+        });
+    }
+    static vehicle(parameters, vehicles, metric) {
+        const amounts = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        for (const player of parameters.players) {
+            for (const ev of player.events) {
+                if (ev.type != "vehicle") {
+                    continue;
+                }
+                if (vehicles.indexOf(ev.vehicleID) > -1) {
+                    amounts.increment(player.name);
+                }
+            }
+        }
+        metric.entries = this.statMapToEntires(parameters, amounts);
+        return metric;
+    }
+    static metric(parameters, events, metric) {
+        const amounts = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        for (const player of parameters.players) {
+            for (const ev of events) {
+                amounts.increment(player.name, player.stats.get(ev));
+            }
+        }
+        metric.entries = this.statMapToEntires(parameters, amounts);
+        return metric;
+    }
+    static value(parameters, accessor, metric) {
+        const map = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        for (const player of parameters.players) {
+            map.set(player.name, accessor(player));
+        }
+        metric.entries = this.statMapToEntires(parameters, map);
+    }
+    static statMapToEntires(parameters, map, display = null) {
+        return Array.from(map.getMap().entries()).map((iter) => {
+            return {
+                name: iter[0],
+                value: iter[1],
+                display: display != null ? display(iter[1]) : null
+            };
+        }).filter(iter => iter.value)
+            .sort((a, b) => b.value - a.value)
+            .slice(0, parameters.settings.topNPlayers == -1 ? undefined : parameters.settings.topNPlayers);
+    }
+}
+
+
+/***/ }),
+
+/***/ "./src/winter/WinterReportParameters.ts":
+/*!**********************************************!*\
+  !*** ./src/winter/WinterReportParameters.ts ***!
+  \**********************************************/
+/*! exports provided: WinterReportParameters, WinterReportSettings */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "WinterReportParameters", function() { return WinterReportParameters; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "WinterReportSettings", function() { return WinterReportSettings; });
+class WinterReportParameters {
+    constructor() {
+        this.players = [];
+        this.events = [];
+        this.timeTracking = { startTime: 0, endTime: 0, running: false };
+        this.settings = new WinterReportSettings();
+    }
+}
+class WinterReportSettings {
+    constructor() {
+        this.useFunNames = true;
+        this.topNPlayers = 5;
+        this.funMetricCount = 10;
+    }
+}
 
 
 /***/ }),

@@ -879,28 +879,46 @@
             <div class="col-12"> <!-- Faction stats -->
                 <h2 class="strike">Factions</h2>
                 <div class="row">
-                    <div class="col-3">
-                        <breakdown-chart :src="outfitReport.factionKillBreakdown"
-                            :show-all="false" :clipped-amount="8">
-                        </breakdown-chart>
-                    </div>
-                    <div class="col-3">
-                        <breakdown :data="outfitReport.factionKillBreakdown" :show-all="true"
-                            left-title="Kills" right-title="Amount"
-                            :show-percent="true" :clipped-amount="10" :show-total="true">
-                        </breakdown>
+                    <div class="col-6">
+                        <div class="row">
+                            <div class="col-12">
+                                <h4 class="strike">Faction kills</h4>
+                            </div>
+
+                            <div class="col-6">
+                                <breakdown-chart :src="outfitReport.factionKillBreakdown"
+                                    :show-all="false" :clipped-amount="8">
+                                </breakdown-chart>
+                            </div>
+
+                            <div class="col-6">
+                                <breakdown :data="outfitReport.factionKillBreakdown" :show-all="true"
+                                    left-title="Kills" right-title="Amount"
+                                    :show-percent="true" :clipped-amount="10" :show-total="true">
+                                </breakdown>
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="col-3">
-                        <breakdown-chart :src="outfitReport.factionDeathBreakdown"
-                            :show-all="false" :clipped-amount="8">
-                        </breakdown-chart>
-                    </div>
-                    <div class="col-3">
-                        <breakdown :data="outfitReport.factionDeathBreakdown" :show-all="true"
-                            left-title="Deaths" right-title="Amount"
-                            :show-percent="true" :clipped-amount="10" :show-total="true">
-                        </breakdown>
+                    <div class="col-6">
+                        <div class="row">
+                            <div class="col-12">
+                                <h4 class="strike">Faction deaths</h4>
+                            </div>
+
+                            <div class="col-6">
+                                <breakdown-chart :src="outfitReport.factionDeathBreakdown"
+                                    :show-all="false" :clipped-amount="8">
+                                </breakdown-chart>
+                            </div>
+
+                            <div class="col-6">
+                                <breakdown :data="outfitReport.factionDeathBreakdown" :show-all="true"
+                                    left-title="Deaths" right-title="Amount"
+                                    :show-percent="true" :clipped-amount="10" :show-total="true">
+                                </breakdown>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -908,28 +926,46 @@
             <div class="col-12">
                 <h2 class="strike">Continents</h2>
                 <div class="row">
-                    <div class="col-3">
-                        <breakdown-chart :src="outfitReport.continentKillBreakdown"
-                            :show-all="false" :clipped-amount="8">
-                        </breakdown-chart>
-                    </div>
-                    <div class="col-3">
-                        <breakdown :data="outfitReport.continentKillBreakdown" :show-all="true"
-                            left-title="Kills" right-title="Amount"
-                            :show-percent="true" :clipped-amount="10" :show-total="true">
-                        </breakdown>
+                    <div class="col-6">
+                        <div class="row">
+                            <div class="col-12">
+                                <h4 class="strike">Continent kills</h4>
+                            </div>
+
+                            <div class="col-6">
+                                <breakdown-chart :src="outfitReport.continentKillBreakdown"
+                                    :show-all="false" :clipped-amount="8">
+                                </breakdown-chart>
+                            </div>
+
+                            <div class="col-6">
+                                <breakdown :data="outfitReport.continentKillBreakdown" :show-all="true"
+                                    left-title="Kills" right-title="Amount"
+                                    :show-percent="true" :clipped-amount="10" :show-total="true">
+                                </breakdown>
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="col-3">
-                        <breakdown-chart :src="outfitReport.continentDeathBreakdown"
-                            :show-all="false" :clipped-amount="8">
-                        </breakdown-chart>
-                    </div>
-                    <div class="col-3">
-                        <breakdown :data="outfitReport.continentDeathBreakdown" :show-all="true"
-                            left-title="Deaths" right-title="Amount"
-                            :show-percent="true" :clipped-amount="10" :show-total="true">
-                        </breakdown>
+                    <div class="col-6">
+                        <div class="row">
+                            <div class="col-12">
+                                <h4 class="strike">Continent deaths</h4>
+                            </div>
+
+                            <div class="col-6">
+                                <breakdown-chart :src="outfitReport.continentDeathBreakdown"
+                                    :show-all="false" :clipped-amount="8">
+                                </breakdown-chart>
+                            </div>
+
+                            <div class="col-6">
+                                <breakdown :data="outfitReport.continentDeathBreakdown" :show-all="true"
+                                    left-title="Deaths" right-title="Amount"
+                                    :show-percent="true" :clipped-amount="10" :show-total="true">
+                                </breakdown>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1269,27 +1305,27 @@
                                 ({{(breakdown.revived / ((breakdown.deaths || 1) + (breakdown.revived || 1)) * 100).toFixed(2)}}%)
                             </td>
                             <td>
-                                {{breakdown.classKills.infil}} / {{breakdown.classDeaths.infil}} ({{breakdown.classRevived.infil}})
+                                {{breakdown.classKills.infil}} / {{breakdown.classDeaths.infil}}
                                 - {{(breakdown.classKills.infil / (breakdown.classDeaths.infil || 1)).toFixed(2)}}
                             </td>
                             <td>
-                                {{breakdown.classKills.lightAssault}} / {{breakdown.classDeaths.lightAssault}} ({{breakdown.classRevived.lightAssault}})
+                                {{breakdown.classKills.lightAssault}} / {{breakdown.classDeaths.lightAssault}}
                                 - {{(breakdown.classKills.lightAssault / (breakdown.classDeaths.lightAssault || 1)).toFixed(2)}}
                             </td>
                             <td>
-                                {{breakdown.classKills.medic}} / {{breakdown.classDeaths.medic}} ({{breakdown.classRevived.medic}})
+                                {{breakdown.classKills.medic}} / {{breakdown.classDeaths.medic}}
                                 - {{(breakdown.classKills.medic / (breakdown.classDeaths.medic || 1)).toFixed(2)}}
                             </td>
                             <td>
-                                {{breakdown.classKills.engineer}} / {{breakdown.classDeaths.engineer}} ({{breakdown.classRevived.engineer}})
+                                {{breakdown.classKills.engineer}} / {{breakdown.classDeaths.engineer}}
                                 - {{(breakdown.classKills.engineer / (breakdown.classDeaths.engineer || 1)).toFixed(2)}}
                             </td>
                             <td>
-                                {{breakdown.classKills.heavy}} / {{breakdown.classDeaths.heavy}} ({{breakdown.classRevived.heavy}})
+                                {{breakdown.classKills.heavy}} / {{breakdown.classDeaths.heavy}}
                                 - {{(breakdown.classKills.heavy / (breakdown.classDeaths.heavy || 1)).toFixed(2)}}
                             </td>
                             <td>
-                                {{breakdown.classKills.max}} / {{breakdown.classDeaths.max}} ({{breakdown.classRevived.max}})
+                                {{breakdown.classKills.max}} / {{breakdown.classDeaths.max}}
                                 - {{(breakdown.classKills.max / (breakdown.classDeaths.max || 1)).toFixed(2)}}
                             </td>
                         </tr>
@@ -1527,6 +1563,79 @@
 
         </div>
 
+        <div v-else-if="view == 'winter'" class="row">
+            <div class="col-12" v-if="winter.report.state == 'loading'">
+                Loading...
+            </div>
+
+            <template v-else>
+                <div class="col-12"> <!-- Header -->
+                    <div class="d-flex align-items-center mb-2">
+                        <img :src="showFrog == false ? '/logo.png' : '/frog.png'" class="mr-1" style="max-width: 128px; max-height: 128px; border-radius: 30%;" title="Tide logo">
+                        <div class="d-flex flex-row flex-grow-1">
+                            <div class="flex-grow-1">
+                                <h2>Tide OP Tracker (TOPT)</h2>
+                                <h5 class="text-muted">Winter report</h5>
+                                <h5>
+                                    <a href="#">https://github.com/Varunda/topt/</a>
+                                </h5>
+                            </div>
+
+                            <div class="flex-grow-1">
+                                <div><b>Start:</b> {{winter.report.data.start | moment}}</div>
+                                <div><b>End:</b> {{winter.report.data.end | moment}}</div>
+                                <div><b>Duration:</b> {{winter.report.data.start | between(winter.report.data.end)}}</div>
+                            </div>
+
+                            <div>
+                                <button @click="view = 'realtime'" type="button" class="btn btn-secondary float-right">
+                                    &times;
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-12">
+                    <h2 class="strike">Summary</h2>
+
+                    <div class="d-flex">
+                        <div v-for="metric in winter.report.data.essential.filter(iter => iter != undefined)" class="card mr-1 mb-1">
+                            <h5 class="card-header">
+                                {{winter.settings.useFunNames ? metric.funName : metric.name}}
+                            </h5>
+                            <div class="card-body flex-grow-0">
+                                <h6 class="card-subtitle text-muted">{{metric.description}}</h6>
+                            </div>
+                            <div class="list-group list-group-flush flex-grow-1">
+                                <div v-for="entry in metric.entries" class="list-group-item border-top">
+                                    {{entry.name}} - {{entry.display != null ? entry.display : entry.value}}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h2 class="strike">Leaderboards</h2>
+
+                    <div class="d-flex" style="flex-wrap: wrap">
+                        <div v-for="metric in winter.report.data.fun.filter(iter => iter != undefined)" class="card mr-1 mb-1">
+                            <h5 class="card-header">
+                                {{winter.settings.useFunNames ? metric.funName : metric.name}}
+                            </h5>
+                            <div class="card-body flex-grow-0">
+                                <h6 class="card-subtitle text-muted">{{metric.description}}</h6>
+                            </div>
+                            <div class="list-group list-group-flush flex-grow-1">
+                                <div v-for="entry in metric.entries" class="list-group-item border-top">
+                                    {{entry.name}} - {{entry.display != null ? entry.display : entry.value}}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+
         <div v-else>
             Unknown view: {{view}}
 
@@ -1590,6 +1699,7 @@
                         <select v-model="parameters.report" class="form-control">
                             <option disabled selected>Select a report</option>
                             <option value="ops">OPs report</option>
+                            <option value="winter">Winter report</option>
                         </select>
 
                         <hr>
@@ -1603,6 +1713,10 @@
                                     {{zone}}
                                 </option>
                             </select>
+                        </div>
+
+                        <div v-else-if="parameters.report == 'winter'">
+                            <h6 class="strike">Winter report settings</h6>
                         </div>
 
                         <hr>
