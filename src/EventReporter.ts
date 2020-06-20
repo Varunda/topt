@@ -828,16 +828,14 @@ export default class EventReporter {
         );
     }
 
-    public static kpmOverTime(events: Event[]): ApiResponse<BreakdownTimeslot[]> { 
-        const response: ApiResponse<BreakdownTimeslot[]> = new ApiResponse();
-
-        const kills: EventKill[] = events.filter(iter => iter.type == "kill") as EventKill[];
+    public static kpmOverTime(events: Event[]): BreakdownTimeslot[] { 
+        const kills: EventKill[] = events.filter(iter => iter.type == "kill")
+            .sort((a, b) => a.timestamp - b.timestamp) as EventKill[];
         const players: Set<string> = new Set();
         console.log(`Using ${kills.length} kills`);
 
         if (kills.length == 0) {
-            response.resolveOk([]);
-            return response;
+            return [];
         }
 
         const slots: BreakdownTimeslot[] = [];
@@ -847,9 +845,13 @@ export default class EventReporter {
         let start = events[0].timestamp;
         let count = 0;
 
+        console.log(`From ${start} to ${stop}`);
+
         while (true) {
             const end = start + diff;
             const section: EventKill[] = kills.filter(iter => iter.timestamp >= start && iter.timestamp < end);
+
+            console.log(`From [${start}, ${end}] got ${section.length} events`);
 
             for (const ev of section) {
                 players.add(ev.sourceID);
@@ -871,9 +873,7 @@ export default class EventReporter {
             }
         }
 
-        response.resolveOk(slots);
-
-        return response;
+        return slots;
     }
 
     public static kdOverTime(events: Event[]): ApiResponse<BreakdownTimeslot[]> {

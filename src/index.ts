@@ -594,6 +594,8 @@ export const vm = new Vue({
                 });
             });
 
+            this.outfitReport.events = this.outfitReport.events.sort((a, b) => a.timestamp - b.timestamp);
+
             if (this.tracking.running == true) {
                 console.log(`Running setting endTime to now as the tracking is running`);
                 this.tracking.endTime = new Date().getTime();
@@ -754,7 +756,7 @@ export const vm = new Vue({
 
             this.outfitReport.continent = IndividualReporter.generateContinentPlayedOn(this.outfitReport.events);
 
-            EventReporter.kpmOverTime(this.outfitReport.events).ok(data => this.outfitReport.overtime.kpm = data);
+            this.outfitReport.overtime.kpm = EventReporter.kpmOverTime(this.outfitReport.events);
             EventReporter.kdOverTime(this.outfitReport.events).ok(data => this.outfitReport.overtime.kd = data);
             EventReporter.revivesOverTime(this.outfitReport.events).ok(data => this.outfitReport.overtime.rpm = data);
 

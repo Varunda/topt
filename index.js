@@ -58638,22 +58638,23 @@ class EventReporter {
         return statMapToBreakdown(amounts, census_CharacterAPI__WEBPACK_IMPORTED_MODULE_1__["CharacterAPI"].getByIDs, (elem, ID) => elem.ID == ID, defaultCharacterMapper);
     }
     static kpmOverTime(events) {
-        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
-        const kills = events.filter(iter => iter.type == "kill");
+        const kills = events.filter(iter => iter.type == "kill")
+            .sort((a, b) => a.timestamp - b.timestamp);
         const players = new Set();
         console.log(`Using ${kills.length} kills`);
         if (kills.length == 0) {
-            response.resolveOk([]);
-            return response;
+            return [];
         }
         const slots = [];
         const diff = 1000 * 60 * 5; // 1000 ms * 60 sec/min * 5 mins
         const stop = kills[kills.length - 1].timestamp;
         let start = events[0].timestamp;
         let count = 0;
+        console.log(`From ${start} to ${stop}`);
         while (true) {
             const end = start + diff;
             const section = kills.filter(iter => iter.timestamp >= start && iter.timestamp < end);
+            console.log(`From [${start}, ${end}] got ${section.length} events`);
             for (const ev of section) {
                 players.add(ev.sourceID);
                 ++count;
@@ -58670,8 +58671,7 @@ class EventReporter {
                 break;
             }
         }
-        response.resolveOk(slots);
-        return response;
+        return slots;
     }
     static kdOverTime(events) {
         const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
@@ -63604,6 +63604,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 });
                 this.outfitReport.players.push(Object.assign({ name: `${(player.outfitTag != '' ? `[${player.outfitTag}] ` : '')}${player.name}` }, playtime));
             });
+            this.outfitReport.events = this.outfitReport.events.sort((a, b) => a.timestamp - b.timestamp);
             if (this.tracking.running == true) {
                 console.log(`Running setting endTime to now as the tracking is running`);
                 this.tracking.endTime = new Date().getTime();
@@ -63769,7 +63770,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                     || (b[0].localeCompare(a[0]));
             }).map((a) => a[1]); // Transform the tuple into the ExpBreakdown
             this.outfitReport.continent = InvididualGenerator__WEBPACK_IMPORTED_MODULE_18__["IndividualReporter"].generateContinentPlayedOn(this.outfitReport.events);
-            EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].kpmOverTime(this.outfitReport.events).ok(data => this.outfitReport.overtime.kpm = data);
+            this.outfitReport.overtime.kpm = EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].kpmOverTime(this.outfitReport.events);
             EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].kdOverTime(this.outfitReport.events).ok(data => this.outfitReport.overtime.kd = data);
             EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].revivesOverTime(this.outfitReport.events).ok(data => this.outfitReport.overtime.rpm = data);
             EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].kdPerUpdate(this.outfitReport.events).ok(data => this.outfitReport.perUpdate.kd = data);
