@@ -63,6 +63,7 @@ export class PsEvent {
     public static radarDetect: string = "353";
     public static squadRadarDetect: string = "354";
 
+    public static roadkill: string = "26";
     public static transportAssists: string = "30";
 
     public static concAssist: string = "550";
@@ -164,11 +165,11 @@ export const PsEvents: Map<string, PsEvent> = new Map<string, PsEvent>([
         track: true,
         alsoIncrement: undefined
     }],
-    ["26", {
+    [PsEvent.roadkill, { // 26
         name: "Roadkill",
-        types: ["versus"],
+        types: [],
         track: true,
-        alsoIncrement: PsEvent.kill
+        alsoIncrement: undefined
     }],
     ["29", {
         name: "MAX kill",
@@ -176,7 +177,7 @@ export const PsEvents: Map<string, PsEvent> = new Map<string, PsEvent>([
         track: true,
         alsoIncrement: PsEvent.kill
     }],
-    [PsEvent.transportAssists, {
+    [PsEvent.transportAssists, { // 30
         name: "Transport assist",
         types: ["logistics"],
         track: true,

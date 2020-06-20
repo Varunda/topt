@@ -394,10 +394,6 @@ export class IndividualReporter {
             + 1     // Weapon type kills
             + 1     // Weapon deaths
             + 1     // Weapon death types
-            + 1     // KD over time
-            + 1     // KPM over time
-            + 1     // KD per update
-            + 1     // RPM over time
             + 1     // Ribbons
             + 1     // Medic breakdown
             + 1     // Engineer breakdown
@@ -456,20 +452,14 @@ export class IndividualReporter {
         EventReporter.weaponTypeDeaths(parameters.player.events)
             .ok(data => report.weaponDeathTypeBreakdown = data).always(callback("Weapon type deaths"));
 
-        EventReporter.kdOverTime(parameters.player.events)
-            .ok(data => report.overtime.kd = data).always(callback("KD over time"));
-        EventReporter.kpmOverTime(parameters.player.events) 
-            .ok(data => report.overtime.kpm = data).always(callback("KPM over time"));
+        report.overtime.kd = EventReporter.kdOverTime(parameters.player.events);
+        report.overtime.kpm = EventReporter.kpmOverTime(parameters.player.events);
 
         if (parameters.player.events.find(iter => iter.type == "exp" && (iter.expID == PsEvent.revive || iter.expID == PsEvent.squadRevive)) != undefined) {
-            EventReporter.revivesOverTime(parameters.player.events)
-                .ok(data => report.overtime.rpm = data).always(callback("RPM over time"));
-        } else {
-            callback("RPM over time")();
+            report.overtime.rpm = EventReporter.revivesOverTime(parameters.player.events);
         }
 
-        EventReporter.kdPerUpdate(parameters.player.events)
-            .ok(data => report.perUpdate.kd = data).always(callback("KD per update"));
+        report.perUpdate.kd = EventReporter.kdPerUpdate(parameters.player.events);
 
         const ribbonIDs: string[] = Array.from(parameters.player.ribbons.getMap().keys());
         if (ribbonIDs.length > 0) {

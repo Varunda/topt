@@ -831,8 +831,8 @@ export default class EventReporter {
     public static kpmOverTime(events: Event[]): BreakdownTimeslot[] { 
         const kills: EventKill[] = events.filter(iter => iter.type == "kill")
             .sort((a, b) => a.timestamp - b.timestamp) as EventKill[];
+
         const players: Set<string> = new Set();
-        console.log(`Using ${kills.length} kills`);
 
         if (kills.length == 0) {
             return [];
@@ -845,13 +845,9 @@ export default class EventReporter {
         let start = events[0].timestamp;
         let count = 0;
 
-        console.log(`From ${start} to ${stop}`);
-
         while (true) {
             const end = start + diff;
             const section: EventKill[] = kills.filter(iter => iter.timestamp >= start && iter.timestamp < end);
-
-            console.log(`From [${start}, ${end}] got ${section.length} events`);
 
             for (const ev of section) {
                 players.add(ev.sourceID);
@@ -876,14 +872,11 @@ export default class EventReporter {
         return slots;
     }
 
-    public static kdOverTime(events: Event[]): ApiResponse<BreakdownTimeslot[]> {
-        const response: ApiResponse<BreakdownTimeslot[]> = new ApiResponse();
-
+    public static kdOverTime(events: Event[]): BreakdownTimeslot[] {
         const evs: Event[] = events.filter(iter => iter.type == "kill" || (iter.type == "death" && iter.revived == false));
 
         if (evs.length == 0) {
-            response.resolveOk([]);
-            return response;
+            return [];
         }
 
         const slots: BreakdownTimeslot[] = [];
@@ -912,19 +905,14 @@ export default class EventReporter {
             }
         }
 
-        response.resolveOk(slots);
-
-        return response;
+        return slots;
     }
 
-    public static kdPerUpdate(allEvents: Event[]): ApiResponse<BreakdownTimeslot[]> {
-        const response: ApiResponse<BreakdownTimeslot[]> = new ApiResponse();
-
+    public static kdPerUpdate(allEvents: Event[]): BreakdownTimeslot[] {
         const events: Event[] = allEvents.filter(iter => iter.type == "kill" || (iter.type == "death" && iter.revived == false));
 
         if (events.length == 0) {
-            response.resolveOk([]);
-            return response;
+            return [];
         }
 
         let kills: number = 0;
@@ -953,19 +941,14 @@ export default class EventReporter {
             });
         }
 
-        response.resolveOk(slots);
-
-        return response;
+        return slots;
     }
 
-    public static revivesOverTime(events: Event[]): ApiResponse<BreakdownTimeslot[]> {
-        const response: ApiResponse<BreakdownTimeslot[]> = new ApiResponse();
-
+    public static revivesOverTime(events: Event[]): BreakdownTimeslot[] {
         const revives: Event[] = events.filter(iter => iter.type == "exp" && (iter.expID == PsEvent.revive || iter.expID == PsEvent.squadRevive));
 
         if (revives.length == 0) {
-            response.resolveOk([]);
-            return response;
+            return [];
         }
 
         const slots: BreakdownTimeslot[] = [];
@@ -994,9 +977,7 @@ export default class EventReporter {
             }
         }
 
-        response.resolveOk(slots);
-
-        return response;
+        return slots;
     }
 
 }

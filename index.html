@@ -1585,6 +1585,7 @@
                                 <div><b>Start:</b> {{winter.report.data.start | moment}}</div>
                                 <div><b>End:</b> {{winter.report.data.end | moment}}</div>
                                 <div><b>Duration:</b> {{winter.report.data.start | between(winter.report.data.end)}}</div>
+                                <div><b>Players:</b> {{winter.report.data.players.length}}</div>
                             </div>
 
                             <div>
@@ -1600,13 +1601,15 @@
                     <h2 class="strike">Summary</h2>
 
                     <div class="d-flex">
-                        <div v-for="metric in winter.report.data.essential.filter(iter => iter != undefined)" class="card mr-1 mb-1">
-                            <h5 class="card-header">
-                                {{winter.settings.useFunNames ? metric.funName : metric.name}}
-                            </h5>
-                            <div class="card-body flex-grow-0">
-                                <h6 class="card-subtitle text-muted">{{metric.description}}</h6>
-                            </div>
+                        <div v-for="metric in winter.report.data.essential.filter(iter => iter != undefined && iter.entries.length > 0)" class="card mr-2 mb-2">
+                            <span class="card-header">
+                                <h5>
+                                    {{winter.settings.useFunNames ? metric.funName : metric.name}}
+                                </h5>
+                                <h6 class="text-muted mb-0 mt-1">
+                                    {{metric.description}}
+                                </h6>
+                            </span>
                             <div class="list-group list-group-flush flex-grow-1">
                                 <div v-for="entry in metric.entries" class="list-group-item border-top">
                                     {{entry.name}} - {{entry.display != null ? entry.display : entry.value}}
@@ -1618,13 +1621,15 @@
                     <h2 class="strike">Leaderboards</h2>
 
                     <div class="d-flex" style="flex-wrap: wrap">
-                        <div v-for="metric in winter.report.data.fun.filter(iter => iter != undefined)" class="card mr-1 mb-1">
-                            <h5 class="card-header">
-                                {{winter.settings.useFunNames ? metric.funName : metric.name}}
-                            </h5>
-                            <div class="card-body flex-grow-0">
-                                <h6 class="card-subtitle text-muted">{{metric.description}}</h6>
-                            </div>
+                        <div v-for="metric in winter.report.data.fun.filter(iter => iter != undefined && iter.entries.length > 0)" class="card mr-2 mb-2">
+                            <span class="card-header">
+                                <h5>
+                                    {{winter.settings.useFunNames ? metric.funName : metric.name}}
+                                </h5>
+                                <h6 class="text-muted mb-0 mt-1">
+                                    {{metric.description}}
+                                </h6>
+                            </span>
                             <div class="list-group list-group-flush flex-grow-1">
                                 <div v-for="entry in metric.entries" class="list-group-item border-top">
                                     {{entry.name}} - {{entry.display != null ? entry.display : entry.value}}
@@ -1717,6 +1722,26 @@
 
                         <div v-else-if="parameters.report == 'winter'">
                             <h6 class="strike">Winter report settings</h6>
+
+                            <label class="col-form-label">What names to display?</label>
+                            <select v-model="winter.settings.useFunNames" class="form-control">
+                                <option :value="true">Use fun names</option>
+                                <option :value="false">Use descriptive names</option>
+                            </select>
+
+                            <label class="col-form-label">How many leadersboards to show?</label>
+                            <select v-model="winter.settings.funMetricCount" class="form-control">
+                                <option :value="-1">Show all leaderboards</option>
+                                <option :value="10">Show 10 random leaderboards</option>
+                                <option :value="20">Show 20 random leaderboards</option>
+                            </select>
+
+                            <label class="col-form-label">How many players to show on each leaderboard?</label>
+                            <select v-model="winter.settings.topNPlayers" class="form-control">
+                                <option :value="5">5</option>
+                                <option :value="8">8</option>
+                                <option :value="10">10</option>
+                            </select>
                         </div>
 
                         <hr>

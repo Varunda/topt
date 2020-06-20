@@ -757,16 +757,17 @@ export const vm = new Vue({
             this.outfitReport.continent = IndividualReporter.generateContinentPlayedOn(this.outfitReport.events);
 
             this.outfitReport.overtime.kpm = EventReporter.kpmOverTime(this.outfitReport.events);
-            EventReporter.kdOverTime(this.outfitReport.events).ok(data => this.outfitReport.overtime.kd = data);
-            EventReporter.revivesOverTime(this.outfitReport.events).ok(data => this.outfitReport.overtime.rpm = data);
+            this.outfitReport.overtime.kd = EventReporter.kdOverTime(this.outfitReport.events);
+            this.outfitReport.overtime.rpm = EventReporter.revivesOverTime(this.outfitReport.events);
 
-            EventReporter.kdPerUpdate(this.outfitReport.events).ok(data => this.outfitReport.perUpdate.kd = data);
+            this.outfitReport.perUpdate.kd = EventReporter.kdPerUpdate(this.outfitReport.events);
         },
 
         generateWinterReport: function(): void {
             const params: WinterReportParameters = new WinterReportParameters();
             params.players = Array.from(this.stats.values());
             params.timeTracking = this.tracking;
+            params.settings = this.winter.settings;
 
             this.stats.forEach((player: TrackedPlayer, charID: string) => {
                 if (player.events.length == 0) { return; }

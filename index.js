@@ -58641,7 +58641,6 @@ class EventReporter {
         const kills = events.filter(iter => iter.type == "kill")
             .sort((a, b) => a.timestamp - b.timestamp);
         const players = new Set();
-        console.log(`Using ${kills.length} kills`);
         if (kills.length == 0) {
             return [];
         }
@@ -58650,11 +58649,9 @@ class EventReporter {
         const stop = kills[kills.length - 1].timestamp;
         let start = events[0].timestamp;
         let count = 0;
-        console.log(`From ${start} to ${stop}`);
         while (true) {
             const end = start + diff;
             const section = kills.filter(iter => iter.timestamp >= start && iter.timestamp < end);
-            console.log(`From [${start}, ${end}] got ${section.length} events`);
             for (const ev of section) {
                 players.add(ev.sourceID);
                 ++count;
@@ -58674,11 +58671,9 @@ class EventReporter {
         return slots;
     }
     static kdOverTime(events) {
-        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
         const evs = events.filter(iter => iter.type == "kill" || (iter.type == "death" && iter.revived == false));
         if (evs.length == 0) {
-            response.resolveOk([]);
-            return response;
+            return [];
         }
         const slots = [];
         const diff = 1000 * 60 * 5; // 1000 ms * 60 sec/min * 5 mins
@@ -58699,15 +58694,12 @@ class EventReporter {
                 break;
             }
         }
-        response.resolveOk(slots);
-        return response;
+        return slots;
     }
     static kdPerUpdate(allEvents) {
-        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
         const events = allEvents.filter(iter => iter.type == "kill" || (iter.type == "death" && iter.revived == false));
         if (events.length == 0) {
-            response.resolveOk([]);
-            return response;
+            return [];
         }
         let kills = 0;
         let deaths = 0;
@@ -58731,15 +58723,12 @@ class EventReporter {
                 endTime: i
             });
         }
-        response.resolveOk(slots);
-        return response;
+        return slots;
     }
     static revivesOverTime(events) {
-        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
         const revives = events.filter(iter => iter.type == "exp" && (iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].revive || iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].squadRevive));
         if (revives.length == 0) {
-            response.resolveOk([]);
-            return response;
+            return [];
         }
         const slots = [];
         const diff = 1000 * 60 * 5; // 1000 ms * 60 sec/min * 5 mins
@@ -58760,8 +58749,7 @@ class EventReporter {
                 break;
             }
         }
-        response.resolveOk(slots);
-        return response;
+        return slots;
     }
 }
 window.EventReporter = EventReporter;
@@ -59143,10 +59131,6 @@ class IndividualReporter {
             + 1 // Weapon type kills
             + 1 // Weapon deaths
             + 1 // Weapon death types
-            + 1 // KD over time
-            + 1 // KPM over time
-            + 1 // KD per update
-            + 1 // RPM over time
             + 1 // Ribbons
             + 1 // Medic breakdown
             + 1 // Engineer breakdown
@@ -59194,19 +59178,12 @@ class IndividualReporter {
             .ok(data => report.weaponDeathBreakdown = data).always(callback("Weapon deaths"));
         EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].weaponTypeDeaths(parameters.player.events)
             .ok(data => report.weaponDeathTypeBreakdown = data).always(callback("Weapon type deaths"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].kdOverTime(parameters.player.events)
-            .ok(data => report.overtime.kd = data).always(callback("KD over time"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].kpmOverTime(parameters.player.events)
-            .ok(data => report.overtime.kpm = data).always(callback("KPM over time"));
+        report.overtime.kd = EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].kdOverTime(parameters.player.events);
+        report.overtime.kpm = EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].kpmOverTime(parameters.player.events);
         if (parameters.player.events.find(iter => iter.type == "exp" && (iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].revive || iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].squadRevive)) != undefined) {
-            EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].revivesOverTime(parameters.player.events)
-                .ok(data => report.overtime.rpm = data).always(callback("RPM over time"));
+            report.overtime.rpm = EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].revivesOverTime(parameters.player.events);
         }
-        else {
-            callback("RPM over time")();
-        }
-        EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].kdPerUpdate(parameters.player.events)
-            .ok(data => report.perUpdate.kd = data).always(callback("KD per update"));
+        report.perUpdate.kd = EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].kdPerUpdate(parameters.player.events);
         const ribbonIDs = Array.from(parameters.player.ribbons.getMap().keys());
         if (ribbonIDs.length > 0) {
             census_AchievementAPI__WEBPACK_IMPORTED_MODULE_3__["AchievementAPI"].getByIDs(ribbonIDs).ok((data) => {
@@ -60740,6 +60717,7 @@ PsEvent.motionDetect = "293";
 PsEvent.squadMotionDetect = "294";
 PsEvent.radarDetect = "353";
 PsEvent.squadRadarDetect = "354";
+PsEvent.roadkill = "26";
 PsEvent.transportAssists = "30";
 PsEvent.concAssist = "550";
 PsEvent.squadConcAssist = "551";
@@ -60836,11 +60814,11 @@ const PsEvents = new Map([
             track: true,
             alsoIncrement: undefined
         }],
-    ["26", {
+    [PsEvent.roadkill, {
             name: "Roadkill",
-            types: ["versus"],
+            types: [],
             track: true,
-            alsoIncrement: PsEvent.kill
+            alsoIncrement: undefined
         }],
     ["29", {
             name: "MAX kill",
@@ -63771,14 +63749,15 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             }).map((a) => a[1]); // Transform the tuple into the ExpBreakdown
             this.outfitReport.continent = InvididualGenerator__WEBPACK_IMPORTED_MODULE_18__["IndividualReporter"].generateContinentPlayedOn(this.outfitReport.events);
             this.outfitReport.overtime.kpm = EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].kpmOverTime(this.outfitReport.events);
-            EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].kdOverTime(this.outfitReport.events).ok(data => this.outfitReport.overtime.kd = data);
-            EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].revivesOverTime(this.outfitReport.events).ok(data => this.outfitReport.overtime.rpm = data);
-            EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].kdPerUpdate(this.outfitReport.events).ok(data => this.outfitReport.perUpdate.kd = data);
+            this.outfitReport.overtime.kd = EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].kdOverTime(this.outfitReport.events);
+            this.outfitReport.overtime.rpm = EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].revivesOverTime(this.outfitReport.events);
+            this.outfitReport.perUpdate.kd = EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].kdPerUpdate(this.outfitReport.events);
         },
         generateWinterReport: function () {
             const params = new winter_WinterReportParameters__WEBPACK_IMPORTED_MODULE_35__["WinterReportParameters"]();
             params.players = Array.from(this.stats.values());
             params.timeTracking = this.tracking;
+            params.settings = this.winter.settings;
             this.stats.forEach((player, charID) => {
                 if (player.events.length == 0) {
                     return;
@@ -64690,6 +64669,7 @@ class WinterReport {
         this.end = new Date();
         this.essential = [];
         this.fun = [];
+        this.players = [];
     }
 }
 
@@ -64713,6 +64693,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var StatMap__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! StatMap */ "./src/StatMap.ts");
 /* harmony import */ var PsEvent__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! PsEvent */ "./src/PsEvent.ts");
 /* harmony import */ var census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! census/VehicleAPI */ "./src/census/VehicleAPI.ts");
+/* harmony import */ var census_WeaponAPI__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! census/WeaponAPI */ "./src/census/WeaponAPI.ts");
+
 
 
 
@@ -64730,9 +64712,11 @@ WinterMetricIndex.REPAIRS = 5;
 class WinterReportGenerator {
     static generate(parameters) {
         const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        console.log(`Generating a report with the following settings: ${JSON.stringify(parameters.settings)}`);
         const report = new _WinterReport__WEBPACK_IMPORTED_MODULE_1__["WinterReport"]();
         report.start = new Date(parameters.events[0].timestamp);
         report.end = new Date(parameters.events[parameters.events.length - 1].timestamp);
+        report.players = [...parameters.players.filter(iter => iter.events.length > 0)];
         report.essential.length = 6;
         report.essential[WinterMetricIndex.KILLS] = this.kills(parameters);
         report.essential[WinterMetricIndex.KD] = this.kds(parameters);
@@ -64752,14 +64736,38 @@ class WinterReportGenerator {
         report.fun.push(this.getDifferentWeapons(parameters));
         report.fun.push(this.mostESFSKills(parameters));
         report.fun.push(this.mostSunderersKilled(parameters));
-        response.resolveOk(report);
+        report.fun.push(this.mostRoadkills(parameters));
+        report.fun.push(this.mostUsefulRevives(parameters));
+        report.fun.push(this.highestAverageLifeExpectance(parameters));
+        report.fun.push(this.mostC4Kills(parameters));
+        report.fun.push(this.mostPercentRevive(parameters));
+        let opsLeft = +1 // Knife kills
+            + 1 // Pistol kills
+            + 1 // Grenade kills
+        ;
+        const handler = () => {
+            if (--opsLeft == 0) {
+                if (parameters.settings.funMetricCount != -1) {
+                    // Shuffle array
+                    for (let i = report.fun.length - 1; i > 0; i--) {
+                        const elem = Math.floor(Math.random() * (i + 1));
+                        [report.fun[i], report.fun[elem]] = [report.fun[elem], report.fun[i]];
+                    }
+                    report.fun = report.fun.slice(0, parameters.settings.funMetricCount);
+                }
+                response.resolveOk(report);
+            }
+        };
+        this.mostKnifeKills(parameters).ok(data => report.fun.push(data)).always(handler);
+        this.mostGrenadeKills(parameters).ok(data => report.fun.push(data)).always(handler);
+        this.mostPistolKills(parameters).ok(data => report.fun.push(data)).always(handler);
         return response;
     }
     static revives(parameters) {
         return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].revive, PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadResupply], {
             name: "Revives",
             funName: "Necromancer",
-            description: "Players with the most revives",
+            description: "Most revives",
             entries: []
         });
     }
@@ -64767,7 +64775,7 @@ class WinterReportGenerator {
         return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].heal, PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadHeal], {
             name: "Heals",
             funName: "Green Wizard",
-            description: "Players with the most heals",
+            description: "Most heals",
             entries: []
         });
     }
@@ -64775,7 +64783,7 @@ class WinterReportGenerator {
         return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].maxRepair, PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadMaxRepair], {
             name: "MAX Repairs",
             funName: "Welder",
-            description: "Players with the most repairs",
+            description: "Most MAX repairs",
             entries: []
         });
     }
@@ -64783,35 +64791,31 @@ class WinterReportGenerator {
         return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].resupply, PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadResupply], {
             name: "Resupply",
             funName: "Ammo printer",
-            description: "Players with the most resupplies",
+            description: "Most resupplies",
             entries: []
         });
     }
     static kills(parameters) {
-        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].kill], {
+        return this.value(parameters, (player) => player.events.filter(iter => iter.type == "kill").length, {
             name: "Kills",
             funName: "Kills",
-            description: "Players with the most kills",
+            description: "Most kills",
             entries: []
         });
     }
     static kds(parameters) {
-        const metric = new _WinterMetric__WEBPACK_IMPORTED_MODULE_2__["WinterMetric"]();
-        metric.name = "K/D";
-        metric.funName = "K/D";
-        metric.description = "Players with the highest K/D";
-        const entries = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
-        for (const player of parameters.players) {
-            entries.set(player.name, player.stats.get(PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].kill) / player.stats.get(PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].death, 1));
-        }
-        metric.entries = this.statMapToEntires(parameters, entries, (value) => value.toFixed(2));
-        return metric;
+        return this.value(parameters, (player) => player.stats.get(PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].kill) / player.stats.get(PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].death, 1), {
+            name: "K/D",
+            funName: "K/D",
+            description: "Highest K/D",
+            entries: []
+        }, (value) => value.toFixed(2));
     }
     static mostRevived(parameters) {
-        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].revived], {
+        return this.value(parameters, ((player) => player.events.filter(iter => iter.type == "death" && iter.revived == true).length), {
             name: "Revived",
             funName: "Zombie",
-            description: "Players who were revived the most",
+            description: "Revived the most",
             entries: []
         });
     }
@@ -64819,7 +64823,7 @@ class WinterReportGenerator {
         return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].transportAssists], {
             name: "Transport assists",
             funName: "Logistics Specialists",
-            description: "Players with the most transport assists",
+            description: "Most transport assists",
             entries: []
         });
     }
@@ -64827,31 +64831,31 @@ class WinterReportGenerator {
         return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].motionDetect, PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadMotionDetect], {
             name: "Recon detections",
             funName: "Flies on the Wall",
-            description: "Players with the most recon detection ticks",
+            description: "Most recon detection ticks",
             entries: []
         });
     }
     static mostConcAssists(parameters) {
-        return this.metric(parameters, ["550", "551"], {
-            name: "Conc assists",
+        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].concAssist, PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadConcAssist], {
+            name: "Conced killers",
             funName: "Concussive Maintenance",
-            description: "Players with the most conc assists",
+            description: "Most kills on concussed players",
             entries: []
         });
     }
     static mostFlashAssists(parameters) {
         return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].flashAssist, PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadFlashAssist], {
-            name: "Flash assists",
-            funName: "Flasher",
-            description: "Players with the most flash assists",
+            name: "Flashed killers",
+            funName: "Darklight",
+            description: "Most kills on flashed players",
             entries: []
         });
     }
     static mostEMPAssist(parameters) {
         return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].empAssist, PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadEmpAssist], {
-            name: "EMP assists",
+            name: "EMPed killers",
             funName: "Sparky Sparky Boom",
-            description: "Players with the most emp assists",
+            description: "Most kills on EMPed players",
             entries: []
         });
     }
@@ -64859,7 +64863,7 @@ class WinterReportGenerator {
         return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].savior], {
             name: "Savior",
             funName: "Savior",
-            description: "Players with the most savior kills",
+            description: "Most savior kills",
             entries: []
         });
     }
@@ -64867,7 +64871,7 @@ class WinterReportGenerator {
         const metric = new _WinterMetric__WEBPACK_IMPORTED_MODULE_2__["WinterMetric"]();
         metric.name = "Kill streaks";
         metric.funName = "Big fish";
-        metric.description = "Players with the longest kill streak";
+        metric.description = "Longest kill streak";
         const amounts = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
         for (const player of parameters.players) {
             let currentStreak = 0;
@@ -64895,7 +64899,7 @@ class WinterReportGenerator {
         const metric = new _WinterMetric__WEBPACK_IMPORTED_MODULE_2__["WinterMetric"]();
         metric.name = "HSR";
         metric.funName = "Head poppers";
-        metric.description = "Players with the highest headshot ratio";
+        metric.description = "Highest headshot ratio";
         const map = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
         for (const player of parameters.players) {
             const kills = player.events.filter(iter => iter.type == "kill").length || 1;
@@ -64915,7 +64919,7 @@ class WinterReportGenerator {
         const metric = new _WinterMetric__WEBPACK_IMPORTED_MODULE_2__["WinterMetric"]();
         metric.name = "Different weapons";
         metric.funName = "Diverse Skillset";
-        metric.description = "Players with the most amount of unique weapons";
+        metric.description = "Most amount of unique weapons";
         const stats = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
         for (const player of parameters.players) {
             const set = new Set();
@@ -64934,7 +64938,7 @@ class WinterReportGenerator {
         return this.vehicle(parameters, [census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].mosquito, census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].reaver, census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].scythe], {
             name: "ESFs destroyed",
             funName: "Fly Swatter",
-            description: "Players with the most ESFs destroyed",
+            description: "Most ESFs destroyed",
             entries: []
         });
     }
@@ -64942,9 +64946,162 @@ class WinterReportGenerator {
         return this.vehicle(parameters, [census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].sunderer], {
             name: "Sunderes killed",
             funName: "Bus Bully",
-            description: "Players with the most sundies destroyed",
+            description: "Most sundies destroyed",
             entries: []
         });
+    }
+    static mostRoadkills(parameters) {
+        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].roadkill], {
+            name: "Roadkills",
+            funName: "Road rage",
+            description: "Most roadkills",
+            entries: []
+        });
+    }
+    static mostUsefulRevives(parameters) {
+        const metric = new _WinterMetric__WEBPACK_IMPORTED_MODULE_2__["WinterMetric"]();
+        metric.name = "Efficient revived";
+        metric.funName = "Efficient Zombie";
+        metric.description = "Most kills 10 seconds after being revived";
+        const amounts = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        for (const player of parameters.players) {
+            const revives = player.events.filter(iter => iter.type == "death" && iter.revivedEvent != null);
+            for (const ev of revives) {
+                const kills = player.events.filter(iter => {
+                    return iter.type == "kill" && iter.timestamp >= ev.timestamp && iter.timestamp < ev.timestamp + 10000;
+                });
+                if (kills.length == 0) {
+                    continue;
+                }
+                amounts.increment(player.name, kills.length);
+            }
+        }
+        metric.entries = this.statMapToEntires(parameters, amounts);
+        return metric;
+    }
+    static mostPercentRevive(parameters) {
+        return this.value(parameters, (player) => {
+            const revived = player.events.filter(iter => iter.type == "death" && iter.revived == true).length;
+            const killed = player.events.filter(iter => iter.type == "death").length;
+            return revived / killed;
+        }, {
+            name: "Percent revived",
+            funName: "Makes me strong",
+            description: "Highest ratio of revived deaths to deaths",
+            entries: []
+        }, (value) => `${(value * 100).toFixed(2)}%`);
+    }
+    static highestAverageLifeExpectance(parameters) {
+        const metric = new _WinterMetric__WEBPACK_IMPORTED_MODULE_2__["WinterMetric"]();
+        metric.name = "Longest life expectance";
+        metric.funName = "Elders";
+        metric.description = "Longest average life expectance";
+        const amounts = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        for (const player of parameters.players) {
+            if (player.events.length == 0) {
+                continue;
+            }
+            const expectances = [];
+            let start = player.events[0].timestamp;
+            for (const ev of player.events) {
+                if (ev.type == "death" && ev.revived == false) {
+                    expectances.push((ev.timestamp - start) / 1000);
+                    start = ev.timestamp;
+                }
+            }
+            if (expectances.length == 0) {
+                continue;
+            }
+            const total = expectances.reduce((acc, val) => { return acc += val; }, 0);
+            const avg = total / expectances.length;
+            amounts.set(player.name, avg);
+        }
+        metric.entries = this.statMapToEntires(parameters, amounts, (value) => {
+            let mins = 0;
+            let seconds = value;
+            if (value > 60) {
+                mins = Math.floor(seconds / 60);
+                seconds = seconds % 60;
+                return `${mins.toFixed(0)} mins ${seconds.toFixed(0)} seconds`;
+            }
+            return `${value.toFixed(1)} seconds`;
+        });
+        return metric;
+    }
+    static mostKnifeKills(parameters) {
+        return this.weaponType(parameters, "Knife", {
+            name: "Knife kills",
+            funName: "Slasher",
+            description: "Most knife kills",
+            entries: []
+        });
+    }
+    static mostC4Kills(parameters) {
+        return this.weapon(parameters, ["432", "800623"], {
+            name: "C4 kills",
+            funName: "Explosive Tedencies",
+            description: "Most C-4 kills",
+            entries: []
+        });
+    }
+    static mostGrenadeKills(parameters) {
+        return this.weaponType(parameters, "Grenade", {
+            name: "Grenade kills",
+            funName: "Hot Potato",
+            description: "Most grenade kills",
+            entries: []
+        });
+    }
+    static mostPistolKills(parameters) {
+        return this.weaponType(parameters, "Pistol", {
+            name: "Pistol kills",
+            funName: "The Cowboy",
+            description: "Most pistol kills",
+            entries: []
+        });
+    }
+    static weaponType(parameters, type, metric) {
+        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        const wepIDs = new Set();
+        for (const player of parameters.players) {
+            const IDs = player.events.filter(iter => iter.type == "kill")
+                .map(iter => iter.weaponID);
+            for (const id of IDs) {
+                wepIDs.add(id);
+            }
+        }
+        const amounts = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        census_WeaponAPI__WEBPACK_IMPORTED_MODULE_6__["WeaponAPI"].getByIDs(Array.from(wepIDs.keys())).ok((data) => {
+            for (const player of parameters.players) {
+                const kills = player.events.filter(iter => iter.type == "kill");
+                for (const kill of kills) {
+                    const weapon = data.find(iter => iter.ID == kill.weaponID);
+                    if (weapon == undefined) {
+                        continue;
+                    }
+                    if (weapon.type == type) {
+                        amounts.increment(player.name);
+                    }
+                }
+            }
+            metric.entries = this.statMapToEntires(parameters, amounts);
+        });
+        response.resolveOk(metric);
+        return response;
+    }
+    static weapon(parameters, ids, metric) {
+        const amounts = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        for (const player of parameters.players) {
+            for (const ev of player.events) {
+                if (ev.type == "kill") {
+                    if (ids.indexOf(ev.weaponID) > -1) {
+                        amounts.increment(player.name);
+                    }
+                }
+            }
+        }
+        metric.entries = this.statMapToEntires(parameters, amounts);
+        return metric;
     }
     static vehicle(parameters, vehicles, metric) {
         const amounts = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
@@ -64964,19 +65121,21 @@ class WinterReportGenerator {
     static metric(parameters, events, metric) {
         const amounts = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
         for (const player of parameters.players) {
-            for (const ev of events) {
-                amounts.increment(player.name, player.stats.get(ev));
+            const evs = player.events.filter(iter => iter.type == "exp" && events.indexOf(iter.expID) > -1);
+            if (evs.length > 0) {
+                amounts.set(player.name, evs.length);
             }
         }
         metric.entries = this.statMapToEntires(parameters, amounts);
         return metric;
     }
-    static value(parameters, accessor, metric) {
+    static value(parameters, accessor, metric, display = null) {
         const map = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
         for (const player of parameters.players) {
             map.set(player.name, accessor(player));
         }
-        metric.entries = this.statMapToEntires(parameters, map);
+        metric.entries = this.statMapToEntires(parameters, map, display);
+        return metric;
     }
     static statMapToEntires(parameters, map, display = null) {
         return Array.from(map.getMap().entries()).map((iter) => {
@@ -65015,9 +65174,9 @@ class WinterReportParameters {
 }
 class WinterReportSettings {
     constructor() {
-        this.useFunNames = true;
+        this.useFunNames = false;
         this.topNPlayers = 5;
-        this.funMetricCount = 10;
+        this.funMetricCount = -1;
     }
 }
 

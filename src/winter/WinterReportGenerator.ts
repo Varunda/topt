@@ -6,9 +6,11 @@ import { WinterMetric, WinterMetricEntry } from "./WinterMetric";
 import { WinterReportParameters } from "./WinterReportParameters";
 
 import StatMap from "StatMap";
+import { Event, EventKill } from "Event";
 import { PsEvent } from "PsEvent";
 import { TrackedPlayer } from "InvididualGenerator";
 import { VehicleTypes, Vehicle, VehicleAPI, Vehicles } from "census/VehicleAPI";
+import { WeaponAPI, Weapon } from "census/WeaponAPI";
 
 export class WinterMetricIndex {
     public static KILLS: number = 0;
@@ -25,9 +27,13 @@ export class WinterReportGenerator {
     public static generate(parameters: WinterReportParameters): ApiResponse<WinterReport> {
         const response: ApiResponse<WinterReport> = new ApiResponse();
 
+        console.log(`Generating a report with the following settings: ${JSON.stringify(parameters.settings)}`);
+
         const report: WinterReport = new WinterReport();
         report.start = new Date(parameters.events[0].timestamp);
         report.end = new Date(parameters.events[parameters.events.length - 1].timestamp);
+
+        report.players = [...parameters.players.filter(iter => iter.events.length > 0)];
 
         report.essential.length = 6;
         report.essential[WinterMetricIndex.KILLS] = this.kills(parameters);
@@ -49,8 +55,37 @@ export class WinterReportGenerator {
         report.fun.push(this.getDifferentWeapons(parameters));
         report.fun.push(this.mostESFSKills(parameters));
         report.fun.push(this.mostSunderersKilled(parameters));
+        report.fun.push(this.mostRoadkills(parameters));
+        report.fun.push(this.mostUsefulRevives(parameters));
+        report.fun.push(this.highestAverageLifeExpectance(parameters));
+        report.fun.push(this.mostC4Kills(parameters));
+        report.fun.push(this.mostPercentRevive(parameters));
 
-        response.resolveOk(report);
+        let opsLeft: number = 
+            + 1     // Knife kills
+            + 1     // Pistol kills
+            + 1     // Grenade kills
+            ;
+
+        const handler = () => {
+            if (--opsLeft == 0) {
+                if (parameters.settings.funMetricCount != -1) {
+                    // Shuffle array
+                    for (let i = report.fun.length - 1; i > 0; i--) {
+                        const elem = Math.floor(Math.random() * (i + 1));
+                        [report.fun[i], report.fun[elem]] = [report.fun[elem], report.fun[i]];
+                    }
+
+                    report.fun = report.fun.slice(0, parameters.settings.funMetricCount);
+                }
+
+                response.resolveOk(report);
+            }
+        }
+
+        this.mostKnifeKills(parameters).ok(data => report.fun.push(data)).always(handler);
+        this.mostGrenadeKills(parameters).ok(data => report.fun.push(data)).always(handler);
+        this.mostPistolKills(parameters).ok(data => report.fun.push(data)).always(handler);
 
         return response;
     }
@@ -59,7 +94,7 @@ export class WinterReportGenerator {
         return this.metric(parameters, [PsEvent.revive, PsEvent.squadResupply], {
             name: "Revives",
             funName: "Necromancer",
-            description: "Players with the most revives",
+            description: "Most revives",
             entries: []
         });
     }
@@ -68,7 +103,7 @@ export class WinterReportGenerator {
         return this.metric(parameters, [PsEvent.heal, PsEvent.squadHeal], {
             name: "Heals",
             funName: "Green Wizard",
-            description: "Players with the most heals",
+            description: "Most heals",
             entries: []
         });
     }
@@ -77,7 +112,7 @@ export class WinterReportGenerator {
         return this.metric(parameters, [PsEvent.maxRepair, PsEvent.squadMaxRepair], {
             name: "MAX Repairs",
             funName: "Welder",
-            description: "Players with the most repairs",
+            description: "Most MAX repairs",
             entries: []
         });
     }
@@ -86,51 +121,52 @@ export class WinterReportGenerator {
         return this.metric(parameters, [PsEvent.resupply, PsEvent.squadResupply], {
             name: "Resupply",
             funName: "Ammo printer",
-            description: "Players with the most resupplies",
+            description: "Most resupplies",
             entries: []
         });
     }
 
     private static kills(parameters: WinterReportParameters): WinterMetric {
-        return this.metric(parameters, [PsEvent.kill], {
+        return this.value(parameters, (player: TrackedPlayer) => player.events.filter(iter => iter.type == "kill").length, {
             name: "Kills",
             funName: "Kills",
-            description: "Players with the most kills",
+            description: "Most kills",
             entries: []
         });
     }
 
     private static kds(parameters: WinterReportParameters): WinterMetric {
-        const metric: WinterMetric = new WinterMetric();
-        metric.name = "K/D";
-        metric.funName = "K/D";
-        metric.description = "Players with the highest K/D";
-
-        const entries: StatMap = new StatMap();
-
-        for (const player of parameters.players) {
-            entries.set(player.name, player.stats.get(PsEvent.kill) / player.stats.get(PsEvent.death, 1));
-        }
-
-        metric.entries = this.statMapToEntires(parameters, entries, (value: number) => value.toFixed(2));
-
-        return metric;
+        return this.value(
+            parameters,
+            (player: TrackedPlayer) => player.stats.get(PsEvent.kill) / player.stats.get(PsEvent.death, 1),
+            {
+                name: "K/D",
+                funName: "K/D",
+                description: "Highest K/D",
+                entries: []
+            },
+            (value: number) => value.toFixed(2)
+        );
     }
 
     private static mostRevived(parameters: WinterReportParameters): WinterMetric {
-        return this.metric(parameters, [PsEvent.revived], {
-            name: "Revived",
-            funName: "Zombie",
-            description: "Players who were revived the most",
-            entries: []
-        });
+        return this.value(
+            parameters,
+            ((player: TrackedPlayer) => player.events.filter(iter => iter.type == "death" && iter.revived == true).length),
+            {
+                name: "Revived",
+                funName: "Zombie",
+                description: "Revived the most",
+                entries: []
+            }
+        );
     }
 
     private static mostTransportAssists(parameters: WinterReportParameters): WinterMetric {
         return this.metric(parameters, [PsEvent.transportAssists], {
             name: "Transport assists",
             funName: "Logistics Specialists",
-            description: "Players with the most transport assists",
+            description: "Most transport assists",
             entries: []
         });
     }
@@ -139,34 +175,34 @@ export class WinterReportGenerator {
         return this.metric(parameters, [PsEvent.motionDetect, PsEvent.squadMotionDetect], {
             name: "Recon detections",
             funName: "Flies on the Wall",
-            description: "Players with the most recon detection ticks",
+            description: "Most recon detection ticks",
             entries: []
         });
     }
 
     private static mostConcAssists(parameters: WinterReportParameters): WinterMetric {
-        return this.metric(parameters, ["550", "551"], {
-            name: "Conc assists",
+        return this.metric(parameters, [PsEvent.concAssist, PsEvent.squadConcAssist], {
+            name: "Conced killers",
             funName: "Concussive Maintenance",
-            description: "Players with the most conc assists",
+            description: "Most kills on concussed players",
             entries: []
         });
     }
 
     private static mostFlashAssists(parameters: WinterReportParameters): WinterMetric {
         return this.metric(parameters, [PsEvent.flashAssist, PsEvent.squadFlashAssist], {
-            name: "Flash assists",
-            funName: "Flasher",
-            description: "Players with the most flash assists",
+            name: "Flashed killers",
+            funName: "Darklight",
+            description: "Most kills on flashed players",
             entries: []
         });
     }
 
     private static mostEMPAssist(parameters: WinterReportParameters): WinterMetric {
         return this.metric(parameters, [PsEvent.empAssist, PsEvent.squadEmpAssist], {
-            name: "EMP assists",
+            name: "EMPed killers",
             funName: "Sparky Sparky Boom",
-            description: "Players with the most emp assists",
+            description: "Most kills on EMPed players",
             entries: []
         });
     }
@@ -175,7 +211,7 @@ export class WinterReportGenerator {
         return this.metric(parameters, [PsEvent.savior], {
             name: "Savior",
             funName: "Savior",
-            description: "Players with the most savior kills",
+            description: "Most savior kills",
             entries: []
         });
     }
@@ -184,7 +220,7 @@ export class WinterReportGenerator {
         const metric: WinterMetric = new WinterMetric();
         metric.name = "Kill streaks";
         metric.funName = "Big fish";
-        metric.description = "Players with the longest kill streak";
+        metric.description = "Longest kill streak";
 
         const amounts: StatMap = new StatMap();
 
@@ -218,7 +254,7 @@ export class WinterReportGenerator {
         const metric: WinterMetric = new WinterMetric();
         metric.name = "HSR";
         metric.funName = "Head poppers";
-        metric.description = "Players with the highest headshot ratio";
+        metric.description = "Highest headshot ratio";
 
         const map: StatMap = new StatMap();
 
@@ -246,7 +282,7 @@ export class WinterReportGenerator {
         const metric: WinterMetric = new WinterMetric();
         metric.name = "Different weapons";
         metric.funName = "Diverse Skillset";
-        metric.description = "Players with the most amount of unique weapons";
+        metric.description = "Most amount of unique weapons";
 
         const stats: StatMap = new StatMap();
 
@@ -273,7 +309,7 @@ export class WinterReportGenerator {
         return this.vehicle(parameters, [Vehicles.mosquito, Vehicles.reaver, Vehicles.scythe], {
             name: "ESFs destroyed",
             funName: "Fly Swatter",
-            description: "Players with the most ESFs destroyed",
+            description: "Most ESFs destroyed",
             entries: []
         });
     }
@@ -282,9 +318,208 @@ export class WinterReportGenerator {
         return this.vehicle(parameters, [Vehicles.sunderer], {
             name: "Sunderes killed",
             funName: "Bus Bully",
-            description: "Players with the most sundies destroyed",
+            description: "Most sundies destroyed",
             entries: []
         });
+    }
+
+    private static mostRoadkills(parameters: WinterReportParameters): WinterMetric {
+        return this.metric(parameters, [PsEvent.roadkill], {
+            name: "Roadkills",
+            funName: "Road rage",
+            description: "Most roadkills",
+            entries: []
+        });
+    }
+
+    private static mostUsefulRevives(parameters: WinterReportParameters): WinterMetric {
+        const metric: WinterMetric = new WinterMetric();
+        metric.name = "Efficient revived";
+        metric.funName = "Efficient Zombie";
+        metric.description = "Most kills 10 seconds after being revived";
+
+        const amounts: StatMap = new StatMap();
+
+        for (const player of parameters.players) {
+            const revives: Event[] = player.events.filter(iter => iter.type == "death" && iter.revivedEvent != null);
+
+            for (const ev of revives) {
+                const kills: Event[] = player.events.filter(iter => {
+                    return iter.type == "kill" && iter.timestamp >= ev.timestamp && iter.timestamp < ev.timestamp + 10000;
+                });
+
+                if (kills.length == 0) { continue; }
+
+                amounts.increment(player.name, kills.length);
+            }
+        }
+
+        metric.entries = this.statMapToEntires(parameters, amounts);
+
+        return metric;
+    }
+
+    private static mostPercentRevive(parameters: WinterReportParameters): WinterMetric {
+        return this.value(
+            parameters,
+            (player: TrackedPlayer) => {
+                const revived: number = player.events.filter(iter => iter.type == "death" && iter.revived == true).length;
+                const killed: number = player.events.filter(iter => iter.type == "death").length;
+                return revived / killed;
+            },
+            {
+                name: "Percent revived",
+                funName: "Makes me strong",
+                description: "Highest ratio of revived deaths to deaths",
+                entries: []
+            },
+            (value: number) => `${(value * 100).toFixed(2)}%`
+        );
+    }
+
+    private static highestAverageLifeExpectance(parameters: WinterReportParameters): WinterMetric {
+        const metric: WinterMetric = new WinterMetric();
+        metric.name = "Longest life expectance";
+        metric.funName = "Elders";
+        metric.description = "Longest average life expectance";
+
+        const amounts: StatMap = new StatMap();
+
+        for (const player of parameters.players) {
+            if (player.events.length == 0) {
+                continue;
+            }
+
+            const expectances: number[] = [];
+
+            let start: number = player.events[0].timestamp;
+
+            for (const ev of player.events) {
+                if (ev.type == "death" && ev.revived == false) {
+                    expectances.push((ev.timestamp - start) / 1000);
+                    start = ev.timestamp;
+                }
+            }
+
+            if (expectances.length == 0) {
+                continue;
+            }
+
+            const total: number = expectances.reduce((acc, val) => { return acc += val; }, 0);
+            const avg: number = total / expectances.length;
+
+            amounts.set(player.name, avg);
+        }
+
+        metric.entries = this.statMapToEntires(parameters, amounts, (value: number) => {
+            let mins: number = 0;
+            let seconds: number = value;
+
+            if (value > 60) {
+                mins = Math.floor(seconds / 60);
+                seconds = seconds % 60;
+
+                return `${mins.toFixed(0)} mins ${seconds.toFixed(0)} seconds`;
+            }
+
+            return `${value.toFixed(1)} seconds`;
+        });
+
+        return metric;
+    }
+
+    private static mostKnifeKills(parameters: WinterReportParameters): ApiResponse<WinterMetric> {
+        return this.weaponType(parameters, "Knife", {
+            name: "Knife kills",
+            funName: "Slasher",
+            description: "Most knife kills",
+            entries: []
+        });
+    }
+
+    private static mostC4Kills(parameters: WinterReportParameters): WinterMetric {
+        return this.weapon(parameters, ["432", "800623"], {
+            name: "C4 kills",
+            funName: "Explosive Tedencies",
+            description: "Most C-4 kills",
+            entries: []
+        });
+    }
+
+    private static mostGrenadeKills(parameters: WinterReportParameters): ApiResponse<WinterMetric> {
+        return this.weaponType(parameters, "Grenade", {
+            name: "Grenade kills",
+            funName: "Hot Potato",
+            description: "Most grenade kills",
+            entries: []
+        });
+    }
+
+    private static mostPistolKills(parameters: WinterReportParameters): ApiResponse<WinterMetric> {
+        return this.weaponType(parameters, "Pistol", {
+            name: "Pistol kills",
+            funName: "The Cowboy",
+            description: "Most pistol kills",
+            entries: []
+        });
+    }
+
+    private static weaponType(parameters: WinterReportParameters, type: string, metric: WinterMetric): ApiResponse<WinterMetric> {
+        const response: ApiResponse<WinterMetric> = new ApiResponse();
+
+        const wepIDs: Set<string> = new Set();
+
+        for (const player of parameters.players) {
+            const IDs: string[] = (player.events.filter(iter => iter.type == "kill") as EventKill[])
+                .map(iter => iter.weaponID);
+
+            for (const id of IDs) {
+                wepIDs.add(id);
+            }
+        }
+
+        const amounts: StatMap = new StatMap();
+
+        WeaponAPI.getByIDs(Array.from(wepIDs.keys())).ok((data: Weapon[]) => {
+            for (const player of parameters.players) {
+                const kills: EventKill[] = player.events.filter(iter => iter.type == "kill") as EventKill[];
+
+                for (const kill of kills) {
+                    const weapon: Weapon | undefined = data.find(iter => iter.ID == kill.weaponID);
+                    if (weapon == undefined) {
+                        continue;
+                    }
+
+                    if (weapon.type == type) {
+                        amounts.increment(player.name);
+                    }
+                }
+            }
+
+            metric.entries = this.statMapToEntires(parameters, amounts);
+        });
+
+        response.resolveOk(metric);
+
+        return response;
+    }
+
+    private static weapon(parameters: WinterReportParameters, ids: string[], metric: WinterMetric): WinterMetric {
+        const amounts: StatMap = new StatMap();
+
+        for (const player of parameters.players) {
+            for (const ev of player.events) {
+                if (ev.type == "kill") {
+                    if (ids.indexOf(ev.weaponID) > -1) {
+                        amounts.increment(player.name);
+                    }
+                }
+            }
+        }
+
+        metric.entries = this.statMapToEntires(parameters, amounts);
+
+        return metric;
     }
 
     private static vehicle(parameters: WinterReportParameters, vehicles: string[], metric: WinterMetric): WinterMetric {
@@ -311,8 +546,9 @@ export class WinterReportGenerator {
         const amounts: StatMap = new StatMap();
 
         for (const player of parameters.players) {
-            for (const ev of events) {
-                amounts.increment(player.name, player.stats.get(ev));
+            const evs: Event[] = player.events.filter(iter => iter.type == "exp" && events.indexOf(iter.expID) > -1);
+            if (evs.length > 0) {
+                amounts.set(player.name, evs.length);
             }
         }
 
@@ -321,14 +557,21 @@ export class WinterReportGenerator {
         return metric;
     }
 
-    private static value(parameters: WinterReportParameters, accessor: (player: TrackedPlayer) => number, metric: WinterMetric) {
+    private static value(
+        parameters: WinterReportParameters,
+        accessor: (player: TrackedPlayer) => number,
+        metric: WinterMetric,
+        display: ((_: number) => string) | null = null): WinterMetric {
+
         const map: StatMap = new StatMap();
 
         for (const player of parameters.players) {
             map.set(player.name, accessor(player));
         }
 
-        metric.entries = this.statMapToEntires(parameters, map);
+        metric.entries = this.statMapToEntires(parameters, map, display);
+
+        return metric;
     }
 
     private static statMapToEntires(

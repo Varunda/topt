@@ -9,7 +9,7 @@ export class WinterReportParameters {
 }
 
 export class WinterReportSettings {
-    public useFunNames: boolean = true;
+    public useFunNames: boolean = false;
     public topNPlayers: number = 5;
-    public funMetricCount: number = 10;
+    public funMetricCount: number = -1;
 }
