@@ -64731,6 +64731,7 @@ class WinterReportGenerator {
         report.fun.push(this.mostEMPAssist(parameters));
         report.fun.push(this.mostFlashAssists(parameters));
         report.fun.push(this.mostSaviors(parameters));
+        report.fun.push(this.mostAssists(parameters));
         report.fun.push(this.longestKillStreak(parameters));
         report.fun.push(this.highestHSR(parameters));
         report.fun.push(this.getDifferentWeapons(parameters));
@@ -64867,6 +64868,14 @@ class WinterReportGenerator {
             entries: []
         });
     }
+    static mostAssists(parameters) {
+        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].killAssist], {
+            name: "Kill assists",
+            funName: "Wingmen",
+            description: "Players with the most kill assists",
+            entries: []
+        });
+    }
     static longestKillStreak(parameters) {
         const metric = new _WinterMetric__WEBPACK_IMPORTED_MODULE_2__["WinterMetric"]();
         metric.name = "Kill streaks";
@@ -64960,8 +64969,8 @@ class WinterReportGenerator {
     }
     static mostUsefulRevives(parameters) {
         const metric = new _WinterMetric__WEBPACK_IMPORTED_MODULE_2__["WinterMetric"]();
-        metric.name = "Efficient revived";
-        metric.funName = "Efficient Zombie";
+        metric.name = "Kills after revives";
+        metric.funName = "Rise of the Undead";
         metric.description = "Most kills 10 seconds after being revived";
         const amounts = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
         for (const player of parameters.players) {

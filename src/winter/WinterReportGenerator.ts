@@ -50,6 +50,7 @@ export class WinterReportGenerator {
         report.fun.push(this.mostEMPAssist(parameters));
         report.fun.push(this.mostFlashAssists(parameters));
         report.fun.push(this.mostSaviors(parameters));
+        report.fun.push(this.mostAssists(parameters));
         report.fun.push(this.longestKillStreak(parameters));
         report.fun.push(this.highestHSR(parameters));
         report.fun.push(this.getDifferentWeapons(parameters));
@@ -216,6 +217,15 @@ export class WinterReportGenerator {
         });
     }
 
+    private static mostAssists(parameters: WinterReportParameters): WinterMetric {
+        return this.metric(parameters, [PsEvent.killAssist], {
+            name: "Kill assists",
+            funName: "Wingmen",
+            description: "Players with the most kill assists",
+            entries: []
+        });
+    }
+
     private static longestKillStreak(parameters: WinterReportParameters): WinterMetric {
         const metric: WinterMetric = new WinterMetric();
         metric.name = "Kill streaks";
@@ -334,8 +344,8 @@ export class WinterReportGenerator {
 
     private static mostUsefulRevives(parameters: WinterReportParameters): WinterMetric {
         const metric: WinterMetric = new WinterMetric();
-        metric.name = "Efficient revived";
-        metric.funName = "Efficient Zombie";
+        metric.name = "Kills after revives";
+        metric.funName = "Rise of the Undead";
         metric.description = "Most kills 10 seconds after being revived";
 
         const amounts: StatMap = new StatMap();
