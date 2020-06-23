@@ -199,6 +199,17 @@ export class KillfeedGeneration {
             if (this._members.has(event.sourceID)) {
                 const member: KillfeedMember = this._members.get(event.sourceID)!;
                 member.state = "alive";
+
+                const loadout: PsLoadout = PsLoadouts.get(event.loadoutID) ?? PsLoadout.default;
+                switch (loadout.type) {
+                    case "infil": member.class = "I"; break;
+                    case "lightAssault": member.class = "L"; break;
+                    case "medic": member.class = "M"; break;
+                    case "engineer": member.class = "E"; break;
+                    case "heavy": member.class = "H"; break;
+                    case "max": member.class = "W"; break;
+                    case "unknown": member.class = ""; break;
+                }
             }
         } else if (event.type == "death") {
             entry.type = "death";
@@ -206,6 +217,17 @@ export class KillfeedGeneration {
             if (this._members.has(event.sourceID)) {
                 const member: KillfeedMember = this._members.get(event.sourceID)!;
                 member.state = "dead";
+
+                const loadout: PsLoadout = PsLoadouts.get(event.loadoutID) ?? PsLoadout.default;
+                switch (loadout.type) {
+                    case "infil": member.class = "I"; break;
+                    case "lightAssault": member.class = "L"; break;
+                    case "medic": member.class = "M"; break;
+                    case "engineer": member.class = "E"; break;
+                    case "heavy": member.class = "H"; break;
+                    case "max": member.class = "W"; break;
+                    case "unknown": member.class = ""; break;
+                }
             }
         }
 
@@ -226,6 +248,17 @@ export class KillfeedGeneration {
         if (this._members.has(event.sourceID)) {
             const member: KillfeedMember = this._members.get(event.sourceID)!;
             member.state = "alive";
+
+            const loadout: PsLoadout = PsLoadouts.get(event.loadoutID) ?? PsLoadout.default;
+            switch (loadout.type) {
+                case "infil": member.class = "I"; break;
+                case "lightAssault": member.class = "L"; break;
+                case "medic": member.class = "M"; break;
+                case "engineer": member.class = "E"; break;
+                case "heavy": member.class = "H"; break;
+                case "max": member.class = "W"; break;
+                case "unknown": member.class = ""; break;
+            }
         }
 
         const sourceMember: KillfeedMember | undefined = this._members.get(event.sourceID);
@@ -253,15 +286,27 @@ export class KillfeedGeneration {
             if (sourceSquad.ID == targetSquad.ID) {
                 //console.log(`${sourceMember.name} // ${targetMember.name} are already in a squad`);
             } else {
-                for (const member of targetSquad.members) {
-                    sourceSquad.members.push(member);
+                if (targetSquad.guess == false) {
+                    for (const member of sourceSquad.members) {
+                        targetSquad.members.push(member);
+                    }
+
+                    // Remove any references in or to the removed squad so it can be garbage collected
+                    sourceSquad.members = [];
+                    this._squads = this._squads.filter(iter => iter.ID != sourceSquad!.ID); 
+
+                    console.log(`Merged ${sourceMember.name}'s squad with ${targetSquad.name}'s squad due to it not being a guess`);
+                } else {
+                    for (const member of targetSquad.members) {
+                        sourceSquad.members.push(member);
+                    }
+
+                    // Remove any references in or to the removed squad so it can be garbage collected
+                    targetSquad.members = [];
+                    this._squads = this._squads.filter(iter => iter.ID != targetSquad!.ID); 
+
+                    console.log(`Merged ${targetMember.name}'s squad with ${sourceMember.name}'s squad due`);
                 }
-
-                // Remove any references in or to the removed squad so it can be garbage collected
-                targetSquad.members = [];
-                this._squads = this._squads.filter(iter => iter.ID != targetSquad!.ID); 
-
-                console.log(`Merged ${targetMember.name}'s squad with ${sourceMember.name}'s squad`);
             }
         }
 
@@ -367,9 +412,16 @@ export class KillfeedGeneration {
 
     public static init(): void {
         this._squad1.name = "1";
+        this._squad1.guess = false;
+
         this._squad2.name = "2";
+        this._squad2.guess = false;
+
         this._squad3.name = "3";
+        this._squad3.guess = false;
+
         this._squad4.name = "4";
+        this._squad4.guess = false;
     }
 
     private static getSquadOfMember(charID: string): KillfeedSquad | null {

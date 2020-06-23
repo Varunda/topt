@@ -60057,6 +60057,7 @@ class KillfeedGeneration {
         this._hoveredMember = null;
     }
     static add(event) {
+        var _a, _b;
         const entry = new KillfeedEntry();
         entry.timestamp = event.timestamp;
         census_CharacterAPI__WEBPACK_IMPORTED_MODULE_1__["CharacterAPI"].getByID(event.sourceID).ok((data) => {
@@ -60073,6 +60074,30 @@ class KillfeedGeneration {
             if (this._members.has(event.sourceID)) {
                 const member = this._members.get(event.sourceID);
                 member.state = "alive";
+                const loadout = (_a = census_PsLoadout__WEBPACK_IMPORTED_MODULE_3__["PsLoadouts"].get(event.loadoutID), (_a !== null && _a !== void 0 ? _a : census_PsLoadout__WEBPACK_IMPORTED_MODULE_3__["PsLoadout"].default));
+                switch (loadout.type) {
+                    case "infil":
+                        member.class = "I";
+                        break;
+                    case "lightAssault":
+                        member.class = "L";
+                        break;
+                    case "medic":
+                        member.class = "M";
+                        break;
+                    case "engineer":
+                        member.class = "E";
+                        break;
+                    case "heavy":
+                        member.class = "H";
+                        break;
+                    case "max":
+                        member.class = "W";
+                        break;
+                    case "unknown":
+                        member.class = "";
+                        break;
+                }
             }
         }
         else if (event.type == "death") {
@@ -60080,11 +60105,36 @@ class KillfeedGeneration {
             if (this._members.has(event.sourceID)) {
                 const member = this._members.get(event.sourceID);
                 member.state = "dead";
+                const loadout = (_b = census_PsLoadout__WEBPACK_IMPORTED_MODULE_3__["PsLoadouts"].get(event.loadoutID), (_b !== null && _b !== void 0 ? _b : census_PsLoadout__WEBPACK_IMPORTED_MODULE_3__["PsLoadout"].default));
+                switch (loadout.type) {
+                    case "infil":
+                        member.class = "I";
+                        break;
+                    case "lightAssault":
+                        member.class = "L";
+                        break;
+                    case "medic":
+                        member.class = "M";
+                        break;
+                    case "engineer":
+                        member.class = "E";
+                        break;
+                    case "heavy":
+                        member.class = "H";
+                        break;
+                    case "max":
+                        member.class = "W";
+                        break;
+                    case "unknown":
+                        member.class = "";
+                        break;
+                }
             }
         }
         this._entries.unshift(entry);
     }
     static exp(event) {
+        var _a;
         if (event.expID == PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].revive || event.expID == PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadRevive) {
             if (this._members.has(event.targetID)) {
                 const member = this._members.get(event.targetID);
@@ -60096,6 +60146,30 @@ class KillfeedGeneration {
         if (this._members.has(event.sourceID)) {
             const member = this._members.get(event.sourceID);
             member.state = "alive";
+            const loadout = (_a = census_PsLoadout__WEBPACK_IMPORTED_MODULE_3__["PsLoadouts"].get(event.loadoutID), (_a !== null && _a !== void 0 ? _a : census_PsLoadout__WEBPACK_IMPORTED_MODULE_3__["PsLoadout"].default));
+            switch (loadout.type) {
+                case "infil":
+                    member.class = "I";
+                    break;
+                case "lightAssault":
+                    member.class = "L";
+                    break;
+                case "medic":
+                    member.class = "M";
+                    break;
+                case "engineer":
+                    member.class = "E";
+                    break;
+                case "heavy":
+                    member.class = "H";
+                    break;
+                case "max":
+                    member.class = "W";
+                    break;
+                case "unknown":
+                    member.class = "";
+                    break;
+            }
         }
         const sourceMember = this._members.get(event.sourceID);
         const targetMember = this._members.get(event.targetID);
@@ -60118,13 +60192,24 @@ class KillfeedGeneration {
                 //console.log(`${sourceMember.name} // ${targetMember.name} are already in a squad`);
             }
             else {
-                for (const member of targetSquad.members) {
-                    sourceSquad.members.push(member);
+                if (targetSquad.guess == false) {
+                    for (const member of sourceSquad.members) {
+                        targetSquad.members.push(member);
+                    }
+                    // Remove any references in or to the removed squad so it can be garbage collected
+                    sourceSquad.members = [];
+                    this._squads = this._squads.filter(iter => iter.ID != sourceSquad.ID);
+                    console.log(`Merged ${sourceMember.name}'s squad with ${targetSquad.name}'s squad due to it not being a guess`);
                 }
-                // Remove any references in or to the removed squad so it can be garbage collected
-                targetSquad.members = [];
-                this._squads = this._squads.filter(iter => iter.ID != targetSquad.ID);
-                console.log(`Merged ${targetMember.name}'s squad with ${sourceMember.name}'s squad`);
+                else {
+                    for (const member of targetSquad.members) {
+                        sourceSquad.members.push(member);
+                    }
+                    // Remove any references in or to the removed squad so it can be garbage collected
+                    targetSquad.members = [];
+                    this._squads = this._squads.filter(iter => iter.ID != targetSquad.ID);
+                    console.log(`Merged ${targetMember.name}'s squad with ${sourceMember.name}'s squad due`);
+                }
             }
         }
         // Check if the squad is no longer valid and needs to be removed, i.e. moved squads
@@ -60217,9 +60302,13 @@ class KillfeedGeneration {
     }
     static init() {
         this._squad1.name = "1";
+        this._squad1.guess = false;
         this._squad2.name = "2";
+        this._squad2.guess = false;
         this._squad3.name = "3";
+        this._squad3.guess = false;
         this._squad4.name = "4";
+        this._squad4.guess = false;
     }
     static getSquadOfMember(charID) {
         if (this._squad1.isMember(charID)) {
@@ -60320,9 +60409,51 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var Killfeed__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! Killfeed */ "./src/Killfeed.ts");
 
 
+function getGroupInfo(members) {
+    if (members.length == 0) {
+        return defaultGroupInfo();
+    }
+    const total = members.length;
+    const alive = members.filter(iter => iter.state == "alive").length;
+    const dead = total - alive;
+    const percent = alive / total;
+    let color = "";
+    if (percent >= 1.0) {
+        color = `rgb(51, 255, 51)`;
+    }
+    else if (percent < 1.0 && percent >= 0.75) {
+        color = `rgb(117, 255, 51)`;
+    }
+    else if (percent < 0.75 && percent >= 0.50) {
+        color = `rgb(219, 255, 51)`;
+    }
+    else if (percent < 0.50 && percent >= 0.25) {
+        color = `rgb(255, 189, 51)`;
+    }
+    else {
+        color = `rgb(255, 87, 51)`;
+    }
+    return {
+        total: total,
+        alive: alive,
+        dead: dead,
+        percentAlive: percent,
+        aliveColor: color
+    };
+}
+function defaultGroupInfo() {
+    return {
+        total: 0,
+        alive: 0,
+        dead: 0,
+        percentAlive: 1,
+        aliveColor: ``
+    };
+}
 vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("killfeed-squad", {
     props: {
-        squad: { type: Object, required: true }
+        squad: { type: Object, required: true },
+        ShowState: { type: Boolean, required: false, default: false },
     },
     data: function () {
         return {};
@@ -60349,6 +60480,11 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("killfeed-squad", {
         },
         memberMouseLeave: function (ev) {
             Killfeed__WEBPACK_IMPORTED_MODULE_1__["KillfeedGeneration"].clearHoveredMember();
+        },
+        resetMembers: function () {
+            for (const member of this.squad.members) {
+                member.state = "alive";
+            }
         }
     },
     template: `
@@ -60358,15 +60494,95 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("killfeed-squad", {
                 :data-squad-name="squad.name">
 
                 {{squad.name}}
-            </div>
-            <div v-for="member in squad.members" :key="member.charID"
-                @mouseover="memberMouseOver" @mouseleave="memberMouseLeave"
-                class="list-group-item" :data-member-id="member.charID">
 
-                {{member.name}} / {{member.state == "alive" ? 'A' : 'D'}}
+                <button class="btn btn-sm btn-warning m-n1 mr-n2 float-right" @click="resetMembers">
+                    Reset
+                </button>
+            </div>
+            <div v-if="ShowState" class="list-group-item p-0">
+                <div :style="{
+                    width: (all.percentAlive * 100) + '%',
+                    'max-width': '100%',
+                    'background-color': all.aliveColor
+                }">
+
+                    &nbsp;
+                </div>
+            </div>
+
+            <div class="list-group-item p-0">
+                <table class="table table-sm mb-0">
+                    <tr v-for="member in squad.members" :key="member.charID"
+                        @mouseover="memberMouseOver" @mouseleave="memberMouseLeave"
+                        :data-member-id="member.charID">
+
+                        <td>
+                            {{member.class}}
+                        </td>
+
+                        <td>
+                            {{member.name}}
+                        </td>
+
+                        <td>
+                            {{member.state == "alive" ? "A" : "D"}}
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            <div v-if="ShowState" class="list-group-item p-0">
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <td><b>Medics</b></td>
+                        <td>{{medics.alive}} / {{medics.total}}</td>
+                        <td><span class="border-rounded px-0" :style="{ 'background-color': medics.aliveColor }">&nbsp;&nbsp;</span></td>
+                    </tr>
+
+                    <tr>
+                        <td><b>Heavies</b></td>
+                        <td>{{heavies.alive}} / {{heavies.total}}</td>
+                        <td><span class="border-rounded px-0" :style="{ 'background-color': heavies.aliveColor }">&nbsp;&nbsp;</span></td>
+                    </tr>
+
+                    <tr>
+                        <td><b>Other</b></td>
+                        <td>{{notBattle.alive}} / {{notBattle.total}}</td>
+                        <td><span class="border-rounded px-0" :style="{ 'background-color': notBattle.aliveColor }">&nbsp;&nbsp;</span></td>
+                    </tr>
+                </table>
             </div>
         </span>
-    `
+    `,
+    computed: {
+        all: function () {
+            return getGroupInfo(this.squad.members);
+        },
+        notBattle: function () {
+            const members = this.squad.members.filter(iter => iter.class != "M" && iter.class != "H");
+            return getGroupInfo(members);
+        },
+        infils: function () {
+            const members = this.squad.members.filter(iter => iter.class == "I");
+            return getGroupInfo(members);
+        },
+        lightAssaults: function () {
+            const members = this.squad.members.filter(iter => iter.class == "L");
+            return getGroupInfo(members);
+        },
+        medics: function () {
+            const members = this.squad.members.filter(iter => iter.class == "M");
+            return getGroupInfo(members);
+        },
+        engineers: function () {
+            const members = this.squad.members.filter(iter => iter.class == "E");
+            return getGroupInfo(members);
+        },
+        heavies: function () {
+            const members = this.squad.members.filter(iter => iter.class == "H");
+            return getGroupInfo(members);
+        },
+    }
 });
 
 

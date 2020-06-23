@@ -571,20 +571,18 @@
 
         <div v-else-if="view == 'killfeed'" class="h-100">
             <div class="d-flex flex-column">
-                <div class="flex-grow-0">
-                    <h2 class="strike" @click="view = 'realtime'">Killfeed</h2>
-                    <button @click="killfeed.options.viewKills = !killfeed.options.viewKills" type="button" class="btn btn-primary btn-sm">
-                        Kills
-                    </button>
-
-                    <button @click="killfeed.options.viewDeaths = !killfeed.options.viewDeaths" type="button" class="btn btn-primary btn-sm">
-                        Deaths
-                    </button>
-                </div>
-
                 <div class="flex-grow-1">
                     <div class="row">
                         <div class="col-6">
+                            <h2 class="strike" @click="view = 'realtime'">Killfeed</h2>
+                            <button @click="killfeed.options.viewKills = !killfeed.options.viewKills" type="button" class="btn btn-primary btn-sm">
+                                Kills
+                            </button>
+
+                            <button @click="killfeed.options.viewDeaths = !killfeed.options.viewDeaths" type="button" class="btn btn-primary btn-sm">
+                                Deaths
+                            </button>
+
                             <div class="list-group list-group-small">
                                 <div v-for="entry in killfeed.entry.entries" class="list-group-item">
                                     <div class="row">
@@ -618,27 +616,27 @@
                         <div class="col-6">
                             <div class="d-flex flex-column">
                                 <div class="row flex-grow-1">
-                                    <div class="col-12">
-                                        Manual squads
-                                    </div>
                                     <div class="col-3">
                                         <h5 class="strike mt-0">Squad 1</h5>
-                                        <killfeed-squad :squad="killfeed.entry.squad1"></killfeed-squad>
+                                        <killfeed-squad
+                                            :squad="killfeed.entry.squad1"
+                                            :show-state="true">
+                                        </killfeed-squad>
                                     </div>
 
                                     <div class="col-3">
                                         <h5 class="strike mt-0">Squad 2</h5>
-                                        <killfeed-squad :squad="killfeed.entry.squad2"></killfeed-squad>
+                                        <killfeed-squad :squad="killfeed.entry.squad2" :show-state="true"></killfeed-squad>
                                     </div>
 
                                     <div class="col-3">
                                         <h5 class="strike mt-0">Squad 3</h5>
-                                        <killfeed-squad :squad="killfeed.entry.squad3"></killfeed-squad>
+                                        <killfeed-squad :squad="killfeed.entry.squad3" :show-state="true"></killfeed-squad>
                                     </div>
 
                                     <div class="col-3">
                                         <h5 class="strike mt-0">Squad 4</h5>
-                                        <killfeed-squad :squad="killfeed.entry.squad4"></killfeed-squad>
+                                        <killfeed-squad :squad="killfeed.entry.squad4" :show-state="true"></killfeed-squad>
                                     </div>
                                 </div>
 
