@@ -6,7 +6,7 @@ import { WinterMetric, WinterMetricEntry } from "./WinterMetric";
 import { WinterReportParameters } from "./WinterReportParameters";
 
 import StatMap from "StatMap";
-import { Event, EventKill } from "Event";
+import { Event, EventKill, EventExp } from "Event";
 import { PsEvent } from "PsEvent";
 import { TrackedPlayer } from "InvididualGenerator";
 import { VehicleTypes, Vehicle, VehicleAPI, Vehicles } from "census/VehicleAPI";
@@ -19,7 +19,6 @@ export class WinterMetricIndex {
     public static HEALS: number = 3;
     public static RESUPPLIES: number = 4;
     public static REPAIRS: number = 5;
-
 }
 
 export class WinterReportGenerator {
@@ -51,6 +50,7 @@ export class WinterReportGenerator {
         report.fun.push(this.mostFlashAssists(parameters));
         report.fun.push(this.mostSaviors(parameters));
         report.fun.push(this.mostAssists(parameters));
+        report.fun.push(this.mostUniqueRevives(parameters));
         report.fun.push(this.longestKillStreak(parameters));
         report.fun.push(this.highestHSR(parameters));
         report.fun.push(this.getDifferentWeapons(parameters));
@@ -222,6 +222,20 @@ export class WinterReportGenerator {
             name: "Kill assists",
             funName: "Wingmen",
             description: "Players with the most kill assists",
+            entries: []
+        });
+    }
+
+    private static mostUniqueRevives(parameters: WinterReportParameters): WinterMetric {
+        return this.value(parameters, ((player: TrackedPlayer) => {
+            const ev: EventExp[] = player.events.filter(iter => iter.type == "exp"
+                && (iter.expID == PsEvent.revive || iter.expID == PsEvent.squadRevive)) as EventExp[];
+
+            return ev.map(iter => iter.targetID).filter((value, index, array) => array.indexOf(value) == index).length;
+        }), {
+            name: "Most unique revives",
+            funName: "Spread the love",
+            description: "Most unique revives",
             entries: []
         });
     }

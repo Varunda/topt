@@ -64948,6 +64948,7 @@ class WinterReportGenerator {
         report.fun.push(this.mostFlashAssists(parameters));
         report.fun.push(this.mostSaviors(parameters));
         report.fun.push(this.mostAssists(parameters));
+        report.fun.push(this.mostUniqueRevives(parameters));
         report.fun.push(this.longestKillStreak(parameters));
         report.fun.push(this.highestHSR(parameters));
         report.fun.push(this.getDifferentWeapons(parameters));
@@ -65089,6 +65090,18 @@ class WinterReportGenerator {
             name: "Kill assists",
             funName: "Wingmen",
             description: "Players with the most kill assists",
+            entries: []
+        });
+    }
+    static mostUniqueRevives(parameters) {
+        return this.value(parameters, ((player) => {
+            const ev = player.events.filter(iter => iter.type == "exp"
+                && (iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].revive || iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadRevive));
+            return ev.map(iter => iter.targetID).filter((value, index, array) => array.indexOf(value) == index).length;
+        }), {
+            name: "Most unique revives",
+            funName: "Spread the love",
+            description: "Most unique revives",
             entries: []
         });
     }
