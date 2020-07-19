@@ -918,7 +918,7 @@
                 </div>
             </div>
 
-            <div class="col-12">
+            <div class="col-12"> <!-- Continent kills//deaths  -->
                 <h2 class="strike">Continents</h2>
                 <div class="row">
                     <div class="col-6">
@@ -1020,7 +1020,8 @@
                 </breakdown-interval>
             </div>
 
-            <div class="col-12"> <!-- Time spend unrevived -->
+            <!--
+            <div class="col-12"> <!-\- Time spend unrevived -\->
                 <h2 class="strike">Revive metrics</h2>
 
                 <div class="row">
@@ -1063,6 +1064,7 @@
                     as the revive timer stops while being revived
                 </text>
             </div>
+            -->
 
             <div class="col-12"> <!-- Weapon breakdown -->
                 <h2 class="strike">Weapons</h2>
@@ -1228,19 +1230,25 @@
                 <table class="table table-sm table-striped">
                     <thead>
                         <tr class="table-secondary">
-                            <td><b>Facility</b></td>
-                            <td><b>Timestamp</b></td>
-                            <td><b>Taken from</b></td>
-                            <td><b>Type</b></td>
+                            <th>Facility</th>
+                            <th>Timestamp</th>
+                            <th>Previous faction</th>
+                            <th>Participants</th>
+                            <th>Outfits</th>
                         </tr>
                     </thead>
 
                     <tbody>
-                        <tr v-for="cap in outfitReport.facilityCaptures">
+                        <tr v-for="cap in outfitReport.baseCaptures">
                             <td>{{cap.name}}</td>
                             <td>{{cap.timestamp | moment}}</td>
-                            <td>{{cap.previousFaction == '0' ? 'Unowned' : cap.previousFaction == '1' ? 'VS' : cap.previousFaction == '2' ? 'NC' : 'TR'}}</td>
-                            <td>{{cap.type}}</td>
+                            <td>{{cap.faction | faction}}</td>
+                            <td>{{cap.outfits.total}}</td>
+                            <td>
+                                <breakdown-chart :src="cap.outfits" style="max-height: 200px; max-width: 60%;"
+                                    :clipped-amount="5">
+                                </breakdown-chart>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -1339,7 +1347,10 @@
                 <h3 class="strike mt-0">{{clazz.title}}</h3>
 
                 <div v-if="outfitReport.players.filter(iter => iter.mostPlayed.name == clazz.title).length > 1">
-                    <h5>Versus class K/D</h5>
+                    <h5>
+                        Versus class K/D
+                        <small class="text-muted">How many kills and deaths this class had against each class</small>
+                    </h5>
                     <table class="table table-sm table-striped">
                         <thead class="table-secondary">
                             <tr>
@@ -1482,15 +1493,26 @@
                             <th>Player</th>
                             <th>Time played</th>
                             <th>Most played class</th>
-                            <th>Report</th>
+                            <th>Time as Infiltrator</th>
+                            <th>Time as Light Assault</th>
+                            <th>Time as Medic</th>
+                            <th>Time as Engineer</th>
+                            <th>Time as Heavy</th>
+                            <th>Time as MAX</th>
                         </tr>
                     </thead>
 
                     <tbody>
                         <tr v-for="player in outfitReport.players">
                             <td>{{player.name}}</td>
-                            <td>{{(player.secondsOnline / 60).toFixed(0)}} minutes</td>
-                            <td>{{player.mostPlayed.name}}</td>
+                            <td>{{player.secondsOnline | duration}}</td>
+                            <td><b>{{player.mostPlayed.name}}</b></td>
+                            <td>{{player.infil.secondsAs | minutes}}</td>
+                            <td>{{player.lightAssault.secondsAs | minutes}}</td>
+                            <td>{{player.medic.secondsAs | minutes}}</td>
+                            <td>{{player.engineer.secondsAs | minutes}}</td>
+                            <td>{{player.heavy.secondsAs | minutes}}</td>
+                            <td>{{player.max.secondsAs | minutes}}</td>
                         </tr>
                     </tbody>
                 </table>

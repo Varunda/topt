@@ -1,4 +1,4 @@
-export type Event = EventExp | EventKill | EventDeath | EventVehicleKill | EventCapture;
+export type Event = EventExp | EventKill | EventDeath | EventTeamkill | EventVehicleKill | EventCapture | EventDefend;
 
 export type EventExp = {
     type: "exp";
@@ -83,6 +83,19 @@ export type EventDeath = {
     zoneID: string;
 }
 
+export type EventTeamkill = {
+    type: "teamkill";
+
+    sourceID: string;
+    loadoutID: string;
+    targetID: string;
+    targetLoadoutID: string;
+
+    zoneID: string;
+    weaponID: string;
+    timestamp: number;
+}
+
 export type EventCapture = {
 
     /**
@@ -95,6 +108,9 @@ export type EventCapture = {
      */
     sourceID: string;
 
+    /**
+     * ID of the zone the capture was in
+     */
     zoneID: string;
 
     /**
@@ -113,6 +129,40 @@ export type EventCapture = {
     facilityID: string;
 }
 
+export type EventDefend = {
+
+    /**
+     * This event will occur when a player gets a facility defense
+     */
+    type: "defend";
+
+    /**
+     * ID of the character who did the defense
+     */
+    sourceID: string;
+
+    /**
+     * ID of the zone the defense was in
+     */
+    zoneID: string;
+
+    /**
+     * ID of the outfit the player is a part of
+     */
+    outfitID: string;
+
+    /**
+     * Timestamp, ms
+     */
+    timestamp: number;
+
+    /**
+     * ID of the facility that was defended
+     */
+    facilityID: string;
+
+}
+
 export type EventVehicleKill = {
     /**
      * Type of event
@@ -124,6 +174,9 @@ export type EventVehicleKill = {
      */
     sourceID: string;
 
+    /**
+     * Zone the vehicle was killed in
+     */
     zoneID: string;
 
     /**

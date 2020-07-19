@@ -43,6 +43,10 @@
             display: none;
         }
 
+        .flex-grow-1 {
+            flex-grow: 1;
+        }
+
         .header {
             margin-left: -15px;
             margin-right: -15px;
@@ -452,7 +456,7 @@
                     </div>
 
                     <h2 class="strike">Weapon death breakdown</h2>
-                    <div class="row mb-2">
+                    <div class="row mb-5">
                         <div class="col-3">
                             <breakdown :data="report.weaponDeathBreakdown" :show-all="false"
                                 left-title="Weapon" right-title="Amount" :show-percent="true" :show-total="true">
@@ -473,6 +477,113 @@
                             <breakdown-chart :src="report.weaponDeathTypeBreakdown"
                                 :show-percent="true">
                             </breakdown-chart>
+                        </div>
+                    </div>
+
+                    <h2 class="strike">
+                        <span class="mr-3">
+                            Player versus
+                        </span>
+                        <select class="form-control" v-model="versusCharID" style="width: unset !important;">
+                            <option :value="null">No player selected</option>
+                            <option v-for="entry in versusEntries" :value="entry.charID">
+                                {{entry.name}} ({{entry.kills}} / {{entry.deaths}})
+                            </option>
+                        </select>
+
+                        <div class="btn-group">
+                            <button disabled type="button" class="btn btn-secondary">
+                                Sort method: 
+                            </button>
+                            <button @click="versusSortMethod = 'name'" type="button" class="btn" :class="[ versusSortMethod == 'name' ? 'btn-primary' : 'btn-secondary' ]">
+                                Name
+                            </button>
+                            <button @click="versusSortMethod = 'amount'" type="button" class="btn" :class="[ versusSortMethod == 'amount' ? 'btn-primary' : 'btn-secondary' ]">
+                                Amount
+                            </button>
+                        </div>
+                    </h2>
+                    <div v-if="versusSelected != null">
+                        <div class="row">
+                            <div class="col-3">
+                                <h4>Metrics</h4>
+                                
+                                <table class="table table-sm">
+                                    <tr class="table-secondary">
+                                        <th>Metric</th>
+                                        <th>Value</th>
+                                    </tr>
+
+                                    <tr>
+                                        <th>Name</th>
+                                        <td>{{versusSelected.name}}</td>
+                                    </tr>
+
+                                    <tr>
+                                        <th>Total encounters</th>
+                                        <td>{{versusSelected.encounters.length}}</td>
+                                    </tr>
+
+                                    <tr>
+                                        <th>Kills</th>
+                                        <td>{{versusSelected.kills}}</td>
+                                    </tr>
+
+                                    <tr>
+                                        <th>Deaths</th>
+                                        <td>{{versusSelected.deaths}}</td>
+                                    </tr>
+
+                                    <tr>
+                                        <th>K/D</th>
+                                        <td>{{(versusSelected.kills / (versusSelected.deaths || 1)).toFixed(2)}}</td>
+                                    </tr>
+
+                                    <tr>
+                                        <th>Revived</th>
+                                        <td>{{versusSelected.revives}}</td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <div class="col-3">
+                                <h4>Encounters</h4>
+                                <table class="table table-sm">
+                                    <tr class="table-secondary">
+                                        <th>Timestamp</th>
+                                        <th>Outcome</th>
+                                        <th>Weapon</th>
+                                        <th>Headshot?</th>
+                                    </tr>
+
+                                    <tr v-for="encounter in versusSelected.encounters">
+                                        <td>
+                                            {{encounter.timestamp | moment("hh:mm:ss")}}
+                                        </td>
+                                        <td>
+                                            {{encounter.type}}
+                                        </td>
+                                        <td>
+                                            {{encounter.weaponName}}
+                                        </td>
+                                        <td>
+                                            {{encounter.headshot}}
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <div class="col-3">
+                                <h4>Weapon kills</h4>
+                                <breakdown-chart :src="versusSelected.weaponKills">
+                                </breakdown-chart>
+                            </div>
+
+                            <div class="col-3">
+                                <h4>Weapon deaths</h4>
+                                <breakdown-chart :src="versusSelected.weaponDeaths">
+                                </breakdown-chart>
+                            </div>
                         </div>
                     </div>
 

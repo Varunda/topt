@@ -110,7 +110,7 @@ export class ApiResponse<T = void> {
                 localMethod = jq.method;
 
                 if (reader != null && jq.status == 200) {
-                    if (data.error != undefined || data.errorCode != undefined) {
+                    if (data.error != undefined || data.errorCode != undefined || data == "") {
                         localStatus = 500;
                         localData = data;
                     } else {

@@ -18,7 +18,7 @@ import StatMap from "StatMap";
 import EventReporter, { 
     statMapToBreakdown, BreakdownWeaponType,
     Breakdown, BreakdownArray, defaultCharacterMapper, defaultCharacterSortField,
-    OutfitVersusBreakdown, ClassCollection, classCollectionNumber, BreakdownTimeslot, BreakdownTrend
+    OutfitVersusBreakdown, ClassCollection, classCollectionNumber, BreakdownTimeslot, BreakdownTrend, BaseCapture
 } from "EventReporter";
 import { classCollectionTrend } from "OutfitTrends";
 
@@ -40,51 +40,6 @@ export class FacilityCapture {
     factionID: string = "";
     outfitID: string = "";
     previousFaction: string = "";
-}
-
-export class CaptureBreakdown {
-    facilityID: string = "";
-    zoneID: string = "";
-    name: string = "";
-    type: string = "";
-    typeID: string = "";
-    timestamp: Date = new Date();
-    timeHeld: number = 0;
-
-    participants: CaptureParticipant[] = [];
-    outfits: OutfitParticipants[] = [];
-
-    factionID: string = "";
-    outfitID: string = "";
-    outfitName: string = "";
-    outfitTag: string = "";
-
-    previousFaction: string = "";
-    previousOutfitID: string = "";
-    previousOutfitName: string = "";
-    previousOutfitTag: string = "";
-
-    captureScore: number = 0;
-    tickScore: number = 0;
-
-    takenBy: FacilityCapture | null = null;
-}
-
-export class OutfitParticipants {
-    public outfitID: string = "";
-    public outfitTag: string = "";
-    public outfitName: string = "";
-    public players: number = 0;
-    public total: number = 0;
-}
-
-export class CaptureParticipant {
-    public characterID: string = "";
-    public outfitID: string = "";
-    public outfitName: string = "";
-    public outfitTag: string = "";
-    public facilityID: string = "";
-    public timestamp: number = 0;
 }
 
 export class ExpBreakdown {
@@ -184,6 +139,8 @@ export class OutfitReport {
 
     continentKillBreakdown: BreakdownArray = new BreakdownArray();
     continentDeathBreakdown: BreakdownArray = new BreakdownArray();
+
+    baseCaptures: BaseCapture[] = [];
 
     classKds = {
         infil: classKdCollection() as ClassKdCollection,
@@ -297,6 +254,28 @@ export class Report {
 
     weaponDeathBreakdown: BreakdownArray = new BreakdownArray();
     weaponDeathTypeBreakdown: BreakdownArray = new BreakdownArray();
+
+    playerVersus: PlayerVersus[] = [];
+}
+
+export class PlayerVersusEntry {
+    public timestamp: number = 0;
+    public type: "kill" | "death" | "revived" | "unknown" = "unknown";
+    public weaponName: string = "";
+    public headshot: boolean = false;
+}
+
+export class PlayerVersus {
+    public charID: string = "";
+    public name: string = "";
+    public kills: number = 0;
+    public deaths: number = 0;
+    public revives: number = 0;
+
+    public weaponKills: BreakdownArray = new BreakdownArray();
+    public weaponDeaths: BreakdownArray = new BreakdownArray();
+
+    public encounters: PlayerVersusEntry[] = [];
 }
 
 export type BreakdownSingleCollection = {
@@ -368,9 +347,25 @@ export class EventFeedEntry {
 }
 
 export class ReportParameters {
+
+    /**
+     * Player the report is being generated for
+     */
     public player: TrackedPlayer = new TrackedPlayer();
+
+    /**
+     * Contains all events collected during tracking. If you need just the player's events, use @see player
+     */
     public events: Event[] = [];
+
+    /**
+     * Tracking information about the current state the tracker
+     */
     public tracking: TimeTracking = { running: false, startTime: 0, endTime: 0 };
+
+    /**
+     * All routers tracked
+     */
     public routers: TrackedRouter[] = [];
 }
 
@@ -397,6 +392,7 @@ export class IndividualReporter {
             + 1     // Ribbons
             + 1     // Medic breakdown
             + 1     // Engineer breakdown
+            + 1     // Player versus
         ;
 
         const totalOps: number = opsLeft;
@@ -452,6 +448,8 @@ export class IndividualReporter {
         EventReporter.weaponTypeDeaths(parameters.player.events)
             .ok(data => report.weaponDeathTypeBreakdown = data).always(callback("Weapon type deaths"));
 
+        IndividualReporter.playerVersus(parameters).ok(data => report.playerVersus = data).always(callback("Player versus"));
+
         report.overtime.kd = EventReporter.kdOverTime(parameters.player.events);
         report.overtime.kpm = EventReporter.kpmOverTime(parameters.player.events);
 
@@ -498,6 +496,143 @@ export class IndividualReporter {
         } else {
             callback("Eng breakdown")();
         }
+
+        return response;
+    }
+
+    public static playerVersus(parameters: ReportParameters): ApiResponse<PlayerVersus[]> {
+        const response: ApiResponse<PlayerVersus[]> = new ApiResponse();
+
+        const versus: PlayerVersus[] = [];
+
+        const charIDs: string[] = [];
+        const wepIDs: string[] = [];
+
+        for (const ev of parameters.player.events) {
+            if (ev.sourceID != parameters.player.characterID) {
+                continue;
+            }
+
+            if (ev.type != "kill" && ev.type != "death") {
+                continue;
+            }
+
+            charIDs.push(ev.targetID);
+            wepIDs.push(ev.weaponID);
+        }
+
+        let characters: Character[] = [];
+        let weapons: Weapon[] = [];
+
+        let opsLeft: number = 2;
+
+        const killsMap: Map<string, StatMap> = new Map();
+        const deathsMap: Map<string, StatMap> = new Map();
+
+        const done = () => {
+            for (const ev of parameters.player.events) {
+                if (ev.sourceID != parameters.player.characterID) {
+                    continue;
+                }
+
+                if (ev.type != "kill" && ev.type != "death") {
+                    continue;
+                }
+
+                let entry: PlayerVersus | undefined = versus.find(iter => iter.charID == ev.targetID);
+                if (entry == undefined) {
+                    entry = new PlayerVersus();
+                    entry.charID = ev.targetID;
+                    entry.name = characters.find(iter => iter.ID == ev.targetID)?.name ?? `Unknown ${ev.targetID}`;
+
+                    killsMap.set(ev.targetID, new StatMap());
+                    deathsMap.set(ev.targetID, new StatMap());
+
+                    versus.push(entry);
+                }
+
+                const weaponName: string = weapons.find(iter => iter.ID == ev.weaponID)?.name ?? `Unknown ${ev.weaponID}`;
+
+                let type: "kill" | "death" | "revived" | "unknown" = "unknown";
+                if (ev.type == "kill") {
+                    ++entry.kills;
+                    type = "kill";
+                    killsMap.get(ev.targetID)!.increment(weaponName);
+                } else if (ev.type == "death") {
+                    if (ev.revived == true) {
+                        ++entry.revives;
+                        type = "revived";
+                    } else {
+                        ++entry.deaths;
+                        type = "death";
+                        deathsMap.get(ev.targetID)!.increment(weaponName);
+                    }
+                } else {
+                    console.error(`Unchecked event type: '${ev}'`);
+                }
+
+                const encounter: PlayerVersusEntry = {
+                    timestamp: ev.timestamp,
+                    headshot: ev.isHeadshot,
+                    type: type,
+                    weaponName: weapons.find(iter => iter.ID == ev.weaponID)?.name ?? `Unknown ${ev.weaponID}`
+                };
+
+                entry.encounters.push(encounter);
+            }
+
+            for (const entry of versus) {
+                if (killsMap.has(entry.charID) == false) {
+                    console.error(`Missing killsMap entry for ${entry.name}`);
+                    continue;
+                }
+                if (deathsMap.has(entry.charID) == false) {
+                    console.error(`Missing deathsMap entry for ${entry.name}`);
+                    continue;
+                }
+
+                const killMap: StatMap = killsMap.get(entry.charID)!;
+                const deathMap: StatMap = deathsMap.get(entry.charID)!;
+
+                const killBreakdown: BreakdownArray = new BreakdownArray();
+                killMap.getMap().forEach((amount: number, weapon: string) => {
+                    killBreakdown.data.push({
+                        display: weapon,
+                        amount: amount,
+                        sortField: weapon,
+                        color: undefined
+                    });
+
+                    killBreakdown.total += amount;
+                });
+                entry.weaponKills = killBreakdown;
+
+                const deathBreakdown: BreakdownArray = new BreakdownArray();
+                deathMap.getMap().forEach((amount: number, weapon: string) => {
+                    deathBreakdown.data.push({
+                        display: weapon,
+                        amount: amount,
+                        sortField: weapon,
+                        color: undefined
+                    });
+
+                    deathBreakdown.total += amount;
+                });
+                entry.weaponDeaths = deathBreakdown;
+            }
+
+            response.resolveOk(versus);
+        };
+
+        CharacterAPI.getByIDs(charIDs).ok((data: Character[]) => {
+            characters = data;
+            if (--opsLeft == 0) { done(); }
+        });
+
+        WeaponAPI.getByIDs(wepIDs).ok((data: Weapon[]) => {
+            weapons = data;
+            if (--opsLeft == 0) { done(); }
+        });
 
         return response;
     }
@@ -887,13 +1022,16 @@ export class IndividualReporter {
 
         events.forEach((event: Event) => {
             if (event.type == "kill" || event.type == "death") {
+                const sourceLoadoutID: string = event.loadoutID;
+                const sourceLoadout = PsLoadouts.get(sourceLoadoutID);
+                if (sourceLoadout == undefined) { return; }
 
                 const targetLoadoutID: string = event.targetLoadoutID;
                 const targetLoadout = PsLoadouts.get(targetLoadoutID);
                 if (targetLoadout == undefined) { return; }
 
                 if (classLimit != undefined) {
-                    if (targetLoadout.type == classLimit) {
+                    if (sourceLoadout.type != classLimit) {
                         return; // Continue to next iteration
                     }
                 }
@@ -953,7 +1091,7 @@ export class IndividualReporter {
         usage.secondsOnline = (finalTimestamp - lastTimestamp) / 1000;
 
         parameters.player.events.forEach((event: Event) => {
-            if (event.type == "capture") {
+            if (event.type == "capture" || event.type == "defend") {
                 return;
             }
 

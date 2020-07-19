@@ -11,6 +11,7 @@ import { PsEvent } from "PsEvent";
 import { TrackedPlayer } from "InvididualGenerator";
 import { VehicleTypes, Vehicle, VehicleAPI, Vehicles } from "census/VehicleAPI";
 import { WeaponAPI, Weapon } from "census/WeaponAPI";
+import { PsLoadout, PsLoadouts } from "census/PsLoadout";
 
 export class WinterMetricIndex {
     public static KILLS: number = 0;
@@ -25,8 +26,6 @@ export class WinterReportGenerator {
 
     public static generate(parameters: WinterReportParameters): ApiResponse<WinterReport> {
         const response: ApiResponse<WinterReport> = new ApiResponse();
-
-        console.log(`Generating a report with the following settings: ${JSON.stringify(parameters.settings)}`);
 
         const report: WinterReport = new WinterReport();
         report.start = new Date(parameters.events[0].timestamp);
@@ -553,6 +552,19 @@ export class WinterReportGenerator {
             for (const ev of player.events) {
                 if (ev.type != "vehicle") {
                     continue;
+                }
+
+                const loadout: PsLoadout | undefined = PsLoadouts.get(ev.loadoutID);
+                if (loadout != undefined) {
+                    if (loadout.faction == "VS" && (ev.vehicleID == Vehicles.scythe || ev.vehicleID == Vehicles.bastionScythe || ev.vehicleID == Vehicles.magrider)) {
+                        continue;
+                    }
+                    if (loadout.faction == "TR" && (ev.vehicleID == Vehicles.mosquito || ev.vehicleID == Vehicles.bastionMosquite || ev.vehicleID == Vehicles.prowler)) {
+                        continue;
+                    }
+                    if (loadout.faction == "NC" && (ev.vehicleID == Vehicles.reaver || ev.vehicleID == Vehicles.bastionReaver || ev.vehicleID == Vehicles.vanguard)) {
+                        continue;
+                    }
                 }
 
                 if (vehicles.indexOf(ev.vehicleID) > -1) {

@@ -1,7 +1,7 @@
 import { ApiResponse } from "census/ApiWrapper";
 import { Character, CharacterAPI } from "census/CharacterAPI";
 import { Weapon, WeaponAPI } from "census/WeaponAPI";
-import { Event, EventExp, EventKill, EventDeath } from "Event";
+import { Event, EventExp, EventKill, EventDeath, EventCapture, EventDefend } from "Event";
 import StatMap from "StatMap";
 import { PsLoadout, PsLoadouts, PsLoadoutType } from "census/PsLoadout";
 import { Vehicle, VehicleAPI, VehicleTypes } from "census/VehicleAPI";
@@ -9,7 +9,8 @@ import { Vehicle, VehicleAPI, VehicleTypes } from "census/VehicleAPI";
 import * as moment from "moment";
 import { PsEvent } from "PsEvent";
 
-import { TrackedPlayer, IndividualReporter, TimeTracking, Playtime } from "InvididualGenerator";
+import { TrackedPlayer, IndividualReporter, TimeTracking, Playtime, FacilityCapture } from "InvididualGenerator";
+import OutfitAPI, { Outfit } from "census/OutfitAPI";
 
 export class BreakdownArray {
     data: Breakdown[] = [];
@@ -80,6 +81,20 @@ export interface ClassCollection<T> {
     max: T;
 }
 
+export class BaseCaptureOutfit {
+    public ID: string = "";
+    public name: string = "";
+    public tag: string = "";
+    public amount: number = 0
+}
+
+export class BaseCapture {
+    public name: string = "";
+    public faction: string = "";
+    public timestamp: number = 0;
+    public outfits: BreakdownArray = new BreakdownArray();
+}
+
 export function statMapToBreakdown<T>(map: StatMap,
         source: (IDs: string[]) => ApiResponse<T[]>,
         matcher: (elem: T, ID: string) => boolean,
@@ -136,6 +151,86 @@ export function defaultVehicleMapper(elem: Vehicle | undefined, ID: string): str
 }
 
 export default class EventReporter {
+
+    public static facilityCaptures(data: {captures: FacilityCapture[], players: (EventDefend | EventCapture)[]}): ApiResponse<BaseCapture[]> {
+        const response: ApiResponse<BaseCapture[]> = new ApiResponse();
+
+        const baseCaptures: BaseCapture[] = [];
+
+        const captures: FacilityCapture[] = data.captures;
+        const players: (EventCapture | EventDefend)[] = data.players;
+
+        const outfitIDs: string[] = players
+            .map(iter => iter.outfitID)
+            .filter((value, index, arr) => arr.indexOf(value) == index);
+
+        OutfitAPI.getByIDs(outfitIDs).ok((data: Outfit[]) => {
+            for (const capture of captures) {
+                // Same faction caps are boring
+                if (capture.factionID == capture.previousFaction) {
+                    continue;
+                }
+
+                const entry: BaseCapture = new BaseCapture();
+                entry.timestamp = capture.timestamp.getTime();
+                entry.name = capture.name;
+                entry.faction = capture.previousFaction;
+
+                const facilityID: string = capture.facilityID;
+                const name: string = capture.name;
+
+                const outfitID: string = capture.outfitID;
+                const outfit: Outfit | undefined = data.find(iter => iter.ID == outfitID);
+                if (outfit == undefined) {
+                    console.warn(`Missing outfit ${outfitID}`);
+                    continue;
+                }
+
+                const helpers: (EventCapture | EventDefend)[] = players.filter(iter => iter.timestamp == capture.timestamp.getTime());
+                const outfits: BaseCaptureOutfit[] = [{ name: "No outfit", ID: "-1", amount: 0, tag: "" }];
+                for (const helper of helpers) {
+                    let outfitEntry: BaseCaptureOutfit | undefined = undefined;
+                    if (helper.outfitID == "0" || helper.outfitID.length == 0) {
+                        outfitEntry = outfits[0];
+                    } else {
+                        outfitEntry = outfits.find(iter => iter.ID == helper.outfitID);
+                        if (outfitEntry == undefined) {
+                            const outfitDatum: Outfit | undefined = data.find(iter => iter.ID == helper.outfitID);
+                            outfitEntry = {
+                                ID: helper.outfitID,
+                                name: outfitDatum?.name ?? `Unknown ${helper.outfitID}`,
+                                amount: 0,
+                                tag: outfitDatum?.tag ?? ``,
+                            }
+                            outfits.push(outfitEntry);
+                        }
+                    }
+
+                    ++outfitEntry.amount;
+                }
+
+                const breakdown: BreakdownArray = {
+                    data: outfits.sort((a, b) => b.amount - a.amount).map(iter => {
+                        return {
+                            display: iter.name,
+                            amount: iter.amount,
+                            color: undefined,
+                            sortField: `${iter.amount}`
+                        }
+                    }),
+                    total: outfits.reduce(((acc, iter) => acc += iter.amount), 0)
+                };
+
+                entry.outfits = breakdown;
+
+                baseCaptures.push(entry);
+            }
+
+            response.resolveOk(baseCaptures);
+        });
+
+        return response;
+    }
 
     public static experience(expID: string, events: Event[]): ApiResponse<BreakdownArray> {
         const exp: StatMap = new StatMap();

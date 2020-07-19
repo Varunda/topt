@@ -57599,8 +57599,11 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("breakdown-chart", {
         },
         draw: function () {
             this.$nextTick(() => {
+                if (this.chart.instance != null && this.chart.instance.destroy) {
+                    this.chart.instance.destroy();
+                }
                 const ctx = document.getElementById(`breakdown-chart-${this.ID}`).getContext("2d");
-                new chart_js__WEBPACK_IMPORTED_MODULE_1__["Chart"](ctx, {
+                this.chart.instance = new chart_js__WEBPACK_IMPORTED_MODULE_1__["Chart"](ctx, {
                     type: "pie",
                     data: {
                         labels: this.chart.labels,
@@ -57616,6 +57619,7 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("breakdown-chart", {
                         hover: {
                             animationDuration: 0
                         },
+                        maintainAspectRatio: false,
                         responsiveAnimationDuration: 0,
                         legend: {
                             display: true,
@@ -57946,7 +57950,7 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("breakdown", {
 /*!******************************!*\
   !*** ./src/EventReporter.ts ***!
   \******************************/
-/*! exports provided: BreakdownArray, Breakdown, BreakdownTimeslot, BreakdownTrend, OutfitVersusBreakdown, BreakdownWeaponType, classCollectionNumber, statMapToBreakdown, defaultCharacterMapper, defaultCharacterSortField, defaultWeaponMapper, defaultVehicleMapper, default */
+/*! exports provided: BreakdownArray, Breakdown, BreakdownTimeslot, BreakdownTrend, OutfitVersusBreakdown, BreakdownWeaponType, classCollectionNumber, BaseCaptureOutfit, BaseCapture, statMapToBreakdown, defaultCharacterMapper, defaultCharacterSortField, defaultWeaponMapper, defaultVehicleMapper, default */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -57958,6 +57962,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "OutfitVersusBreakdown", function() { return OutfitVersusBreakdown; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "BreakdownWeaponType", function() { return BreakdownWeaponType; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "classCollectionNumber", function() { return classCollectionNumber; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "BaseCaptureOutfit", function() { return BaseCaptureOutfit; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "BaseCapture", function() { return BaseCapture; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "statMapToBreakdown", function() { return statMapToBreakdown; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "defaultCharacterMapper", function() { return defaultCharacterMapper; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "defaultCharacterSortField", function() { return defaultCharacterSortField; });
@@ -57972,6 +57978,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! census/VehicleAPI */ "./src/census/VehicleAPI.ts");
 /* harmony import */ var PsEvent__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! PsEvent */ "./src/PsEvent.ts");
 /* harmony import */ var InvididualGenerator__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! InvididualGenerator */ "./src/InvididualGenerator.ts");
+/* harmony import */ var census_OutfitAPI__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! census/OutfitAPI */ "./src/census/OutfitAPI.ts");
+
 
 
 
@@ -58044,6 +58052,22 @@ function classCollectionNumber() {
         max: 0
     };
 }
+class BaseCaptureOutfit {
+    constructor() {
+        this.ID = "";
+        this.name = "";
+        this.tag = "";
+        this.amount = 0;
+    }
+}
+class BaseCapture {
+    constructor() {
+        this.name = "";
+        this.faction = "";
+        this.timestamp = 0;
+        this.outfits = new BreakdownArray();
+    }
+}
 function statMapToBreakdown(map, source, matcher, mapper, sortField = undefined) {
     const breakdown = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
     const arr = new BreakdownArray();
@@ -58090,6 +58114,73 @@ function defaultVehicleMapper(elem, ID) {
     return _b = (_a = elem) === null || _a === void 0 ? void 0 : _a.name, (_b !== null && _b !== void 0 ? _b : `Unknown ${ID}`);
 }
 class EventReporter {
+    static facilityCaptures(data) {
+        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        const baseCaptures = [];
+        const captures = data.captures;
+        const players = data.players;
+        const outfitIDs = players
+            .map(iter => iter.outfitID)
+            .filter((value, index, arr) => arr.indexOf(value) == index);
+        census_OutfitAPI__WEBPACK_IMPORTED_MODULE_8__["default"].getByIDs(outfitIDs).ok((data) => {
+            var _a, _b, _c, _d;
+            for (const capture of captures) {
+                // Same faction caps are boring
+                if (capture.factionID == capture.previousFaction) {
+                    continue;
+                }
+                const entry = new BaseCapture();
+                entry.timestamp = capture.timestamp.getTime();
+                entry.name = capture.name;
+                entry.faction = capture.previousFaction;
+                const facilityID = capture.facilityID;
+                const name = capture.name;
+                const outfitID = capture.outfitID;
+                const outfit = data.find(iter => iter.ID == outfitID);
+                if (outfit == undefined) {
+                    console.warn(`Missing outfit ${outfitID}`);
+                    continue;
+                }
+                const helpers = players.filter(iter => iter.timestamp == capture.timestamp.getTime());
+                const outfits = [{ name: "No outfit", ID: "-1", amount: 0, tag: "" }];
+                for (const helper of helpers) {
+                    let outfitEntry = undefined;
+                    if (helper.outfitID == "0" || helper.outfitID.length == 0) {
+                        outfitEntry = outfits[0];
+                    }
+                    else {
+                        outfitEntry = outfits.find(iter => iter.ID == helper.outfitID);
+                        if (outfitEntry == undefined) {
+                            const outfitDatum = data.find(iter => iter.ID == helper.outfitID);
+                            outfitEntry = {
+                                ID: helper.outfitID,
+                                name: (_b = (_a = outfitDatum) === null || _a === void 0 ? void 0 : _a.name, (_b !== null && _b !== void 0 ? _b : `Unknown ${helper.outfitID}`)),
+                                amount: 0,
+                                tag: (_d = (_c = outfitDatum) === null || _c === void 0 ? void 0 : _c.tag, (_d !== null && _d !== void 0 ? _d : ``)),
+                            };
+                            outfits.push(outfitEntry);
+                        }
+                    }
+                    ++outfitEntry.amount;
+                }
+                const breakdown = {
+                    data: outfits.sort((a, b) => b.amount - a.amount).map(iter => {
+                        return {
+                            display: iter.name,
+                            amount: iter.amount,
+                            color: undefined,
+                            sortField: `${iter.amount}`
+                        };
+                    }),
+                    total: outfits.reduce(((acc, iter) => acc += iter.amount), 0)
+                };
+                entry.outfits = breakdown;
+                baseCaptures.push(entry);
+            }
+            response.resolveOk(baseCaptures);
+        });
+        return response;
+    }
     static experience(expID, events) {
         const exp = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
         for (const event of events) {
@@ -58761,16 +58852,13 @@ window.EventReporter = EventReporter;
 /*!************************************!*\
   !*** ./src/InvididualGenerator.ts ***!
   \************************************/
-/*! exports provided: ClassBreakdown, FacilityCapture, CaptureBreakdown, OutfitParticipants, CaptureParticipant, ExpBreakdown, classKdCollection, classCollectionBreakdownTrend, OutfitReport, TrackedRouter, Playtime, ClassUsage, Report, BreakdownSpawn, TrackedPlayer, BreakdownCollection, BreakdownSection, BreakdownMeta, BreakdownSingle, EventFeedEntry, ReportParameters, IndividualReporter */
+/*! exports provided: ClassBreakdown, FacilityCapture, ExpBreakdown, classKdCollection, classCollectionBreakdownTrend, OutfitReport, TrackedRouter, Playtime, ClassUsage, Report, PlayerVersusEntry, PlayerVersus, BreakdownSpawn, TrackedPlayer, BreakdownCollection, BreakdownSection, BreakdownMeta, BreakdownSingle, EventFeedEntry, ReportParameters, IndividualReporter */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "ClassBreakdown", function() { return ClassBreakdown; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "FacilityCapture", function() { return FacilityCapture; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "CaptureBreakdown", function() { return CaptureBreakdown; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "OutfitParticipants", function() { return OutfitParticipants; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "CaptureParticipant", function() { return CaptureParticipant; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "ExpBreakdown", function() { return ExpBreakdown; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "classKdCollection", function() { return classKdCollection; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "classCollectionBreakdownTrend", function() { return classCollectionBreakdownTrend; });
@@ -58779,6 +58867,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Playtime", function() { return Playtime; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "ClassUsage", function() { return ClassUsage; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Report", function() { return Report; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "PlayerVersusEntry", function() { return PlayerVersusEntry; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "PlayerVersus", function() { return PlayerVersus; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "BreakdownSpawn", function() { return BreakdownSpawn; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "TrackedPlayer", function() { return TrackedPlayer; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "BreakdownCollection", function() { return BreakdownCollection; });
@@ -58790,12 +58880,14 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "IndividualReporter", function() { return IndividualReporter; });
 /* harmony import */ var census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! census/ApiWrapper */ "./src/census/ApiWrapper.ts");
 /* harmony import */ var census_CharacterAPI__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! census/CharacterAPI */ "./src/census/CharacterAPI.ts");
-/* harmony import */ var census_EventAPI__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! census/EventAPI */ "./src/census/EventAPI.ts");
-/* harmony import */ var census_AchievementAPI__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! census/AchievementAPI */ "./src/census/AchievementAPI.ts");
-/* harmony import */ var census_PsLoadout__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! census/PsLoadout */ "./src/census/PsLoadout.ts");
-/* harmony import */ var PsEvent__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! PsEvent */ "./src/PsEvent.ts");
-/* harmony import */ var StatMap__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! StatMap */ "./src/StatMap.ts");
-/* harmony import */ var EventReporter__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! EventReporter */ "./src/EventReporter.ts");
+/* harmony import */ var census_WeaponAPI__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! census/WeaponAPI */ "./src/census/WeaponAPI.ts");
+/* harmony import */ var census_EventAPI__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! census/EventAPI */ "./src/census/EventAPI.ts");
+/* harmony import */ var census_AchievementAPI__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! census/AchievementAPI */ "./src/census/AchievementAPI.ts");
+/* harmony import */ var census_PsLoadout__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! census/PsLoadout */ "./src/census/PsLoadout.ts");
+/* harmony import */ var PsEvent__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! PsEvent */ "./src/PsEvent.ts");
+/* harmony import */ var StatMap__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! StatMap */ "./src/StatMap.ts");
+/* harmony import */ var EventReporter__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! EventReporter */ "./src/EventReporter.ts");
+
 
 
 
@@ -58824,49 +58916,6 @@ class FacilityCapture {
         this.factionID = "";
         this.outfitID = "";
         this.previousFaction = "";
-    }
-}
-class CaptureBreakdown {
-    constructor() {
-        this.facilityID = "";
-        this.zoneID = "";
-        this.name = "";
-        this.type = "";
-        this.typeID = "";
-        this.timestamp = new Date();
-        this.timeHeld = 0;
-        this.participants = [];
-        this.outfits = [];
-        this.factionID = "";
-        this.outfitID = "";
-        this.outfitName = "";
-        this.outfitTag = "";
-        this.previousFaction = "";
-        this.previousOutfitID = "";
-        this.previousOutfitName = "";
-        this.previousOutfitTag = "";
-        this.captureScore = 0;
-        this.tickScore = 0;
-        this.takenBy = null;
-    }
-}
-class OutfitParticipants {
-    constructor() {
-        this.outfitID = "";
-        this.outfitTag = "";
-        this.outfitName = "";
-        this.players = 0;
-        this.total = 0;
-    }
-}
-class CaptureParticipant {
-    constructor() {
-        this.characterID = "";
-        this.outfitID = "";
-        this.outfitName = "";
-        this.outfitTag = "";
-        this.facilityID = "";
-        this.timestamp = 0;
     }
 }
 class ExpBreakdown {
@@ -58923,26 +58972,27 @@ class OutfitReport {
             kpm: classCollectionBreakdownTrend(),
             kd: classCollectionBreakdownTrend()
         };
-        this.weaponKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
-        this.weaponTypeKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
-        this.deathAllBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
-        this.deathAllTypeBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
-        this.deathRevivedBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
-        this.deathRevivedTypeBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
-        this.deathKilledBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
-        this.deathKilledTypeBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+        this.weaponKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
+        this.weaponTypeKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
+        this.deathAllBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
+        this.deathAllTypeBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
+        this.deathRevivedBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
+        this.deathRevivedTypeBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
+        this.deathKilledBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
+        this.deathKilledTypeBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
         this.outfitVersusBreakdown = [];
         this.weaponTypeDeathBreakdown = [];
-        this.vehicleKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
-        this.vehicleKillWeaponBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+        this.vehicleKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
+        this.vehicleKillWeaponBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
         this.timeUnrevived = [];
         this.revivedLifeExpectance = [];
         this.kmLifeExpectance = [];
         this.kmTimeDead = [];
-        this.factionKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
-        this.factionDeathBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
-        this.continentKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
-        this.continentDeathBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+        this.factionKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
+        this.factionDeathBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
+        this.continentKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
+        this.continentDeathBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
+        this.baseCaptures = [];
         this.classKds = {
             infil: classKdCollection(),
             lightAssault: classKdCollection(),
@@ -58953,20 +59003,20 @@ class OutfitReport {
             total: classKdCollection()
         };
         this.classTypeKills = {
-            infil: new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"](),
-            lightAssault: new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"](),
-            medic: new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"](),
-            engineer: new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"](),
-            heavy: new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"](),
-            max: new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"](),
+            infil: new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"](),
+            lightAssault: new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"](),
+            medic: new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"](),
+            engineer: new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"](),
+            heavy: new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"](),
+            max: new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"](),
         };
         this.classTypeDeaths = {
-            infil: new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"](),
-            lightAssault: new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"](),
-            medic: new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"](),
-            engineer: new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"](),
-            heavy: new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"](),
-            max: new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"](),
+            infil: new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"](),
+            lightAssault: new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"](),
+            medic: new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"](),
+            engineer: new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"](),
+            heavy: new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"](),
+            max: new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"](),
         };
     }
 }
@@ -59034,15 +59084,36 @@ class Report {
             rpm: []
         };
         this.collections = [];
-        this.vehicleBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+        this.vehicleBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
         this.scoreBreakdown = [];
         this.ribbons = [];
         this.ribbonCount = 0;
         this.breakdowns = [];
-        this.weaponKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
-        this.weaponKillTypeBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
-        this.weaponDeathBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
-        this.weaponDeathTypeBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+        this.weaponKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
+        this.weaponKillTypeBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
+        this.weaponDeathBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
+        this.weaponDeathTypeBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
+        this.playerVersus = [];
+    }
+}
+class PlayerVersusEntry {
+    constructor() {
+        this.timestamp = 0;
+        this.type = "unknown";
+        this.weaponName = "";
+        this.headshot = false;
+    }
+}
+class PlayerVersus {
+    constructor() {
+        this.charID = "";
+        this.name = "";
+        this.kills = 0;
+        this.deaths = 0;
+        this.revives = 0;
+        this.weaponKills = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
+        this.weaponDeaths = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
+        this.encounters = [];
     }
 }
 class BreakdownSpawn {
@@ -59062,8 +59133,8 @@ class TrackedPlayer {
         this.online = true;
         this.joinTime = 0;
         this.secondsOnline = 0;
-        this.stats = new StatMap__WEBPACK_IMPORTED_MODULE_6__["default"]();
-        this.ribbons = new StatMap__WEBPACK_IMPORTED_MODULE_6__["default"]();
+        this.stats = new StatMap__WEBPACK_IMPORTED_MODULE_7__["default"]();
+        this.ribbons = new StatMap__WEBPACK_IMPORTED_MODULE_7__["default"]();
         this.recentDeath = null;
         this.events = [];
     }
@@ -59087,14 +59158,14 @@ class BreakdownMeta {
     constructor() {
         this.title = "";
         this.altTitle = "Count";
-        this.data = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+        this.data = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
     }
 }
 class BreakdownSingle {
     constructor() {
         this.title = "";
         this.altTitle = "";
-        this.data = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+        this.data = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
         this.showPercent = true;
         this.showTotal = true;
     }
@@ -59109,9 +59180,21 @@ class EventFeedEntry {
 }
 class ReportParameters {
     constructor() {
+        /**
+         * Player the report is being generated for
+         */
         this.player = new TrackedPlayer();
+        /**
+         * Contains all events collected during tracking. If you need just the player's events, use @see player
+         */
         this.events = [];
+        /**
+         * Tracking information about the current state the tracker
+         */
         this.tracking = { running: false, startTime: 0, endTime: 0 };
+        /**
+         * All routers tracked
+         */
         this.routers = [];
     }
 }
@@ -59134,6 +59217,7 @@ class IndividualReporter {
             + 1 // Ribbons
             + 1 // Medic breakdown
             + 1 // Engineer breakdown
+            + 1 // Player versus
         ;
         const totalOps = opsLeft;
         const firstPlayerEvent = parameters.player.events[0];
@@ -59146,7 +59230,7 @@ class IndividualReporter {
         report.scoreBreakdown = IndividualReporter.scoreBreakdown(parameters);
         report.player.stats.getMap().forEach((value, eventID) => {
             var _a;
-            const event = PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvents"].get(eventID);
+            const event = PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvents"].get(eventID);
             if (event == undefined) {
                 return;
             }
@@ -59170,26 +59254,27 @@ class IndividualReporter {
             .ok(data => report.collections.push(data)).always(callback("Supported by"));
         IndividualReporter.miscCollection(parameters)
             .ok(data => report.collections.push(data)).always(callback("Misc coll"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].weaponKills(parameters.player.events)
+        EventReporter__WEBPACK_IMPORTED_MODULE_8__["default"].weaponKills(parameters.player.events)
             .ok(data => report.weaponKillBreakdown = data).always(callback("Weapon kills"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].weaponTypeKills(parameters.player.events)
+        EventReporter__WEBPACK_IMPORTED_MODULE_8__["default"].weaponTypeKills(parameters.player.events)
             .ok(data => report.weaponKillTypeBreakdown = data).always(callback("Weapon type kills"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].weaponDeaths(parameters.player.events)
+        EventReporter__WEBPACK_IMPORTED_MODULE_8__["default"].weaponDeaths(parameters.player.events)
             .ok(data => report.weaponDeathBreakdown = data).always(callback("Weapon deaths"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].weaponTypeDeaths(parameters.player.events)
+        EventReporter__WEBPACK_IMPORTED_MODULE_8__["default"].weaponTypeDeaths(parameters.player.events)
             .ok(data => report.weaponDeathTypeBreakdown = data).always(callback("Weapon type deaths"));
-        report.overtime.kd = EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].kdOverTime(parameters.player.events);
-        report.overtime.kpm = EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].kpmOverTime(parameters.player.events);
-        if (parameters.player.events.find(iter => iter.type == "exp" && (iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].revive || iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].squadRevive)) != undefined) {
-            report.overtime.rpm = EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].revivesOverTime(parameters.player.events);
+        IndividualReporter.playerVersus(parameters).ok(data => report.playerVersus = data).always(callback("Player versus"));
+        report.overtime.kd = EventReporter__WEBPACK_IMPORTED_MODULE_8__["default"].kdOverTime(parameters.player.events);
+        report.overtime.kpm = EventReporter__WEBPACK_IMPORTED_MODULE_8__["default"].kpmOverTime(parameters.player.events);
+        if (parameters.player.events.find(iter => iter.type == "exp" && (iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].revive || iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].squadRevive)) != undefined) {
+            report.overtime.rpm = EventReporter__WEBPACK_IMPORTED_MODULE_8__["default"].revivesOverTime(parameters.player.events);
         }
-        report.perUpdate.kd = EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].kdPerUpdate(parameters.player.events);
+        report.perUpdate.kd = EventReporter__WEBPACK_IMPORTED_MODULE_8__["default"].kdPerUpdate(parameters.player.events);
         const ribbonIDs = Array.from(parameters.player.ribbons.getMap().keys());
         if (ribbonIDs.length > 0) {
-            census_AchievementAPI__WEBPACK_IMPORTED_MODULE_3__["AchievementAPI"].getByIDs(ribbonIDs).ok((data) => {
+            census_AchievementAPI__WEBPACK_IMPORTED_MODULE_4__["AchievementAPI"].getByIDs(ribbonIDs).ok((data) => {
                 var _a;
                 (_a = report.player) === null || _a === void 0 ? void 0 : _a.ribbons.getMap().forEach((amount, achivID) => {
-                    const achiv = data.find((iter) => iter.ID == achivID) || census_AchievementAPI__WEBPACK_IMPORTED_MODULE_3__["AchievementAPI"].unknown;
+                    const achiv = data.find((iter) => iter.ID == achivID) || census_AchievementAPI__WEBPACK_IMPORTED_MODULE_4__["AchievementAPI"].unknown;
                     const entry = Object.assign(Object.assign({}, achiv), { amount: amount });
                     report.ribbonCount += amount;
                     report.ribbons.push(entry);
@@ -59220,6 +59305,123 @@ class IndividualReporter {
         }
         return response;
     }
+    static playerVersus(parameters) {
+        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        const versus = [];
+        const charIDs = [];
+        const wepIDs = [];
+        for (const ev of parameters.player.events) {
+            if (ev.sourceID != parameters.player.characterID) {
+                continue;
+            }
+            if (ev.type != "kill" && ev.type != "death") {
+                continue;
+            }
+            charIDs.push(ev.targetID);
+            wepIDs.push(ev.weaponID);
+        }
+        let characters = [];
+        let weapons = [];
+        let opsLeft = 2;
+        const killsMap = new Map();
+        const deathsMap = new Map();
+        const done = () => {
+            var _a, _b, _c, _d, _e, _f;
+            for (const ev of parameters.player.events) {
+                if (ev.sourceID != parameters.player.characterID) {
+                    continue;
+                }
+                if (ev.type != "kill" && ev.type != "death") {
+                    continue;
+                }
+                let entry = versus.find(iter => iter.charID == ev.targetID);
+                if (entry == undefined) {
+                    entry = new PlayerVersus();
+                    entry.charID = ev.targetID;
+                    entry.name = (_b = (_a = characters.find(iter => iter.ID == ev.targetID)) === null || _a === void 0 ? void 0 : _a.name, (_b !== null && _b !== void 0 ? _b : `Unknown ${ev.targetID}`));
+                    killsMap.set(ev.targetID, new StatMap__WEBPACK_IMPORTED_MODULE_7__["default"]());
+                    deathsMap.set(ev.targetID, new StatMap__WEBPACK_IMPORTED_MODULE_7__["default"]());
+                    versus.push(entry);
+                }
+                const weaponName = (_d = (_c = weapons.find(iter => iter.ID == ev.weaponID)) === null || _c === void 0 ? void 0 : _c.name, (_d !== null && _d !== void 0 ? _d : `Unknown ${ev.weaponID}`));
+                let type = "unknown";
+                if (ev.type == "kill") {
+                    ++entry.kills;
+                    type = "kill";
+                    killsMap.get(ev.targetID).increment(weaponName);
+                }
+                else if (ev.type == "death") {
+                    if (ev.revived == true) {
+                        ++entry.revives;
+                        type = "revived";
+                    }
+                    else {
+                        ++entry.deaths;
+                        type = "death";
+                        deathsMap.get(ev.targetID).increment(weaponName);
+                    }
+                }
+                else {
+                    console.error(`Unchecked event type: '${ev}'`);
+                }
+                const encounter = {
+                    timestamp: ev.timestamp,
+                    headshot: ev.isHeadshot,
+                    type: type,
+                    weaponName: (_f = (_e = weapons.find(iter => iter.ID == ev.weaponID)) === null || _e === void 0 ? void 0 : _e.name, (_f !== null && _f !== void 0 ? _f : `Unknown ${ev.weaponID}`))
+                };
+                entry.encounters.push(encounter);
+            }
+            for (const entry of versus) {
+                if (killsMap.has(entry.charID) == false) {
+                    console.error(`Missing killsMap entry for ${entry.name}`);
+                    continue;
+                }
+                if (deathsMap.has(entry.charID) == false) {
+                    console.error(`Missing deathsMap entry for ${entry.name}`);
+                    continue;
+                }
+                const killMap = killsMap.get(entry.charID);
+                const deathMap = deathsMap.get(entry.charID);
+                const killBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
+                killMap.getMap().forEach((amount, weapon) => {
+                    killBreakdown.data.push({
+                        display: weapon,
+                        amount: amount,
+                        sortField: weapon,
+                        color: undefined
+                    });
+                    killBreakdown.total += amount;
+                });
+                entry.weaponKills = killBreakdown;
+                const deathBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
+                deathMap.getMap().forEach((amount, weapon) => {
+                    deathBreakdown.data.push({
+                        display: weapon,
+                        amount: amount,
+                        sortField: weapon,
+                        color: undefined
+                    });
+                    deathBreakdown.total += amount;
+                });
+                entry.weaponDeaths = deathBreakdown;
+            }
+            response.resolveOk(versus);
+        };
+        census_CharacterAPI__WEBPACK_IMPORTED_MODULE_1__["CharacterAPI"].getByIDs(charIDs).ok((data) => {
+            characters = data;
+            if (--opsLeft == 0) {
+                done();
+            }
+        });
+        census_WeaponAPI__WEBPACK_IMPORTED_MODULE_2__["WeaponAPI"].getByIDs(wepIDs).ok((data) => {
+            weapons = data;
+            if (--opsLeft == 0) {
+                done();
+            }
+        });
+        return response;
+    }
     static medicBreakdown(parameters) {
         const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
         const medicCollection = new BreakdownCollection();
@@ -59235,9 +59437,9 @@ class IndividualReporter {
                 response.resolveOk(medicCollection);
             }
         };
-        IndividualReporter.breakdownSection(parameters, "Heal ticks", PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].heal, PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].squadHeal).ok(add).always(callback);
-        IndividualReporter.breakdownSection(parameters, "Revives", PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].revive, PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].squadRevive).ok(add).always(callback);
-        IndividualReporter.breakdownSection(parameters, "Shield repair ticks", PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].shieldRepair, PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].squadShieldRepair).ok(add).always(callback);
+        IndividualReporter.breakdownSection(parameters, "Heal ticks", PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].heal, PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].squadHeal).ok(add).always(callback);
+        IndividualReporter.breakdownSection(parameters, "Revives", PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].revive, PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].squadRevive).ok(add).always(callback);
+        IndividualReporter.breakdownSection(parameters, "Shield repair ticks", PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].shieldRepair, PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].squadShieldRepair).ok(add).always(callback);
         return response;
     }
     static engineerBreakdown(parameters) {
@@ -59254,8 +59456,8 @@ class IndividualReporter {
                 response.resolveOk(engCollection);
             }
         };
-        IndividualReporter.breakdownSection(parameters, "Resupply ticks", PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].resupply, PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].squadResupply).ok(add).always(callback);
-        IndividualReporter.breakdownSection(parameters, "MAX repair ticks", PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].maxRepair, PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].squadMaxRepair).ok(add).always(callback);
+        IndividualReporter.breakdownSection(parameters, "Resupply ticks", PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].resupply, PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].squadResupply).ok(add).always(callback);
+        IndividualReporter.breakdownSection(parameters, "MAX repair ticks", PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].maxRepair, PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].squadMaxRepair).ok(add).always(callback);
         return response;
     }
     static breakdownSection(parameters, name, expID, squadExpID) {
@@ -59272,12 +59474,12 @@ class IndividualReporter {
             };
             section.left = new BreakdownMeta();
             section.left.title = "All";
-            EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].experience(expID, ticks).ok((data) => {
+            EventReporter__WEBPACK_IMPORTED_MODULE_8__["default"].experience(expID, ticks).ok((data) => {
                 section.left.data = data;
             }).always(callback);
             section.right = new BreakdownMeta();
             section.right.title = "Squad only";
-            EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].experience(squadExpID, ticks).ok((data) => {
+            EventReporter__WEBPACK_IMPORTED_MODULE_8__["default"].experience(squadExpID, ticks).ok((data) => {
                 section.right.data = data;
             }).always(callback);
         }
@@ -59324,11 +59526,11 @@ class IndividualReporter {
                 response.resolveOk(coll);
             }
         };
-        IndividualReporter.singleSupportedBy(parameters, "Healed by", [PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].heal, PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].squadHeal]).ok(add).always(callback);
-        IndividualReporter.singleSupportedBy(parameters, "Revived by", [PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].revive, PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].squadRevive]).ok(add).always(callback);
-        IndividualReporter.singleSupportedBy(parameters, "Shield repaired by", [PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].shieldRepair, PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].squadShieldRepair]).ok(add).always(callback);
-        IndividualReporter.singleSupportedBy(parameters, "Resupplied by", [PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].resupply, PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].squadResupply]).ok(add).always(callback);
-        IndividualReporter.singleSupportedBy(parameters, "Repaired by", [PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].maxRepair, PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].squadMaxRepair]).ok(add).always(callback);
+        IndividualReporter.singleSupportedBy(parameters, "Healed by", [PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].heal, PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].squadHeal]).ok(add).always(callback);
+        IndividualReporter.singleSupportedBy(parameters, "Revived by", [PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].revive, PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].squadRevive]).ok(add).always(callback);
+        IndividualReporter.singleSupportedBy(parameters, "Shield repaired by", [PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].shieldRepair, PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].squadShieldRepair]).ok(add).always(callback);
+        IndividualReporter.singleSupportedBy(parameters, "Resupplied by", [PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].resupply, PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].squadResupply]).ok(add).always(callback);
+        IndividualReporter.singleSupportedBy(parameters, "Repaired by", [PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].maxRepair, PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].squadMaxRepair]).ok(add).always(callback);
         return response;
     }
     static singleSupportedBy(parameters, name, ids) {
@@ -59347,8 +59549,8 @@ class IndividualReporter {
             const meta = new BreakdownSingle();
             meta.title = name;
             meta.altTitle = "Player";
-            meta.data = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
-            EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].experienceSource(ids, parameters.player.characterID, parameters.events).ok((data) => {
+            meta.data = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
+            EventReporter__WEBPACK_IMPORTED_MODULE_8__["default"].experienceSource(ids, parameters.player.characterID, parameters.events).ok((data) => {
                 meta.data = data;
                 response.resolveOk(meta);
             });
@@ -59376,8 +59578,8 @@ class IndividualReporter {
             const meta = new BreakdownSingle();
             meta.title = "Deployable kills";
             meta.altTitle = "Deployable";
-            meta.data = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
-            const map = new StatMap__WEBPACK_IMPORTED_MODULE_6__["default"]();
+            meta.data = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
+            const map = new StatMap__WEBPACK_IMPORTED_MODULE_7__["default"]();
             for (const tick of ticks) {
                 let name = "unknown";
                 if (tick.expID == "57") {
@@ -59436,11 +59638,11 @@ class IndividualReporter {
             const killedIDs = transAssists.map(iter => iter.targetID).filter((iter, index, arr) => arr.indexOf(iter) == index);
             const firstEv = Math.min(...transAssists.map(iter => iter.timestamp));
             const lastEv = Math.max(...transAssists.map(iter => iter.timestamp));
-            const map = new StatMap__WEBPACK_IMPORTED_MODULE_6__["default"]();
+            const map = new StatMap__WEBPACK_IMPORTED_MODULE_7__["default"]();
             const meta = new BreakdownMeta();
             meta.title = "Transport assists";
-            meta.data = new EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
-            census_EventAPI__WEBPACK_IMPORTED_MODULE_2__["EventAPI"].getMultiDeaths(killedIDs, firstEv, lastEv).ok((data) => {
+            meta.data = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
+            census_EventAPI__WEBPACK_IMPORTED_MODULE_3__["EventAPI"].getMultiDeaths(killedIDs, firstEv, lastEv).ok((data) => {
                 const killers = [];
                 for (const assist of transAssists) {
                     const death = data.find(iter => iter.sourceID == assist.targetID && iter.timestamp == assist.timestamp);
@@ -59504,7 +59706,7 @@ class IndividualReporter {
         const breakdown = new Map();
         for (const event of parameters.player.events) {
             if (event.type == "exp") {
-                const exp = PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvents"].get(event.expID) || PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].other;
+                const exp = PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvents"].get(event.expID) || PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].other;
                 if (!breakdown.has(exp.name)) {
                     breakdown.set(exp.name, new ExpBreakdown());
                 }
@@ -59512,7 +59714,7 @@ class IndividualReporter {
                 score.name = exp.name;
                 score.score += event.amount;
                 score.amount += 1;
-                if (exp == PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].other) {
+                if (exp == PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].other) {
                     //console.log(`Other: ${JSON.stringify(event)}`);
                 }
             }
@@ -59528,13 +59730,18 @@ class IndividualReporter {
         const kds = classKdCollection();
         events.forEach((event) => {
             if (event.type == "kill" || event.type == "death") {
+                const sourceLoadoutID = event.loadoutID;
+                const sourceLoadout = census_PsLoadout__WEBPACK_IMPORTED_MODULE_5__["PsLoadouts"].get(sourceLoadoutID);
+                if (sourceLoadout == undefined) {
+                    return;
+                }
                 const targetLoadoutID = event.targetLoadoutID;
-                const targetLoadout = census_PsLoadout__WEBPACK_IMPORTED_MODULE_4__["PsLoadouts"].get(targetLoadoutID);
+                const targetLoadout = census_PsLoadout__WEBPACK_IMPORTED_MODULE_5__["PsLoadouts"].get(targetLoadoutID);
                 if (targetLoadout == undefined) {
                     return;
                 }
                 if (classLimit != undefined) {
-                    if (targetLoadout.type == classLimit) {
+                    if (sourceLoadout.type != classLimit) {
                         return; // Continue to next iteration
                     }
                 }
@@ -59622,10 +59829,10 @@ class IndividualReporter {
         usage.characterID = parameters.player.characterID;
         usage.secondsOnline = (finalTimestamp - lastTimestamp) / 1000;
         parameters.player.events.forEach((event) => {
-            if (event.type == "capture") {
+            if (event.type == "capture" || event.type == "defend") {
                 return;
             }
-            lastLoadout = census_PsLoadout__WEBPACK_IMPORTED_MODULE_4__["PsLoadouts"].get(event.loadoutID);
+            lastLoadout = census_PsLoadout__WEBPACK_IMPORTED_MODULE_5__["PsLoadouts"].get(event.loadoutID);
             if (lastLoadout == undefined) {
                 return console.warn(`Unknown loadout ID: ${event.loadoutID}`);
             }
@@ -60192,23 +60399,41 @@ class KillfeedGeneration {
                 //console.log(`${sourceMember.name} // ${targetMember.name} are already in a squad`);
             }
             else {
-                if (targetSquad.guess == false) {
+                // 3 cases:
+                //      1. Both squads are guesses => Merge squads
+                //      2. One squad isn't a guess => Move guess squad into non-guess squad
+                //      3. Neither squad is a guess => Move member who performed action into other squad
+                if (targetSquad.guess == true && sourceSquad.guess == true) {
+                    console.log(`Both squads are guesses, merging ${sourceMember.name} (${sourceSquad.name}) into ${targetMember.name} (${targetSquad.name})`);
                     for (const member of sourceSquad.members) {
                         targetSquad.members.push(member);
                     }
                     // Remove any references in or to the removed squad so it can be garbage collected
                     sourceSquad.members = [];
                     this._squads = this._squads.filter(iter => iter.ID != sourceSquad.ID);
-                    console.log(`Merged ${sourceMember.name}'s squad with ${targetSquad.name}'s squad due to it not being a guess`);
                 }
-                else {
+                else if (targetSquad.guess == false && sourceSquad.guess == true) {
+                    console.log(`Target is not a guess, merging ${sourceMember.name} (${sourceSquad.name}) into ${targetMember.name} (${targetSquad.name})`);
+                    for (const member of sourceSquad.members) {
+                        targetSquad.members.push(member);
+                    }
+                    // Remove any references in or to the removed squad so it can be garbage collected
+                    sourceSquad.members = [];
+                    this._squads = this._squads.filter(iter => iter.ID != sourceSquad.ID);
+                }
+                else if (targetSquad.guess == true && sourceSquad.guess == false) {
+                    console.log(`Source is not a guess, merging ${targetMember.name} (${targetSquad.name}) into ${sourceMember.name} (${sourceSquad.name})`);
                     for (const member of targetSquad.members) {
                         sourceSquad.members.push(member);
                     }
                     // Remove any references in or to the removed squad so it can be garbage collected
                     targetSquad.members = [];
                     this._squads = this._squads.filter(iter => iter.ID != targetSquad.ID);
-                    console.log(`Merged ${targetMember.name}'s squad with ${sourceMember.name}'s squad due`);
+                }
+                else if (targetSquad.guess == false && sourceSquad.guess == false) {
+                    console.log(`Neither squad is a guess, moving ${targetMember.name} into ${sourceMember.name} (${sourceSquad.name})`);
+                    sourceSquad.members.push(targetMember);
+                    targetSquad.members = targetSquad.members.filter(iter => iter.charID != targetMember.charID);
                 }
             }
         }
@@ -60279,6 +60504,37 @@ class KillfeedGeneration {
         }
         this._hoveredSquad.members = [];
         this._squads = this._squads.filter(iter => iter.ID != this._hoveredSquad.ID);
+    }
+    static removeMember(charID) {
+        var _a;
+        const squad = this.getSquadOfMember(charID);
+        console.log(`Remove ${charID} from tracking ${(_a = squad) === null || _a === void 0 ? void 0 : _a.name}`);
+        if (squad != null) {
+            squad.members = squad.members.filter(iter => iter.charID != charID);
+            console.log(`${squad.members.length} members after removing ${charID}`);
+            if (squad.members.length == 0) {
+                this._squads = this._squads.filter(iter => iter.ID != squad.ID);
+            }
+        }
+        if (this._members.has(charID)) {
+            this._members.delete(charID);
+        }
+    }
+    static addMember(charID) {
+        if (this._members.has(charID)) {
+            return;
+        }
+        console.log(`Adding ${charID} to the killfeed`);
+        census_CharacterAPI__WEBPACK_IMPORTED_MODULE_1__["CharacterAPI"].getByID(charID).ok((character) => {
+            const member = this.toMember(character);
+            this._members.set(character.ID, member);
+            if (character.online == true) {
+                const squad = new KillfeedSquad();
+                squad.members.push(member);
+                this._squads.push(squad);
+            }
+            console.log(`Added ${character.name}`);
+        });
     }
     static addCharacters(characters) {
         for (const char of characters) {
@@ -60500,11 +60756,12 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("killfeed-squad", {
                 </button>
             </div>
             <div v-if="ShowState" class="list-group-item p-0">
-                <div :style="{
-                    width: (all.percentAlive * 100) + '%',
-                    'max-width': '100%',
-                    'background-color': all.aliveColor
+                <div class="pl-1" :style="{
+                    width: '100%',
+                    background: 'linear-gradient(90deg,' + all.aliveColor + (all.percentAlive * 100) + '%, transparent ' + (all.percentAlive * 100) + '% ' +  ((1 - all.percentAlive) * 100) + '%)'
                 }">
+
+                    {{all.alive}} / {{all.total}}
 
                     &nbsp;
                 </div>
@@ -60790,6 +61047,16 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].filter("duration", (input) => {
     const hours = Math.floor(val / 3600);
     const mins = Math.floor((val - (3600 * hours)) / 60);
     return `${hours} hours ${mins} minutes ${val % 60} seconds`;
+});
+vue__WEBPACK_IMPORTED_MODULE_0__["default"].filter("minutes", (input) => {
+    const val = (typeof (input) == "string") ? Number.parseInt(input) : input;
+    if (Number.isNaN(val)) {
+        return `NaN ${val}`;
+    }
+    if (val == 0) {
+        return "0 minutes";
+    }
+    return `${(val / 60).toFixed(0)} minutes`;
 });
 
 
@@ -61714,7 +61981,7 @@ class ApiResponse {
                 localUrl = jq.url;
                 localMethod = jq.method;
                 if (reader != null && jq.status == 200) {
-                    if (data.error != undefined || data.errorCode != undefined) {
+                    if (data.error != undefined || data.errorCode != undefined || data == "") {
                         localStatus = 500;
                         localData = data;
                     }
@@ -62620,7 +62887,12 @@ class FacilityAPI {
                 for (const wepID of requestIDs) {
                     FacilityAPI._cache.set(wepID, null);
                 }
-                response.resolveOk([]);
+                if (facilities.length > 0) {
+                    response.resolveOk(facilities);
+                }
+                else {
+                    response.resolve({ code: 500, data: "" });
+                }
                 console.error(err);
             });
         }
@@ -63207,6 +63479,7 @@ class WeaponAPI {
                     response.resolveOk(wep);
                 }
             }).internalError((err) => {
+                WeaponAPI._cache.set(weaponID, null);
                 console.error(err);
             });
         }
@@ -63250,7 +63523,13 @@ class WeaponAPI {
                 for (const wepID of requestIDs) {
                     WeaponAPI._cache.set(wepID, null);
                 }
-                response.resolveOk([]);
+                if (weapons.length > 0) {
+                    console.error(`API call failed, but some weapons were cached, so using that`);
+                    response.resolveOk(weapons);
+                }
+                else {
+                    response.resolve({ code: 500, data: "" });
+                }
                 console.error(err);
             });
         }
@@ -63435,7 +63714,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
         // Used to make iteration thru classes easier
         classIterator: [
             { title: "Infiltrator", name: "infil" },
-            { title: "Light assault", name: "lightAssault" },
+            { title: "Light Assault", name: "lightAssault" },
             { title: "Medic", name: "medic" },
             { title: "Engineer", name: "engineer" },
             { title: "Heavy", name: "heavy" },
@@ -63569,13 +63848,15 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                     const events = data.events;
                     this.subscribeToExpGains(chars);
                     this.outfits = outfits;
-                    const parsedData = events.map(iter => JSON.parse(iter));
-                    this.tracking.startTime = Math.min(...parsedData.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
-                    this.tracking.endTime = Math.max(...parsedData.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
-                    for (const ev of events) {
-                        this.processMessage(ev, true);
+                    if (events != undefined && events.length != 0) {
+                        const parsedData = events.map(iter => JSON.parse(iter));
+                        this.tracking.startTime = Math.min(...parsedData.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
+                        this.tracking.endTime = Math.max(...parsedData.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
+                        for (const ev of events) {
+                            this.processMessage(ev, true);
+                        }
+                        this.setSaveEvents(false);
                     }
-                    this.setSaveEvents(false);
                     console.log(`Took ${new Date().getTime() - nowMs}ms to import data from ${this.tracking.startTime} ${new Date(this.tracking.startTime)} to ${this.tracking.endTime}`);
                 }
                 else {
@@ -63750,6 +64031,10 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             this.outfitReport.facilityCaptures.sort((a, b) => {
                 return a.timestamp.getTime() - b.timestamp.getTime();
             });
+            EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].facilityCaptures({
+                captures: this.outfitReport.facilityCaptures,
+                players: this.playerCaptures
+            }).ok(data => this.outfitReport.baseCaptures = data);
             const sessions = this.outfitTrends.sessions
                 .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
             this.outfitReport.trends.kpm.total = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kpms.total }; });
@@ -63895,10 +64180,12 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].weaponTypeDeaths(this.outfitReport.events, true).ok(data => this.outfitReport.deathRevivedTypeBreakdown = data);
             EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].weaponTypeDeaths(this.outfitReport.events, false).ok(data => this.outfitReport.deathKilledTypeBreakdown = data);
             EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].weaponDeathBreakdown(this.outfitReport.events).ok(data => this.outfitReport.weaponTypeDeathBreakdown = data);
-            this.outfitReport.timeUnrevived = InvididualGenerator__WEBPACK_IMPORTED_MODULE_18__["IndividualReporter"].unrevivedTime(this.outfitReport.events);
-            this.outfitReport.revivedLifeExpectance = InvididualGenerator__WEBPACK_IMPORTED_MODULE_18__["IndividualReporter"].reviveLifeExpectance(this.outfitReport.events);
-            this.outfitReport.kmLifeExpectance = InvididualGenerator__WEBPACK_IMPORTED_MODULE_18__["IndividualReporter"].lifeExpectanceRate(this.outfitReport.events);
-            this.outfitReport.kmTimeDead = InvididualGenerator__WEBPACK_IMPORTED_MODULE_18__["IndividualReporter"].timeUntilReviveRate(this.outfitReport.events);
+            /* Not super useful and take a long time to generate
+            this.outfitReport.timeUnrevived = IndividualReporter.unrevivedTime(this.outfitReport.events);
+            this.outfitReport.revivedLifeExpectance = IndividualReporter.reviveLifeExpectance(this.outfitReport.events);
+            this.outfitReport.kmLifeExpectance = IndividualReporter.lifeExpectanceRate(this.outfitReport.events);
+            this.outfitReport.kmTimeDead = IndividualReporter.timeUntilReviveRate(this.outfitReport.events);
+            */
             const classFilter = (iter, type, loadouts) => {
                 if (iter.type == type) {
                     return loadouts.indexOf(iter.loadoutID) > -1;
@@ -63997,6 +64284,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             });
             this.generatePlayerReport(charID).ok((data) => {
                 report = data;
+                console.log(`Made report: ${JSON.stringify(report.playerVersus)}`);
                 if (--opsLeft == 0) {
                     done();
                 }
@@ -64024,6 +64312,9 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             else {
                 const events = [...player.events];
                 this.stats.forEach((player, charID) => {
+                    if (charID == player.characterID) { // Don't add the characters's events twice
+                        return;
+                    }
                     events.push(...player.events);
                 });
                 events.push(...this.miscEvents);
@@ -64447,6 +64738,17 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                             (_a = targetTicks) === null || _a === void 0 ? void 0 : _a.stats.increment(PsEvent__WEBPACK_IMPORTED_MODULE_15__["PsEvent"].teamkilled);
                             this.statTotals.increment(PsEvent__WEBPACK_IMPORTED_MODULE_15__["PsEvent"].teamkill);
                             this.statTotals.increment(PsEvent__WEBPACK_IMPORTED_MODULE_15__["PsEvent"].teamkilled);
+                            const ev = {
+                                type: "teamkill",
+                                sourceID: sourceID,
+                                loadoutID: sourceLoadoutID,
+                                targetID: targetID,
+                                targetLoadoutID: targetLoadoutID,
+                                weaponID: msg.payload.attacker_weapon_id,
+                                zoneID: zoneID,
+                                timestamp: Number.parseInt(msg.payload.timestamp) * 1000
+                            };
+                            sourceTicks.events.push(ev);
                         }
                         else {
                             sourceTicks.stats.increment(PsEvent__WEBPACK_IMPORTED_MODULE_15__["PsEvent"].kill);
@@ -64499,6 +64801,18 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 }
                 else if (event == "PlayerFacilityDefend") {
                     const playerID = msg.payload.character_id;
+                    const outfitID = msg.payload.outfit_id;
+                    const facilityID = msg.payload.facility_id;
+                    const timestamp = Number.parseInt(msg.payload.timestamp) * 1000;
+                    const ev = {
+                        type: "defend",
+                        sourceID: playerID,
+                        outfitID: outfitID,
+                        facilityID: facilityID,
+                        timestamp: timestamp,
+                        zoneID: zoneID,
+                    };
+                    this.playerCaptures.push(ev);
                     let player = this.stats.get(playerID);
                     if (player != undefined) {
                         player.stats.increment(PsEvent__WEBPACK_IMPORTED_MODULE_15__["PsEvent"].baseDefense);
@@ -64719,12 +65033,14 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                         if (this.tracking.running == true) {
                             char.joinTime = new Date().getTime();
                         }
+                        Killfeed__WEBPACK_IMPORTED_MODULE_33__["KillfeedGeneration"].addMember(charID);
                         console.log(`${charID} logged in`);
                     }
                 }
                 else if (event == "PlayerLogout") {
                     const charID = msg.payload.character_id;
                     if (this.stats.has(charID)) {
+                        Killfeed__WEBPACK_IMPORTED_MODULE_33__["KillfeedGeneration"].removeMember(charID);
                         const char = this.stats.get(charID);
                         char.online = false;
                         if (this.tracking.running == true) {
@@ -64910,6 +65226,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var PsEvent__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! PsEvent */ "./src/PsEvent.ts");
 /* harmony import */ var census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! census/VehicleAPI */ "./src/census/VehicleAPI.ts");
 /* harmony import */ var census_WeaponAPI__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! census/WeaponAPI */ "./src/census/WeaponAPI.ts");
+/* harmony import */ var census_PsLoadout__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! census/PsLoadout */ "./src/census/PsLoadout.ts");
+
 
 
 
@@ -64928,7 +65246,6 @@ WinterMetricIndex.REPAIRS = 5;
 class WinterReportGenerator {
     static generate(parameters) {
         const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
-        console.log(`Generating a report with the following settings: ${JSON.stringify(parameters.settings)}`);
         const report = new _WinterReport__WEBPACK_IMPORTED_MODULE_1__["WinterReport"]();
         report.start = new Date(parameters.events[0].timestamp);
         report.end = new Date(parameters.events[parameters.events.length - 1].timestamp);
@@ -65348,6 +65665,18 @@ class WinterReportGenerator {
                 if (ev.type != "vehicle") {
                     continue;
                 }
+                const loadout = census_PsLoadout__WEBPACK_IMPORTED_MODULE_7__["PsLoadouts"].get(ev.loadoutID);
+                if (loadout != undefined) {
+                    if (loadout.faction == "VS" && (ev.vehicleID == census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].scythe || ev.vehicleID == census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].bastionScythe || ev.vehicleID == census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].magrider)) {
+                        continue;
+                    }
+                    if (loadout.faction == "TR" && (ev.vehicleID == census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].mosquito || ev.vehicleID == census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].bastionMosquite || ev.vehicleID == census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].prowler)) {
+                        continue;
+                    }
+                    if (loadout.faction == "NC" && (ev.vehicleID == census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].reaver || ev.vehicleID == census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].bastionReaver || ev.vehicleID == census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].vanguard)) {
+                        continue;
+                    }
+                }
                 if (vehicles.indexOf(ev.vehicleID) > -1) {
                     amounts.increment(player.name);
                 }
@@ -65422,9 +65751,9 @@ class WinterReportSettings {
 /***/ }),
 
 /***/ 0:
-/*!****************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
-  !*** multi ./src/BaseGenerator.ts ./src/BreakdownBar.ts ./src/BreakdownBox.ts ./src/BreakdownChart.ts ./src/BreakdownInterval.ts ./src/BreakdownList.ts ./src/census/AchievementAPI.ts ./src/census/ApiWrapper.ts ./src/census/CensusAPI.ts ./src/census/CharacterAPI.ts ./src/census/EventAPI.ts ./src/census/FacilityAPI.ts ./src/census/OutfitAPI.ts ./src/census/PsLoadout.ts ./src/census/VehicleAPI.ts ./src/census/WeaponAPI.ts ./src/Event.ts ./src/EventReporter.ts ./src/index.ts ./src/InvididualGenerator.ts ./src/Killfeed.ts ./src/KillfeedSquad.ts ./src/Loadable.ts ./src/MomentFilter.ts ./src/OutfitTrends.ts ./src/PersonalReportGenerator.ts ./src/PsEvent.ts ./src/Quartile.ts ./src/StatMap.ts ./src/Storage.ts ***!
-  \****************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+/*!*******************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** multi ./src/BaseGenerator.ts ./src/BreakdownBar.ts ./src/BreakdownBox.ts ./src/BreakdownChart.ts ./src/BreakdownInterval.ts ./src/BreakdownList.ts ./src/census/AchievementAPI.ts ./src/census/ApiWrapper.ts ./src/census/CensusAPI.ts ./src/census/CharacterAPI.ts ./src/census/EventAPI.ts ./src/census/FacilityAPI.ts ./src/census/OutfitAPI.ts ./src/census/PsLoadout.ts ./src/census/VehicleAPI.ts ./src/census/WeaponAPI.ts ./src/Event.ts ./src/EventReporter.ts ./src/index.ts ./src/InvididualGenerator.ts ./src/Killfeed.ts ./src/KillfeedSquad.ts ./src/Loadable.ts ./src/MomentFilter.ts ./src/OutfitTrends.ts ./src/PersonalReportGenerator.ts ./src/PsEvent.ts ./src/Quartile.ts ./src/StatMap.ts ./src/Storage.ts ./src/winter/WinterMetric.ts ./src/winter/WinterReport.ts ./src/winter/WinterReportGenerator.ts ./src/winter/WinterReportParameters.ts ***!
+  \*******************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -65457,7 +65786,11 @@ __webpack_require__(/*! ./src/PersonalReportGenerator.ts */"./src/PersonalReport
 __webpack_require__(/*! ./src/PsEvent.ts */"./src/PsEvent.ts");
 __webpack_require__(/*! ./src/Quartile.ts */"./src/Quartile.ts");
 __webpack_require__(/*! ./src/StatMap.ts */"./src/StatMap.ts");
-module.exports = __webpack_require__(/*! ./src/Storage.ts */"./src/Storage.ts");
+__webpack_require__(/*! ./src/Storage.ts */"./src/Storage.ts");
+__webpack_require__(/*! ./src/winter/WinterMetric.ts */"./src/winter/WinterMetric.ts");
+__webpack_require__(/*! ./src/winter/WinterReport.ts */"./src/winter/WinterReport.ts");
+__webpack_require__(/*! ./src/winter/WinterReportGenerator.ts */"./src/winter/WinterReportGenerator.ts");
+module.exports = __webpack_require__(/*! ./src/winter/WinterReportParameters.ts */"./src/winter/WinterReportParameters.ts");
 
 
 /***/ })

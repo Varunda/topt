@@ -78,8 +78,12 @@ Vue.component("breakdown-chart", {
 
         draw: function(): void {
             this.$nextTick(() => {
+                if (this.chart.instance != null && this.chart.instance.destroy) {
+                    this.chart.instance.destroy();
+                }
+
                 const ctx = (document.getElementById(`breakdown-chart-${this.ID}`) as any).getContext("2d");
-                new Chart(ctx, {
+                this.chart.instance = new Chart(ctx, {
                     type: "pie",
                     data: {
                         labels: this.chart.labels,
@@ -95,6 +99,7 @@ Vue.component("breakdown-chart", {
                         hover: {
                             animationDuration: 0
                         },
+                        maintainAspectRatio: false,
                         responsiveAnimationDuration: 0,
                         legend: {
                             display: true,

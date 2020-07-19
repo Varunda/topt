@@ -21,7 +21,7 @@ import { FacilityAPI, Facility } from "census/FacilityAPI";
 
 import { PsLoadout, PsLoadouts } from "census/PsLoadout";
 import { PsEventType, PsEvent, PsEvents } from "PsEvent";
-import { Event, EventExp, EventKill, EventDeath, EventVehicleKill, EventCapture } from "Event";
+import { Event, EventExp, EventKill, EventDeath, EventVehicleKill, EventCapture, EventTeamkill, EventDefend } from "Event";
 import StatMap from "StatMap";
 
 import EventReporter, { statMapToBreakdown,
@@ -158,7 +158,7 @@ export const vm = new Vue({
         // Used to make iteration thru classes easier
         classIterator: [
             { title: "Infiltrator", name: "infil" },
-            { title: "Light assault", name: "lightAssault" },
+            { title: "Light Assault", name: "lightAssault" },
             { title: "Medic", name: "medic" },
             { title: "Engineer", name: "engineer" },
             { title: "Heavy", name: "heavy" },
@@ -179,7 +179,7 @@ export const vm = new Vue({
         characters: [] as Character[], // Characters being tracked
         outfits: [] as string[], // Outfits being tracked for base caps
         facilityCaptures: [] as FacilityCapture[], // Facilities captures while tracking
-        playerCaptures: [] as EventCapture[], // Any PlayerFacilityCapture events
+        playerCaptures: [] as (EventCapture | EventDefend)[], // Any PlayerFacilityCapture events
         miscEvents: [] as Event[], // Other events captured used to generate stats
 
         zoneIDs: [] as string[], // All the zone IDs captured during this operational
@@ -320,14 +320,17 @@ export const vm = new Vue({
 
                     this.outfits = outfits;
 
-                    const parsedData = events.map(iter => JSON.parse(iter));
-                    this.tracking.startTime = Math.min(...parsedData.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
-                    this.tracking.endTime = Math.max(...parsedData.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
+                    if (events != undefined && events.length != 0) {
+                        const parsedData = events.map(iter => JSON.parse(iter));
+                        this.tracking.startTime = Math.min(...parsedData.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
+                        this.tracking.endTime = Math.max(...parsedData.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
 
-                    for (const ev of events) {
-                        this.processMessage(ev, true);
+                        for (const ev of events) {
+                            this.processMessage(ev, true);
+                        }
+
+                        this.setSaveEvents(false);
                     }
-                    this.setSaveEvents(false);
 
                     console.log(`Took ${new Date().getTime() - nowMs}ms to import data from ${this.tracking.startTime} ${new Date(this.tracking.startTime)} to ${this.tracking.endTime}`);
                 } else {
@@ -539,6 +542,11 @@ export const vm = new Vue({
                 return a.timestamp.getTime() - b.timestamp.getTime();
             });
 
+            EventReporter.facilityCaptures({
+                captures: this.outfitReport.facilityCaptures,
+                players: this.playerCaptures
+            }).ok(data => this.outfitReport.baseCaptures = data);
+
             const sessions: SessionV1[] = this.outfitTrends.sessions
                 .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
@@ -675,10 +683,12 @@ export const vm = new Vue({
 
             EventReporter.weaponDeathBreakdown(this.outfitReport.events).ok(data => this.outfitReport.weaponTypeDeathBreakdown = data);
 
+            /* Not super useful and take a long time to generate
             this.outfitReport.timeUnrevived = IndividualReporter.unrevivedTime(this.outfitReport.events);
             this.outfitReport.revivedLifeExpectance = IndividualReporter.reviveLifeExpectance(this.outfitReport.events);
             this.outfitReport.kmLifeExpectance = IndividualReporter.lifeExpectanceRate(this.outfitReport.events);
             this.outfitReport.kmTimeDead = IndividualReporter.timeUntilReviveRate(this.outfitReport.events);
+            */
 
             const classFilter: (iter: Event, type: "kill" | "death", loadouts: string[]) => boolean = (iter, type, loadouts) => {
                 if (iter.type == type) {
@@ -796,6 +806,7 @@ export const vm = new Vue({
 
             this.generatePlayerReport(charID).ok((data: Report) => {
                 report = data;
+                console.log(`Made report: ${JSON.stringify(report.playerVersus)}`);
                 if (--opsLeft == 0) {
                     done();
                 }
@@ -828,6 +839,9 @@ export const vm = new Vue({
             } else {
                 const events: Event[] = [...player.events];
                 this.stats.forEach((player: TrackedPlayer, charID: string) => {
+                    if (charID == player.characterID) { // Don't add the characters's events twice
+                        return;
+                    }
                     events.push(...player.events);
                 });
                 events.push(...this.miscEvents);
@@ -1328,6 +1342,19 @@ export const vm = new Vue({
 
                             this.statTotals.increment(PsEvent.teamkill);
                             this.statTotals.increment(PsEvent.teamkilled);
+
+                            const ev: EventTeamkill = {
+                                type: "teamkill",
+                                sourceID: sourceID,
+                                loadoutID: sourceLoadoutID,
+                                targetID: targetID,
+                                targetLoadoutID: targetLoadoutID,
+                                weaponID: msg.payload.attacker_weapon_id,
+                                zoneID: zoneID,
+                                timestamp: Number.parseInt(msg.payload.timestamp) * 1000
+                            }
+
+                            sourceTicks.events.push(ev);
                         } else {
                             sourceTicks.stats.increment(PsEvent.kill);
                             this.statTotals.increment(PsEvent.kill);
@@ -1386,6 +1413,20 @@ export const vm = new Vue({
                     save = true;
                 } else if (event == "PlayerFacilityDefend") {
                     const playerID: string = msg.payload.character_id;
+                    const outfitID: string = msg.payload.outfit_id;
+                    const facilityID: string = msg.payload.facility_id;
+                    const timestamp: number = Number.parseInt(msg.payload.timestamp) * 1000;
+
+                    const ev: EventDefend = {
+                        type: "defend",
+                        sourceID: playerID,
+                        outfitID: outfitID,
+                        facilityID: facilityID,
+                        timestamp: timestamp,
+                        zoneID: zoneID,
+                    }
+
+                    this.playerCaptures.push(ev);
 
                     let player = this.stats.get(playerID);
                     if (player != undefined) {
@@ -1425,7 +1466,7 @@ export const vm = new Vue({
                         console.error(`Failed to find facility ID ${facilityID}`);
                     });
                     save = true;
-                } else if (event == "ItemAdded"){
+                } else if (event == "ItemAdded") {
                     const itemID: string = msg.payload.item_id;
                     const charID: string = msg.payload.character_id;
                     const timestamp: number = Number.parseInt(msg.payload.timestamp) * 1000;
@@ -1624,11 +1665,16 @@ export const vm = new Vue({
                         if (this.tracking.running == true) {
                             char.joinTime = new Date().getTime();
                         }
+
+                        KillfeedGeneration.addMember(charID);
+
                         console.log(`${charID} logged in`);
                     }
                 } else if (event == "PlayerLogout") {
                     const charID: string = msg.payload.character_id;
                     if (this.stats.has(charID)) {
+                        KillfeedGeneration.removeMember(charID);
+
                         const char: TrackedPlayer = this.stats.get(charID)!;
                         char.online = false;
 

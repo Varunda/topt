@@ -111,11 +111,12 @@ Vue.component("killfeed-squad", {
                 </button>
             </div>
             <div v-if="ShowState" class="list-group-item p-0">
-                <div :style="{
-                    width: (all.percentAlive * 100) + '%',
-                    'max-width': '100%',
-                    'background-color': all.aliveColor
+                <div class="pl-1" :style="{
+                    width: '100%',
+                    background: 'linear-gradient(90deg,' + all.aliveColor + (all.percentAlive * 100) + '%, transparent ' + (all.percentAlive * 100) + '% ' +  ((1 - all.percentAlive) * 100) + '%)'
                 }">
+
+                    {{all.alive}} / {{all.total}}
 
                     &nbsp;
                 </div>

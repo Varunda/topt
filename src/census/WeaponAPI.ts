@@ -86,6 +86,7 @@ export class WeaponAPI {
                     response.resolveOk(wep);
                 }
             }).internalError((err: string) => {
+                WeaponAPI._cache.set(weaponID, null);
                 console.error(err);
             });
         }
@@ -134,7 +135,12 @@ export class WeaponAPI {
                 for (const wepID of requestIDs) {
                     WeaponAPI._cache.set(wepID, null);
                 }
-                response.resolveOk([]);
+                if (weapons.length > 0) {
+                    console.error(`API call failed, but some weapons were cached, so using that`);
+                    response.resolveOk(weapons);
+                } else {
+                    response.resolve({ code: 500, data: "" });
+                }
                 console.error(err);
             });
         } else {

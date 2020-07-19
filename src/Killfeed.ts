@@ -286,7 +286,13 @@ export class KillfeedGeneration {
             if (sourceSquad.ID == targetSquad.ID) {
                 //console.log(`${sourceMember.name} // ${targetMember.name} are already in a squad`);
             } else {
-                if (targetSquad.guess == false) {
+                // 3 cases:
+                //      1. Both squads are guesses => Merge squads
+                //      2. One squad isn't a guess => Move guess squad into non-guess squad
+                //      3. Neither squad is a guess => Move member who performed action into other squad
+                if (targetSquad.guess == true && sourceSquad.guess == true) {
+                    console.log(`Both squads are guesses, merging ${sourceMember.name} (${sourceSquad.name}) into ${targetMember.name} (${targetSquad.name})`);
+
                     for (const member of sourceSquad.members) {
                         targetSquad.members.push(member);
                     }
@@ -294,9 +300,17 @@ export class KillfeedGeneration {
                     // Remove any references in or to the removed squad so it can be garbage collected
                     sourceSquad.members = [];
                     this._squads = this._squads.filter(iter => iter.ID != sourceSquad!.ID); 
+                } else if (targetSquad.guess == false && sourceSquad.guess == true) {
+                    console.log(`Target is not a guess, merging ${sourceMember.name} (${sourceSquad.name}) into ${targetMember.name} (${targetSquad.name})`);
+                    for (const member of sourceSquad.members) {
+                        targetSquad.members.push(member);
+                    }
 
-                    console.log(`Merged ${sourceMember.name}'s squad with ${targetSquad.name}'s squad due to it not being a guess`);
-                } else {
+                    // Remove any references in or to the removed squad so it can be garbage collected
+                    sourceSquad.members = [];
+                    this._squads = this._squads.filter(iter => iter.ID != sourceSquad!.ID); 
+                } else if (targetSquad.guess == true && sourceSquad.guess == false) {
+                    console.log(`Source is not a guess, merging ${targetMember.name} (${targetSquad.name}) into ${sourceMember.name} (${sourceSquad.name})`);
                     for (const member of targetSquad.members) {
                         sourceSquad.members.push(member);
                     }
@@ -304,9 +318,12 @@ export class KillfeedGeneration {
                     // Remove any references in or to the removed squad so it can be garbage collected
                     targetSquad.members = [];
                     this._squads = this._squads.filter(iter => iter.ID != targetSquad!.ID); 
-
-                    console.log(`Merged ${targetMember.name}'s squad with ${sourceMember.name}'s squad due`);
+                } else if (targetSquad.guess == false && sourceSquad.guess == false) {
+                    console.log(`Neither squad is a guess, moving ${targetMember.name} into ${sourceMember.name} (${sourceSquad.name})`);
+                    sourceSquad.members.push(targetMember);
+                    targetSquad.members = targetSquad.members.filter(iter => iter.charID != targetMember.charID);
                 }
+
             }
         }
 
@@ -383,6 +400,47 @@ export class KillfeedGeneration {
 
         this._hoveredSquad.members = [];
         this._squads = this._squads.filter(iter => iter.ID != this._hoveredSquad!.ID);
+    }
+
+    public static removeMember(charID: string): void {
+        const squad: KillfeedSquad | null = this.getSquadOfMember(charID);
+
+        console.log(`Remove ${charID} from tracking ${squad?.name}`);
+
+        if (squad != null) {
+            squad.members = squad.members.filter(iter => iter.charID != charID);
+            console.log(`${squad.members.length} members after removing ${charID}`);
+            if (squad.members.length == 0) {
+                this._squads = this._squads.filter(iter => iter.ID != squad.ID);
+            }
+        }
+
+        if (this._members.has(charID)) {
+            this._members.delete(charID);
+        }
+    }
+
+    public static addMember(charID: string): void {
+        if (this._members.has(charID)) {
+            return;
+        }
+
+        console.log(`Adding ${charID} to the killfeed`);
+
+        CharacterAPI.getByID(charID).ok((character: Character) => {
+            const member: KillfeedMember = this.toMember(character);
+
+            this._members.set(character.ID, member);
+
+            if (character.online == true) {
+                const squad: KillfeedSquad = new KillfeedSquad();
+                squad.members.push(member);
+
+                this._squads.push(squad);
+            }
+
+            console.log(`Added ${character.name}`);
+        });
     }
 
     public static addCharacters(characters: Character[]): void {

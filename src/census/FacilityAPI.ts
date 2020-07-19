@@ -125,7 +125,6 @@ export class FacilityAPI {
                         response.resolveOk(facilities);
                     }
                 } else {
-
                     const bases: Facility[] = [];
                     for (const datum of data.map_region_list) {
                         const fac: Facility = FacilityAPI.parse(datum);
@@ -148,7 +147,12 @@ export class FacilityAPI {
                 for (const wepID of requestIDs) {
                     FacilityAPI._cache.set(wepID, null);
                 }
-                response.resolveOk([]);
+
+                if (facilities.length > 0) {
+                    response.resolveOk(facilities);
+                } else {
+                    response.resolve({ code: 500, data: "" });
+                }
                 console.error(err);
             });
         } else {

@@ -133,5 +133,17 @@ Vue.filter("duration", (input: string | number): string => {
     const mins = Math.floor((val - (3600 * hours)) / 60);
 
     return `${hours} hours ${mins} minutes ${val % 60} seconds`;
-
 });
+
+Vue.filter("minutes", (input: string | number): string => {
+    const val = (typeof(input) == "string") ? Number.parseInt(input) : input;
+    if (Number.isNaN(val)) {
+        return `NaN ${val}`;
+    }
+
+    if (val == 0) {
+        return "0 minutes";
+    }
+
+    return `${(val / 60).toFixed(0)} minutes`;
+})
