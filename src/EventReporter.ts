@@ -764,7 +764,7 @@ export default class EventReporter {
         const response: ApiResponse<BreakdownArray> = new ApiResponse();
 
         const countDeaths = function(ev: Event, faction: string) {
-            if (ev.type != "death") {
+            if (ev.type != "death" || ev.revived == true) {
                 return false;
             }
             const loadout = PsLoadouts.get(ev.targetLoadoutID);
@@ -800,7 +800,7 @@ export default class EventReporter {
             sortField: "NS"
         });
 
-        arr.total = events.filter(iter => iter.type == "death").length;
+        arr.total = events.filter(iter => iter.type == "death" && iter.revived == false).length;
 
         response.resolveOk(arr);
 
@@ -854,7 +854,7 @@ export default class EventReporter {
         const response: ApiResponse<BreakdownArray> = new ApiResponse();
 
         const countDeaths = function(ev: Event, zoneID: string) {
-            return ev.type == "death" && ev.zoneID == zoneID;
+            return ev.type == "death" && ev.revived == false && ev.zoneID == zoneID;
         }
 
         const arr: BreakdownArray = new BreakdownArray();
@@ -886,7 +886,7 @@ export default class EventReporter {
             sortField: "Esamir"
         });
 
-        arr.total = events.filter(iter => iter.type == "death").length;
+        arr.total = events.filter(iter => iter.type == "death" && iter.revived == false).length;
 
         response.resolveOk(arr);
 
@@ -925,7 +925,7 @@ export default class EventReporter {
         );
     }
 
-    public static kpmOverTime(events: Event[]): BreakdownTimeslot[] { 
+    public static kpmOverTime(events: Event[], timeWidth: number = 300000): BreakdownTimeslot[] { 
         const kills: EventKill[] = events.filter(iter => iter.type == "kill")
             .sort((a, b) => a.timestamp - b.timestamp) as EventKill[];
 
@@ -937,13 +937,14 @@ export default class EventReporter {
 
         const slots: BreakdownTimeslot[] = [];
 
-        const diff = 1000 * 60 * 5; // 1000 ms * 60 sec/min * 5 mins
+        const minutes: number = timeWidth / 60000;
+
         const stop = kills[kills.length - 1].timestamp;
         let start = events[0].timestamp;
         let count = 0;
 
         while (true) {
-            const end = start + diff;
+            const end = start + timeWidth;
             const section: EventKill[] = kills.filter(iter => iter.timestamp >= start && iter.timestamp < end);
 
             for (const ev of section) {
@@ -954,12 +955,12 @@ export default class EventReporter {
             slots.push({
                 startTime: start,
                 endTime: end,
-                value: Number.parseFloat((count / (players.size || 1) / 5).toFixed(2))
+                value: Number.parseFloat((count / (players.size || 1) / minutes).toFixed(2))
             });
 
             count = 0;
             players.clear();
-            start += diff;
+            start += timeWidth;
 
             if (start > stop) {
                 break;
@@ -969,7 +970,7 @@ export default class EventReporter {
         return slots;
     }
 
-    public static kdOverTime(events: Event[]): BreakdownTimeslot[] {
+    public static kdOverTime(events: Event[], timeWidth: number = 300000): BreakdownTimeslot[] {
         const evs: Event[] = events.filter(iter => iter.type == "kill" || (iter.type == "death" && iter.revived == false));
 
         if (evs.length == 0) {
@@ -978,12 +979,11 @@ export default class EventReporter {
 
         const slots: BreakdownTimeslot[] = [];
 
-        const diff = 1000 * 60 * 5; // 1000 ms * 60 sec/min * 5 mins
         const stop = evs[evs.length - 1].timestamp;
         let start = events[0].timestamp;
 
         while (true) {
-            const end = start + diff;
+            const end = start + timeWidth;
             const section: Event[] = evs.filter(iter => iter.timestamp >= start && iter.timestamp < end);
 
             const kills: EventKill[] = section.filter(iter => iter.type == "kill") as EventKill[];
@@ -995,7 +995,7 @@ export default class EventReporter {
                 value: Number.parseFloat((kills.length / (deaths.length || 1)).toFixed(2))
             });
 
-            start += diff;
+            start += timeWidth;
 
             if (start > stop) {
                 break;
@@ -1041,7 +1041,7 @@ export default class EventReporter {
         return slots;
     }
 
-    public static revivesOverTime(events: Event[]): BreakdownTimeslot[] {
+    public static revivesOverTime(events: Event[], timeWidth: number = 300000): BreakdownTimeslot[] {
         const revives: Event[] = events.filter(iter => iter.type == "exp" && (iter.expID == PsEvent.revive || iter.expID == PsEvent.squadRevive));
 
         if (revives.length == 0) {
@@ -1050,12 +1050,11 @@ export default class EventReporter {
 
         const slots: BreakdownTimeslot[] = [];
 
-        const diff = 1000 * 60 * 5; // 1000 ms * 60 sec/min * 5 mins
         const stop = revives[revives.length - 1].timestamp;
         let start = events[0].timestamp;
 
         while (true) {
-            const end = start + diff;
+            const end = start + timeWidth;
             const section: Event[] = revives.filter(iter => iter.timestamp >= start && iter.timestamp < end);
 
             const players: number = section.map(iter => iter.sourceID)
@@ -1067,7 +1066,7 @@ export default class EventReporter {
                 value: Number.parseFloat((section.length / (players || 1) / 5).toFixed(2))
             });
 
-            start += diff;
+            start += timeWidth;
 
             if (start > stop) {
                 break;

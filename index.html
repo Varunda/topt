@@ -1000,17 +1000,32 @@
                 <h2 class="strike">Metric trends</h2>
 
                 <h4 class="strike">KPM per 5 minute blocks</h4>
-                <breakdown-interval :src="outfitReport.overtime.kpm"
+                <breakdown-interval :src="outfitReport.overtimePer5.kpm"
+                    :show-x-axis="false" :show-labels="false">
+                </breakdown-interval>
+
+                <h4 class="strike">KPM per 1 minute blocks</h4>
+                <breakdown-interval :src="outfitReport.overtimePer1.kpm"
                     :show-x-axis="false" :show-labels="false">
                 </breakdown-interval>
 
                 <h4 class="strike">K/D per 5 minute blocks</h4>
-                <breakdown-interval :src="outfitReport.overtime.kd"
+                <breakdown-interval :src="outfitReport.overtimePer5.kd"
+                    :show-labels="false">
+                </breakdown-interval>
+
+                <h4 class="strike">K/D per 1 minute blocks</h4>
+                <breakdown-interval :src="outfitReport.overtimePer1.kd"
                     :show-labels="false">
                 </breakdown-interval>
 
                 <h4 class="strike">RPM per 5 minute blocks</h4>
-                <breakdown-interval :src="outfitReport.overtime.rpm"
+                <breakdown-interval :src="outfitReport.overtimePer5.rpm"
+                    :show-labels="false">
+                </breakdown-interval>
+
+                <h4 class="strike">RPM per 1 minute blocks</h4>
+                <breakdown-interval :src="outfitReport.overtimePer1.rpm"
                     :show-labels="false">
                 </breakdown-interval>
 

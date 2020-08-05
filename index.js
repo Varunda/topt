@@ -57099,218 +57099,6 @@ module.exports = function(module) {
 
 /***/ }),
 
-/***/ "./src/BaseGenerator.ts":
-/*!******************************!*\
-  !*** ./src/BaseGenerator.ts ***!
-  \******************************/
-/*! exports provided: OutfitCapture, BaseReport, BaseGenerator */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "OutfitCapture", function() { return OutfitCapture; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "BaseReport", function() { return BaseReport; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "BaseGenerator", function() { return BaseGenerator; });
-/* harmony import */ var census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! census/ApiWrapper */ "./src/census/ApiWrapper.ts");
-/* harmony import */ var census_OutfitAPI__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! census/OutfitAPI */ "./src/census/OutfitAPI.ts");
-/* harmony import */ var InvididualGenerator__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! InvididualGenerator */ "./src/InvididualGenerator.ts");
-
-
-
-class OutfitCapture {
-    constructor() {
-        this.name = "";
-        this.factionID = "";
-        this.score = 0;
-        this.captures = [];
-        this.breakdown = [];
-    }
-}
-class BaseReport {
-    constructor() {
-        this.outfits = [];
-        this.captures = [];
-        this.breakdown = [];
-        this.outfitCaptures = [];
-    }
-}
-class BaseGenerator {
-    static generate(events, captures, participants) {
-        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
-        const report = new BaseReport();
-        if (events.length == 0 || captures.length == 0) {
-            return response;
-        }
-        const lastTimestamp = events[events.length - 1].timestamp;
-        report.captures = captures.filter(iter => iter.factionID != iter.previousFaction && iter.outfitID != "0");
-        report.captures.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-        report.outfits = captures.filter(iter => iter.outfitID.length > 0 && iter.outfitID != "0")
-            .map(iter => iter.outfitID)
-            .filter((val, index, arr) => arr.indexOf(val) == index);
-        const participantOutfits = participants.map(iter => iter.outfitID)
-            .filter((val, index, arr) => arr.indexOf(val) == index);
-        report.outfits.push(...participantOutfits);
-        report.outfits = report.outfits.filter((iter, index, arr) => arr.indexOf(iter) == index);
-        console.log(`Loading ${report.outfits.length} outfits:\n\t${report.outfits.join(", ")}`);
-        census_OutfitAPI__WEBPACK_IMPORTED_MODULE_1__["default"].getByIDs(report.outfits).ok((data) => {
-            for (const capture of report.captures) {
-                const breakdown = new InvididualGenerator__WEBPACK_IMPORTED_MODULE_2__["CaptureBreakdown"]();
-                Object.assign(breakdown, Object.assign({}, capture));
-                if (capture.outfitID.length == 0 || capture.outfitID == "0") {
-                    breakdown.outfitName = "No outfit";
-                    breakdown.outfitTag = "";
-                }
-                else {
-                    const outfit = data.find(iter => iter.ID == capture.outfitID);
-                    if (outfit == undefined) {
-                        breakdown.outfitName = `Bad ID ${capture.outfitID}`;
-                        breakdown.outfitTag = ``;
-                    }
-                    else {
-                        breakdown.outfitName = outfit.name;
-                        breakdown.outfitTag = outfit.tag;
-                    }
-                }
-                breakdown.participants = participants.filter((iter) => {
-                    return iter.facilityID == breakdown.facilityID && iter.timestamp == breakdown.timestamp.getTime();
-                }).map((iter) => {
-                    const outfit = data.find(i => i.ID == iter.outfitID);
-                    return {
-                        characterID: iter.sourceID,
-                        outfitID: iter.outfitID,
-                        outfitName: outfit != undefined ? outfit.name : "<No outfit>",
-                        outfitTag: outfit != undefined ? outfit.tag : "",
-                        timestamp: iter.timestamp,
-                        facilityID: iter.facilityID
-                    };
-                });
-                for (const part of breakdown.participants) {
-                    const existing = breakdown.outfits.find(iter => iter.outfitID == part.outfitID);
-                    if (existing != undefined) {
-                        continue;
-                    }
-                    const outfit = new InvididualGenerator__WEBPACK_IMPORTED_MODULE_2__["OutfitParticipants"]();
-                    outfit.outfitID = part.outfitID;
-                    outfit.outfitName = part.outfitName;
-                    outfit.outfitTag = part.outfitTag;
-                    outfit.players = breakdown.participants.filter(iter => iter.outfitID == outfit.outfitID).length;
-                    outfit.total = breakdown.participants.length;
-                    breakdown.outfits.push(outfit);
-                }
-                report.breakdown.push(breakdown);
-            }
-            for (let i = 0; i < report.breakdown.length; ++i) {
-                const cap = report.breakdown[i];
-                for (let b = i - 1; b >= 0; --b) {
-                    if (report.breakdown[b].facilityID == cap.facilityID && report.breakdown[b].factionID != cap.factionID) {
-                        cap.previousOutfitID = report.breakdown[b].outfitID;
-                        cap.previousOutfitName = report.breakdown[b].outfitName;
-                        cap.previousOutfitTag = report.breakdown[b].outfitTag;
-                        report.breakdown[b].takenBy = cap;
-                        break;
-                    }
-                }
-            }
-            for (const outfit of data) {
-                const caps = new OutfitCapture();
-                caps.captures = report.captures.filter(iter => iter.outfitID == outfit.ID);
-                caps.breakdown = report.breakdown.filter(iter => iter.outfitID == outfit.ID);
-                for (const cap of caps.breakdown) {
-                    // Facilities // Large = 15 points, 6 per tick
-                    // Small // Construction = 5 points, 2 per tick
-                    let capScore = 0;
-                    switch (cap.typeID) {
-                        case "1":
-                            capScore = 0;
-                            break; // Default
-                        case "2":
-                            capScore = 15;
-                            break; // Amp
-                        case "3":
-                            capScore = 15;
-                            break; // Bio
-                        case "4":
-                            capScore = 15;
-                            break; // Tech
-                        case "5":
-                            capScore = 15;
-                            break; // Large outpost
-                        case "6":
-                            capScore = 5;
-                            break; // Small outpost
-                        case "7":
-                            capScore = 0;
-                            break; // Warpgate
-                        case "8":
-                            capScore = 0;
-                            break; // Interlink facility
-                        case "9":
-                            capScore = 5;
-                            break; // Construction outpost
-                    }
-                    cap.captureScore = capScore;
-                    caps.score += cap.captureScore;
-                    let tickScore = 0;
-                    switch (cap.typeID) {
-                        case "1":
-                            tickScore = 0;
-                            break; // Default
-                        case "2":
-                            tickScore = 6;
-                            break; // Amp
-                        case "3":
-                            tickScore = 6;
-                            break; // Bio
-                        case "4":
-                            tickScore = 6;
-                            break; // Tech
-                        case "5":
-                            tickScore = 6;
-                            break; // Large outpost
-                        case "6":
-                            tickScore = 2;
-                            break; // Small outpost
-                        case "7":
-                            tickScore = 0;
-                            break; // Warpgate
-                        case "8":
-                            tickScore = 0;
-                            break; // Interlink facility
-                        case "9":
-                            tickScore = 2;
-                            break; // Construction outpost
-                    }
-                    if (cap.takenBy != null) {
-                        const ticks = Math.floor(cap.takenBy.timeHeld / (5 * 60));
-                        //console.log(`Held for ${ticks} ticks`);
-                        cap.tickScore = tickScore * ticks;
-                    }
-                    else {
-                        const diff = lastTimestamp - cap.timestamp.getTime();
-                        const ticks = Math.abs(Math.floor((diff / 1000) / (5 * 60)));
-                        //console.log(`Held for ${diff}, got ${ticks} count`);
-                        cap.tickScore = tickScore * ticks;
-                    }
-                    caps.score += cap.tickScore;
-                }
-                if (caps.captures.length > 0) {
-                    caps.factionID = outfit.faction;
-                    caps.name = `${outfit.tag.length > 0 ? `[${outfit.tag}] ` : ``}${outfit.name}`;
-                    report.outfitCaptures.push(caps);
-                }
-            }
-            report.outfitCaptures.sort((a, b) => {
-                return b.factionID.localeCompare(a.factionID) || b.score - a.score;
-            });
-            response.resolveOk(report);
-        });
-        return response;
-    }
-}
-
-
-/***/ }),
-
 /***/ "./src/BreakdownBar.ts":
 /*!*****************************!*\
   !*** ./src/BreakdownBar.ts ***!
@@ -57421,9 +57209,13 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var chart_js__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(chart_js__WEBPACK_IMPORTED_MODULE_1__);
 /* harmony import */ var moment__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! moment */ "./node_modules/moment/moment.js");
 /* harmony import */ var moment__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(moment__WEBPACK_IMPORTED_MODULE_2__);
+/* harmony import */ var Quartile__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! Quartile */ "./src/Quartile.ts");
 
 
 
+
+/*
+*/
 vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("breakdown-box", {
     props: {
         src: { type: Array, required: true },
@@ -57432,12 +57224,53 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("breakdown-box", {
     template: `
         <div :id="'breakdown-box-' + ID + '-parent'">
             <canvas :id="'breakdown-box-' + ID"></canvas>
+
+            <table class="table table-sm border-right" :id="'breakdown-box-' + ID + '-quartile'">
+                <tr>
+                    <th>Session</th>
+                    <th>Min</th>
+                    <th>Q1</th>
+                    <th>Avg</th>
+                    <th>Q3</th>
+                    <th>Max</th>
+                </tr>
+                <tr>
+                    <td>Latest</td>
+                    <td>{{quartiles.current.min.toFixed(2)}}</td>
+                    <td>{{quartiles.current.q1.toFixed(2)}}</td>
+                    <td>{{quartiles.current.median.toFixed(2)}}</td>
+                    <td>{{quartiles.current.q3.toFixed(2)}}</td>
+                    <td>{{quartiles.current.max.toFixed(2)}}</td>
+                </tr>
+                <tr>
+                    <td>Last 5</td>
+                    <td>{{quartiles.recent.min.toFixed(2)}}</td>
+                    <td>{{quartiles.recent.q1.toFixed(2)}}</td>
+                    <td>{{quartiles.recent.median.toFixed(2)}}</td>
+                    <td>{{quartiles.recent.q3.toFixed(2)}}</td>
+                    <td>{{quartiles.recent.max.toFixed(2)}}</td>
+                </tr>
+                <tr>
+                    <td>All time</td>
+                    <td>{{quartiles.allTime.min.toFixed(2)}}</td>
+                    <td>{{quartiles.allTime.q1.toFixed(2)}}</td>
+                    <td>{{quartiles.allTime.median.toFixed(2)}}</td>
+                    <td>{{quartiles.allTime.q3.toFixed(2)}}</td>
+                    <td>{{quartiles.allTime.max.toFixed(2)}}</td>
+                </tr>
+            </table>
         </div>
     `,
     data: function () {
         return {
             ID: Math.round(Math.random() * 100000),
             array: [],
+            quartile: new Quartile__WEBPACK_IMPORTED_MODULE_3__["Quartile"](),
+            quartiles: {
+                current: new Quartile__WEBPACK_IMPORTED_MODULE_3__["Quartile"](),
+                recent: new Quartile__WEBPACK_IMPORTED_MODULE_3__["Quartile"](),
+                allTime: new Quartile__WEBPACK_IMPORTED_MODULE_3__["Quartile"](),
+            },
             chart: {
                 instance: {},
                 elem: {},
@@ -57458,11 +57291,28 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("breakdown-box", {
         setup: function () {
             this.chart.labels = this.array.map(iter => moment__WEBPACK_IMPORTED_MODULE_2__(iter.timestamp).format("YYYY-MM-DD"));
             this.chart.data = this.array.map(iter => iter.values);
+            if (this.array.length > 5) {
+                const recent = this.array.slice(0, 5);
+                this.chart.data = recent.map(iter => iter.values);
+                this.chart.data.push(this.array.slice(5).reduce((acc, cur) => { acc.push(...cur.values); return acc; }, []));
+                this.chart.data.push(this.array.reduce((acc, cur) => { acc.push(...cur.values); return acc; }, []));
+                this.chart.labels = this.chart.labels.slice(0, 5);
+                this.chart.labels.push(`Recent`);
+                this.chart.labels.push(`All time`);
+            }
+            this.quartiles.current = Quartile__WEBPACK_IMPORTED_MODULE_3__["Quartile"].get(this.array[0].values);
+            this.quartiles.recent = Quartile__WEBPACK_IMPORTED_MODULE_3__["Quartile"].get(this.array.slice(0, 5).reduce((acc, cur) => { acc.push(...cur.values); return acc; }, []));
+            this.quartiles.allTime = Quartile__WEBPACK_IMPORTED_MODULE_3__["Quartile"].get(this.array.reduce((acc, cur) => { acc.push(...cur.values); return acc; }, []));
         },
         draw: function () {
             this.$nextTick(() => {
+                const quartileHeight = document.getElementById(`breakdown-box-${this.ID}-quartile`).clientHeight;
                 document.getElementById(`breakdown-box-${this.ID}-parent`)
-                    .style.height = `${this.src.length * 40 + 20}px`;
+                    .style.height = `${this.chart.data.length * 40 + 20 + quartileHeight}px`;
+                document.getElementById(`breakdown-box-${this.ID}`)
+                    .style.height = `${this.chart.data.length * 40 + 20}px`;
+                document.getElementById(`breakdown-box-${this.ID}`)
+                    .style.maxHeight = `${this.chart.data.length * 40 + 20}px`;
                 const ctx = document.getElementById(`breakdown-box-${this.ID}`).getContext("2d");
                 new chart_js__WEBPACK_IMPORTED_MODULE_1__["Chart"](ctx, {
                     type: "horizontalBoxplot",
@@ -58608,7 +58458,7 @@ class EventReporter {
     static factionDeaths(events) {
         const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
         const countDeaths = function (ev, faction) {
-            if (ev.type != "death") {
+            if (ev.type != "death" || ev.revived == true) {
                 return false;
             }
             const loadout = census_PsLoadout__WEBPACK_IMPORTED_MODULE_4__["PsLoadouts"].get(ev.targetLoadoutID);
@@ -58639,7 +58489,7 @@ class EventReporter {
             display: "NS",
             sortField: "NS"
         });
-        arr.total = events.filter(iter => iter.type == "death").length;
+        arr.total = events.filter(iter => iter.type == "death" && iter.revived == false).length;
         response.resolveOk(arr);
         return response;
     }
@@ -58680,7 +58530,7 @@ class EventReporter {
     static continentDeaths(events) {
         const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
         const countDeaths = function (ev, zoneID) {
-            return ev.type == "death" && ev.zoneID == zoneID;
+            return ev.type == "death" && ev.revived == false && ev.zoneID == zoneID;
         };
         const arr = new BreakdownArray();
         arr.data.push({
@@ -58707,7 +58557,7 @@ class EventReporter {
             display: "Esamir",
             sortField: "Esamir"
         });
-        arr.total = events.filter(iter => iter.type == "death").length;
+        arr.total = events.filter(iter => iter.type == "death" && iter.revived == false).length;
         response.resolveOk(arr);
         return response;
     }
@@ -58729,7 +58579,7 @@ class EventReporter {
         }
         return statMapToBreakdown(amounts, census_CharacterAPI__WEBPACK_IMPORTED_MODULE_1__["CharacterAPI"].getByIDs, (elem, ID) => elem.ID == ID, defaultCharacterMapper);
     }
-    static kpmOverTime(events) {
+    static kpmOverTime(events, timeWidth = 300000) {
         const kills = events.filter(iter => iter.type == "kill")
             .sort((a, b) => a.timestamp - b.timestamp);
         const players = new Set();
@@ -58737,12 +58587,12 @@ class EventReporter {
             return [];
         }
         const slots = [];
-        const diff = 1000 * 60 * 5; // 1000 ms * 60 sec/min * 5 mins
+        const minutes = timeWidth / 60000;
         const stop = kills[kills.length - 1].timestamp;
         let start = events[0].timestamp;
         let count = 0;
         while (true) {
-            const end = start + diff;
+            const end = start + timeWidth;
             const section = kills.filter(iter => iter.timestamp >= start && iter.timestamp < end);
             for (const ev of section) {
                 players.add(ev.sourceID);
@@ -58751,28 +58601,27 @@ class EventReporter {
             slots.push({
                 startTime: start,
                 endTime: end,
-                value: Number.parseFloat((count / (players.size || 1) / 5).toFixed(2))
+                value: Number.parseFloat((count / (players.size || 1) / minutes).toFixed(2))
             });
             count = 0;
             players.clear();
-            start += diff;
+            start += timeWidth;
             if (start > stop) {
                 break;
             }
         }
         return slots;
     }
-    static kdOverTime(events) {
+    static kdOverTime(events, timeWidth = 300000) {
         const evs = events.filter(iter => iter.type == "kill" || (iter.type == "death" && iter.revived == false));
         if (evs.length == 0) {
             return [];
         }
         const slots = [];
-        const diff = 1000 * 60 * 5; // 1000 ms * 60 sec/min * 5 mins
         const stop = evs[evs.length - 1].timestamp;
         let start = events[0].timestamp;
         while (true) {
-            const end = start + diff;
+            const end = start + timeWidth;
             const section = evs.filter(iter => iter.timestamp >= start && iter.timestamp < end);
             const kills = section.filter(iter => iter.type == "kill");
             const deaths = section.filter(iter => iter.type == "death" && iter.revived == false);
@@ -58781,7 +58630,7 @@ class EventReporter {
                 endTime: end,
                 value: Number.parseFloat((kills.length / (deaths.length || 1)).toFixed(2))
             });
-            start += diff;
+            start += timeWidth;
             if (start > stop) {
                 break;
             }
@@ -58817,17 +58666,16 @@ class EventReporter {
         }
         return slots;
     }
-    static revivesOverTime(events) {
+    static revivesOverTime(events, timeWidth = 300000) {
         const revives = events.filter(iter => iter.type == "exp" && (iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].revive || iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].squadRevive));
         if (revives.length == 0) {
             return [];
         }
         const slots = [];
-        const diff = 1000 * 60 * 5; // 1000 ms * 60 sec/min * 5 mins
         const stop = revives[revives.length - 1].timestamp;
         let start = events[0].timestamp;
         while (true) {
-            const end = start + diff;
+            const end = start + timeWidth;
             const section = revives.filter(iter => iter.timestamp >= start && iter.timestamp < end);
             const players = section.map(iter => iter.sourceID)
                 .filter((value, index, arr) => arr.indexOf(value) == index).length;
@@ -58836,7 +58684,7 @@ class EventReporter {
                 endTime: end,
                 value: Number.parseFloat((section.length / (players || 1) / 5).toFixed(2))
             });
-            start += diff;
+            start += timeWidth;
             if (start > stop) {
                 break;
             }
@@ -58959,7 +58807,12 @@ class OutfitReport {
         this.continent = "Unknown";
         this.classStats = new Map();
         this.scoreBreakdown = [];
-        this.overtime = {
+        this.overtimePer5 = {
+            kpm: [],
+            kd: [],
+            rpm: [],
+        };
+        this.overtimePer1 = {
             kpm: [],
             kd: [],
             rpm: [],
@@ -61599,11 +61452,35 @@ class Quartile {
     }
     static get(data) {
         const quart = new Quartile();
-        const sorted = data.sort((a, b) => a - b);
+        if (data.length == 0) {
+            return quart;
+        }
+        if (data.length == 1) {
+            quart.min = data[0];
+            quart.q1 = data[0];
+            quart.median = data[0];
+            quart.q3 = data[0];
+            quart.max = data[0];
+            return quart;
+        }
         quart.q1 = this.quartile(data, 0.25);
         quart.median = this.quartile(data, 0.5);
         quart.q3 = this.quartile(data, 0.75);
         const stdDev = this.standardDeviation(data);
+        for (let i = data.length - 1; i >= 0; --i) {
+            if (data[i] <= quart.q3 + stdDev) {
+                quart.max = data[i];
+                break;
+            }
+        }
+        for (let i = 0; i < data.length; ++i) {
+            if (data[i] >= quart.q1 - stdDev) {
+                quart.min = data[i];
+                break;
+            }
+        }
+        quart.max = quart.max == 0 ? data[data.length - 1] : quart.max;
+        quart.min = quart.min == 0 ? data[0] : quart.min;
         return quart;
     }
     static sum(data) {
@@ -61620,13 +61497,14 @@ class Quartile {
         const base = Math.floor(pos);
         const rest = pos - base;
         if (sorted[base + 1] !== undefined) {
-            return sorted[base] + rest * (sorted[base - 1] - sorted[base]);
+            return sorted[base] + rest * (sorted[base + 1] - sorted[base]);
         }
         else {
             return sorted[base];
         }
     }
 }
+window.Quartile = Quartile;
 
 
 /***/ }),
@@ -64254,9 +64132,12 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                     || (b[0].localeCompare(a[0]));
             }).map((a) => a[1]); // Transform the tuple into the ExpBreakdown
             this.outfitReport.continent = InvididualGenerator__WEBPACK_IMPORTED_MODULE_18__["IndividualReporter"].generateContinentPlayedOn(this.outfitReport.events);
-            this.outfitReport.overtime.kpm = EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].kpmOverTime(this.outfitReport.events);
-            this.outfitReport.overtime.kd = EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].kdOverTime(this.outfitReport.events);
-            this.outfitReport.overtime.rpm = EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].revivesOverTime(this.outfitReport.events);
+            this.outfitReport.overtimePer1.kpm = EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].kpmOverTime(this.outfitReport.events, 60000);
+            this.outfitReport.overtimePer1.kd = EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].kdOverTime(this.outfitReport.events, 60000);
+            this.outfitReport.overtimePer1.rpm = EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].revivesOverTime(this.outfitReport.events, 60000);
+            this.outfitReport.overtimePer5.kpm = EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].kpmOverTime(this.outfitReport.events);
+            this.outfitReport.overtimePer5.kd = EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].kdOverTime(this.outfitReport.events);
+            this.outfitReport.overtimePer5.rpm = EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].revivesOverTime(this.outfitReport.events);
             this.outfitReport.perUpdate.kd = EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].kdPerUpdate(this.outfitReport.events);
         },
         generateWinterReport: function () {
@@ -65754,13 +65635,12 @@ class WinterReportSettings {
 /***/ }),
 
 /***/ 0:
-/*!*******************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
-  !*** multi ./src/BaseGenerator.ts ./src/BreakdownBar.ts ./src/BreakdownBox.ts ./src/BreakdownChart.ts ./src/BreakdownInterval.ts ./src/BreakdownList.ts ./src/census/AchievementAPI.ts ./src/census/ApiWrapper.ts ./src/census/CensusAPI.ts ./src/census/CharacterAPI.ts ./src/census/EventAPI.ts ./src/census/FacilityAPI.ts ./src/census/OutfitAPI.ts ./src/census/PsLoadout.ts ./src/census/VehicleAPI.ts ./src/census/WeaponAPI.ts ./src/Event.ts ./src/EventReporter.ts ./src/index.ts ./src/InvididualGenerator.ts ./src/Killfeed.ts ./src/KillfeedSquad.ts ./src/Loadable.ts ./src/MomentFilter.ts ./src/OutfitTrends.ts ./src/PersonalReportGenerator.ts ./src/PsEvent.ts ./src/Quartile.ts ./src/StatMap.ts ./src/Storage.ts ./src/winter/WinterMetric.ts ./src/winter/WinterReport.ts ./src/winter/WinterReportGenerator.ts ./src/winter/WinterReportParameters.ts ***!
-  \*******************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+/*!********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** multi ./src/BreakdownBar.ts ./src/BreakdownBox.ts ./src/BreakdownChart.ts ./src/BreakdownInterval.ts ./src/BreakdownList.ts ./src/census/AchievementAPI.ts ./src/census/ApiWrapper.ts ./src/census/CensusAPI.ts ./src/census/CharacterAPI.ts ./src/census/EventAPI.ts ./src/census/FacilityAPI.ts ./src/census/OutfitAPI.ts ./src/census/PsLoadout.ts ./src/census/VehicleAPI.ts ./src/census/WeaponAPI.ts ./src/Event.ts ./src/EventReporter.ts ./src/index.ts ./src/InvididualGenerator.ts ./src/Killfeed.ts ./src/KillfeedSquad.ts ./src/Loadable.ts ./src/MomentFilter.ts ./src/OutfitTrends.ts ./src/PersonalReportGenerator.ts ./src/PsEvent.ts ./src/Quartile.ts ./src/StatMap.ts ./src/Storage.ts ./src/winter/WinterMetric.ts ./src/winter/WinterReport.ts ./src/winter/WinterReportGenerator.ts ./src/winter/WinterReportParameters.ts ***!
+  \********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
-__webpack_require__(/*! ./src/BaseGenerator.ts */"./src/BaseGenerator.ts");
 __webpack_require__(/*! ./src/BreakdownBar.ts */"./src/BreakdownBar.ts");
 __webpack_require__(/*! ./src/BreakdownBox.ts */"./src/BreakdownBox.ts");
 __webpack_require__(/*! ./src/BreakdownChart.ts */"./src/BreakdownChart.ts");

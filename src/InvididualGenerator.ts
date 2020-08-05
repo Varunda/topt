@@ -96,7 +96,13 @@ export class OutfitReport {
 
     scoreBreakdown: ExpBreakdown[] = [];
 
-    overtime = {
+    overtimePer5 = {
+        kpm: [] as BreakdownTimeslot[],
+        kd: [] as BreakdownTimeslot[],
+        rpm: [] as BreakdownTimeslot[],
+    };
+
+    overtimePer1 = {
         kpm: [] as BreakdownTimeslot[],
         kd: [] as BreakdownTimeslot[],
         rpm: [] as BreakdownTimeslot[],

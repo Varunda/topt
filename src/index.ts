@@ -767,9 +767,13 @@ export const vm = new Vue({
 
             this.outfitReport.continent = IndividualReporter.generateContinentPlayedOn(this.outfitReport.events);
 
-            this.outfitReport.overtime.kpm = EventReporter.kpmOverTime(this.outfitReport.events);
-            this.outfitReport.overtime.kd = EventReporter.kdOverTime(this.outfitReport.events);
-            this.outfitReport.overtime.rpm = EventReporter.revivesOverTime(this.outfitReport.events);
+            this.outfitReport.overtimePer1.kpm = EventReporter.kpmOverTime(this.outfitReport.events, 60000);
+            this.outfitReport.overtimePer1.kd = EventReporter.kdOverTime(this.outfitReport.events, 60000);
+            this.outfitReport.overtimePer1.rpm = EventReporter.revivesOverTime(this.outfitReport.events, 60000);
+
+            this.outfitReport.overtimePer5.kpm = EventReporter.kpmOverTime(this.outfitReport.events);
+            this.outfitReport.overtimePer5.kd = EventReporter.kdOverTime(this.outfitReport.events);
+            this.outfitReport.overtimePer5.rpm = EventReporter.revivesOverTime(this.outfitReport.events);
 
             this.outfitReport.perUpdate.kd = EventReporter.kdPerUpdate(this.outfitReport.events);
         },
