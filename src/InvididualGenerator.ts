@@ -805,6 +805,7 @@ export class IndividualReporter {
 
             EventReporter.experienceSource(ids, parameters.player.characterID, parameters.events).ok((data: BreakdownArray) => {
                 meta.data = data;
+                console.log(`Found [${data.data.map(iter => `${iter.display}:${iter.amount}`).join(", ")}] for [${ids.join(", ")}]`);
                 response.resolveOk(meta);
             });
         }

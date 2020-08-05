@@ -131,7 +131,7 @@ export const PsEvents: Map<string, PsEvent> = new Map<string, PsEvent>([
     }],
     [PsEvent.healAssist, {
         name: "Heal assist",
-        types: ["medic"],
+        types: [],
         track: true,
         alsoIncrement: undefined
     }],

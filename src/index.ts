@@ -455,6 +455,7 @@ export const vm = new Vue({
 
                     // Is this stat one of the ones being displayed?
                     if (psEvent.types.indexOf(this.settings.eventType) > -1) {
+                        //console.log(`Needed ${this.settings.eventType} to display ${char.name}, found from ${key}`);
                         containsType = true;
                     }
 
@@ -838,7 +839,7 @@ export const vm = new Vue({
                 response.resolve({ code: 404, data: `` });
             } else {
                 const events: Event[] = [...player.events];
-                this.stats.forEach((player: TrackedPlayer, charID: string) => {
+                this.stats.forEach((player: TrackedPlayer, _: string) => {
                     if (charID == player.characterID) { // Don't add the characters's events twice
                         return;
                     }

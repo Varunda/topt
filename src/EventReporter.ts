@@ -262,6 +262,8 @@ export default class EventReporter {
             return ApiResponse.resolve({ code: 204, data: null });
         }
 
+        console.log(`charIDs: [${Array.from(exp.getMap().keys()).join(", ")}]`);
+
         return statMapToBreakdown(exp,
             CharacterAPI.getByIDs,
             (elem: Character, charID: string) => elem.ID == charID,

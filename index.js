@@ -58200,6 +58200,7 @@ class EventReporter {
         if (exp.size() == 0) {
             return census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"].resolve({ code: 204, data: null });
         }
+        console.log(`charIDs: [${Array.from(exp.getMap().keys()).join(", ")}]`);
         return statMapToBreakdown(exp, census_CharacterAPI__WEBPACK_IMPORTED_MODULE_1__["CharacterAPI"].getByIDs, (elem, charID) => elem.ID == charID, defaultCharacterMapper, defaultCharacterSortField);
     }
     static outfitVersusBreakdown(events) {
@@ -59552,6 +59553,7 @@ class IndividualReporter {
             meta.data = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
             EventReporter__WEBPACK_IMPORTED_MODULE_8__["default"].experienceSource(ids, parameters.player.characterID, parameters.events).ok((data) => {
                 meta.data = data;
+                console.log(`Found [${data.data.map(iter => `${iter.display}:${iter.amount}`).join(", ")}] for [${ids.join(", ")}]`);
                 response.resolveOk(meta);
             });
         }
@@ -61263,7 +61265,7 @@ const PsEvents = new Map([
         }],
     [PsEvent.healAssist, {
             name: "Heal assist",
-            types: ["medic"],
+            types: [],
             track: true,
             alsoIncrement: undefined
         }],
@@ -63955,6 +63957,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                     const psEvent = PsEvent__WEBPACK_IMPORTED_MODULE_15__["PsEvents"].get(key) || PsEvent__WEBPACK_IMPORTED_MODULE_15__["PsEvent"].default;
                     // Is this stat one of the ones being displayed?
                     if (psEvent.types.indexOf(this.settings.eventType) > -1) {
+                        //console.log(`Needed ${this.settings.eventType} to display ${char.name}, found from ${key}`);
                         containsType = true;
                     }
                     // Always copy the stat to the display collection, useful if the event type is not what
@@ -64311,7 +64314,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             }
             else {
                 const events = [...player.events];
-                this.stats.forEach((player, charID) => {
+                this.stats.forEach((player, _) => {
                     if (charID == player.characterID) { // Don't add the characters's events twice
                         return;
                     }
