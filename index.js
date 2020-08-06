@@ -63427,6 +63427,753 @@ window.WeaponAPI = WeaponAPI;
 
 /***/ }),
 
+/***/ "./src/core/Core.ts":
+/*!**************************!*\
+  !*** ./src/core/Core.ts ***!
+  \**************************/
+/*! exports provided: Core */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Core", function() { return Core; });
+/* harmony import */ var Loadable__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! Loadable */ "./src/Loadable.ts");
+/* harmony import */ var census_CensusAPI__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! census/CensusAPI */ "./src/census/CensusAPI.ts");
+/* harmony import */ var census_OutfitAPI__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! census/OutfitAPI */ "./src/census/OutfitAPI.ts");
+/* harmony import */ var census_CharacterAPI__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! census/CharacterAPI */ "./src/census/CharacterAPI.ts");
+/* harmony import */ var InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! InvididualGenerator */ "./src/InvididualGenerator.ts");
+
+
+
+
+
+class Core {
+    constructor(serviceID) {
+        this.sockets = {
+            tracked: null,
+            logistics: null,
+            logins: null,
+            facility: null
+        };
+        this.routerTracking = {
+            // key - Who placed the router
+            // value - Lastest npc ID that gave them a router spawn tick
+            routerNpcs: new Map(),
+            routers: [] // All routers that have been placed
+        };
+        this.socketMessageQueue = [];
+        this.stats = new Map();
+        this.outfits = [];
+        this.characters = [];
+        this.miscEvents = [];
+        this.playerCaptures = [];
+        this.facilityCaptures = [];
+        this.rawData = [];
+        this.tracking = {
+            running: false,
+            startTime: new Date().getTime(),
+            endTime: new Date().getTime()
+        };
+        this.handlers = {
+            exp: [],
+            kill: [],
+            death: [],
+            teamkill: [],
+            capture: [],
+            defend: [],
+            vehicle: []
+        };
+        this.serviceID = serviceID;
+        census_CensusAPI__WEBPACK_IMPORTED_MODULE_1__["default"].init(this.serviceID);
+    }
+    /**
+     * Emit an event and execute all handlers on it
+     *
+     * @param event Event being emitted to all handlers
+     */
+    emit(event) {
+        this.handlers[event.type].forEach((callback) => { callback(event); });
+    }
+    /**
+     * Add an event handler that will occur when a specific event is created from the core
+     *
+     * @param type      Event to attach the handler to
+     * @param handler   Handler that will be executed when that event is emitted
+     */
+    on(type, handler) {
+        switch (type) {
+            case "exp":
+                this.handlers.exp.push(handler);
+                break;
+            case "kill":
+                this.handlers.kill.push(handler);
+                break;
+            case "death":
+                this.handlers.death.push(handler);
+                break;
+            case "teamkill":
+                this.handlers.death.push(handler);
+                break;
+            case "capture":
+                this.handlers.capture.push(handler);
+                break;
+            case "defend":
+                this.handlers.defend.push(handler);
+                break;
+            case "vehicle":
+                this.handlers.vehicle.push(handler);
+                break;
+            default: throw `Unchecked event type ${type}`;
+        }
+    }
+    /**
+     * Start the tracking and begin saving events
+     */
+    start() {
+        this.tracking.running = true;
+        const nowMs = new Date().getTime();
+        this.tracking.startTime = nowMs;
+        this.stats.forEach((char, charID) => {
+            char.joinTime = nowMs;
+        });
+    }
+    /**
+     * Stop running the tracker
+     */
+    stop() {
+        if (this.tracking.running == true) {
+            const nowMs = new Date().getTime();
+            this.tracking.endTime = nowMs;
+        }
+        this.tracking.running = false;
+        this.stats.forEach((char, charID) => {
+            if (char.events.length > 0) {
+                const first = char.events[0];
+                const last = char.events[char.events.length - 1];
+                char.joinTime = first.timestamp;
+                char.secondsOnline = (last.timestamp - first.timestamp) / 1000;
+            }
+            else {
+                char.secondsOnline = 0;
+            }
+        });
+    }
+    /**
+     * Begin tracking all members of an outfit
+     *
+     * @param tag Tag of the outfit to track. Case-insensitive
+     *
+     * @returns A Loading that will contain the state of
+     */
+    addOutfit(tag) {
+        const loading = Loadable__WEBPACK_IMPORTED_MODULE_0__["Loadable"].loading();
+        if (tag.trim().length == 0) {
+            loading.state = "loaded";
+            return loading;
+        }
+        census_OutfitAPI__WEBPACK_IMPORTED_MODULE_2__["default"].getByTag(tag).ok((data) => {
+            this.outfits.push(data.ID);
+        });
+        census_OutfitAPI__WEBPACK_IMPORTED_MODULE_2__["default"].getCharactersByTag(tag).ok((data) => {
+            this.subscribeToEvents(data);
+            loading.state = "loaded";
+        });
+        return loading;
+    }
+    /**
+     * Begin tracking a new player
+     *
+     * @param name Name of the player to track. Case-insensitive
+     *
+     * @returns A loading that will contain the state of
+     */
+    addPlayer(name) {
+        const loading = Loadable__WEBPACK_IMPORTED_MODULE_0__["Loadable"].loading();
+        if (name.trim().length == 0) {
+            loading.state = "loaded";
+            return loading;
+        }
+        census_CharacterAPI__WEBPACK_IMPORTED_MODULE_3__["CharacterAPI"].getByName(name).ok((data) => {
+            this.subscribeToEvents([data]);
+        });
+        return loading;
+    }
+    /**
+     * Subscribe to the events in the event stream
+     *
+     * @param chars Characters to subscribe to
+     */
+    subscribeToEvents(chars) {
+        if (this.sockets.tracked == null) {
+            console.warn(`Cannot subscribe to events, tracked socket is null`);
+            return;
+        }
+        // No duplicates
+        chars = chars.filter((char) => {
+            return this.characters.map((c) => c.ID).indexOf(char.ID) == -1;
+        });
+        if (chars.length == 0) {
+            return;
+        }
+        this.characters = this.characters.concat(chars).sort((a, b) => {
+            return a.name.localeCompare(b.name);
+        });
+        chars.forEach((character) => {
+            const player = new InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["TrackedPlayer"]();
+            player.characterID = character.ID;
+            player.faction = character.faction;
+            player.outfitTag = character.outfitTag;
+            player.name = character.name;
+            if (character.online == true) {
+                player.joinTime = new Date().getTime();
+            }
+            this.stats.set(character.ID, player);
+        });
+        const subscribeExp = {
+            "action": "subscribe",
+            "characters": [
+                ...(chars.map((char) => char.ID))
+            ],
+            "eventNames": [
+                "GainExperience",
+                "AchievementEarned",
+                "Death",
+                "FacilityControl",
+                "ItemAdded",
+                "VehicleDestroy"
+            ],
+            "service": "event"
+        };
+        this.sockets.tracked.send(JSON.stringify(subscribeExp));
+    }
+    onmessage(ev) {
+        for (const message of this.socketMessageQueue) {
+            if (ev.data == message) {
+                //console.log(`Duplicate message found: ${ev.data}`);
+                return;
+            }
+        }
+        this.socketMessageQueue.push(ev.data);
+        this.socketMessageQueue.shift();
+        this.processMessage(ev.data, false);
+    }
+    onRouterOpen(ev) {
+    }
+    onRouterMessage(ev) {
+    }
+    onRouterError(ev) {
+    }
+    onLoginMessage(ev) {
+    }
+    onLoginError(ev) {
+    }
+    onFacilityOpen(ev) {
+    }
+    onFacilityMessage(ev) {
+    }
+    onFacilityError(er) {
+    }
+}
+window.Core = Core;
+
+
+/***/ }),
+
+/***/ "./src/core/CoreConnection.ts":
+/*!************************************!*\
+  !*** ./src/core/CoreConnection.ts ***!
+  \************************************/
+/*! no exports provided */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var core_Core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! core/Core */ "./src/core/Core.ts");
+/* harmony import */ var Loadable__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! Loadable */ "./src/Loadable.ts");
+
+
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.connect = function () {
+    const self = this;
+    const response = Loadable__WEBPACK_IMPORTED_MODULE_1__["Loadable"].saving("connecting");
+    self.disconnect();
+    self.sockets.tracked = new WebSocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${self.serviceID}`);
+    self.sockets.tracked.onopen = () => {
+        response.state = "saving";
+        if (response.state != "saving") {
+            throw ``;
+        }
+        response.data = "Connecting...";
+    };
+    self.sockets.tracked.onerror = () => {
+        response.state = "error";
+        if (response.state != "error") {
+            throw ``;
+        }
+        response.message = "Failed to connect to stream. Bad service ID?";
+    };
+    self.sockets.tracked.onmessage = () => {
+        console.log(`Connected to event stream`);
+        response.state = "loaded";
+        if (response.state != "loaded") {
+            throw ``;
+        }
+        response.data = "Connected";
+        self.sockets.tracked.onmessage = self.onmessage;
+    };
+    self.sockets.logistics = new WebSocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${self.serviceID}`);
+    self.sockets.logistics.onopen = self.onRouterOpen;
+    self.sockets.logistics.onerror = self.onRouterError;
+    self.sockets.logistics.onmessage = self.onRouterMessage;
+    self.sockets.logins = new WebSocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${self.serviceID}`);
+    self.sockets.logins.onopen = (ev) => {
+        if (self.sockets.logins == null) {
+            throw `Expected sockets.login to not be null`;
+        }
+        const msg = {
+            service: "event",
+            action: "subscribe",
+            characters: ["all"],
+            worlds: [
+                //self.settings.serverID
+                "1"
+            ],
+            eventNames: [
+                "PlayerLogin",
+                "PlayerLogout"
+            ],
+            logicalAndCharactersWithWorlds: true
+        };
+        self.sockets.logins.send(JSON.stringify(msg));
+    };
+    self.sockets.logins.onerror = self.onLoginError;
+    self.sockets.logins.onmessage = self.onLoginMessage;
+    self.sockets.facility = new WebSocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${self.serviceID}`);
+    self.sockets.facility.onopen = self.onFacilityOpen;
+    self.sockets.facility.onmessage = self.onFacilityMessage;
+    self.sockets.facility.onerror = self.onFacilityError;
+    return response;
+};
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.disconnect = function () {
+    const self = this;
+    if (self.sockets.tracked != null) {
+        self.sockets.tracked.close();
+    }
+    if (self.sockets.logins != null) {
+        self.sockets.logins.close();
+    }
+    if (self.sockets.logistics != null) {
+        self.sockets.logistics.close();
+    }
+    if (self.sockets.facility != null) {
+        self.sockets.facility.close();
+    }
+};
+
+
+/***/ }),
+
+/***/ "./src/core/CoreProcessing.ts":
+/*!************************************!*\
+  !*** ./src/core/CoreProcessing.ts ***!
+  \************************************/
+/*! no exports provided */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var core_Core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! core/Core */ "./src/core/Core.ts");
+/* harmony import */ var census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! census/PsLoadout */ "./src/census/PsLoadout.ts");
+/* harmony import */ var PsEvent__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! PsEvent */ "./src/PsEvent.ts");
+/* harmony import */ var census_WeaponAPI__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! census/WeaponAPI */ "./src/census/WeaponAPI.ts");
+/* harmony import */ var census_FacilityAPI__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! census/FacilityAPI */ "./src/census/FacilityAPI.ts");
+/* harmony import */ var census_CharacterAPI__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! census/CharacterAPI */ "./src/census/CharacterAPI.ts");
+
+
+
+
+
+
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processMessage = function (input, override = false) {
+    var _a;
+    const self = this;
+    if (self.tracking.running == false && override == false) {
+        return;
+    }
+    let save = false;
+    const msg = JSON.parse(input);
+    if (msg.type == "serviceMessage") {
+        const event = msg.payload.event_name;
+        const zoneID = msg.payload.zone_id;
+        if (event == "GainExperience") {
+            const eventID = msg.payload.experience_id;
+            const charID = msg.payload.character_id;
+            const targetID = msg.payload.other_id;
+            const amount = Number.parseInt(msg.payload.amount);
+            const event = PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvents"].get(eventID);
+            const timestamp = Number.parseInt(msg.payload.timestamp) * 1000;
+            if (eventID == "1410") {
+                if (self.stats.get(charID) != undefined) {
+                    if (self.routerTracking.routerNpcs.has(charID)) {
+                        //console.log(`${charID} router npc check for ${targetID}`);
+                        const router = self.routerTracking.routerNpcs.get(charID);
+                        if (router.ID != targetID) {
+                            //console.warn(`New router placed by ${charID}, missed ItemAdded event: removing old one and replacing with ${targetID}`);
+                            router.destroyed = timestamp;
+                            self.routerTracking.routers.push(Object.assign({}, router));
+                            self.routerTracking.routerNpcs.set(charID, {
+                                ID: targetID,
+                                owner: charID,
+                                pulledAt: timestamp,
+                                firstSpawn: timestamp,
+                                destroyed: undefined,
+                                count: 1,
+                                type: "router"
+                            });
+                        }
+                        else {
+                            //console.log(`Same router, incrementing count`);
+                            if (router.ID == "") {
+                                router.ID = targetID;
+                            }
+                            if (router.firstSpawn == undefined) {
+                                router.firstSpawn = timestamp;
+                            }
+                            ++router.count;
+                        }
+                    }
+                    else {
+                        //console.log(`${charID} has new router ${targetID} placed/used`);
+                        self.routerTracking.routerNpcs.set(charID, {
+                            ID: targetID,
+                            owner: charID,
+                            pulledAt: timestamp,
+                            firstSpawn: timestamp,
+                            destroyed: undefined,
+                            count: 1,
+                            type: "router"
+                        });
+                    }
+                    save = true;
+                }
+            }
+            else if (eventID == "1409") {
+                const trackedNpcs = Array.from(self.routerTracking.routerNpcs.values());
+                const ids = trackedNpcs.map(iter => iter.ID);
+                if (ids.indexOf(targetID) > -1) {
+                    const router = trackedNpcs.find(iter => iter.ID == targetID);
+                    //console.log(`Router ${router.ID} placed by ${router.owner} destroyed, saving`);
+                    router.destroyed = timestamp;
+                    self.routerTracking.routers.push(Object.assign({}, router));
+                    self.routerTracking.routerNpcs.delete(router.owner);
+                    save = true;
+                }
+            }
+            const ev = {
+                type: "exp",
+                amount: amount,
+                expID: eventID,
+                zoneID: zoneID,
+                trueExpID: eventID,
+                loadoutID: msg.payload.loadout_id,
+                sourceID: charID,
+                targetID: targetID,
+                timestamp: timestamp
+            };
+            // Undefined means was the target of the event, not the source
+            const player = self.stats.get(charID);
+            if (player != undefined) {
+                if (Number.isNaN(amount)) {
+                    console.warn(`NaN amount from event: ${JSON.stringify(msg)}`);
+                }
+                else {
+                    player.score += amount;
+                }
+                if (event != undefined) {
+                    if (event.track == true) {
+                        player.stats.increment(eventID);
+                        if (event.alsoIncrement != undefined) {
+                            const alsoEvent = PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvents"].get(event.alsoIncrement);
+                            if (alsoEvent.track == true) {
+                                player.stats.increment(event.alsoIncrement);
+                            }
+                            ev.expID = event.alsoIncrement;
+                        }
+                    }
+                }
+                player.events.push(ev);
+            }
+            else {
+                self.miscEvents.push(ev);
+            }
+            self.emit(ev);
+            if (eventID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].revive || eventID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadRevive) {
+                const target = self.stats.get(targetID);
+                if (target != undefined) {
+                    if (target.recentDeath != null) {
+                        target.recentDeath.revived = true;
+                        target.recentDeath.revivedEvent = ev;
+                        //console.log(`${targetID} died but was revived by ${charID}`);
+                    }
+                    target.stats.decrement(PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].death);
+                    target.stats.increment(PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].revived);
+                }
+            }
+            save = true;
+        }
+        else if (event == "Death") {
+            const targetID = msg.payload.character_id;
+            const sourceID = msg.payload.attacker_character_id;
+            const isHeadshot = msg.payload.is_headshot == "1";
+            const targetLoadoutID = msg.payload.character_loadout_id;
+            const sourceLoadoutID = msg.payload.attacker_loadout_id;
+            if (self.tracking.running == true) {
+                census_CharacterAPI__WEBPACK_IMPORTED_MODULE_5__["CharacterAPI"].cache(targetID);
+                census_CharacterAPI__WEBPACK_IMPORTED_MODULE_5__["CharacterAPI"].cache(sourceID);
+            }
+            const targetLoadout = census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadouts"].get(targetLoadoutID);
+            if (targetLoadout == undefined) {
+                return console.warn(`Unknown target loadout ID: ${targetLoadoutID}`);
+            }
+            const sourceLoadout = census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadouts"].get(sourceLoadoutID);
+            if (sourceLoadout == undefined) {
+                return console.warn(`Unknown source loadout ID: ${sourceLoadoutID}`);
+            }
+            let targetTicks = self.stats.get(targetID);
+            if (targetTicks != undefined && targetLoadout.faction != sourceLoadout.faction) {
+                targetTicks.stats.increment(PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].death);
+                const ev = {
+                    type: "death",
+                    isHeadshot: isHeadshot,
+                    sourceID: targetID,
+                    targetID: sourceID,
+                    loadoutID: targetLoadoutID,
+                    targetLoadoutID: sourceLoadoutID,
+                    weaponID: msg.payload.attacker_weapon_id,
+                    revived: false,
+                    revivedEvent: null,
+                    timestamp: Number.parseInt(msg.payload.timestamp) * 1000,
+                    zoneID: zoneID
+                };
+                targetTicks.events.push(ev);
+                targetTicks.recentDeath = ev;
+                census_WeaponAPI__WEBPACK_IMPORTED_MODULE_3__["WeaponAPI"].precache(ev.weaponID);
+                self.emit(ev);
+                save = true;
+            }
+            let sourceTicks = self.stats.get(sourceID);
+            if (sourceTicks != undefined) {
+                if (targetLoadout.faction == sourceLoadout.faction) {
+                    sourceTicks.stats.increment(PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].teamkill);
+                    (_a = targetTicks) === null || _a === void 0 ? void 0 : _a.stats.increment(PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].teamkilled);
+                    const ev = {
+                        type: "teamkill",
+                        sourceID: sourceID,
+                        loadoutID: sourceLoadoutID,
+                        targetID: targetID,
+                        targetLoadoutID: targetLoadoutID,
+                        weaponID: msg.payload.attacker_weapon_id,
+                        zoneID: zoneID,
+                        timestamp: Number.parseInt(msg.payload.timestamp) * 1000
+                    };
+                    sourceTicks.events.push(ev);
+                    self.emit(ev);
+                }
+                else {
+                    sourceTicks.stats.increment(PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].kill);
+                    if (isHeadshot == true) {
+                        sourceTicks.stats.increment(PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].headshot);
+                    }
+                    const ev = {
+                        type: "kill",
+                        isHeadshot: isHeadshot,
+                        sourceID: sourceID,
+                        targetID: targetID,
+                        loadoutID: sourceLoadoutID,
+                        targetLoadoutID: targetLoadoutID,
+                        weaponID: msg.payload.attacker_weapon_id,
+                        timestamp: Number.parseInt(msg.payload.timestamp) * 1000,
+                        zoneID: zoneID
+                    };
+                    sourceTicks.events.push(ev);
+                    census_WeaponAPI__WEBPACK_IMPORTED_MODULE_3__["WeaponAPI"].precache(ev.weaponID);
+                    self.emit(ev);
+                }
+                save = true;
+            }
+        }
+        else if (event == "PlayerFacilityCapture") {
+            const playerID = msg.payload.character_id;
+            const outfitID = msg.payload.outfit_id;
+            const facilityID = msg.payload.facility_id;
+            const timestamp = Number.parseInt(msg.payload.timestamp) * 1000;
+            const ev = {
+                type: "capture",
+                sourceID: playerID,
+                outfitID: outfitID,
+                facilityID: facilityID,
+                timestamp: timestamp,
+                zoneID: zoneID
+            };
+            self.playerCaptures.push(ev);
+            let player = self.stats.get(playerID);
+            if (player != undefined) {
+                player.stats.increment(PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].baseCapture);
+                player.events.push(ev);
+            }
+            self.emit(ev);
+            save = true;
+        }
+        else if (event == "PlayerFacilityDefend") {
+            const playerID = msg.payload.character_id;
+            const outfitID = msg.payload.outfit_id;
+            const facilityID = msg.payload.facility_id;
+            const timestamp = Number.parseInt(msg.payload.timestamp) * 1000;
+            const ev = {
+                type: "defend",
+                sourceID: playerID,
+                outfitID: outfitID,
+                facilityID: facilityID,
+                timestamp: timestamp,
+                zoneID: zoneID,
+            };
+            self.playerCaptures.push(ev);
+            self.emit(ev);
+            let player = self.stats.get(playerID);
+            if (player != undefined) {
+                player.stats.increment(PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].baseDefense);
+            }
+            save = true;
+        }
+        else if (event == "AchievementEarned") {
+            const charID = msg.payload.character_id;
+            const achivID = msg.payload.achievement_id;
+            const char = self.stats.get(charID);
+            if (char != undefined) {
+                char.ribbons.increment(achivID);
+                save = true;
+            }
+        }
+        else if (event == "FacilityControl") {
+            const outfitID = msg.payload.outfit_id;
+            const facilityID = msg.payload.facility_id;
+            const timestamp = Number.parseInt(msg.payload.timestamp) * 1000;
+            census_FacilityAPI__WEBPACK_IMPORTED_MODULE_4__["FacilityAPI"].getByID(facilityID).ok((data) => {
+                const capture = {
+                    facilityID: data.ID,
+                    zoneID: zoneID,
+                    name: data.name,
+                    typeID: data.typeID,
+                    type: data.type,
+                    timestamp: new Date(timestamp),
+                    timeHeld: Number.parseInt(msg.payload.duration_held),
+                    factionID: msg.payload.new_faction_id,
+                    outfitID: outfitID,
+                    previousFaction: msg.payload.old_faction_id,
+                };
+                self.facilityCaptures.push(capture);
+            }).noContent(() => {
+                console.error(`Failed to find facility ID ${facilityID}`);
+            });
+            save = true;
+        }
+        else if (event == "ItemAdded") {
+            const itemID = msg.payload.item_id;
+            const charID = msg.payload.character_id;
+            const timestamp = Number.parseInt(msg.payload.timestamp) * 1000;
+            if (itemID == "6003551") {
+                if (self.stats.get(charID) != undefined) {
+                    //console.log(`${charID} pulled a new router`);
+                    if (self.routerTracking.routerNpcs.has(charID)) {
+                        const router = self.routerTracking.routerNpcs.get(charID);
+                        //console.log(`${charID} pulled a new router, saving old one`);
+                        router.destroyed = timestamp;
+                        self.routerTracking.routers.push(Object.assign({}, router));
+                    }
+                    const router = {
+                        ID: "",
+                        owner: charID,
+                        count: 0,
+                        destroyed: undefined,
+                        firstSpawn: undefined,
+                        pulledAt: timestamp,
+                        type: "router"
+                    };
+                    self.routerTracking.routerNpcs.set(charID, router);
+                    save = true;
+                }
+            }
+        }
+        else if (event == "VehicleDestroy") {
+            const killerID = msg.payload.attacker_character_id;
+            const killerLoadoutID = msg.payload.attacker_loadout_id;
+            const killerWeaponID = msg.payload.attacker_weapon_id;
+            const vehicleID = msg.payload.vehicle_id;
+            const timestamp = Number.parseInt(msg.payload.timestamp) * 1000;
+            const player = self.stats.get(killerID);
+            if (player != undefined) {
+                const ev = {
+                    type: "vehicle",
+                    sourceID: killerID,
+                    loadoutID: killerLoadoutID,
+                    weaponID: killerWeaponID,
+                    targetID: msg.payload.character_id,
+                    vehicleID: vehicleID,
+                    timestamp: timestamp,
+                    zoneID: zoneID
+                };
+                player.events.push(ev);
+                save = true;
+                //console.log(`${killerID} killed vehicle ${vehicleID}`);
+                self.emit(ev);
+            }
+        }
+        else {
+            console.warn(`Unknown event type: ${event}\n${JSON.stringify(msg)}`);
+        }
+    }
+    else if (msg.type == "heartbeat") {
+        //console.log(`Heartbeat ${new Date().toISOString()}`);
+    }
+    else if (msg.type == "serviceStateChanged") {
+        console.log(`serviceStateChanged event`);
+    }
+    else if (msg.type == "connectionStateChanged") {
+        console.log(`connectionStateChanged event`);
+    }
+    else if (msg.type == undefined) {
+        // Occurs in response to subscribing to new events
+    }
+    else {
+        console.warn(`Unchecked message type: '${msg.type}'`);
+    }
+    if (save == true) {
+        self.rawData.push(JSON.stringify(msg));
+    }
+};
+
+
+/***/ }),
+
+/***/ "./src/core/index.ts":
+/*!***************************!*\
+  !*** ./src/core/index.ts ***!
+  \***************************/
+/*! exports provided: default */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _Core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./Core */ "./src/core/Core.ts");
+/* harmony import */ var _CoreProcessing__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./CoreProcessing */ "./src/core/CoreProcessing.ts");
+/* harmony import */ var _CoreConnection__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./CoreConnection */ "./src/core/CoreConnection.ts");
+
+
+
+/* harmony default export */ __webpack_exports__["default"] = (_Core__WEBPACK_IMPORTED_MODULE_0__["Core"]);
+
+
+/***/ }),
+
 /***/ "./src/index.ts":
 /*!**********************!*\
   !*** ./src/index.ts ***!
@@ -63482,6 +64229,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var Killfeed__WEBPACK_IMPORTED_MODULE_33__ = __webpack_require__(/*! Killfeed */ "./src/Killfeed.ts");
 /* harmony import */ var winter_WinterReportGenerator__WEBPACK_IMPORTED_MODULE_34__ = __webpack_require__(/*! winter/WinterReportGenerator */ "./src/winter/WinterReportGenerator.ts");
 /* harmony import */ var winter_WinterReportParameters__WEBPACK_IMPORTED_MODULE_35__ = __webpack_require__(/*! winter/WinterReportParameters */ "./src/winter/WinterReportParameters.ts");
+/* harmony import */ var core_index__WEBPACK_IMPORTED_MODULE_36__ = __webpack_require__(/*! core/index */ "./src/core/index.ts");
 
 
 
@@ -63522,6 +64270,8 @@ chart_js__WEBPACK_IMPORTED_MODULE_22__["Chart"].plugins.unregister(_node_modules
 
 
 
+
+new core_index__WEBPACK_IMPORTED_MODULE_36__["default"]("ciksericeid80");
 class OpReportSettings {
     constructor() {
         this.zoneID = null;
@@ -63871,9 +64621,6 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             }
             this.display.sort(sortFunc);
             //console.timeEnd("update display");
-        },
-        trap: function (ev) {
-            debugger;
         },
         squadKeyEvent(ev) {
             if (this.view != "killfeed") {

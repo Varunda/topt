@@ -57,7 +57,6 @@ import "BreakdownBar";
 import "MomentFilter";
 import "KillfeedSquad";
 
-import { BaseReport, BaseGenerator } from "BaseGenerator";
 import { OutfitTrendsV1, OutfitTrends, SessionV1 } from "OutfitTrends";
 import { StorageHelper, StorageSession, StorageTrend } from "Storage";
 import { KillfeedGeneration, KillfeedEntry, KillfeedOptions, Killfeed } from "Killfeed";
@@ -65,6 +64,9 @@ import { KillfeedGeneration, KillfeedEntry, KillfeedOptions, Killfeed } from "Ki
 import { WinterReportGenerator } from "winter/WinterReportGenerator";
 import { WinterReport } from "winter/WinterReport";
 import { WinterReportParameters, WinterReportSettings } from "winter/WinterReportParameters";
+
+import Core from "core/index";
+new Core("ciksericeid80");
 
 class OpReportSettings {
     public zoneID: string | null = null;
@@ -493,10 +495,6 @@ export const vm = new Vue({
 
             this.display.sort(sortFunc);
             //console.timeEnd("update display");
-        },
-
-        trap: function(ev: any): void {
-            debugger;
         },
 
         squadKeyEvent(ev: KeyboardEvent): void {
