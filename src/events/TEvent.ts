@@ -1,4 +1,4 @@
-export type TEventType = "exp" | "kill" | "death" | "capture" | "defend" | "vehicle" | "teamkill";
+export type TEventType = "exp" | "kill" | "death" | "capture" | "defend" | "vehicle" | "teamkill" | "login" | "logout";
 
 /**
  * Base TEvent (TOPT-Event) that all events emitted come from

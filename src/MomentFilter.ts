@@ -146,4 +146,4 @@ Vue.filter("minutes", (input: string | number): string => {
     }
 
     return `${(val / 60).toFixed(0)} minutes`;
-})
+});

@@ -1,11 +1,5 @@
-import Vue, { PropType } from "vue";
-
 import { ApiResponse } from "census/ApiWrapper";
 import { Loading, Loadable } from "Loadable";
-
-import * as moment from "moment";
-import * as $ from "jquery";
-import * as JSZip from "jszip";
 
 import CensusAPI from "census/CensusAPI";
 import OutfitAPI, { Outfit } from "census/OutfitAPI";
@@ -15,17 +9,13 @@ import { EventAPI } from "census/EventAPI";
 import { Achievement, AchievementAPI } from "census/AchievementAPI";
 import { FacilityAPI, Facility } from "census/FacilityAPI";
 
-import { PsLoadout, PsLoadouts } from "census/PsLoadout";
-import { PsEventType, PsEvent, PsEvents } from "PsEvent";
 import StatMap from "StatMap";
 
-import EventReporter, { statMapToBreakdown,
-    Breakdown, BreakdownArray,
-    OutfitVersusBreakdown, ClassCollection, classCollectionNumber
-} from "EventReporter";
+import { TrackedPlayer } from "core/TrackedPlayer";
+
 import {
     ExpBreakdown, FacilityCapture, ClassBreakdown, IndividualReporter, OutfitReport,
-    CountedRibbon, Report, TrackedPlayer, TimeTracking, BreakdownCollection, BreakdownSection, BreakdownMeta,
+    CountedRibbon, Report, TimeTracking, BreakdownCollection, BreakdownSection, BreakdownMeta,
     TrackedRouter,
     ReportParameters
 } from "InvididualGenerator";
@@ -81,8 +71,11 @@ export class Core {
         endTime: new Date().getTime() as number
     };
 
+    public connected: boolean = false;
+
     public constructor(serviceID: string) {
         this.serviceID = serviceID;
+        this.socketMessageQueue.length = 5;
 
         CensusAPI.init(this.serviceID);
     }
@@ -94,7 +87,9 @@ export class Core {
         teamkill: [] as TEventHandler<"teamkill">[],
         capture: [] as TEventHandler<"capture">[],
         defend: [] as TEventHandler<"defend">[],
-        vehicle: [] as TEventHandler<"vehicle">[]
+        vehicle: [] as TEventHandler<"vehicle">[],
+        login: [] as TEventHandler<"login">[],
+        logout: [] as TEventHandler<"logout">[]
     };
 
     /**
@@ -121,7 +116,30 @@ export class Core {
             case "capture": this.handlers.capture.push(handler as TEventHandler<"capture">); break;
             case "defend": this.handlers.defend.push(handler as TEventHandler<"defend">); break;
             case "vehicle": this.handlers.vehicle.push(handler as TEventHandler<"vehicle">); break;
+            case "login": this.handlers.login.push(handler as TEventHandler<"login">); break;
+            case "logout": this.handlers.logout.push(handler as TEventHandler<"logout">); break;
             default: throw `Unchecked event type ${type}`;
+        }
+    }
+
+    /**
+     * Remove handlers and no longer emit events to them
+     * 
+     * @param type Optional type of handler to clear. If not given, all handlers are cleared
+     */
+    public clearHandlers(type?: TEventType): void {
+        if (type == undefined) {
+            this.handlers.exp.length = 0;
+            this.handlers.kill.length = 0;
+            this.handlers.death.length = 0;
+            this.handlers.teamkill.length = 0;
+            this.handlers.capture.length = 0;
+            this.handlers.defend.length = 0;
+            this.handlers.vehicle.length = 0;
+            this.handlers.login.length = 0;
+            this.handlers.logout.length = 0;
+        } else {
+            this.handlers[type].length = 0;
         }
     }
 
@@ -129,6 +147,10 @@ export class Core {
      * Start the tracking and begin saving events
      */
     public start(): void {
+        if (this.connected == false) {
+            throw `Cannot start TOPT: core is not connected`;
+        }
+
         this.tracking.running = true;
 
         const nowMs: number = new Date().getTime();
@@ -170,6 +192,10 @@ export class Core {
      * @returns A Loading that will contain the state of 
      */
     public addOutfit(tag: string): Loading<string> {
+        if (this.connected == false) {
+            throw `Cannot track outfit ${tag}: Core is not connected`;
+        }
+
         const loading: Loading<string> = Loadable.loading();
 
         if (tag.trim().length == 0) {
@@ -197,6 +223,10 @@ export class Core {
      * @returns A loading that will contain the state of
      */
     public addPlayer(name: string): Loading<string> {
+        if (this.connected == false) {
+            throw `Cannot track character ${name}: Core is not connected`;
+        }
+
         const loading: Loading<string> = Loadable.loading();
 
         if (name.trim().length == 0) {
@@ -216,7 +246,7 @@ export class Core {
      * 
      * @param chars Characters to subscribe to
      */
-    private subscribeToEvents(chars: Character[]): void {
+    public subscribeToEvents(chars: Character[]): void {
         if (this.sockets.tracked == null) {
             console.warn(`Cannot subscribe to events, tracked socket is null`);
             return;
@@ -266,7 +296,7 @@ export class Core {
         this.sockets.tracked.send(JSON.stringify(subscribeExp));
     }
 
-    public onmessage(ev: any): void {
+    public onmessage(ev: MessageEvent): void {
         for (const message of this.socketMessageQueue) {
             if (ev.data == message) {
                 //console.log(`Duplicate message found: ${ev.data}`);
@@ -278,38 +308,6 @@ export class Core {
         this.socketMessageQueue.shift();
 
         this.processMessage(ev.data, false);
-    }
-
-    public onRouterOpen(ev: any): void {
-
-    }
-
-    public onRouterMessage(ev: any): void {
-
-    }
-
-    public onRouterError(ev: any): void {
-
-    }
-
-    public onLoginMessage(ev: any): void {
-
-    }
-
-    public onLoginError(ev: any): void {
-
-    }
-
-    public onFacilityOpen(ev: any): void {
-
-    }
-
-    public onFacilityMessage(ev: any): void {
-
-    }
-
-    public onFacilityError(er: any): void {
-
     }
 
 }

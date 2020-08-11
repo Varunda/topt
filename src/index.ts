@@ -24,13 +24,21 @@ import { PsEventType, PsEvent, PsEvents } from "PsEvent";
 import { Event, EventExp, EventKill, EventDeath, EventVehicleKill, EventCapture, EventTeamkill, EventDefend } from "Event";
 import StatMap from "StatMap";
 
+import {
+    TEvent, TEventType, TLoadoutEvent, TZoneEvent,
+    TExpEvent, TKillEvent, TDeathEvent, TTeamkillEvent,
+    TCaptureEvent, TDefendEvent,
+    TVehicleKillEvent,
+    TEventHandler
+} from "events/index";
+
 import EventReporter, { statMapToBreakdown,
     Breakdown, BreakdownArray,
     OutfitVersusBreakdown, ClassCollection, classCollectionNumber
 } from "EventReporter";
 import {
     ExpBreakdown, FacilityCapture, ClassBreakdown, IndividualReporter, OutfitReport,
-    CountedRibbon, Report, TrackedPlayer, TimeTracking, BreakdownCollection, BreakdownSection, BreakdownMeta,
+    CountedRibbon, Report, TimeTracking, BreakdownCollection, BreakdownSection, BreakdownMeta,
     TrackedRouter,
     ReportParameters
 } from "InvididualGenerator";
@@ -66,13 +74,9 @@ import { WinterReport } from "winter/WinterReport";
 import { WinterReportParameters, WinterReportSettings } from "winter/WinterReportParameters";
 
 import Core from "core/index";
-new Core("ciksericeid80");
+import { TrackedPlayer } from "core/TrackedPlayer";
 
 class OpReportSettings {
-    public zoneID: string | null = null;
-}
-
-class BaseReportSettings {
     public zoneID: string | null = null;
 }
 
@@ -82,29 +86,9 @@ export const vm = new Vue({
     el: "#app" as string,
 
     data: {
-        socketStatus: Loadable.idle() as Loading<string>,
-        socketStep: "idle" as  "idle" | "connecting" | "pinging" | "connected",
+        coreObject: null as (Core | null),
 
-        sockets: {
-            tracked: null as WebSocket | null,
-            logistics: null as WebSocket | null,
-            logins: null as WebSocket | null,
-            facility: null as WebSocket | null,
-
-            queue: [] as string[]
-        },
-
-        routerTracking: {
-            // key - Who placed the router
-            // value - Lastest npc ID that gave them a router spawn tick
-            routerNpcs: new Map() as Map<string, TrackedRouter>, // <char ID, npc ID>
-
-            routers: [] as TrackedRouter[] // All routers that have been placed
-        },
-
-        data: [] as any[], // Collection of all messages from all sockets, used for exporting
-
-        view: "setup" as "setup" | "realtime" | "ops" | "personal" | "base" | "killfeed" | "winter",
+        view: "setup" as "setup" | "realtime" | "ops" | "killfeed" | "winter",
 
         // Field related to settings about how TOPT runs
         settings: {
@@ -150,13 +134,6 @@ export const vm = new Vue({
             options: new KillfeedOptions() as KillfeedOptions
         },
 
-        // Fields related to the current state of tracking
-        tracking: {
-            running: false as boolean,
-            startTime: new Date().getTime() as number,
-            endTime: new Date().getTime() as number
-        } as TimeTracking,
-
         // Used to make iteration thru classes easier
         classIterator: [
             { title: "Infiltrator", name: "infil" },
@@ -178,21 +155,6 @@ export const vm = new Vue({
         outfitTrends: new OutfitTrendsV1() as OutfitTrends,
 
         refreshIntervalID: -1 as number, // ID of the timed interval to refresh the realtime view
-        characters: [] as Character[], // Characters being tracked
-        outfits: [] as string[], // Outfits being tracked for base caps
-        facilityCaptures: [] as FacilityCapture[], // Facilities captures while tracking
-        playerCaptures: [] as (EventCapture | EventDefend)[], // Any PlayerFacilityCapture events
-        miscEvents: [] as Event[], // Other events captured used to generate stats
-
-        zoneIDs: [] as string[], // All the zone IDs captured during this operational
-
-        stats: new Map<string, TrackedPlayer>() as Map<string, TrackedPlayer>,  // <char ID, Player>
-
-        statTotals: new StatMap() as StatMap, // Total time an event has been ticked
-
-        // How many events have been tracked, useful for debugging
-        totalTicks: 0 as number,
-        totalLength: 0 as number,
 
         showFrog: false as boolean,
 
@@ -204,8 +166,6 @@ export const vm = new Vue({
 
         this.storage.enabled = StorageHelper.isEnabled();
 
-        this.sockets.queue.length = 5;
-
         WeaponAPI.loadJson();
         FacilityAPI.loadJson();
     },
@@ -216,7 +176,7 @@ export const vm = new Vue({
         }
 
         window.onbeforeunload = (ev: BeforeUnloadEvent) => {
-            this.disconnect();
+            this.core.disconnect();
         };
 
         document.addEventListener("keyup", this.squadKeyEvent);
@@ -224,34 +184,18 @@ export const vm = new Vue({
 
     methods: {
         connect: function(): void {
-            this.disconnect();
-
             if (this.canConnect == false) {
                 return console.warn(`Cannot connect: service ID is empty`);
             }
 
-            this.socketStep = "connecting";
-            CensusAPI.init(this.settings.serviceToken);
+            if (this.coreObject != null) {
+                this.coreObject.disconnect();
+            }
 
-            this.sockets.tracked = new WebSocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${this.settings.serviceToken}`);
-            this.sockets.tracked.onopen = this.onTestOpen;
-            this.sockets.tracked.onerror = this.onTestError;
-            this.sockets.tracked.onmessage = this.onTestMessage;
-
-            this.sockets.logistics = new WebSocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${this.settings.serviceToken}`);
-            this.sockets.logistics.onopen = this.onRouterOpen;
-            this.sockets.logistics.onerror = this.onRouterError;
-            this.sockets.logistics.onmessage = this.onRouterMessage;
-
-            this.sockets.logins = new WebSocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${this.settings.serviceToken}`);
-            this.sockets.logins.onopen = this.onLoginOpen;
-            this.sockets.logins.onerror = this.onLoginError;
-            this.sockets.logins.onmessage = this.onLoginMessage;
-
-            this.sockets.facility = new WebSocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${this.settings.serviceToken}`);
-            this.sockets.facility.onopen = this.onFacilityOpen;
-            this.sockets.facility.onmessage = this.onFacilityMessage;
-            this.sockets.facility.onerror = this.onTestError;
+            this.coreObject = new Core(this.settings.serviceToken);
+            this.coreObject.connect().ok(() => {
+                this.view = "realtime";
+            });
 
             if (this.storage.pendingTrend !== null && this.storage.pendingTrend !== undefined) {
                 console.log(`Loading trends from storage: ${this.storage.pendingTrend}`);
@@ -277,13 +221,6 @@ export const vm = new Vue({
             } else {
                 throw `Messed up logic: storage.pendingTrends is null or undefined, and not null, and not undefined`;
             }
-        },
-
-        disconnect: function(): void {
-            if (this.sockets.tracked != null) { this.sockets.tracked.close(); }
-            if (this.sockets.logins != null) { this.sockets.logins.close(); }
-            if (this.sockets.logistics != null) { this.sockets.logistics.close(); }
-            if (this.sockets.facility != null) { this.sockets.facility.close(); }
         },
 
         importData: function(): void {
@@ -318,23 +255,23 @@ export const vm = new Vue({
                     const outfits: string[] = data.outfits;
                     const events: any[] = data.events;
 
-                    this.subscribeToExpGains(chars);
+                    this.core.subscribeToEvents(chars);
 
-                    this.outfits = outfits;
+                    this.core.outfits = outfits;
 
                     if (events != undefined && events.length != 0) {
                         const parsedData = events.map(iter => JSON.parse(iter));
-                        this.tracking.startTime = Math.min(...parsedData.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
-                        this.tracking.endTime = Math.max(...parsedData.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
+                        this.core.tracking.startTime = Math.min(...parsedData.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
+                        this.core.tracking.endTime = Math.max(...parsedData.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
 
                         for (const ev of events) {
-                            this.processMessage(ev, true);
+                            this.core.processMessage(ev, true);
                         }
 
                         this.setSaveEvents(false);
                     }
 
-                    console.log(`Took ${new Date().getTime() - nowMs}ms to import data from ${this.tracking.startTime} ${new Date(this.tracking.startTime)} to ${this.tracking.endTime}`);
+                    console.log(`Took ${new Date().getTime() - nowMs}ms to import data`);
                 } else {
                     console.error(`Unchecked version: ${data.version}`);
                 }
@@ -391,9 +328,9 @@ export const vm = new Vue({
         exportData: function(): void {
             const json: object = {
                 version: "1" as string,
-                events: this.data,
-                players: this.characters,
-                outfits: this.outfits
+                events: this.core.rawData,
+                players: this.core.characters,
+                outfits: this.core.outfits
             };
 
             const file = new File([JSON.stringify(json)], "data.json", { type: "text/json" });
@@ -435,7 +372,7 @@ export const vm = new Vue({
             const nowMs: number = new Date().getTime();
 
             this.display = [];
-            this.stats.forEach((char: TrackedPlayer, charID: string) => {
+            this.core.stats.forEach((char: TrackedPlayer, charID: string) => {
                 if (char.stats.size() == 0) { return; }
 
                 const collection: TrackedPlayer = new TrackedPlayer();
@@ -446,7 +383,7 @@ export const vm = new Vue({
                 collection.secondsOnline = char.secondsOnline;
                 collection.score = char.score;
 
-                if (char.online == true && this.tracking.running == true) {
+                if (char.online == true && this.core.tracking.running == true) {
                     collection.secondsOnline += (nowMs - char.joinTime) / 1000;
                 }
 
@@ -532,9 +469,9 @@ export const vm = new Vue({
 
             let filterZoneID: boolean = this.opsReportSettings.zoneID != null;
 
-            this.outfitReport.facilityCaptures = this.facilityCaptures.filter((iter: FacilityCapture) => {
+            this.outfitReport.facilityCaptures = this.core.facilityCaptures.filter((iter: FacilityCapture) => {
                 return (filterZoneID == false || (filterZoneID == true && iter.zoneID == this.opsReportSettings.zoneID))
-                    && this.outfits.indexOf(iter.outfitID) > -1;
+                    && this.core.outfits.indexOf(iter.outfitID) > -1;
             });
 
             this.outfitReport.facilityCaptures.sort((a, b) => {
@@ -543,7 +480,7 @@ export const vm = new Vue({
 
             EventReporter.facilityCaptures({
                 captures: this.outfitReport.facilityCaptures,
-                players: this.playerCaptures
+                players: this.core.playerCaptures
             }).ok(data => this.outfitReport.baseCaptures = data);
 
             const sessions: SessionV1[] = this.outfitTrends.sessions
@@ -563,14 +500,14 @@ export const vm = new Vue({
             this.outfitReport.trends.kd.engineer = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kds.engineer }; });
             this.outfitReport.trends.kd.heavy = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kds.heavy }; });
 
-            this.statTotals.getMap().forEach((amount: number, expID: string) => {
+            this.core.statTotals.getMap().forEach((amount: number, expID: string) => {
                 const event: PsEvent | undefined = PsEvents.get(expID);
                 if (event == undefined) { return; }
 
                 this.outfitReport.stats.set(event.name, amount);
             });
 
-            this.stats.forEach((player: TrackedPlayer, charID: string) => {
+            this.core.stats.forEach((player: TrackedPlayer, charID: string) => {
                 if (player.events.length == 0) { return; }
 
                 let onZoneID: boolean = false;
@@ -592,7 +529,7 @@ export const vm = new Vue({
                     player: player,
                     events: [],
                     routers: [],
-                    tracking: this.tracking
+                    tracking: this.core.tracking
                 });
 
                 this.outfitReport.players.push({
@@ -603,9 +540,9 @@ export const vm = new Vue({
 
             this.outfitReport.events = this.outfitReport.events.sort((a, b) => a.timestamp - b.timestamp);
 
-            if (this.tracking.running == true) {
+            if (this.core.tracking.running == true) {
                 console.log(`Running setting endTime to now as the tracking is running`);
-                this.tracking.endTime = new Date().getTime();
+                this.core.tracking.endTime = new Date().getTime();
             }
 
             const headshots: ClassCollection<number> = classCollectionNumber();
@@ -778,11 +715,11 @@ export const vm = new Vue({
 
         generateWinterReport: function(): void {
             const params: WinterReportParameters = new WinterReportParameters();
-            params.players = Array.from(this.stats.values());
-            params.timeTracking = this.tracking;
+            params.players = Array.from(this.core.stats.values());
+            params.timeTracking = this.core.tracking;
             params.settings = this.winter.settings;
 
-            this.stats.forEach((player: TrackedPlayer, charID: string) => {
+            this.core.stats.forEach((player: TrackedPlayer, charID: string) => {
                 if (player.events.length == 0) { return; }
 
                 params.events.push(...player.events);
@@ -836,26 +773,26 @@ export const vm = new Vue({
         generatePlayerReport: function(charID: string): ApiResponse<Report> {
             const response: ApiResponse<Report> = new ApiResponse();
 
-            const player: TrackedPlayer | undefined = this.stats.get(charID);
+            const player: TrackedPlayer | undefined = this.core.stats.get(charID);
             if (player == undefined) {
                 response.resolve({ code: 404, data: `` });
             } else {
-                const events: Event[] = [...player.events];
-                this.stats.forEach((player: TrackedPlayer, _: string) => {
+                const events: TEvent[] = [...player.events];
+                this.core.stats.forEach((player: TrackedPlayer, _: string) => {
                     if (charID == player.characterID) { // Don't add the characters's events twice
                         return;
                     }
                     events.push(...player.events);
                 });
-                events.push(...this.miscEvents);
+                events.push(...this.core.miscEvents);
 
                 events.sort((a, b) => a.timestamp - b.timestamp);
 
                 const parameters: ReportParameters = {
                     player: player,
                     events: events,
-                    tracking: {...this.tracking},
-                    routers: [...this.routerTracking.routers]
+                    tracking: {...this.core.tracking},
+                    routers: [...this.core.routerTracking.routers]
                 };
 
                 IndividualReporter.generatePersonalReport(parameters).ok(data => {
@@ -868,7 +805,7 @@ export const vm = new Vue({
 
         generateAllReports: function(): void {
             let left: TrackedPlayer[] = [];
-            this.stats.forEach((player: TrackedPlayer, charID: string) => {
+            this.core.stats.forEach((player: TrackedPlayer, charID: string) => {
                 if (player.events.length > 0) {
                     left.push(player);
                 }
@@ -965,52 +902,30 @@ export const vm = new Vue({
 
         setSaveEvents: function(save: boolean): void {
             if (save == true) {
-                const nowMs: number = new Date().getTime();
-                this.tracking.startTime = nowMs;
-                console.log(`Setting startTime to ${nowMs}`);
-                this.stats.forEach((char: TrackedPlayer, charID: string) => {
-                    char.joinTime = nowMs;
-                });
+                this.core.start();
             } else {
-                // If TOPT was already running update the end time, else we're doing an import of old data
-                if (this.tracking.running == true) {
-                    const nowMs: number = new Date().getTime();
-                    this.tracking.endTime = nowMs;
-                }
+                this.core.stop();
 
-                this.stats.forEach((char: TrackedPlayer, charID: string) => {
-                    if (char.events.length > 0) {
-                        const first = char.events[0];
-                        const last = char.events[char.events.length - 1];
-
-                        char.joinTime = first.timestamp;
-                        char.secondsOnline = (last.timestamp - first.timestamp) / 1000;
-                    } else {
-                        char.secondsOnline = 0;
-                    }
-                });
-
-                const chars: TrackedPlayer[] = Array.from(this.stats.values());
-
+                const chars: TrackedPlayer[] = Array.from(this.core.stats.values());
                 this.outfitTrends.sessions.push({
-                    timestamp: new Date(this.tracking.startTime),
+                    timestamp: new Date(this.core.tracking.startTime),
                     kds: {
-                        total: EventReporter.kdBoxplot(chars, this.tracking),
-                        infil: EventReporter.kdBoxplot(chars, this.tracking, "infil"),
-                        lightAssault: EventReporter.kdBoxplot(chars, this.tracking, "lightAssault"),
-                        medic: EventReporter.kdBoxplot(chars, this.tracking, "medic"),
-                        engineer: EventReporter.kdBoxplot(chars, this.tracking, "engineer"),
-                        heavy: EventReporter.kdBoxplot(chars, this.tracking, "heavy"),
-                        max: EventReporter.kdBoxplot(chars, this.tracking, "max")
+                        total: EventReporter.kdBoxplot(chars, this.core.tracking),
+                        infil: EventReporter.kdBoxplot(chars, this.core.tracking, "infil"),
+                        lightAssault: EventReporter.kdBoxplot(chars, this.core.tracking, "lightAssault"),
+                        medic: EventReporter.kdBoxplot(chars, this.core.tracking, "medic"),
+                        engineer: EventReporter.kdBoxplot(chars, this.core.tracking, "engineer"),
+                        heavy: EventReporter.kdBoxplot(chars, this.core.tracking, "heavy"),
+                        max: EventReporter.kdBoxplot(chars, this.core.tracking, "max")
                     },
                     kpms: {
-                        total: EventReporter.kpmBoxplot(chars, this.tracking),
-                        infil: EventReporter.kpmBoxplot(chars, this.tracking, "infil"),
-                        lightAssault: EventReporter.kpmBoxplot(chars, this.tracking, "lightAssault"),
-                        medic: EventReporter.kpmBoxplot(chars, this.tracking, "medic"),
-                        engineer: EventReporter.kpmBoxplot(chars, this.tracking, "engineer"),
-                        heavy: EventReporter.kpmBoxplot(chars, this.tracking, "heavy"),
-                        max: EventReporter.kpmBoxplot(chars, this.tracking, "max"),
+                        total: EventReporter.kpmBoxplot(chars, this.core.tracking),
+                        infil: EventReporter.kpmBoxplot(chars, this.core.tracking, "infil"),
+                        lightAssault: EventReporter.kpmBoxplot(chars, this.core.tracking, "lightAssault"),
+                        medic: EventReporter.kpmBoxplot(chars, this.core.tracking, "medic"),
+                        engineer: EventReporter.kpmBoxplot(chars, this.core.tracking, "engineer"),
+                        heavy: EventReporter.kpmBoxplot(chars, this.core.tracking, "heavy"),
+                        max: EventReporter.kpmBoxplot(chars, this.core.tracking, "max"),
                     }
                 });
 
@@ -1018,8 +933,6 @@ export const vm = new Vue({
                     StorageHelper.setTrends(this.storage.newTrendFile, this.outfitTrends);
                 }
             }
-
-            this.tracking.running = save;
         },
 
         addOutfit: function(): void {
@@ -1027,24 +940,11 @@ export const vm = new Vue({
                 return;
             }
 
-            OutfitAPI.getByTag(this.parameters.outfitTag).ok((data: Outfit) => {
-                this.outfits.push(data.ID);
-                console.log(`Tracking outfit ${data.ID} for base caps/defends`);
-            });
-
             if (["fooi", "fiji", "g0bs"].indexOf(this.parameters.outfitTag.toLowerCase()) > -1) {
                 this.showFrog = true;
             }
 
-            this.parameters.outfitRequest = Loadable.loading();
-            OutfitAPI.getCharactersByTag(this.parameters.outfitTag).ok((data: Character[]) => {
-                this.parameters.outfitRequest = Loadable.loaded("");
-                this.subscribeToExpGains(data);
-
-                KillfeedGeneration.addCharacters(data);
-
-                this.parameters.outfitTag = "";
-            });
+            this.core.addOutfit(this.parameters.outfitTag);
         },
 
         addPlayer: function(): void {
@@ -1052,723 +952,9 @@ export const vm = new Vue({
                 return;
             }
 
-            CharacterAPI.getByName(this.parameters.playerName).ok((data: Character) => {
-                this.subscribeToExpGains([data]);
-                this.parameters.playerName = "";
-            });
+            this.core.addPlayer(this.parameters.playerName);
         },
 
-        clearEvents: function(): void {
-            const conf = confirm(`Are you sure you want to remove all events?`);
-            if (conf == true) {
-                this.stats.forEach((value: TrackedPlayer, key: string) => {
-                    value.secondsOnline = 0;
-                    value.score = 0;
-                    value.events = [];
-                    value.stats.clear();
-                });
-                this.updateDisplay();
-                this.totalTicks = 0;
-            }
-        },
-
-        subscribeToExpGains: function(chars: Character[]): void {
-            // No duplicates
-            chars = chars.filter((char: Character) => {
-                return this.characters.map((c) => c.ID).indexOf(char.ID) == -1;
-            });
-
-            if (chars.length == 0) {
-                return;
-            }
-
-            this.characters = this.characters.concat(chars).sort((a, b) => {
-                return a.name.localeCompare(b.name);
-            });
-
-            chars.forEach((character: Character) => {
-                const player: TrackedPlayer = new TrackedPlayer();
-                player.characterID = character.ID;
-                player.faction = character.faction;
-                player.outfitTag = character.outfitTag;
-                player.name = character.name;
-                if (character.online == true) {
-                    player.joinTime = new Date().getTime();
-                }
-                this.stats.set(character.ID, player);
-            });
-
-            const subscribeExp: object = {
-                "action": "subscribe",
-                "characters": [
-                    ...(chars.map((char) => char.ID))
-                ],
-                "eventNames": [
-                    "GainExperience",
-                    "AchievementEarned",
-                    "Death",
-                    "FacilityControl",
-                    "ItemAdded",
-                    "VehicleDestroy"
-                ],
-                "service": "event"
-            };
-            this.sendMessage(subscribeExp);
-        },
-
-        sendMessage: function(msg: object): void {
-            if (this.sockets.tracked == null) {
-                return console.error(`Cannot send message to socket, socket is null`);
-            }
-
-            const str: string = JSON.stringify(msg);
-
-            console.log(`>>> ${str}`);
-
-            this.sockets.tracked.send(str);
-        },
-
-        onerror: function(ev: any): void {
-            console.log(`On error`);
-        },
-
-        processMessage: function(input: string, override: boolean = false): void {
-            if (this.tracking.running == false && override == false) {
-                return;
-            }
-
-            let save: boolean = false;
-
-            const msg = JSON.parse(input);
-
-            if (msg.type == "serviceMessage") {
-                const event: string = msg.payload.event_name;
-
-                const zoneID: string = msg.payload.zone_id;
-                if (this.zoneIDs.indexOf(zoneID) == -1) {
-                    this.zoneIDs.push(zoneID);
-                    console.log(`Encountered new zone ID ${zoneID}:\n${JSON.stringify(msg)}`);
-                }
-
-                if (event == "GainExperience") {
-                    const eventID: string = msg.payload.experience_id;
-                    const charID: string = msg.payload.character_id;
-                    const targetID: string = msg.payload.other_id;
-                    const amount: number = Number.parseInt(msg.payload.amount);
-                    const event: PsEvent | undefined = PsEvents.get(eventID);
-                    const timestamp: number = Number.parseInt(msg.payload.timestamp) * 1000;
-
-                    if (eventID == "1410") {
-                        if (this.stats.get(charID) != undefined) {
-                            if (this.routerTracking.routerNpcs.has(charID)) {
-                                //console.log(`${charID} router npc check for ${targetID}`);
-                                const router: TrackedRouter = this.routerTracking.routerNpcs.get(charID)!;
-                                if (router.ID != targetID) {
-                                    //console.warn(`New router placed by ${charID}, missed ItemAdded event: removing old one and replacing with ${targetID}`);
-
-                                    router.destroyed = timestamp;
-
-                                    this.routerTracking.routers.push({...router});
-
-                                    this.routerTracking.routerNpcs.set(charID, {
-                                        ID: targetID,
-                                        owner: charID,
-                                        pulledAt: timestamp,
-                                        firstSpawn: timestamp,
-                                        destroyed: undefined,
-                                        count: 1, // Count the event that caused the new router to be tracked
-                                        type: "router"
-                                    });
-                                } else {
-                                    //console.log(`Same router, incrementing count`);
-                                    if (router.ID == "") {
-                                        router.ID = targetID;
-                                    }
-                                    if (router.firstSpawn == undefined) {
-                                        router.firstSpawn = timestamp;
-                                    }
-                                    ++router.count;
-                                }
-                            } else {
-                                //console.log(`${charID} has new router ${targetID} placed/used`);
-
-                                this.routerTracking.routerNpcs.set(charID, {
-                                    ID: targetID,
-                                    owner: charID,
-                                    pulledAt: timestamp,
-                                    firstSpawn: timestamp,
-                                    destroyed: undefined,
-                                    count: 1, // Count the event that caused the new router to be tracked
-                                    type: "router"
-                                });
-                            }
-
-                            save = true;
-                        }
-                    } else if (eventID == "1409") {
-                        const trackedNpcs: TrackedRouter[] = Array.from(this.routerTracking.routerNpcs.values());
-                        const ids: string[] = trackedNpcs.map(iter => iter.ID);
-                        if (ids.indexOf(targetID) > -1) {
-                            const router: TrackedRouter = trackedNpcs.find(iter => iter.ID == targetID)!;
-                            //console.log(`Router ${router.ID} placed by ${router.owner} destroyed, saving`);
-
-                            router.destroyed = timestamp;
-                            this.routerTracking.routers.push({...router});
-
-                            this.routerTracking.routerNpcs.delete(router.owner);
-
-                            save = true;
-                        }
-                    }
-
-                    const ev: EventExp = {
-                        type: "exp",
-                        amount: amount,
-                        expID: eventID,
-                        zoneID: zoneID,
-                        trueExpID: eventID,
-                        loadoutID: msg.payload.loadout_id,
-                        sourceID: charID,
-                        targetID: targetID,
-                        timestamp: timestamp
-                    };
-
-                    // Undefined means was the target of the event, not the source
-                    const player = this.stats.get(charID);
-                    if (player != undefined) {
-                        ++this.totalTicks;
-
-                        if (Number.isNaN(amount)) {
-                            console.warn(`NaN amount from event: ${JSON.stringify(msg)}`);
-                        } else {
-                            player.score += amount;
-                        }
-
-                        if (event != undefined) {
-                            if (event.track == true) {
-                                player.stats.increment(eventID);
-                                this.statTotals.increment(eventID);
-
-                                if (event.alsoIncrement != undefined) {
-                                    const alsoEvent: PsEvent = PsEvents.get(event.alsoIncrement)!;
-                                    if (alsoEvent.track == true) {
-                                        player.stats.increment(event.alsoIncrement);
-                                    }
-
-                                    ev.expID = event.alsoIncrement;
-                                }
-                            }
-                        }
-
-                        player.events.push(ev);
-                    } else {
-                        this.miscEvents.push(ev);
-                    }
-
-                    if (eventID == PsEvent.revive || eventID == PsEvent.squadRevive) {
-                        const target = this.stats.get(targetID);
-                        if (target != undefined) {
-                            if (target.recentDeath != null) {
-                                target.recentDeath.revived = true;
-                                target.recentDeath.revivedEvent = ev;
-                                //console.log(`${targetID} died but was revived by ${charID}`);
-                            }
-
-                            target.stats.decrement(PsEvent.death);
-                            target.stats.increment(PsEvent.revived);
-
-                            this.statTotals.decrement(PsEvent.death);
-                            this.statTotals.increment(PsEvent.revived);
-                        }
-                    }
-
-                    KillfeedGeneration.exp(ev);
-
-                    save = true;
-                } else if (event == "Death") {
-                    const targetID: string = msg.payload.character_id;
-                    const sourceID: string = msg.payload.attacker_character_id;
-                    const isHeadshot: boolean = msg.payload.is_headshot == "1";
-                    const targetLoadoutID: string = msg.payload.character_loadout_id;
-                    const sourceLoadoutID: string = msg.payload.attacker_loadout_id;
-
-                    if (this.tracking.running == true) {
-                        CharacterAPI.cache(targetID);
-                        CharacterAPI.cache(sourceID);
-                    }
-
-                    const targetLoadout: PsLoadout | undefined = PsLoadouts.get(targetLoadoutID);
-                    if (targetLoadout == undefined) {
-                        return console.warn(`Unknown target loadout ID: ${targetLoadoutID}`);
-                    }
-
-                    const sourceLoadout: PsLoadout | undefined = PsLoadouts.get(sourceLoadoutID);
-                    if (sourceLoadout == undefined) {
-                        return console.warn(`Unknown source loadout ID: ${sourceLoadoutID}`);
-                    }
-
-                    let targetTicks = this.stats.get(targetID);
-                    if (targetTicks != undefined && targetLoadout.faction != sourceLoadout.faction) {
-                        targetTicks.stats.increment(PsEvent.death);
-                        this.statTotals.increment(PsEvent.death);
-
-                        const ev: EventDeath = {
-                            type: "death",
-                            isHeadshot: isHeadshot,
-                            sourceID: targetID, // Swap the target and source to keep the events consistent
-                            targetID: sourceID,
-                            loadoutID: targetLoadoutID,
-                            targetLoadoutID: sourceLoadoutID,
-                            weaponID: msg.payload.attacker_weapon_id,
-                            revived: false,
-                            revivedEvent: null,
-                            timestamp: Number.parseInt(msg.payload.timestamp) * 1000, // Include MS
-                            zoneID: zoneID
-                        };
-                        targetTicks.events.push(ev);
-                        targetTicks.recentDeath = ev;
-
-                        WeaponAPI.precache(ev.weaponID);
-
-                        if (this.view == "killfeed") {
-                            KillfeedGeneration.add(ev);
-                        }
-
-                        save = true;
-                    }
-
-                    let sourceTicks = this.stats.get(sourceID);
-                    if (sourceTicks != undefined) {
-                        if (targetLoadout.faction == sourceLoadout.faction) {
-                            sourceTicks.stats.increment(PsEvent.teamkill);
-                            targetTicks?.stats.increment(PsEvent.teamkilled);
-
-                            this.statTotals.increment(PsEvent.teamkill);
-                            this.statTotals.increment(PsEvent.teamkilled);
-
-                            const ev: EventTeamkill = {
-                                type: "teamkill",
-                                sourceID: sourceID,
-                                loadoutID: sourceLoadoutID,
-                                targetID: targetID,
-                                targetLoadoutID: targetLoadoutID,
-                                weaponID: msg.payload.attacker_weapon_id,
-                                zoneID: zoneID,
-                                timestamp: Number.parseInt(msg.payload.timestamp) * 1000
-                            }
-
-                            sourceTicks.events.push(ev);
-                        } else {
-                            sourceTicks.stats.increment(PsEvent.kill);
-                            this.statTotals.increment(PsEvent.kill);
-
-                            if (isHeadshot == true) {
-                                sourceTicks.stats.increment(PsEvent.headshot);
-                                this.statTotals.increment(PsEvent.headshot);
-                            }
-
-                            const ev: EventKill = {
-                                type: "kill",
-                                isHeadshot: isHeadshot,
-                                sourceID: sourceID,
-                                targetID: targetID,
-                                loadoutID: sourceLoadoutID,
-                                targetLoadoutID: targetLoadoutID,
-                                weaponID: msg.payload.attacker_weapon_id,
-                                timestamp: Number.parseInt(msg.payload.timestamp) * 1000, // Include MS
-                                zoneID: zoneID
-                            };
-                            sourceTicks.events.push(ev);
-
-                            WeaponAPI.precache(ev.weaponID);
-
-                            if (this.view == "killfeed") {
-                                KillfeedGeneration.add(ev);
-                            }
-                        }
-                        save = true;
-                    }
-
-                    ++this.totalTicks;
-                } else if (event == "PlayerFacilityCapture") {
-                    const playerID: string = msg.payload.character_id;
-                    const outfitID: string = msg.payload.outfit_id;
-                    const facilityID: string = msg.payload.facility_id;
-                    const timestamp: number = Number.parseInt(msg.payload.timestamp) * 1000;
-
-                    const ev: EventCapture = {
-                        type: "capture",
-                        sourceID: playerID,
-                        outfitID: outfitID,
-                        facilityID: facilityID,
-                        timestamp: timestamp,
-                        zoneID: zoneID
-                    };
-
-                    this.playerCaptures.push(ev);
-
-                    let player = this.stats.get(playerID);
-                    if (player != undefined) {
-                        player.stats.increment(PsEvent.baseCapture);
-                        player.events.push(ev);
-                    }
-
-                    save = true;
-                } else if (event == "PlayerFacilityDefend") {
-                    const playerID: string = msg.payload.character_id;
-                    const outfitID: string = msg.payload.outfit_id;
-                    const facilityID: string = msg.payload.facility_id;
-                    const timestamp: number = Number.parseInt(msg.payload.timestamp) * 1000;
-
-                    const ev: EventDefend = {
-                        type: "defend",
-                        sourceID: playerID,
-                        outfitID: outfitID,
-                        facilityID: facilityID,
-                        timestamp: timestamp,
-                        zoneID: zoneID,
-                    }
-
-                    this.playerCaptures.push(ev);
-
-                    let player = this.stats.get(playerID);
-                    if (player != undefined) {
-                        player.stats.increment(PsEvent.baseDefense);
-                    }
-                    save = true;
-                } else if (event == "AchievementEarned") {
-                    const charID: string = msg.payload.character_id;
-                    const achivID: string = msg.payload.achievement_id;
-
-                    const char = this.stats.get(charID);
-                    if (char != undefined) {
-                        char.ribbons.increment(achivID);
-                        save = true;
-                    }
-                } else if (event == "FacilityControl") {
-                    const outfitID: string = msg.payload.outfit_id;
-                    const facilityID: string = msg.payload.facility_id;
-                    const timestamp: number = Number.parseInt(msg.payload.timestamp) * 1000;
-
-                    FacilityAPI.getByID(facilityID).ok((data: Facility) => {
-                        const capture: FacilityCapture = {
-                            facilityID: data.ID,
-                            zoneID: zoneID,
-                            name: data.name,
-                            typeID: data.typeID,
-                            type: data.type,
-                            timestamp: new Date(timestamp),
-                            timeHeld: Number.parseInt(msg.payload.duration_held),
-                            factionID: msg.payload.new_faction_id,
-                            outfitID: outfitID,
-                            previousFaction: msg.payload.old_faction_id,
-                        };
-
-                        this.facilityCaptures.push(capture);
-                    }).noContent(() => {
-                        console.error(`Failed to find facility ID ${facilityID}`);
-                    });
-                    save = true;
-                } else if (event == "ItemAdded") {
-                    const itemID: string = msg.payload.item_id;
-                    const charID: string = msg.payload.character_id;
-                    const timestamp: number = Number.parseInt(msg.payload.timestamp) * 1000;
-
-                    if (itemID == "6003551") {
-                        if (this.stats.get(charID) != undefined) {
-                            //console.log(`${charID} pulled a new router`);
-
-                            if (this.routerTracking.routerNpcs.has(charID)) {
-                                const router: TrackedRouter = this.routerTracking.routerNpcs.get(charID)!;
-                                //console.log(`${charID} pulled a new router, saving old one`);
-                                router.destroyed = timestamp;
-
-                                this.routerTracking.routers.push({...router});
-                            }
-
-                            const router: TrackedRouter = {
-                                ID: "", // We don't get the NPC ID until someone spawns on the router
-                                owner: charID,
-                                count: 0,
-                                destroyed: undefined,
-                                firstSpawn: undefined,
-                                pulledAt: timestamp,
-                                type: "router"
-                            };
-
-                            this.routerTracking.routerNpcs.set(charID, router);
-
-                            save = true;
-                        }
-                    }
-                } else if (event == "VehicleDestroy") {
-                    const killerID: string = msg.payload.attacker_character_id;
-                    const killerLoadoutID: string = msg.payload.attacker_loadout_id;
-                    const killerWeaponID: string = msg.payload.attacker_weapon_id;
-                    const vehicleID: string = msg.payload.vehicle_id;
-                    const timestamp: number = Number.parseInt(msg.payload.timestamp) * 1000;
-
-                    const player = this.stats.get(killerID);
-                    if (player != undefined) {
-                        const ev: EventVehicleKill = {
-                            type: "vehicle",
-                            sourceID: killerID,
-                            loadoutID: killerLoadoutID,
-                            weaponID: killerWeaponID,
-                            targetID: msg.payload.character_id,
-                            vehicleID: vehicleID,
-                            timestamp: timestamp,
-                            zoneID: zoneID
-                        };
-                        player.events.push(ev);
-                        save = true;
-                        //console.log(`${killerID} killed vehicle ${vehicleID}`);
-                    }
-                } else {
-                    console.warn(`Unknown event type: ${event}\n${JSON.stringify(msg)}`);
-                }
-            } else if (msg.type == "heartbeat") {
-                //console.log(`Heartbeat ${new Date().toISOString()}`);
-            } else if (msg.type == "serviceStateChanged") {
-                console.log(`serviceStateChanged event`);
-            } else if (msg.type == "connectionStateChanged") {
-                console.log(`connectionStateChanged event`);
-            } else if (msg.type == "echo") {
-                // Comes from the initial setup
-                // Pong!
-            } else if (msg.type == undefined) {
-                // Occurs in response to subscribing to new events
-            } else {
-                console.warn(`Unchecked message type: '${msg.type}'`);
-            }
-
-            if (save == true) {
-                this.data.push(JSON.stringify(msg));
-            }
-        },
-
-        onmessage: function(ev: MessageEvent): void {
-            if (typeof ev.data == "string") {
-                this.totalLength += ev.data.length;
-            }
-
-            for (const message of this.sockets.queue) {
-                if (ev.data == message) {
-                    //console.log(`Duplicate message found: ${ev.data}`);
-                    return;
-                }
-            }
-
-            this.sockets.queue.push(ev.data);
-            this.sockets.queue.shift();
-
-            this.processMessage(ev.data);
-        },
-
-        onTestOpen: function(ev: any): void {
-            console.log(`Testing service ID`);
-            this.socketStatus = Loadable.saving("Connecting...");
-        },
-
-        onTestError: function(ev: any): void {
-            if (ev.type == "error") {
-                console.error(`Failed to connect to streaming API`);
-                this.socketStatus = Loadable.error(`Failed to connect. Bad Service ID?`);
-            }
-        },
-
-        onTestMessage: function(ev: MessageEvent): void {
-            const msg: any = JSON.parse(ev.data);
-
-            if (this.socketStep == "connecting") {
-                if (msg.connected == "true") {
-                    if (this.sockets.tracked != null) {
-                        this.socketStatus = Loadable.saving(`Connected, pinging`);
-                        this.socketStep = "pinging";
-
-                        const ping: object = {
-                            action: "echo",
-                            payload: {
-                                ping: "ping",
-                                type: "echo"
-                            },
-                            service: "event"
-                        };
-                        this.sendMessage(ping);
-                    }
-                } else {
-                    this.socketStatus = Loadable.error(`onTestMessage failed: Expected onTestError to handle connected not being 'true'`);
-                }
-            } else if (this.socketStep == "pinging") {
-                if (msg.type != "echo") {
-                    return;
-                }
-
-                this.socketStatus = Loadable.loaded(`Connected!`);
-
-                setTimeout(() => {
-                    this.view = "realtime";
-                }, 1000);
-
-                const subscribeExp: object = {
-                    action: "subscribe",
-                    worlds: [this.settings.serverID],
-                    eventNames: [
-                        "FacilityControl",
-                    ],
-                    service: "event"
-                };
-                this.sendMessage(subscribeExp);
-
-                if (this.sockets.tracked != null) {
-                    this.sockets.tracked.onmessage = this.onmessage;
-                    this.sockets.tracked.onerror = this.onerror;
-                }
-            } else {
-                throw `Unchecked socketStep in onTestMessage: '${this.socketStep}'`;
-            }
-        },
-
-        onLoginOpen: function(ev: any): void {
-            if (this.sockets.logins == null) {
-                throw `sockest.logins is null`;
-            }
-
-            console.log(`login socket connected`);
-
-            const msg: object = {
-                service: "event",
-                action: "subscribe",
-                characters: ["all"],
-                worlds: [
-                    this.settings.serverID
-                ],
-                eventNames: [
-                    "PlayerLogin",
-                    "PlayerLogout"
-                ],
-                logicalAndCharactersWithWorlds: true
-            };
-
-            this.sockets.logins.send(JSON.stringify(msg));
-        },
-
-        onLoginMessage: function(ev: MessageEvent): void {
-            const input = ev.data;
-            const msg = JSON.parse(input);
-
-            if (msg.type == "serviceMessage") {
-                const event: string = msg.payload.event_name;
-
-                if (event == "PlayerLogin") {
-                    const charID: string = msg.payload.character_id;
-                    if (this.stats.has(charID)) {
-                        const char: TrackedPlayer = this.stats.get(charID)!;
-                        char.online = true;
-                        if (this.tracking.running == true) {
-                            char.joinTime = new Date().getTime();
-                        }
-
-                        KillfeedGeneration.addMember(charID);
-
-                        console.log(`${charID} logged in`);
-                    }
-                } else if (event == "PlayerLogout") {
-                    const charID: string = msg.payload.character_id;
-                    if (this.stats.has(charID)) {
-                        KillfeedGeneration.removeMember(charID);
-
-                        const char: TrackedPlayer = this.stats.get(charID)!;
-                        char.online = false;
-
-                        if (this.tracking.running == true) {
-                            const diff: number = new Date().getTime() - char.joinTime;
-                            char.secondsOnline += (diff / 1000);
-                            console.log(`${charID} logged out, added ${diff / 1000} seconds`);
-                        }
-                    }
-                }
-            } else if (msg.type == "heartbeat") {
-                //console.log(`Heartbeat ${new Date().toISOString()}`);
-            } else if (msg.type == "serviceStateChanged") {
-                console.log(`login socket: serviceStateChanged event`);
-            } else if (msg.type == "connectionStateChanged") {
-                console.log(`login socket: connectionStateChanged event`);
-            } else if (msg.type == undefined) {
-                // Occurs in response to subscribing to new events
-            } else {
-                console.warn(`login socket: Unchecked message type: '${msg.type}'`);
-            }
-        },
-
-        onLoginError: function(ev: any): void {
-            console.error(`Error in login socket`);
-        },
-
-        onRouterOpen: function(ev: any): void {
-            if (this.sockets.logistics == null) {
-                throw `sockets.logistics is null`;
-            }
-
-            console.log(`logistics socket connected`);
-
-            const msg: object = {
-                service: "event",
-                action: "subscribe",
-                characters: ["all"],
-                worlds: [
-                    this.settings.serverID
-                ],
-                eventNames: [
-                    "GainExperience_experience_id_1409",
-                    "GainExperience_experience_id_550",
-                    "GainExperience_experience_id_551"
-                ],
-                logicalAndCharactersWithWorlds: true
-            };
-
-            this.sockets.logistics.send(JSON.stringify(msg));
-        },
-
-        onRouterError: function(ev: any): void {},
-
-        onRouterMessage: function(ev: MessageEvent): void {
-            if (typeof ev.data == "string") {
-                this.totalLength += ev.data.length;
-            }
-
-            this.processMessage(ev.data);
-        },
-
-        onFacilityOpen: function(ev: any): void {
-            if (this.sockets.facility == null) {
-                throw `sockets.facility is null`;
-            }
-
-            console.log(`facility socket connected`);
-
-            const msg: object = {
-                service: "event",
-                action: "subscribe",
-                characters: ["all"],
-                worlds: [this.settings.serverID],
-                eventNames: [
-                    "PlayerFacilityCapture",
-                    "PlayerFacilityDefend"
-                ],
-                logicalAndCharactersWithWorlds: true
-            };
-
-            this.sockets.facility.send(JSON.stringify(msg));
-        },
-
-        onFacilityMessage: function(ev: MessageEvent): void {
-            if (typeof ev.data == "string") {
-                this.totalLength += ev.data.length;
-            }
-
-            this.processMessage(ev.data);
-        }
     },
 
     computed: {
@@ -1781,17 +967,11 @@ export const vm = new Vue({
                 );
         },
 
-        totalBytes: function(): string {
-            if (this.totalLength < 1024) {
-                return `${this.totalLength} bytes`;
+        core: function(): Core {
+            if (this.coreObject == null) {
+                throw ``;
             }
-            if (this.totalLength < 1024 * 1024) {
-                return `${(this.totalLength / 1024).toFixed(2)} KiB`;
-            }
-            if (this.totalLength < 1024 * 1024 * 1024) {
-                return `${(this.totalLength / (1024 * 1024)).toFixed(2)} MiB`;
-            }
-            return `${this.totalLength} bytes`;
+            return this.coreObject;
         }
     },
 

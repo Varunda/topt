@@ -12,10 +12,12 @@ import { CharacterAPI, Character } from "census/CharacterAPI";
 
 import {
     ExpBreakdown, FacilityCapture, ClassBreakdown, IndividualReporter, OutfitReport,
-    CountedRibbon, Report, TrackedPlayer, TimeTracking, BreakdownCollection, BreakdownSection, BreakdownMeta,
+    CountedRibbon, Report,  TimeTracking, BreakdownCollection, BreakdownSection, BreakdownMeta,
     TrackedRouter,
     ReportParameters
 } from "InvididualGenerator";
+
+import { TrackedPlayer } from "core/TrackedPlayer";
 
 import {
     TEvent, TEventType, TLoadoutEvent, TZoneEvent,
@@ -24,6 +26,8 @@ import {
     TVehicleKillEvent,
     TEventHandler
 } from "events/index";
+import { TLogoutEvent } from "events/TLogoutEvent";
+import { TLoginEvent } from "events/TLoginEvent";
 
 declare module "Core" {
 
@@ -53,6 +57,7 @@ declare module "Core" {
 
     if (msg.type == "serviceMessage") {
         const event: string = msg.payload.event_name;
+        const timestamp: number = Number.parseInt(msg.payload.timestamp) * 1000;
 
         const zoneID: string = msg.payload.zone_id;
 
@@ -62,7 +67,6 @@ declare module "Core" {
             const targetID: string = msg.payload.other_id;
             const amount: number = Number.parseInt(msg.payload.amount);
             const event: PsEvent | undefined = PsEvents.get(eventID);
-            const timestamp: number = Number.parseInt(msg.payload.timestamp) * 1000;
 
             if (eventID == "1410") {
                 if (self.stats.get(charID) != undefined) {
@@ -71,7 +75,6 @@ declare module "Core" {
                         const router: TrackedRouter = self.routerTracking.routerNpcs.get(charID)!;
                         if (router.ID != targetID) {
                             //console.warn(`New router placed by ${charID}, missed ItemAdded event: removing old one and replacing with ${targetID}`);
-
                             router.destroyed = timestamp;
 
                             self.routerTracking.routers.push({...router});
@@ -221,7 +224,7 @@ declare module "Core" {
                     weaponID: msg.payload.attacker_weapon_id,
                     revived: false,
                     revivedEvent: null,
-                    timestamp: Number.parseInt(msg.payload.timestamp) * 1000, // Include MS
+                    timestamp: timestamp,
                     zoneID: zoneID
                 };
 
@@ -249,7 +252,7 @@ declare module "Core" {
                         targetLoadoutID: targetLoadoutID,
                         weaponID: msg.payload.attacker_weapon_id,
                         zoneID: zoneID,
-                        timestamp: Number.parseInt(msg.payload.timestamp) * 1000
+                        timestamp: timestamp
                     }
 
                     sourceTicks.events.push(ev);
@@ -270,7 +273,7 @@ declare module "Core" {
                         loadoutID: sourceLoadoutID,
                         targetLoadoutID: targetLoadoutID,
                         weaponID: msg.payload.attacker_weapon_id,
-                        timestamp: Number.parseInt(msg.payload.timestamp) * 1000, // Include MS
+                        timestamp: timestamp,
                         zoneID: zoneID
                     };
                     sourceTicks.events.push(ev);
@@ -285,7 +288,6 @@ declare module "Core" {
             const playerID: string = msg.payload.character_id;
             const outfitID: string = msg.payload.outfit_id;
             const facilityID: string = msg.payload.facility_id;
-            const timestamp: number = Number.parseInt(msg.payload.timestamp) * 1000;
 
             const ev: TCaptureEvent = {
                 type: "capture",
@@ -311,7 +313,6 @@ declare module "Core" {
             const playerID: string = msg.payload.character_id;
             const outfitID: string = msg.payload.outfit_id;
             const facilityID: string = msg.payload.facility_id;
-            const timestamp: number = Number.parseInt(msg.payload.timestamp) * 1000;
 
             const ev: TDefendEvent = {
                 type: "defend",
@@ -343,7 +344,6 @@ declare module "Core" {
         } else if (event == "FacilityControl") {
             const outfitID: string = msg.payload.outfit_id;
             const facilityID: string = msg.payload.facility_id;
-            const timestamp: number = Number.parseInt(msg.payload.timestamp) * 1000;
 
             FacilityAPI.getByID(facilityID).ok((data: Facility) => {
                 const capture: FacilityCapture = {
@@ -367,7 +367,6 @@ declare module "Core" {
         } else if (event == "ItemAdded") {
             const itemID: string = msg.payload.item_id;
             const charID: string = msg.payload.character_id;
-            const timestamp: number = Number.parseInt(msg.payload.timestamp) * 1000;
 
             if (itemID == "6003551") {
                 if (self.stats.get(charID) != undefined) {
@@ -401,7 +400,6 @@ declare module "Core" {
             const killerLoadoutID: string = msg.payload.attacker_loadout_id;
             const killerWeaponID: string = msg.payload.attacker_weapon_id;
             const vehicleID: string = msg.payload.vehicle_id;
-            const timestamp: number = Number.parseInt(msg.payload.timestamp) * 1000;
 
             const player = self.stats.get(killerID);
             if (player != undefined) {
@@ -417,7 +415,46 @@ declare module "Core" {
                 };
                 player.events.push(ev);
                 save = true;
-                //console.log(`${killerID} killed vehicle ${vehicleID}`);
+
+                self.emit(ev);
+            }
+        } else if (event == "PlayerLogin") {
+            const charID: string = msg.payload.character_id;
+            if (this.stats.has(charID)) {
+                const char: TrackedPlayer = this.stats.get(charID)!;
+                char.online = true;
+                if (this.tracking.running == true) {
+                    char.joinTime = new Date().getTime();
+                }
+
+                const ev: TLoginEvent = {
+                    type: "login",
+                    sourceID: charID,
+                    timestamp: timestamp
+                }
+
+                char.events.push(ev);
+
+                self.emit(ev);
+            }
+        } else if (event == "PlayerLogout") {
+            const charID: string = msg.payload.character_id;
+            if (this.stats.has(charID)) {
+                const char: TrackedPlayer = this.stats.get(charID)!;
+                char.online = false;
+
+                if (this.tracking.running == true) {
+                    const diff: number = new Date().getTime() - char.joinTime;
+                    char.secondsOnline += (diff / 1000);
+                }
+
+                const ev: TLogoutEvent = {
+                    type: "logout",
+                    sourceID: charID,
+                    timestamp: timestamp
+                };
+
+                char.events.push(ev);
 
                 self.emit(ev);
             }

@@ -1,0 +1,64 @@
+<head>
+    <meta charset="UTF-8">
+
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"
+        integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo"
+        crossorigin="anonymous">
+    </script>
+
+    <script src="./index.js" defer></script>
+
+    <title>Router tracking</title>
+
+    <style>
+        .table.table-sm td {
+            padding: 0.25rem;
+        }
+        .list-group.list-group-small .list-group-item {
+            padding: 0.25rem 0.5rem;
+        }
+        .table.table-sm {
+            line-height: 1.2;
+        }
+        .table-striped tbody tr:nth-of-type(even) {
+            background-color: rgba(0, 0, 0, 0.15);
+        }
+        .table-striped tbody tr:nth-of-type(odd) {
+            background-color: unset !important;
+        }
+
+        [v-cloak] {
+            display: none;
+        }
+
+        .header {
+            margin-left: -15px;
+            margin-right: -15px;
+            padding-left: 15px;
+            font-weight: 400;
+            padding-bottom: 4px;
+            padding-top: 4px;
+            background-color: rgba(0,0,0,0.15);
+        }
+
+        .strike {
+            margin-top: 1rem;
+            display: flex;
+            align-items: center;
+            text-align: center;
+            font-weight: 400;
+        }
+        .strike::before, .strike::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+        }
+        .strike::before {
+            margin-right: 0.25rem;
+            max-width: 1rem;
+        }
+        .strike::after {
+            margin-left: 0.25rem;
+        }
+    </style>
+</head>
