@@ -57,7 +57,6 @@ import "BreakdownBar";
 import "MomentFilter";
 import "KillfeedSquad";
 
-import { BaseReport, BaseGenerator } from "BaseGenerator";
 import { OutfitTrendsV1, OutfitTrends, SessionV1 } from "OutfitTrends";
 import { StorageHelper, StorageSession, StorageTrend } from "Storage";
 import { KillfeedGeneration, KillfeedEntry, KillfeedOptions, Killfeed } from "Killfeed";

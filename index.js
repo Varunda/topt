@@ -61048,6 +61048,7 @@ PsEvent.vehicleRepair = "90";
 PsEvent.resupply = "34";
 PsEvent.squadResupply = "55";
 PsEvent.squadMaxRepair = "142";
+PsEvent.drawfire = "1394";
 // Recon events
 PsEvent.spotKill = "36";
 PsEvent.squadSpotKill = "54";
@@ -65154,12 +65155,16 @@ class WinterReportGenerator {
         report.fun.push(this.highestHSR(parameters));
         report.fun.push(this.getDifferentWeapons(parameters));
         report.fun.push(this.mostESFSKills(parameters));
+        report.fun.push(this.mostLightningKills(parameters));
+        report.fun.push(this.mostHarasserKills(parameters));
+        report.fun.push(this.mostMBTKills(parameters));
         report.fun.push(this.mostSunderersKilled(parameters));
         report.fun.push(this.mostRoadkills(parameters));
         report.fun.push(this.mostUsefulRevives(parameters));
         report.fun.push(this.highestAverageLifeExpectance(parameters));
         report.fun.push(this.mostC4Kills(parameters));
         report.fun.push(this.mostPercentRevive(parameters));
+        report.fun.push(this.mostDrawfireAssists(parameters));
         let opsLeft = +1 // Knife kills
             + 1 // Pistol kills
             + 1 // Grenade kills
@@ -65251,6 +65256,14 @@ class WinterReportGenerator {
             name: "Recon detections",
             funName: "Flies on the Wall",
             description: "Most recon detection ticks",
+            entries: []
+        });
+    }
+    static mostDrawfireAssists(parameters) {
+        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].drawfire], {
+            name: "Drawfire Assists",
+            funName: "Decoy placer",
+            description: "Most drawfire assists",
             entries: []
         });
     }
@@ -65378,6 +65391,30 @@ class WinterReportGenerator {
             name: "ESFs destroyed",
             funName: "Fly Swatter",
             description: "Most ESFs destroyed",
+            entries: []
+        });
+    }
+    static mostMBTKills(parameters) {
+        return this.vehicle(parameters, [census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].vanguard, census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].prowler, census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].magrider], {
+            name: "MBTs destroyed",
+            funName: "Heavy Hitter",
+            description: "Most MBTs destroyed",
+            entries: []
+        });
+    }
+    static mostHarasserKills(parameters) {
+        return this.vehicle(parameters, [census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].harasser], {
+            name: "Harassers destroyed",
+            funName: "Rasser Harasser",
+            description: "Most harassers destroyed",
+            entries: []
+        });
+    }
+    static mostLightningKills(parameters) {
+        return this.vehicle(parameters, [census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].lightning], {
+            name: "Lightnings destroyed",
+            funName: "Thunder stealer",
+            description: "Most lightnings destroyed",
             entries: []
         });
     }

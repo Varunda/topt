@@ -54,12 +54,16 @@ export class WinterReportGenerator {
         report.fun.push(this.highestHSR(parameters));
         report.fun.push(this.getDifferentWeapons(parameters));
         report.fun.push(this.mostESFSKills(parameters));
+        report.fun.push(this.mostLightningKills(parameters));
+        report.fun.push(this.mostHarasserKills(parameters));
+        report.fun.push(this.mostMBTKills(parameters));
         report.fun.push(this.mostSunderersKilled(parameters));
         report.fun.push(this.mostRoadkills(parameters));
         report.fun.push(this.mostUsefulRevives(parameters));
         report.fun.push(this.highestAverageLifeExpectance(parameters));
         report.fun.push(this.mostC4Kills(parameters));
         report.fun.push(this.mostPercentRevive(parameters));
+        report.fun.push(this.mostDrawfireAssists(parameters));
 
         let opsLeft: number = 
             + 1     // Knife kills
@@ -176,6 +180,15 @@ export class WinterReportGenerator {
             name: "Recon detections",
             funName: "Flies on the Wall",
             description: "Most recon detection ticks",
+            entries: []
+        });
+    }
+
+    private static mostDrawfireAssists(parameters: WinterReportParameters): WinterMetric {
+        return this.metric(parameters, [PsEvent.drawfire], {
+            name: "Drawfire Assists",
+            funName: "Decoy placer",
+            description: "Most drawfire assists",
             entries: []
         });
     }
@@ -333,6 +346,33 @@ export class WinterReportGenerator {
             name: "ESFs destroyed",
             funName: "Fly Swatter",
             description: "Most ESFs destroyed",
+            entries: []
+        });
+    }
+
+    private static mostMBTKills(parameters: WinterReportParameters): WinterMetric {
+        return this.vehicle(parameters, [Vehicles.vanguard, Vehicles.prowler, Vehicles.magrider], {
+            name: "MBTs destroyed",
+            funName: "Heavy Hitter",
+            description: "Most MBTs destroyed",
+            entries: []
+        });
+    }
+
+    private static mostHarasserKills(parameters: WinterReportParameters): WinterMetric {
+        return this.vehicle(parameters, [Vehicles.harasser], {
+            name: "Harassers destroyed",
+            funName: "Rasser Harasser",
+            description: "Most harassers destroyed",
+            entries: []
+        });
+    }
+
+    private static mostLightningKills(parameters: WinterReportParameters): WinterMetric {
+        return this.vehicle(parameters, [Vehicles.lightning], {
+            name: "Lightnings destroyed",
+            funName: "Thunder stealer",
+            description: "Most lightnings destroyed",
             entries: []
         });
     }
