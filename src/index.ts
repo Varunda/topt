@@ -25,7 +25,7 @@ import { Event, EventExp, EventKill, EventDeath, EventVehicleKill, EventCapture,
 import StatMap from "StatMap";
 
 import {
-    TEvent, TEventType, TLoadoutEvent, TZoneEvent,
+    TEvent, TEventType,
     TExpEvent, TKillEvent, TDeathEvent, TTeamkillEvent,
     TCaptureEvent, TDefendEvent,
     TVehicleKillEvent,
@@ -75,6 +75,7 @@ import { WinterReportParameters, WinterReportSettings } from "winter/WinterRepor
 
 import Core from "core/index";
 import { TrackedPlayer } from "core/TrackedPlayer";
+import { OutfitReportGenerator } from "reports/OutfitReport.js";
 
 class OpReportSettings {
     public zoneID: string | null = null;
@@ -465,252 +466,17 @@ export const vm = new Vue({
         },
 
         generateOutfitReport: function(): void {
-            this.outfitReport = new OutfitReport();
-
-            let filterZoneID: boolean = this.opsReportSettings.zoneID != null;
-
-            this.outfitReport.facilityCaptures = this.core.facilityCaptures.filter((iter: FacilityCapture) => {
-                return (filterZoneID == false || (filterZoneID == true && iter.zoneID == this.opsReportSettings.zoneID))
-                    && this.core.outfits.indexOf(iter.outfitID) > -1;
-            });
-
-            this.outfitReport.facilityCaptures.sort((a, b) => {
-                return a.timestamp.getTime() - b.timestamp.getTime();
-            });
-
-            EventReporter.facilityCaptures({
-                captures: this.outfitReport.facilityCaptures,
-                players: this.core.playerCaptures
-            }).ok(data => this.outfitReport.baseCaptures = data);
-
-            const sessions: SessionV1[] = this.outfitTrends.sessions
-                .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-
-            this.outfitReport.trends.kpm.total = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kpms.total }; });
-            this.outfitReport.trends.kpm.infil = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kpms.infil }; });
-            this.outfitReport.trends.kpm.lightAssault = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kpms.lightAssault }; });
-            this.outfitReport.trends.kpm.medic = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kpms.medic }; });
-            this.outfitReport.trends.kpm.engineer = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kpms.engineer }; });
-            this.outfitReport.trends.kpm.heavy = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kpms.heavy }; });
-
-            this.outfitReport.trends.kd.total = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kds.total }; });
-            this.outfitReport.trends.kd.infil = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kds.infil }; });
-            this.outfitReport.trends.kd.lightAssault = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kds.lightAssault }; });
-            this.outfitReport.trends.kd.medic = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kds.medic }; });
-            this.outfitReport.trends.kd.engineer = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kds.engineer }; });
-            this.outfitReport.trends.kd.heavy = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kds.heavy }; });
-
-            this.core.statTotals.getMap().forEach((amount: number, expID: string) => {
-                const event: PsEvent | undefined = PsEvents.get(expID);
-                if (event == undefined) { return; }
-
-                this.outfitReport.stats.set(event.name, amount);
-            });
-
-            this.core.stats.forEach((player: TrackedPlayer, charID: string) => {
-                if (player.events.length == 0) { return; }
-
-                let onZoneID: boolean = false;
-
-                this.outfitReport.score += player.score;
-                if (filterZoneID == true) {
-                    const zoneEvents = player.events.filter(iter => iter.zoneID == this.opsReportSettings.zoneID);
-                    if (zoneEvents.length > 0) {
-                        onZoneID = true;
-                        this.outfitReport.events.push(...zoneEvents);
-                    } else {
-                        return;
-                    }
-                } else {
-                    this.outfitReport.events.push(...player.events);
-                }
-
-                const playtime = IndividualReporter.classUsage({
-                    player: player,
-                    events: [],
-                    routers: [],
-                    tracking: this.core.tracking
-                });
-
-                this.outfitReport.players.push({
-                    name: `${(player.outfitTag != '' ? `[${player.outfitTag}] ` : '')}${player.name}`,
-                    ...playtime 
-                });
-            });
-
-            this.outfitReport.events = this.outfitReport.events.sort((a, b) => a.timestamp - b.timestamp);
-
-            if (this.core.tracking.running == true) {
-                console.log(`Running setting endTime to now as the tracking is running`);
-                this.core.tracking.endTime = new Date().getTime();
-            }
-
-            const headshots: ClassCollection<number> = classCollectionNumber();
-            for (const ev of this.outfitReport.events) {
-                if (ev.type != "kill" || ev.isHeadshot == false) {
-                    continue;
-                }
-
-                const loadout: PsLoadout | undefined = PsLoadouts.get(ev.loadoutID);
-                if (loadout == undefined) { continue; }
-
-                if (loadout.type == "infil") { ++headshots.infil; }
-                else if (loadout.type == "lightAssault") { ++headshots.lightAssault; }
-                else if (loadout.type == "medic") { ++headshots.medic; }
-                else if (loadout.type == "engineer") { ++headshots.engineer; }
-                else if (loadout.type == "heavy") { ++headshots.heavy; }
-                else if (loadout.type == "max") { ++headshots.max; }
-
-                ++headshots.total;
-            }
-            this.outfitReport.classStats.set("Headshot", headshots);
-
-            for (const ev of this.outfitReport.events) {
-                let statName: string = "Other";
-
-                if (ev.type == "kill") {
-                    statName = "Kill";
-                } else if (ev.type == "death") {
-                    statName = (ev.revived == true) ? "Revived" : "Death";
-                } else if (ev.type == "exp") {
-                    const event: PsEvent | undefined = PsEvents.get(ev.expID);
-                    if (event != undefined) {
-                        if (event.track == false) { continue; }
-                        statName = event.name;
-                    }
-                } else {
-                    continue;
-                }
-
-                if (!this.outfitReport.classStats.has(statName)) {
-                    //console.log(`Added stats for '${statName}'`);
-                    this.outfitReport.classStats.set(statName, classCollectionNumber());
-                }
-
-                const classCollection: ClassCollection<number> = this.outfitReport.classStats.get(statName)!;
-                ++classCollection.total;
-
-                const loadout: PsLoadout | undefined = PsLoadouts.get(ev.loadoutID);
-                if (loadout == undefined) { continue; }
-
-                if (loadout.type == "infil") { ++classCollection.infil; }
-                else if (loadout.type == "lightAssault") { ++classCollection.lightAssault; }
-                else if (loadout.type == "medic") { ++classCollection.medic; }
-                else if (loadout.type == "engineer") { ++classCollection.engineer; } 
-                else if (loadout.type == "heavy") { ++classCollection.heavy; } 
-                else if (loadout.type == "max") { ++classCollection.max; }
-            }
-
-            EventReporter.weaponKills(this.outfitReport.events).ok(data => this.outfitReport.weaponKillBreakdown = data);
-            EventReporter.weaponTypeKills(this.outfitReport.events).ok(data => this.outfitReport.weaponTypeKillBreakdown = data);
-
-            EventReporter.factionKills(this.outfitReport.events).ok(data => this.outfitReport.factionKillBreakdown = data);
-            EventReporter.factionDeaths(this.outfitReport.events).ok(data => this.outfitReport.factionDeathBreakdown = data);
-
-            EventReporter.continentKills(this.outfitReport.events).ok(data => this.outfitReport.continentKillBreakdown = data);
-            EventReporter.continentDeaths(this.outfitReport.events).ok(data => this.outfitReport.continentDeathBreakdown = data);
-
-            EventReporter.weaponDeaths(this.outfitReport.events).ok(data => this.outfitReport.deathAllBreakdown = data);
-            EventReporter.weaponDeaths(this.outfitReport.events, true).ok(data => this.outfitReport.deathRevivedBreakdown = data);
-            EventReporter.weaponDeaths(this.outfitReport.events, false).ok(data => this.outfitReport.deathKilledBreakdown = data);
-            EventReporter.weaponTypeDeaths(this.outfitReport.events).ok(data => this.outfitReport.deathAllTypeBreakdown = data);
-            EventReporter.weaponTypeDeaths(this.outfitReport.events, true).ok(data => this.outfitReport.deathRevivedTypeBreakdown = data);
-            EventReporter.weaponTypeDeaths(this.outfitReport.events, false).ok(data => this.outfitReport.deathKilledTypeBreakdown = data);
-
-            EventReporter.weaponDeathBreakdown(this.outfitReport.events).ok(data => this.outfitReport.weaponTypeDeathBreakdown = data);
-
-            /* Not super useful and take a long time to generate
-            this.outfitReport.timeUnrevived = IndividualReporter.unrevivedTime(this.outfitReport.events);
-            this.outfitReport.revivedLifeExpectance = IndividualReporter.reviveLifeExpectance(this.outfitReport.events);
-            this.outfitReport.kmLifeExpectance = IndividualReporter.lifeExpectanceRate(this.outfitReport.events);
-            this.outfitReport.kmTimeDead = IndividualReporter.timeUntilReviveRate(this.outfitReport.events);
-            */
-
-            const classFilter: (iter: Event, type: "kill" | "death", loadouts: string[]) => boolean = (iter, type, loadouts) => {
-                if (iter.type == type) {
-                    return loadouts.indexOf(iter.loadoutID) > -1;
-                }
-                return false;
-            };
-
-            EventReporter.weaponTypeKills(this.outfitReport.events.filter(iter => classFilter(iter, "kill", ["1", "8", "15"])))
-                .ok(data => this.outfitReport.classTypeKills.infil = data);
-            EventReporter.weaponTypeKills(this.outfitReport.events.filter(iter => classFilter(iter, "kill", ["3", "10", "17"])))
-                .ok(data => this.outfitReport.classTypeKills.lightAssault = data);
-            EventReporter.weaponTypeKills(this.outfitReport.events.filter(iter => classFilter(iter, "kill", ["4", "11", "18"])))
-                .ok(data => this.outfitReport.classTypeKills.medic = data);
-            EventReporter.weaponTypeKills(this.outfitReport.events.filter(iter => classFilter(iter, "kill", ["5", "12", "19"])))
-                .ok(data => this.outfitReport.classTypeKills.engineer = data);
-            EventReporter.weaponTypeKills(this.outfitReport.events.filter(iter => classFilter(iter, "kill", ["6", "13", "20"])))
-                .ok(data => this.outfitReport.classTypeKills.heavy = data);
-            EventReporter.weaponTypeKills(this.outfitReport.events.filter(iter => classFilter(iter, "kill", ["7", "14", "21"])))
-                .ok(data => this.outfitReport.classTypeKills.max = data);
-
-            EventReporter.weaponTypeDeaths(this.outfitReport.events.filter(iter => classFilter(iter, "death", ["1", "8", "15"])))
-                .ok(data => this.outfitReport.classTypeDeaths.infil = data);
-            EventReporter.weaponTypeDeaths(this.outfitReport.events.filter(iter => classFilter(iter, "death", ["3", "10", "17"])))
-                .ok(data => this.outfitReport.classTypeDeaths.lightAssault = data);
-            EventReporter.weaponTypeDeaths(this.outfitReport.events.filter(iter => classFilter(iter, "death", ["4", "11", "18"])))
-                .ok(data => this.outfitReport.classTypeDeaths.medic = data);
-            EventReporter.weaponTypeDeaths(this.outfitReport.events.filter(iter => classFilter(iter, "death", ["5", "12", "19"])))
-                .ok(data => this.outfitReport.classTypeDeaths.engineer = data);
-            EventReporter.weaponTypeDeaths(this.outfitReport.events.filter(iter => classFilter(iter, "death", ["6", "13", "20"])))
-                .ok(data => this.outfitReport.classTypeDeaths.heavy = data);
-            EventReporter.weaponTypeDeaths(this.outfitReport.events.filter(iter => classFilter(iter, "death", ["7", "14", "21"])))
-                .ok(data => this.outfitReport.classTypeDeaths.max = data);
-
-            this.outfitReport.classKds.infil = IndividualReporter.classVersusKd(this.outfitReport.events, "infil");
-            this.outfitReport.classKds.lightAssault = IndividualReporter.classVersusKd(this.outfitReport.events, "lightAssault");
-            this.outfitReport.classKds.medic = IndividualReporter.classVersusKd(this.outfitReport.events, "medic");
-            this.outfitReport.classKds.engineer = IndividualReporter.classVersusKd(this.outfitReport.events, "engineer");
-            this.outfitReport.classKds.heavy = IndividualReporter.classVersusKd(this.outfitReport.events, "heavy");
-            this.outfitReport.classKds.max = IndividualReporter.classVersusKd(this.outfitReport.events, "max");
-            this.outfitReport.classKds.total = IndividualReporter.classVersusKd(this.outfitReport.events);
-
-            EventReporter.outfitVersusBreakdown(this.outfitReport.events).ok(data => this.outfitReport.outfitVersusBreakdown = data);
-
-            EventReporter.vehicleKills(this.outfitReport.events).ok(data => this.outfitReport.vehicleKillBreakdown = data);
-            EventReporter.vehicleWeaponKills(this.outfitReport.events).ok(data => this.outfitReport.vehicleKillWeaponBreakdown = data);
-
-            let otherIDs: string[] = [];
-            const breakdown: Map<string, ExpBreakdown> = new Map<string, ExpBreakdown>();
-            for (const event of this.outfitReport.events) {
-                if (event.type == "exp") {
-                    const exp: PsEvent = PsEvents.get(event.expID) || PsEvent.other;
-                    if (!breakdown.has(exp.name)) {
-                        breakdown.set(exp.name, new ExpBreakdown());
-                    }
-
-                    const score: ExpBreakdown = breakdown.get(exp.name)!;
-                    score.name = exp.name;
-                    score.score += event.amount;
-                    score.amount += 1;
-
-                    if (exp == PsEvent.other) {
-                        otherIDs.push(event.expID);
-                    }
-                }
-            }
-            console.log(`Untracked experience IDs: ${otherIDs.filter((v, i, a) => a.indexOf(v) == i).join(", ")}`);
-
-            // Sort all the entries by score, followed by amount, then lastly name
-            this.outfitReport.scoreBreakdown = [...breakdown.entries()].sort((a, b) => {
-                return (b[1].score - a[1].score)
-                    || (b[1].amount - a[1].amount)
-                    || (b[0].localeCompare(a[0]))
-            }).map((a) => a[1]); // Transform the tuple into the ExpBreakdown
-
-            this.outfitReport.continent = IndividualReporter.generateContinentPlayedOn(this.outfitReport.events);
-
-            this.outfitReport.overtimePer1.kpm = EventReporter.kpmOverTime(this.outfitReport.events, 60000);
-            this.outfitReport.overtimePer1.kd = EventReporter.kdOverTime(this.outfitReport.events, 60000);
-            this.outfitReport.overtimePer1.rpm = EventReporter.revivesOverTime(this.outfitReport.events, 60000);
-
-            this.outfitReport.overtimePer5.kpm = EventReporter.kpmOverTime(this.outfitReport.events);
-            this.outfitReport.overtimePer5.kd = EventReporter.kdOverTime(this.outfitReport.events);
-            this.outfitReport.overtimePer5.rpm = EventReporter.revivesOverTime(this.outfitReport.events);
-
-            this.outfitReport.perUpdate.kd = EventReporter.kdPerUpdate(this.outfitReport.events);
+            OutfitReportGenerator.generate({
+                settings: {
+                    zoneID: null
+                },
+                captures: [],
+                playerCaptures: [],
+                players: new Map(),
+                outfits: [],
+                events: [],
+                tracking: this.core.tracking
+            }).ok(data => this.outfitReport = data);
         },
 
         generateWinterReport: function(): void {

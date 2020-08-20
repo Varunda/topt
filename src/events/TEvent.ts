@@ -1,23 +1,12 @@
+import {
+    TKillEvent, TDeathEvent, TTeamkillEvent,
+    TCaptureEvent, TDefendEvent,
+    TLoginEvent, TLogoutEvent,
+    TExpEvent, TVehicleKillEvent
+} from "./index";
+
 export type TEventType = "exp" | "kill" | "death" | "capture" | "defend" | "vehicle" | "teamkill" | "login" | "logout";
 
-/**
- * Base TEvent (TOPT-Event) that all events emitted come from
- */
-export interface TEvent {
+export type TEvent = TKillEvent | TDefendEvent | TDeathEvent | TTeamkillEvent | TLoginEvent | TLogoutEvent | TCaptureEvent | TExpEvent | TVehicleKillEvent;
 
-    /**
-     * Type of event this TEvent is
-     */
-    type: TEventType;
-
-    /**
-     * Character ID of the character that produced the TEvent
-     */
-    sourceID: string;
-
-    /**
-     * Timestamp in UTC milliseconds of when this TEvent was produced
-     */
-    timestamp: number;
-
-}
+export type TLoadoutEvent = TKillEvent | TDeathEvent | TTeamkillEvent | TExpEvent | TVehicleKillEvent;

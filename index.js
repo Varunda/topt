@@ -58699,7 +58699,7 @@ window.EventReporter = EventReporter;
 /*!************************************!*\
   !*** ./src/InvididualGenerator.ts ***!
   \************************************/
-/*! exports provided: ClassBreakdown, FacilityCapture, ExpBreakdown, classKdCollection, classCollectionBreakdownTrend, OutfitReport, TrackedRouter, Playtime, ClassUsage, Report, PlayerVersusEntry, PlayerVersus, BreakdownSpawn, TrackedPlayer, BreakdownCollection, BreakdownSection, BreakdownMeta, BreakdownSingle, EventFeedEntry, ReportParameters, IndividualReporter */
+/*! exports provided: ClassBreakdown, FacilityCapture, ExpBreakdown, TimeTracking, classKdCollection, classCollectionBreakdownTrend, OutfitReport, TrackedRouter, Playtime, ClassUsage, Report, PlayerVersusEntry, PlayerVersus, BreakdownSpawn, TrackedPlayer, BreakdownCollection, BreakdownSection, BreakdownMeta, BreakdownSingle, EventFeedEntry, ReportParameters, IndividualReporter */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -58707,6 +58707,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "ClassBreakdown", function() { return ClassBreakdown; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "FacilityCapture", function() { return FacilityCapture; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "ExpBreakdown", function() { return ExpBreakdown; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "TimeTracking", function() { return TimeTracking; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "classKdCollection", function() { return classKdCollection; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "classCollectionBreakdownTrend", function() { return classCollectionBreakdownTrend; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "OutfitReport", function() { return OutfitReport; });
@@ -58770,6 +58771,13 @@ class ExpBreakdown {
         this.name = "";
         this.score = 0;
         this.amount = 0;
+    }
+}
+class TimeTracking {
+    constructor() {
+        this.running = false;
+        this.startTime = 0;
+        this.endTime = 0;
     }
 }
 function classKdCollection() {
@@ -59037,7 +59045,7 @@ class ReportParameters {
          */
         this.player = new TrackedPlayer();
         /**
-         * Contains all events collected during tracking. If you need just the player's events, use @see player
+         * Contains all events collected during tracking. If you need just the player's events, use player
          */
         this.events = [];
         /**
@@ -59682,7 +59690,7 @@ class IndividualReporter {
         usage.characterID = parameters.player.characterID;
         usage.secondsOnline = (finalTimestamp - lastTimestamp) / 1000;
         parameters.player.events.forEach((event) => {
-            if (event.type == "capture" || event.type == "defend") {
+            if (event.type == "capture" || event.type == "defend" || event.type == "login" || event.type == "logout") {
                 return;
             }
             lastLoadout = census_PsLoadout__WEBPACK_IMPORTED_MODULE_5__["PsLoadouts"].get(event.loadoutID);
@@ -64321,241 +64329,6 @@ __webpack_require__.r(__webpack_exports__);
 
 /***/ }),
 
-/***/ "./src/events/TCaptureEvent.ts":
-/*!*************************************!*\
-  !*** ./src/events/TCaptureEvent.ts ***!
-  \*************************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
-
-
-/***/ }),
-
-/***/ "./src/events/TDeathEvent.ts":
-/*!***********************************!*\
-  !*** ./src/events/TDeathEvent.ts ***!
-  \***********************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
-
-
-/***/ }),
-
-/***/ "./src/events/TDefendEvent.ts":
-/*!************************************!*\
-  !*** ./src/events/TDefendEvent.ts ***!
-  \************************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
-
-
-/***/ }),
-
-/***/ "./src/events/TEvent.ts":
-/*!******************************!*\
-  !*** ./src/events/TEvent.ts ***!
-  \******************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
-
-
-/***/ }),
-
-/***/ "./src/events/TEventHandlers.ts":
-/*!**************************************!*\
-  !*** ./src/events/TEventHandlers.ts ***!
-  \**************************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
-
-
-/***/ }),
-
-/***/ "./src/events/TExpEvent.ts":
-/*!*********************************!*\
-  !*** ./src/events/TExpEvent.ts ***!
-  \*********************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
-
-
-/***/ }),
-
-/***/ "./src/events/TKillEvent.ts":
-/*!**********************************!*\
-  !*** ./src/events/TKillEvent.ts ***!
-  \**********************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
-
-
-/***/ }),
-
-/***/ "./src/events/TLoadoutEvent.ts":
-/*!*************************************!*\
-  !*** ./src/events/TLoadoutEvent.ts ***!
-  \*************************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
-
-
-/***/ }),
-
-/***/ "./src/events/TLoginEvent.ts":
-/*!***********************************!*\
-  !*** ./src/events/TLoginEvent.ts ***!
-  \***********************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
-
-
-/***/ }),
-
-/***/ "./src/events/TLogoutEvent.ts":
-/*!************************************!*\
-  !*** ./src/events/TLogoutEvent.ts ***!
-  \************************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
-
-
-/***/ }),
-
-/***/ "./src/events/TTargetEvent.ts":
-/*!************************************!*\
-  !*** ./src/events/TTargetEvent.ts ***!
-  \************************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
-
-
-/***/ }),
-
-/***/ "./src/events/TTeamkillEvent.ts":
-/*!**************************************!*\
-  !*** ./src/events/TTeamkillEvent.ts ***!
-  \**************************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
-
-
-/***/ }),
-
-/***/ "./src/events/TVehicleKillEvent.ts":
-/*!*****************************************!*\
-  !*** ./src/events/TVehicleKillEvent.ts ***!
-  \*****************************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
-
-
-/***/ }),
-
-/***/ "./src/events/TZoneEvent.ts":
-/*!**********************************!*\
-  !*** ./src/events/TZoneEvent.ts ***!
-  \**********************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
-
-
-/***/ }),
-
-/***/ "./src/events/index.ts":
-/*!*****************************!*\
-  !*** ./src/events/index.ts ***!
-  \*****************************/
-/*! exports provided: TEvent, TEventType, TLoadoutEvent, TZoneEvent, TExpEvent, TKillEvent, TDeathEvent, TTeamkillEvent, TCaptureEvent, TDefendEvent, TVehicleKillEvent, TLoginEvent, TLogoutEvent, TEventHandler */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _TEvent__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./TEvent */ "./src/events/TEvent.ts");
-/* harmony import */ var _TEvent__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_TEvent__WEBPACK_IMPORTED_MODULE_0__);
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TEvent", function() { return _TEvent__WEBPACK_IMPORTED_MODULE_0__["TEvent"]; });
-
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TEventType", function() { return _TEvent__WEBPACK_IMPORTED_MODULE_0__["TEventType"]; });
-
-/* harmony import */ var _TLoadoutEvent__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./TLoadoutEvent */ "./src/events/TLoadoutEvent.ts");
-/* harmony import */ var _TLoadoutEvent__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(_TLoadoutEvent__WEBPACK_IMPORTED_MODULE_1__);
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TLoadoutEvent", function() { return _TLoadoutEvent__WEBPACK_IMPORTED_MODULE_1__["TLoadoutEvent"]; });
-
-/* harmony import */ var _TZoneEvent__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./TZoneEvent */ "./src/events/TZoneEvent.ts");
-/* harmony import */ var _TZoneEvent__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(_TZoneEvent__WEBPACK_IMPORTED_MODULE_2__);
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TZoneEvent", function() { return _TZoneEvent__WEBPACK_IMPORTED_MODULE_2__["TZoneEvent"]; });
-
-/* harmony import */ var _TExpEvent__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./TExpEvent */ "./src/events/TExpEvent.ts");
-/* harmony import */ var _TExpEvent__WEBPACK_IMPORTED_MODULE_3___default = /*#__PURE__*/__webpack_require__.n(_TExpEvent__WEBPACK_IMPORTED_MODULE_3__);
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TExpEvent", function() { return _TExpEvent__WEBPACK_IMPORTED_MODULE_3__["TExpEvent"]; });
-
-/* harmony import */ var _TKillEvent__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./TKillEvent */ "./src/events/TKillEvent.ts");
-/* harmony import */ var _TKillEvent__WEBPACK_IMPORTED_MODULE_4___default = /*#__PURE__*/__webpack_require__.n(_TKillEvent__WEBPACK_IMPORTED_MODULE_4__);
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TKillEvent", function() { return _TKillEvent__WEBPACK_IMPORTED_MODULE_4__["TKillEvent"]; });
-
-/* harmony import */ var _TDeathEvent__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./TDeathEvent */ "./src/events/TDeathEvent.ts");
-/* harmony import */ var _TDeathEvent__WEBPACK_IMPORTED_MODULE_5___default = /*#__PURE__*/__webpack_require__.n(_TDeathEvent__WEBPACK_IMPORTED_MODULE_5__);
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TDeathEvent", function() { return _TDeathEvent__WEBPACK_IMPORTED_MODULE_5__["TDeathEvent"]; });
-
-/* harmony import */ var _TTeamkillEvent__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./TTeamkillEvent */ "./src/events/TTeamkillEvent.ts");
-/* harmony import */ var _TTeamkillEvent__WEBPACK_IMPORTED_MODULE_6___default = /*#__PURE__*/__webpack_require__.n(_TTeamkillEvent__WEBPACK_IMPORTED_MODULE_6__);
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TTeamkillEvent", function() { return _TTeamkillEvent__WEBPACK_IMPORTED_MODULE_6__["TTeamkillEvent"]; });
-
-/* harmony import */ var _TCaptureEvent__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./TCaptureEvent */ "./src/events/TCaptureEvent.ts");
-/* harmony import */ var _TCaptureEvent__WEBPACK_IMPORTED_MODULE_7___default = /*#__PURE__*/__webpack_require__.n(_TCaptureEvent__WEBPACK_IMPORTED_MODULE_7__);
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TCaptureEvent", function() { return _TCaptureEvent__WEBPACK_IMPORTED_MODULE_7__["TCaptureEvent"]; });
-
-/* harmony import */ var _TDefendEvent__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./TDefendEvent */ "./src/events/TDefendEvent.ts");
-/* harmony import */ var _TDefendEvent__WEBPACK_IMPORTED_MODULE_8___default = /*#__PURE__*/__webpack_require__.n(_TDefendEvent__WEBPACK_IMPORTED_MODULE_8__);
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TDefendEvent", function() { return _TDefendEvent__WEBPACK_IMPORTED_MODULE_8__["TDefendEvent"]; });
-
-/* harmony import */ var _TVehicleKillEvent__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ./TVehicleKillEvent */ "./src/events/TVehicleKillEvent.ts");
-/* harmony import */ var _TVehicleKillEvent__WEBPACK_IMPORTED_MODULE_9___default = /*#__PURE__*/__webpack_require__.n(_TVehicleKillEvent__WEBPACK_IMPORTED_MODULE_9__);
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TVehicleKillEvent", function() { return _TVehicleKillEvent__WEBPACK_IMPORTED_MODULE_9__["TVehicleKillEvent"]; });
-
-/* harmony import */ var _TLoginEvent__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ./TLoginEvent */ "./src/events/TLoginEvent.ts");
-/* harmony import */ var _TLoginEvent__WEBPACK_IMPORTED_MODULE_10___default = /*#__PURE__*/__webpack_require__.n(_TLoginEvent__WEBPACK_IMPORTED_MODULE_10__);
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TLoginEvent", function() { return _TLoginEvent__WEBPACK_IMPORTED_MODULE_10__["TLoginEvent"]; });
-
-/* harmony import */ var _TLogoutEvent__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! ./TLogoutEvent */ "./src/events/TLogoutEvent.ts");
-/* harmony import */ var _TLogoutEvent__WEBPACK_IMPORTED_MODULE_11___default = /*#__PURE__*/__webpack_require__.n(_TLogoutEvent__WEBPACK_IMPORTED_MODULE_11__);
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TLogoutEvent", function() { return _TLogoutEvent__WEBPACK_IMPORTED_MODULE_11__["TLogoutEvent"]; });
-
-/* harmony import */ var _TEventHandlers__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! ./TEventHandlers */ "./src/events/TEventHandlers.ts");
-/* harmony import */ var _TEventHandlers__WEBPACK_IMPORTED_MODULE_12___default = /*#__PURE__*/__webpack_require__.n(_TEventHandlers__WEBPACK_IMPORTED_MODULE_12__);
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TEventHandler", function() { return _TEventHandlers__WEBPACK_IMPORTED_MODULE_12__["TEventHandler"]; });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/***/ }),
-
 /***/ "./src/index.ts":
 /*!**********************!*\
   !*** ./src/index.ts ***!
@@ -64582,34 +64355,33 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var jszip__WEBPACK_IMPORTED_MODULE_8___default = /*#__PURE__*/__webpack_require__.n(jszip__WEBPACK_IMPORTED_MODULE_8__);
 /* harmony import */ var census_WeaponAPI__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! census/WeaponAPI */ "./src/census/WeaponAPI.ts");
 /* harmony import */ var census_FacilityAPI__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! census/FacilityAPI */ "./src/census/FacilityAPI.ts");
-/* harmony import */ var census_PsLoadout__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! census/PsLoadout */ "./src/census/PsLoadout.ts");
-/* harmony import */ var PsEvent__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! PsEvent */ "./src/PsEvent.ts");
-/* harmony import */ var EventReporter__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(/*! EventReporter */ "./src/EventReporter.ts");
-/* harmony import */ var InvididualGenerator__WEBPACK_IMPORTED_MODULE_14__ = __webpack_require__(/*! InvididualGenerator */ "./src/InvididualGenerator.ts");
-/* harmony import */ var PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_15__ = __webpack_require__(/*! PersonalReportGenerator */ "./src/PersonalReportGenerator.ts");
-/* harmony import */ var _node_modules_file_saver_dist_FileSaver_js__WEBPACK_IMPORTED_MODULE_16__ = __webpack_require__(/*! ../node_modules/file-saver/dist/FileSaver.js */ "./node_modules/file-saver/dist/FileSaver.js");
-/* harmony import */ var _node_modules_file_saver_dist_FileSaver_js__WEBPACK_IMPORTED_MODULE_16___default = /*#__PURE__*/__webpack_require__.n(_node_modules_file_saver_dist_FileSaver_js__WEBPACK_IMPORTED_MODULE_16__);
-/* harmony import */ var _node_modules_chartjs_plugin_datalabels_dist_chartjs_plugin_datalabels_js__WEBPACK_IMPORTED_MODULE_17__ = __webpack_require__(/*! ../node_modules/chartjs-plugin-datalabels/dist/chartjs-plugin-datalabels.js */ "./node_modules/chartjs-plugin-datalabels/dist/chartjs-plugin-datalabels.js");
-/* harmony import */ var _node_modules_chartjs_plugin_datalabels_dist_chartjs_plugin_datalabels_js__WEBPACK_IMPORTED_MODULE_17___default = /*#__PURE__*/__webpack_require__.n(_node_modules_chartjs_plugin_datalabels_dist_chartjs_plugin_datalabels_js__WEBPACK_IMPORTED_MODULE_17__);
-/* harmony import */ var chart_js__WEBPACK_IMPORTED_MODULE_18__ = __webpack_require__(/*! chart.js */ "./node_modules/chart.js/dist/Chart.js");
-/* harmony import */ var chart_js__WEBPACK_IMPORTED_MODULE_18___default = /*#__PURE__*/__webpack_require__.n(chart_js__WEBPACK_IMPORTED_MODULE_18__);
-/* harmony import */ var _node_modules_chartjs_chart_box_and_violin_plot_build_Chart_BoxPlot_js__WEBPACK_IMPORTED_MODULE_19__ = __webpack_require__(/*! ../node_modules/chartjs-chart-box-and-violin-plot/build/Chart.BoxPlot.js */ "./node_modules/chartjs-chart-box-and-violin-plot/build/Chart.BoxPlot.js");
-/* harmony import */ var _node_modules_chartjs_chart_box_and_violin_plot_build_Chart_BoxPlot_js__WEBPACK_IMPORTED_MODULE_19___default = /*#__PURE__*/__webpack_require__.n(_node_modules_chartjs_chart_box_and_violin_plot_build_Chart_BoxPlot_js__WEBPACK_IMPORTED_MODULE_19__);
-/* harmony import */ var BreakdownList__WEBPACK_IMPORTED_MODULE_20__ = __webpack_require__(/*! BreakdownList */ "./src/BreakdownList.ts");
-/* harmony import */ var BreakdownChart__WEBPACK_IMPORTED_MODULE_21__ = __webpack_require__(/*! BreakdownChart */ "./src/BreakdownChart.ts");
-/* harmony import */ var BreakdownInterval__WEBPACK_IMPORTED_MODULE_22__ = __webpack_require__(/*! BreakdownInterval */ "./src/BreakdownInterval.ts");
-/* harmony import */ var BreakdownBox__WEBPACK_IMPORTED_MODULE_23__ = __webpack_require__(/*! BreakdownBox */ "./src/BreakdownBox.ts");
-/* harmony import */ var BreakdownBar__WEBPACK_IMPORTED_MODULE_24__ = __webpack_require__(/*! BreakdownBar */ "./src/BreakdownBar.ts");
-/* harmony import */ var MomentFilter__WEBPACK_IMPORTED_MODULE_25__ = __webpack_require__(/*! MomentFilter */ "./src/MomentFilter.ts");
-/* harmony import */ var KillfeedSquad__WEBPACK_IMPORTED_MODULE_26__ = __webpack_require__(/*! KillfeedSquad */ "./src/KillfeedSquad.ts");
-/* harmony import */ var OutfitTrends__WEBPACK_IMPORTED_MODULE_27__ = __webpack_require__(/*! OutfitTrends */ "./src/OutfitTrends.ts");
-/* harmony import */ var Storage__WEBPACK_IMPORTED_MODULE_28__ = __webpack_require__(/*! Storage */ "./src/Storage.ts");
-/* harmony import */ var Killfeed__WEBPACK_IMPORTED_MODULE_29__ = __webpack_require__(/*! Killfeed */ "./src/Killfeed.ts");
-/* harmony import */ var winter_WinterReportGenerator__WEBPACK_IMPORTED_MODULE_30__ = __webpack_require__(/*! winter/WinterReportGenerator */ "./src/winter/WinterReportGenerator.ts");
-/* harmony import */ var winter_WinterReportParameters__WEBPACK_IMPORTED_MODULE_31__ = __webpack_require__(/*! winter/WinterReportParameters */ "./src/winter/WinterReportParameters.ts");
-/* harmony import */ var core_index__WEBPACK_IMPORTED_MODULE_32__ = __webpack_require__(/*! core/index */ "./src/core/index.ts");
-/* harmony import */ var core_TrackedPlayer__WEBPACK_IMPORTED_MODULE_33__ = __webpack_require__(/*! core/TrackedPlayer */ "./src/core/TrackedPlayer.ts");
-
+/* harmony import */ var PsEvent__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! PsEvent */ "./src/PsEvent.ts");
+/* harmony import */ var EventReporter__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! EventReporter */ "./src/EventReporter.ts");
+/* harmony import */ var InvididualGenerator__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(/*! InvididualGenerator */ "./src/InvididualGenerator.ts");
+/* harmony import */ var PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_14__ = __webpack_require__(/*! PersonalReportGenerator */ "./src/PersonalReportGenerator.ts");
+/* harmony import */ var _node_modules_file_saver_dist_FileSaver_js__WEBPACK_IMPORTED_MODULE_15__ = __webpack_require__(/*! ../node_modules/file-saver/dist/FileSaver.js */ "./node_modules/file-saver/dist/FileSaver.js");
+/* harmony import */ var _node_modules_file_saver_dist_FileSaver_js__WEBPACK_IMPORTED_MODULE_15___default = /*#__PURE__*/__webpack_require__.n(_node_modules_file_saver_dist_FileSaver_js__WEBPACK_IMPORTED_MODULE_15__);
+/* harmony import */ var _node_modules_chartjs_plugin_datalabels_dist_chartjs_plugin_datalabels_js__WEBPACK_IMPORTED_MODULE_16__ = __webpack_require__(/*! ../node_modules/chartjs-plugin-datalabels/dist/chartjs-plugin-datalabels.js */ "./node_modules/chartjs-plugin-datalabels/dist/chartjs-plugin-datalabels.js");
+/* harmony import */ var _node_modules_chartjs_plugin_datalabels_dist_chartjs_plugin_datalabels_js__WEBPACK_IMPORTED_MODULE_16___default = /*#__PURE__*/__webpack_require__.n(_node_modules_chartjs_plugin_datalabels_dist_chartjs_plugin_datalabels_js__WEBPACK_IMPORTED_MODULE_16__);
+/* harmony import */ var chart_js__WEBPACK_IMPORTED_MODULE_17__ = __webpack_require__(/*! chart.js */ "./node_modules/chart.js/dist/Chart.js");
+/* harmony import */ var chart_js__WEBPACK_IMPORTED_MODULE_17___default = /*#__PURE__*/__webpack_require__.n(chart_js__WEBPACK_IMPORTED_MODULE_17__);
+/* harmony import */ var _node_modules_chartjs_chart_box_and_violin_plot_build_Chart_BoxPlot_js__WEBPACK_IMPORTED_MODULE_18__ = __webpack_require__(/*! ../node_modules/chartjs-chart-box-and-violin-plot/build/Chart.BoxPlot.js */ "./node_modules/chartjs-chart-box-and-violin-plot/build/Chart.BoxPlot.js");
+/* harmony import */ var _node_modules_chartjs_chart_box_and_violin_plot_build_Chart_BoxPlot_js__WEBPACK_IMPORTED_MODULE_18___default = /*#__PURE__*/__webpack_require__.n(_node_modules_chartjs_chart_box_and_violin_plot_build_Chart_BoxPlot_js__WEBPACK_IMPORTED_MODULE_18__);
+/* harmony import */ var BreakdownList__WEBPACK_IMPORTED_MODULE_19__ = __webpack_require__(/*! BreakdownList */ "./src/BreakdownList.ts");
+/* harmony import */ var BreakdownChart__WEBPACK_IMPORTED_MODULE_20__ = __webpack_require__(/*! BreakdownChart */ "./src/BreakdownChart.ts");
+/* harmony import */ var BreakdownInterval__WEBPACK_IMPORTED_MODULE_21__ = __webpack_require__(/*! BreakdownInterval */ "./src/BreakdownInterval.ts");
+/* harmony import */ var BreakdownBox__WEBPACK_IMPORTED_MODULE_22__ = __webpack_require__(/*! BreakdownBox */ "./src/BreakdownBox.ts");
+/* harmony import */ var BreakdownBar__WEBPACK_IMPORTED_MODULE_23__ = __webpack_require__(/*! BreakdownBar */ "./src/BreakdownBar.ts");
+/* harmony import */ var MomentFilter__WEBPACK_IMPORTED_MODULE_24__ = __webpack_require__(/*! MomentFilter */ "./src/MomentFilter.ts");
+/* harmony import */ var KillfeedSquad__WEBPACK_IMPORTED_MODULE_25__ = __webpack_require__(/*! KillfeedSquad */ "./src/KillfeedSquad.ts");
+/* harmony import */ var OutfitTrends__WEBPACK_IMPORTED_MODULE_26__ = __webpack_require__(/*! OutfitTrends */ "./src/OutfitTrends.ts");
+/* harmony import */ var Storage__WEBPACK_IMPORTED_MODULE_27__ = __webpack_require__(/*! Storage */ "./src/Storage.ts");
+/* harmony import */ var Killfeed__WEBPACK_IMPORTED_MODULE_28__ = __webpack_require__(/*! Killfeed */ "./src/Killfeed.ts");
+/* harmony import */ var winter_WinterReportGenerator__WEBPACK_IMPORTED_MODULE_29__ = __webpack_require__(/*! winter/WinterReportGenerator */ "./src/winter/WinterReportGenerator.ts");
+/* harmony import */ var winter_WinterReportParameters__WEBPACK_IMPORTED_MODULE_30__ = __webpack_require__(/*! winter/WinterReportParameters */ "./src/winter/WinterReportParameters.ts");
+/* harmony import */ var core_index__WEBPACK_IMPORTED_MODULE_31__ = __webpack_require__(/*! core/index */ "./src/core/index.ts");
+/* harmony import */ var core_TrackedPlayer__WEBPACK_IMPORTED_MODULE_32__ = __webpack_require__(/*! core/TrackedPlayer */ "./src/core/TrackedPlayer.ts");
+!(function webpackMissingModule() { var e = new Error("Cannot find module 'reports/OutfitReport.js'"); e.code = 'MODULE_NOT_FOUND'; throw e; }());
 
 
 
@@ -64629,9 +64401,10 @@ __webpack_require__.r(__webpack_exports__);
 
 // @ts-ignore
 
-chart_js__WEBPACK_IMPORTED_MODULE_18__["Chart"].plugins.unregister(_node_modules_chartjs_plugin_datalabels_dist_chartjs_plugin_datalabels_js__WEBPACK_IMPORTED_MODULE_17___default.a);
+chart_js__WEBPACK_IMPORTED_MODULE_17__["Chart"].plugins.unregister(_node_modules_chartjs_plugin_datalabels_dist_chartjs_plugin_datalabels_js__WEBPACK_IMPORTED_MODULE_16___default.a);
 
 // @ts-ignore
+
 
 
 
@@ -64687,8 +64460,8 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             state: []
         },
         killfeed: {
-            entry: new Killfeed__WEBPACK_IMPORTED_MODULE_29__["Killfeed"](),
-            options: new Killfeed__WEBPACK_IMPORTED_MODULE_29__["KillfeedOptions"]()
+            entry: new Killfeed__WEBPACK_IMPORTED_MODULE_28__["Killfeed"](),
+            options: new Killfeed__WEBPACK_IMPORTED_MODULE_28__["KillfeedOptions"]()
         },
         // Used to make iteration thru classes easier
         classIterator: [
@@ -64701,24 +64474,24 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
         ],
         winter: {
             report: Loadable__WEBPACK_IMPORTED_MODULE_5__["Loadable"].idle(),
-            settings: new winter_WinterReportParameters__WEBPACK_IMPORTED_MODULE_31__["WinterReportSettings"](),
+            settings: new winter_WinterReportParameters__WEBPACK_IMPORTED_MODULE_30__["WinterReportSettings"](),
         },
-        outfitReport: new InvididualGenerator__WEBPACK_IMPORTED_MODULE_14__["OutfitReport"](),
+        outfitReport: new InvididualGenerator__WEBPACK_IMPORTED_MODULE_13__["OutfitReport"](),
         opsReportSettings: new OpReportSettings(),
-        outfitTrends: new OutfitTrends__WEBPACK_IMPORTED_MODULE_27__["OutfitTrendsV1"](),
+        outfitTrends: new OutfitTrends__WEBPACK_IMPORTED_MODULE_26__["OutfitTrendsV1"](),
         refreshIntervalID: -1,
         showFrog: false,
         display: [] // The currently displayed stats
     },
     created: function () {
         this.refreshIntervalID = setInterval(this.updateDisplay, this.settings.updateRate * 1000);
-        this.storage.enabled = Storage__WEBPACK_IMPORTED_MODULE_28__["StorageHelper"].isEnabled();
+        this.storage.enabled = Storage__WEBPACK_IMPORTED_MODULE_27__["StorageHelper"].isEnabled();
         census_WeaponAPI__WEBPACK_IMPORTED_MODULE_9__["WeaponAPI"].loadJson();
         census_FacilityAPI__WEBPACK_IMPORTED_MODULE_10__["FacilityAPI"].loadJson();
     },
     mounted: function () {
         if (this.storage.enabled == true) {
-            this.storage.trends = Storage__WEBPACK_IMPORTED_MODULE_28__["StorageHelper"].getTrends();
+            this.storage.trends = Storage__WEBPACK_IMPORTED_MODULE_27__["StorageHelper"].getTrends();
         }
         window.onbeforeunload = (ev) => {
             this.core.disconnect();
@@ -64733,13 +64506,13 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             if (this.coreObject != null) {
                 this.coreObject.disconnect();
             }
-            this.coreObject = new core_index__WEBPACK_IMPORTED_MODULE_32__["default"](this.settings.serviceToken);
+            this.coreObject = new core_index__WEBPACK_IMPORTED_MODULE_31__["default"](this.settings.serviceToken);
             this.coreObject.connect().ok(() => {
                 this.view = "realtime";
             });
             if (this.storage.pendingTrend !== null && this.storage.pendingTrend !== undefined) {
                 console.log(`Loading trends from storage: ${this.storage.pendingTrend}`);
-                const trend = Storage__WEBPACK_IMPORTED_MODULE_28__["StorageHelper"].getTrend(this.storage.pendingTrend);
+                const trend = Storage__WEBPACK_IMPORTED_MODULE_27__["StorageHelper"].getTrend(this.storage.pendingTrend);
                 if (trend != null) {
                     console.log(`Successfully loaded trends file for ${this.storage.pendingTrend}`);
                     this.outfitTrends = Object.assign({}, trend);
@@ -64750,9 +64523,9 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 }
             }
             else if (this.storage.pendingTrend === null) {
-                Storage__WEBPACK_IMPORTED_MODULE_28__["StorageHelper"].setTrends(this.storage.newTrendFile, new OutfitTrends__WEBPACK_IMPORTED_MODULE_27__["OutfitTrendsV1"]());
+                Storage__WEBPACK_IMPORTED_MODULE_27__["StorageHelper"].setTrends(this.storage.newTrendFile, new OutfitTrends__WEBPACK_IMPORTED_MODULE_26__["OutfitTrendsV1"]());
                 this.storage.trendFileName = this.storage.newTrendFile;
-                this.outfitTrends = new OutfitTrends__WEBPACK_IMPORTED_MODULE_27__["OutfitTrendsV1"]();
+                this.outfitTrends = new OutfitTrends__WEBPACK_IMPORTED_MODULE_26__["OutfitTrendsV1"]();
                 console.log(`Created new trends file named ${this.storage.trendFileName}`);
             }
             else if (this.storage.pendingTrend === undefined) {
@@ -64849,18 +64622,18 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 outfits: this.core.outfits
             };
             const file = new File([JSON.stringify(json)], "data.json", { type: "text/json" });
-            _node_modules_file_saver_dist_FileSaver_js__WEBPACK_IMPORTED_MODULE_16__["saveAs"](file);
+            _node_modules_file_saver_dist_FileSaver_js__WEBPACK_IMPORTED_MODULE_15__["saveAs"](file);
         },
         exportTrends: function () {
             const file = new File([JSON.stringify(this.outfitTrends)], "trends.json", { type: "text/json" });
-            _node_modules_file_saver_dist_FileSaver_js__WEBPACK_IMPORTED_MODULE_16__["saveAs"](file);
+            _node_modules_file_saver_dist_FileSaver_js__WEBPACK_IMPORTED_MODULE_15__["saveAs"](file);
         },
         saveTrends: function () {
             const name = prompt("What to name this trends file as? Leave blank to cancel");
             if (name == null || name.length == 0) {
                 return;
             }
-            Storage__WEBPACK_IMPORTED_MODULE_28__["StorageHelper"].setTrends(name, this.outfitTrends);
+            Storage__WEBPACK_IMPORTED_MODULE_27__["StorageHelper"].setTrends(name, this.outfitTrends);
         },
         updateDisplay: function () {
             //console.time("update display");
@@ -64872,7 +64645,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             }
         },
         updateKillfeedDisplay: function () {
-            this.killfeed.entry = Killfeed__WEBPACK_IMPORTED_MODULE_29__["KillfeedGeneration"].generate(this.killfeed.options);
+            this.killfeed.entry = Killfeed__WEBPACK_IMPORTED_MODULE_28__["KillfeedGeneration"].generate(this.killfeed.options);
         },
         updateRealtimeDisplay: function () {
             const nowMs = new Date().getTime();
@@ -64881,7 +64654,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 if (char.stats.size() == 0) {
                     return;
                 }
-                const collection = new core_TrackedPlayer__WEBPACK_IMPORTED_MODULE_33__["TrackedPlayer"]();
+                const collection = new core_TrackedPlayer__WEBPACK_IMPORTED_MODULE_32__["TrackedPlayer"]();
                 collection.name = char.name;
                 collection.outfitTag = char.outfitTag;
                 collection.characterID = char.characterID;
@@ -64893,7 +64666,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 }
                 let containsType = false;
                 char.stats.getMap().forEach((value, key) => {
-                    const psEvent = PsEvent__WEBPACK_IMPORTED_MODULE_12__["PsEvents"].get(key) || PsEvent__WEBPACK_IMPORTED_MODULE_12__["PsEvent"].default;
+                    const psEvent = PsEvent__WEBPACK_IMPORTED_MODULE_11__["PsEvents"].get(key) || PsEvent__WEBPACK_IMPORTED_MODULE_11__["PsEvent"].default;
                     // Is this stat one of the ones being displayed?
                     if (psEvent.types.indexOf(this.settings.eventType) > -1) {
                         //console.log(`Needed ${this.settings.eventType} to display ${char.name}, found from ${key}`);
@@ -64937,13 +64710,13 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             if (this.view != "killfeed") {
                 return;
             }
-            const whatHovered = Killfeed__WEBPACK_IMPORTED_MODULE_29__["KillfeedGeneration"].getHovered();
+            const whatHovered = Killfeed__WEBPACK_IMPORTED_MODULE_28__["KillfeedGeneration"].getHovered();
             if (whatHovered == "squad") {
-                Killfeed__WEBPACK_IMPORTED_MODULE_29__["KillfeedGeneration"].mergeSquads(ev.key);
+                Killfeed__WEBPACK_IMPORTED_MODULE_28__["KillfeedGeneration"].mergeSquads(ev.key);
                 this.updateDisplay();
             }
             else if (whatHovered == "member") {
-                Killfeed__WEBPACK_IMPORTED_MODULE_29__["KillfeedGeneration"].moveMember(ev.key);
+                Killfeed__WEBPACK_IMPORTED_MODULE_28__["KillfeedGeneration"].moveMember(ev.key);
                 this.updateDisplay();
             }
             else {
@@ -64961,245 +64734,20 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             this.parameters.report = "";
         },
         generateOutfitReport: function () {
-            this.outfitReport = new InvididualGenerator__WEBPACK_IMPORTED_MODULE_14__["OutfitReport"]();
-            let filterZoneID = this.opsReportSettings.zoneID != null;
-            this.outfitReport.facilityCaptures = this.core.facilityCaptures.filter((iter) => {
-                return (filterZoneID == false || (filterZoneID == true && iter.zoneID == this.opsReportSettings.zoneID))
-                    && this.core.outfits.indexOf(iter.outfitID) > -1;
-            });
-            this.outfitReport.facilityCaptures.sort((a, b) => {
-                return a.timestamp.getTime() - b.timestamp.getTime();
-            });
-            EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].facilityCaptures({
-                captures: this.outfitReport.facilityCaptures,
-                players: this.core.playerCaptures
-            }).ok(data => this.outfitReport.baseCaptures = data);
-            const sessions = this.outfitTrends.sessions
-                .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-            this.outfitReport.trends.kpm.total = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kpms.total }; });
-            this.outfitReport.trends.kpm.infil = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kpms.infil }; });
-            this.outfitReport.trends.kpm.lightAssault = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kpms.lightAssault }; });
-            this.outfitReport.trends.kpm.medic = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kpms.medic }; });
-            this.outfitReport.trends.kpm.engineer = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kpms.engineer }; });
-            this.outfitReport.trends.kpm.heavy = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kpms.heavy }; });
-            this.outfitReport.trends.kd.total = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kds.total }; });
-            this.outfitReport.trends.kd.infil = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kds.infil }; });
-            this.outfitReport.trends.kd.lightAssault = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kds.lightAssault }; });
-            this.outfitReport.trends.kd.medic = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kds.medic }; });
-            this.outfitReport.trends.kd.engineer = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kds.engineer }; });
-            this.outfitReport.trends.kd.heavy = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kds.heavy }; });
-            this.core.statTotals.getMap().forEach((amount, expID) => {
-                const event = PsEvent__WEBPACK_IMPORTED_MODULE_12__["PsEvents"].get(expID);
-                if (event == undefined) {
-                    return;
-                }
-                this.outfitReport.stats.set(event.name, amount);
-            });
-            this.core.stats.forEach((player, charID) => {
-                if (player.events.length == 0) {
-                    return;
-                }
-                let onZoneID = false;
-                this.outfitReport.score += player.score;
-                if (filterZoneID == true) {
-                    const zoneEvents = player.events.filter(iter => iter.zoneID == this.opsReportSettings.zoneID);
-                    if (zoneEvents.length > 0) {
-                        onZoneID = true;
-                        this.outfitReport.events.push(...zoneEvents);
-                    }
-                    else {
-                        return;
-                    }
-                }
-                else {
-                    this.outfitReport.events.push(...player.events);
-                }
-                const playtime = InvididualGenerator__WEBPACK_IMPORTED_MODULE_14__["IndividualReporter"].classUsage({
-                    player: player,
-                    events: [],
-                    routers: [],
-                    tracking: this.core.tracking
-                });
-                this.outfitReport.players.push(Object.assign({ name: `${(player.outfitTag != '' ? `[${player.outfitTag}] ` : '')}${player.name}` }, playtime));
-            });
-            this.outfitReport.events = this.outfitReport.events.sort((a, b) => a.timestamp - b.timestamp);
-            if (this.core.tracking.running == true) {
-                console.log(`Running setting endTime to now as the tracking is running`);
-                this.core.tracking.endTime = new Date().getTime();
-            }
-            const headshots = Object(EventReporter__WEBPACK_IMPORTED_MODULE_13__["classCollectionNumber"])();
-            for (const ev of this.outfitReport.events) {
-                if (ev.type != "kill" || ev.isHeadshot == false) {
-                    continue;
-                }
-                const loadout = census_PsLoadout__WEBPACK_IMPORTED_MODULE_11__["PsLoadouts"].get(ev.loadoutID);
-                if (loadout == undefined) {
-                    continue;
-                }
-                if (loadout.type == "infil") {
-                    ++headshots.infil;
-                }
-                else if (loadout.type == "lightAssault") {
-                    ++headshots.lightAssault;
-                }
-                else if (loadout.type == "medic") {
-                    ++headshots.medic;
-                }
-                else if (loadout.type == "engineer") {
-                    ++headshots.engineer;
-                }
-                else if (loadout.type == "heavy") {
-                    ++headshots.heavy;
-                }
-                else if (loadout.type == "max") {
-                    ++headshots.max;
-                }
-                ++headshots.total;
-            }
-            this.outfitReport.classStats.set("Headshot", headshots);
-            for (const ev of this.outfitReport.events) {
-                let statName = "Other";
-                if (ev.type == "kill") {
-                    statName = "Kill";
-                }
-                else if (ev.type == "death") {
-                    statName = (ev.revived == true) ? "Revived" : "Death";
-                }
-                else if (ev.type == "exp") {
-                    const event = PsEvent__WEBPACK_IMPORTED_MODULE_12__["PsEvents"].get(ev.expID);
-                    if (event != undefined) {
-                        if (event.track == false) {
-                            continue;
-                        }
-                        statName = event.name;
-                    }
-                }
-                else {
-                    continue;
-                }
-                if (!this.outfitReport.classStats.has(statName)) {
-                    //console.log(`Added stats for '${statName}'`);
-                    this.outfitReport.classStats.set(statName, Object(EventReporter__WEBPACK_IMPORTED_MODULE_13__["classCollectionNumber"])());
-                }
-                const classCollection = this.outfitReport.classStats.get(statName);
-                ++classCollection.total;
-                const loadout = census_PsLoadout__WEBPACK_IMPORTED_MODULE_11__["PsLoadouts"].get(ev.loadoutID);
-                if (loadout == undefined) {
-                    continue;
-                }
-                if (loadout.type == "infil") {
-                    ++classCollection.infil;
-                }
-                else if (loadout.type == "lightAssault") {
-                    ++classCollection.lightAssault;
-                }
-                else if (loadout.type == "medic") {
-                    ++classCollection.medic;
-                }
-                else if (loadout.type == "engineer") {
-                    ++classCollection.engineer;
-                }
-                else if (loadout.type == "heavy") {
-                    ++classCollection.heavy;
-                }
-                else if (loadout.type == "max") {
-                    ++classCollection.max;
-                }
-            }
-            EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].weaponKills(this.outfitReport.events).ok(data => this.outfitReport.weaponKillBreakdown = data);
-            EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].weaponTypeKills(this.outfitReport.events).ok(data => this.outfitReport.weaponTypeKillBreakdown = data);
-            EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].factionKills(this.outfitReport.events).ok(data => this.outfitReport.factionKillBreakdown = data);
-            EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].factionDeaths(this.outfitReport.events).ok(data => this.outfitReport.factionDeathBreakdown = data);
-            EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].continentKills(this.outfitReport.events).ok(data => this.outfitReport.continentKillBreakdown = data);
-            EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].continentDeaths(this.outfitReport.events).ok(data => this.outfitReport.continentDeathBreakdown = data);
-            EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].weaponDeaths(this.outfitReport.events).ok(data => this.outfitReport.deathAllBreakdown = data);
-            EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].weaponDeaths(this.outfitReport.events, true).ok(data => this.outfitReport.deathRevivedBreakdown = data);
-            EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].weaponDeaths(this.outfitReport.events, false).ok(data => this.outfitReport.deathKilledBreakdown = data);
-            EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].weaponTypeDeaths(this.outfitReport.events).ok(data => this.outfitReport.deathAllTypeBreakdown = data);
-            EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].weaponTypeDeaths(this.outfitReport.events, true).ok(data => this.outfitReport.deathRevivedTypeBreakdown = data);
-            EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].weaponTypeDeaths(this.outfitReport.events, false).ok(data => this.outfitReport.deathKilledTypeBreakdown = data);
-            EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].weaponDeathBreakdown(this.outfitReport.events).ok(data => this.outfitReport.weaponTypeDeathBreakdown = data);
-            /* Not super useful and take a long time to generate
-            this.outfitReport.timeUnrevived = IndividualReporter.unrevivedTime(this.outfitReport.events);
-            this.outfitReport.revivedLifeExpectance = IndividualReporter.reviveLifeExpectance(this.outfitReport.events);
-            this.outfitReport.kmLifeExpectance = IndividualReporter.lifeExpectanceRate(this.outfitReport.events);
-            this.outfitReport.kmTimeDead = IndividualReporter.timeUntilReviveRate(this.outfitReport.events);
-            */
-            const classFilter = (iter, type, loadouts) => {
-                if (iter.type == type) {
-                    return loadouts.indexOf(iter.loadoutID) > -1;
-                }
-                return false;
-            };
-            EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].weaponTypeKills(this.outfitReport.events.filter(iter => classFilter(iter, "kill", ["1", "8", "15"])))
-                .ok(data => this.outfitReport.classTypeKills.infil = data);
-            EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].weaponTypeKills(this.outfitReport.events.filter(iter => classFilter(iter, "kill", ["3", "10", "17"])))
-                .ok(data => this.outfitReport.classTypeKills.lightAssault = data);
-            EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].weaponTypeKills(this.outfitReport.events.filter(iter => classFilter(iter, "kill", ["4", "11", "18"])))
-                .ok(data => this.outfitReport.classTypeKills.medic = data);
-            EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].weaponTypeKills(this.outfitReport.events.filter(iter => classFilter(iter, "kill", ["5", "12", "19"])))
-                .ok(data => this.outfitReport.classTypeKills.engineer = data);
-            EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].weaponTypeKills(this.outfitReport.events.filter(iter => classFilter(iter, "kill", ["6", "13", "20"])))
-                .ok(data => this.outfitReport.classTypeKills.heavy = data);
-            EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].weaponTypeKills(this.outfitReport.events.filter(iter => classFilter(iter, "kill", ["7", "14", "21"])))
-                .ok(data => this.outfitReport.classTypeKills.max = data);
-            EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].weaponTypeDeaths(this.outfitReport.events.filter(iter => classFilter(iter, "death", ["1", "8", "15"])))
-                .ok(data => this.outfitReport.classTypeDeaths.infil = data);
-            EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].weaponTypeDeaths(this.outfitReport.events.filter(iter => classFilter(iter, "death", ["3", "10", "17"])))
-                .ok(data => this.outfitReport.classTypeDeaths.lightAssault = data);
-            EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].weaponTypeDeaths(this.outfitReport.events.filter(iter => classFilter(iter, "death", ["4", "11", "18"])))
-                .ok(data => this.outfitReport.classTypeDeaths.medic = data);
-            EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].weaponTypeDeaths(this.outfitReport.events.filter(iter => classFilter(iter, "death", ["5", "12", "19"])))
-                .ok(data => this.outfitReport.classTypeDeaths.engineer = data);
-            EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].weaponTypeDeaths(this.outfitReport.events.filter(iter => classFilter(iter, "death", ["6", "13", "20"])))
-                .ok(data => this.outfitReport.classTypeDeaths.heavy = data);
-            EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].weaponTypeDeaths(this.outfitReport.events.filter(iter => classFilter(iter, "death", ["7", "14", "21"])))
-                .ok(data => this.outfitReport.classTypeDeaths.max = data);
-            this.outfitReport.classKds.infil = InvididualGenerator__WEBPACK_IMPORTED_MODULE_14__["IndividualReporter"].classVersusKd(this.outfitReport.events, "infil");
-            this.outfitReport.classKds.lightAssault = InvididualGenerator__WEBPACK_IMPORTED_MODULE_14__["IndividualReporter"].classVersusKd(this.outfitReport.events, "lightAssault");
-            this.outfitReport.classKds.medic = InvididualGenerator__WEBPACK_IMPORTED_MODULE_14__["IndividualReporter"].classVersusKd(this.outfitReport.events, "medic");
-            this.outfitReport.classKds.engineer = InvididualGenerator__WEBPACK_IMPORTED_MODULE_14__["IndividualReporter"].classVersusKd(this.outfitReport.events, "engineer");
-            this.outfitReport.classKds.heavy = InvididualGenerator__WEBPACK_IMPORTED_MODULE_14__["IndividualReporter"].classVersusKd(this.outfitReport.events, "heavy");
-            this.outfitReport.classKds.max = InvididualGenerator__WEBPACK_IMPORTED_MODULE_14__["IndividualReporter"].classVersusKd(this.outfitReport.events, "max");
-            this.outfitReport.classKds.total = InvididualGenerator__WEBPACK_IMPORTED_MODULE_14__["IndividualReporter"].classVersusKd(this.outfitReport.events);
-            EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].outfitVersusBreakdown(this.outfitReport.events).ok(data => this.outfitReport.outfitVersusBreakdown = data);
-            EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].vehicleKills(this.outfitReport.events).ok(data => this.outfitReport.vehicleKillBreakdown = data);
-            EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].vehicleWeaponKills(this.outfitReport.events).ok(data => this.outfitReport.vehicleKillWeaponBreakdown = data);
-            let otherIDs = [];
-            const breakdown = new Map();
-            for (const event of this.outfitReport.events) {
-                if (event.type == "exp") {
-                    const exp = PsEvent__WEBPACK_IMPORTED_MODULE_12__["PsEvents"].get(event.expID) || PsEvent__WEBPACK_IMPORTED_MODULE_12__["PsEvent"].other;
-                    if (!breakdown.has(exp.name)) {
-                        breakdown.set(exp.name, new InvididualGenerator__WEBPACK_IMPORTED_MODULE_14__["ExpBreakdown"]());
-                    }
-                    const score = breakdown.get(exp.name);
-                    score.name = exp.name;
-                    score.score += event.amount;
-                    score.amount += 1;
-                    if (exp == PsEvent__WEBPACK_IMPORTED_MODULE_12__["PsEvent"].other) {
-                        otherIDs.push(event.expID);
-                    }
-                }
-            }
-            console.log(`Untracked experience IDs: ${otherIDs.filter((v, i, a) => a.indexOf(v) == i).join(", ")}`);
-            // Sort all the entries by score, followed by amount, then lastly name
-            this.outfitReport.scoreBreakdown = [...breakdown.entries()].sort((a, b) => {
-                return (b[1].score - a[1].score)
-                    || (b[1].amount - a[1].amount)
-                    || (b[0].localeCompare(a[0]));
-            }).map((a) => a[1]); // Transform the tuple into the ExpBreakdown
-            this.outfitReport.continent = InvididualGenerator__WEBPACK_IMPORTED_MODULE_14__["IndividualReporter"].generateContinentPlayedOn(this.outfitReport.events);
-            this.outfitReport.overtimePer1.kpm = EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].kpmOverTime(this.outfitReport.events, 60000);
-            this.outfitReport.overtimePer1.kd = EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].kdOverTime(this.outfitReport.events, 60000);
-            this.outfitReport.overtimePer1.rpm = EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].revivesOverTime(this.outfitReport.events, 60000);
-            this.outfitReport.overtimePer5.kpm = EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].kpmOverTime(this.outfitReport.events);
-            this.outfitReport.overtimePer5.kd = EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].kdOverTime(this.outfitReport.events);
-            this.outfitReport.overtimePer5.rpm = EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].revivesOverTime(this.outfitReport.events);
-            this.outfitReport.perUpdate.kd = EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].kdPerUpdate(this.outfitReport.events);
+            !(function webpackMissingModule() { var e = new Error("Cannot find module 'reports/OutfitReport.js'"); e.code = 'MODULE_NOT_FOUND'; throw e; }()).generate({
+                settings: {
+                    zoneID: null
+                },
+                captures: [],
+                playerCaptures: [],
+                players: new Map(),
+                outfits: [],
+                events: [],
+                tracking: this.core.tracking
+            }).ok(data => this.outfitReport = data);
         },
         generateWinterReport: function () {
-            const params = new winter_WinterReportParameters__WEBPACK_IMPORTED_MODULE_31__["WinterReportParameters"]();
+            const params = new winter_WinterReportParameters__WEBPACK_IMPORTED_MODULE_30__["WinterReportParameters"]();
             params.players = Array.from(this.core.stats.values());
             params.timeTracking = this.core.tracking;
             params.settings = this.winter.settings;
@@ -65210,15 +64758,15 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 params.events.push(...player.events);
             });
             this.winter.report = Loadable__WEBPACK_IMPORTED_MODULE_5__["Loadable"].loading();
-            winter_WinterReportGenerator__WEBPACK_IMPORTED_MODULE_30__["WinterReportGenerator"].generate(params).ok((data) => {
+            winter_WinterReportGenerator__WEBPACK_IMPORTED_MODULE_29__["WinterReportGenerator"].generate(params).ok((data) => {
                 this.winter.report = Loadable__WEBPACK_IMPORTED_MODULE_5__["Loadable"].loaded(data);
             });
         },
         generatePersonalReport: function (charID) {
             let opsLeft = 2;
             let html = "";
-            let report = new InvididualGenerator__WEBPACK_IMPORTED_MODULE_14__["Report"]();
-            PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_15__["PersonalReportGenerator"].getTemplate().ok((type) => {
+            let report = new InvididualGenerator__WEBPACK_IMPORTED_MODULE_13__["Report"]();
+            PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_14__["PersonalReportGenerator"].getTemplate().ok((type) => {
                 html = type;
                 if (--opsLeft == 0) {
                     done();
@@ -65233,8 +64781,8 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             });
             const done = () => {
                 var _a;
-                const str = PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_15__["PersonalReportGenerator"].generate(html, report);
-                _node_modules_file_saver_dist_FileSaver_js__WEBPACK_IMPORTED_MODULE_16__["saveAs"](new File([str], `topt-${(_a = report.player) === null || _a === void 0 ? void 0 : _a.name}.html`, { type: "text/html" }));
+                const str = PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_14__["PersonalReportGenerator"].generate(html, report);
+                _node_modules_file_saver_dist_FileSaver_js__WEBPACK_IMPORTED_MODULE_15__["saveAs"](new File([str], `topt-${(_a = report.player) === null || _a === void 0 ? void 0 : _a.name}.html`, { type: "text/html" }));
             };
         },
         removeTrendSession: function (index) {
@@ -65243,7 +64791,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 return;
             }
             this.outfitTrends.sessions.splice(index, 1);
-            Storage__WEBPACK_IMPORTED_MODULE_28__["StorageHelper"].setTrends(this.storage.trendFileName, this.outfitTrends);
+            Storage__WEBPACK_IMPORTED_MODULE_27__["StorageHelper"].setTrends(this.storage.trendFileName, this.outfitTrends);
         },
         generatePlayerReport: function (charID) {
             const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_4__["ApiResponse"]();
@@ -65267,7 +64815,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                     tracking: Object.assign({}, this.core.tracking),
                     routers: [...this.core.routerTracking.routers]
                 };
-                InvididualGenerator__WEBPACK_IMPORTED_MODULE_14__["IndividualReporter"].generatePersonalReport(parameters).ok(data => {
+                InvididualGenerator__WEBPACK_IMPORTED_MODULE_13__["IndividualReporter"].generatePersonalReport(parameters).ok(data => {
                     response.resolveOk(data);
                 });
             }
@@ -65316,7 +64864,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                     generateReport();
                 }
             };
-            PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_15__["PersonalReportGenerator"].getTemplate().ok((type) => {
+            PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_14__["PersonalReportGenerator"].getTemplate().ok((type) => {
                 html = type;
                 if (--opsLeft == 0) {
                     done();
@@ -65328,7 +64876,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 const zip = new jszip__WEBPACK_IMPORTED_MODULE_8__();
                 const timestamp = moment__WEBPACK_IMPORTED_MODULE_6__(new Date()).format("YYYY-MM-DD");
                 for (const report of reports) {
-                    const str = PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_15__["PersonalReportGenerator"].generate(html, report);
+                    const str = PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_14__["PersonalReportGenerator"].generate(html, report);
                     zip.file(`topt_report_${(_a = report.player) === null || _a === void 0 ? void 0 : _a.name}_${timestamp}.html`, str);
                     console.log(`Added ${(_b = report.player) === null || _b === void 0 ? void 0 : _b.name} to zip file`);
                 }
@@ -65337,7 +64885,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                     type: "blob"
                 }).then((content) => {
                     console.log(`Generated zip file`);
-                    _node_modules_file_saver_dist_FileSaver_js__WEBPACK_IMPORTED_MODULE_16__["saveAs"](content, `topt_ops_${timestamp}_all.zip`);
+                    _node_modules_file_saver_dist_FileSaver_js__WEBPACK_IMPORTED_MODULE_15__["saveAs"](content, `topt_ops_${timestamp}_all.zip`);
                     console.log(`FileSaver performed save of zip`);
                 });
             };
@@ -65361,26 +64909,26 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 this.outfitTrends.sessions.push({
                     timestamp: new Date(this.core.tracking.startTime),
                     kds: {
-                        total: EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].kdBoxplot(chars, this.core.tracking),
-                        infil: EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].kdBoxplot(chars, this.core.tracking, "infil"),
-                        lightAssault: EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].kdBoxplot(chars, this.core.tracking, "lightAssault"),
-                        medic: EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].kdBoxplot(chars, this.core.tracking, "medic"),
-                        engineer: EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].kdBoxplot(chars, this.core.tracking, "engineer"),
-                        heavy: EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].kdBoxplot(chars, this.core.tracking, "heavy"),
-                        max: EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].kdBoxplot(chars, this.core.tracking, "max")
+                        total: EventReporter__WEBPACK_IMPORTED_MODULE_12__["default"].kdBoxplot(chars, this.core.tracking),
+                        infil: EventReporter__WEBPACK_IMPORTED_MODULE_12__["default"].kdBoxplot(chars, this.core.tracking, "infil"),
+                        lightAssault: EventReporter__WEBPACK_IMPORTED_MODULE_12__["default"].kdBoxplot(chars, this.core.tracking, "lightAssault"),
+                        medic: EventReporter__WEBPACK_IMPORTED_MODULE_12__["default"].kdBoxplot(chars, this.core.tracking, "medic"),
+                        engineer: EventReporter__WEBPACK_IMPORTED_MODULE_12__["default"].kdBoxplot(chars, this.core.tracking, "engineer"),
+                        heavy: EventReporter__WEBPACK_IMPORTED_MODULE_12__["default"].kdBoxplot(chars, this.core.tracking, "heavy"),
+                        max: EventReporter__WEBPACK_IMPORTED_MODULE_12__["default"].kdBoxplot(chars, this.core.tracking, "max")
                     },
                     kpms: {
-                        total: EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].kpmBoxplot(chars, this.core.tracking),
-                        infil: EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].kpmBoxplot(chars, this.core.tracking, "infil"),
-                        lightAssault: EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].kpmBoxplot(chars, this.core.tracking, "lightAssault"),
-                        medic: EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].kpmBoxplot(chars, this.core.tracking, "medic"),
-                        engineer: EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].kpmBoxplot(chars, this.core.tracking, "engineer"),
-                        heavy: EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].kpmBoxplot(chars, this.core.tracking, "heavy"),
-                        max: EventReporter__WEBPACK_IMPORTED_MODULE_13__["default"].kpmBoxplot(chars, this.core.tracking, "max"),
+                        total: EventReporter__WEBPACK_IMPORTED_MODULE_12__["default"].kpmBoxplot(chars, this.core.tracking),
+                        infil: EventReporter__WEBPACK_IMPORTED_MODULE_12__["default"].kpmBoxplot(chars, this.core.tracking, "infil"),
+                        lightAssault: EventReporter__WEBPACK_IMPORTED_MODULE_12__["default"].kpmBoxplot(chars, this.core.tracking, "lightAssault"),
+                        medic: EventReporter__WEBPACK_IMPORTED_MODULE_12__["default"].kpmBoxplot(chars, this.core.tracking, "medic"),
+                        engineer: EventReporter__WEBPACK_IMPORTED_MODULE_12__["default"].kpmBoxplot(chars, this.core.tracking, "engineer"),
+                        heavy: EventReporter__WEBPACK_IMPORTED_MODULE_12__["default"].kpmBoxplot(chars, this.core.tracking, "heavy"),
+                        max: EventReporter__WEBPACK_IMPORTED_MODULE_12__["default"].kpmBoxplot(chars, this.core.tracking, "max"),
                     }
                 });
                 if (this.storage.enabled == true) {
-                    Storage__WEBPACK_IMPORTED_MODULE_28__["StorageHelper"].setTrends(this.storage.newTrendFile, this.outfitTrends);
+                    Storage__WEBPACK_IMPORTED_MODULE_27__["StorageHelper"].setTrends(this.storage.newTrendFile, this.outfitTrends);
                 }
             }
         },
@@ -66022,9 +65570,9 @@ class WinterReportSettings {
 /***/ }),
 
 /***/ 0:
-/*!*****************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
-  !*** multi ./src/BreakdownBar.ts ./src/BreakdownBox.ts ./src/BreakdownChart.ts ./src/BreakdownInterval.ts ./src/BreakdownList.ts ./src/census/AchievementAPI.ts ./src/census/ApiWrapper.ts ./src/census/CensusAPI.ts ./src/census/CharacterAPI.ts ./src/census/EventAPI.ts ./src/census/FacilityAPI.ts ./src/census/OutfitAPI.ts ./src/census/PsLoadout.ts ./src/census/VehicleAPI.ts ./src/census/WeaponAPI.ts ./src/core/Core.ts ./src/core/CoreConnection.ts ./src/core/CoreProcessing.ts ./src/core/index.ts ./src/core/TrackedPlayer.ts ./src/Event.ts ./src/EventReporter.ts ./src/events/index.ts ./src/events/TCaptureEvent.ts ./src/events/TDeathEvent.ts ./src/events/TDefendEvent.ts ./src/events/TEvent.ts ./src/events/TEventHandlers.ts ./src/events/TExpEvent.ts ./src/events/TKillEvent.ts ./src/events/TLoadoutEvent.ts ./src/events/TLoginEvent.ts ./src/events/TLogoutEvent.ts ./src/events/TTargetEvent.ts ./src/events/TTeamkillEvent.ts ./src/events/TVehicleKillEvent.ts ./src/events/TZoneEvent.ts ./src/index.ts ./src/InvididualGenerator.ts ./src/Killfeed.ts ./src/KillfeedSquad.ts ./src/Loadable.ts ./src/MomentFilter.ts ./src/OutfitTrends.ts ./src/PersonalReportGenerator.ts ./src/PsEvent.ts ./src/Quartile.ts ./src/StatMap.ts ./src/Storage.ts ./src/winter/WinterMetric.ts ./src/winter/WinterReport.ts ./src/winter/WinterReportGenerator.ts ./src/winter/WinterReportParameters.ts ***!
-  \*****************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+/*!********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** multi ./src/BreakdownBar.ts ./src/BreakdownBox.ts ./src/BreakdownChart.ts ./src/BreakdownInterval.ts ./src/BreakdownList.ts ./src/census/AchievementAPI.ts ./src/census/ApiWrapper.ts ./src/census/CensusAPI.ts ./src/census/CharacterAPI.ts ./src/census/EventAPI.ts ./src/census/FacilityAPI.ts ./src/census/OutfitAPI.ts ./src/census/PsLoadout.ts ./src/census/VehicleAPI.ts ./src/census/WeaponAPI.ts ./src/Event.ts ./src/EventReporter.ts ./src/index.ts ./src/InvididualGenerator.ts ./src/Killfeed.ts ./src/KillfeedSquad.ts ./src/Loadable.ts ./src/MomentFilter.ts ./src/OutfitTrends.ts ./src/PersonalReportGenerator.ts ./src/PsEvent.ts ./src/Quartile.ts ./src/StatMap.ts ./src/Storage.ts ./src/winter/WinterMetric.ts ./src/winter/WinterReport.ts ./src/winter/WinterReportGenerator.ts ./src/winter/WinterReportParameters.ts ***!
+  \********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -66043,28 +65591,8 @@ __webpack_require__(/*! ./src/census/OutfitAPI.ts */"./src/census/OutfitAPI.ts")
 __webpack_require__(/*! ./src/census/PsLoadout.ts */"./src/census/PsLoadout.ts");
 __webpack_require__(/*! ./src/census/VehicleAPI.ts */"./src/census/VehicleAPI.ts");
 __webpack_require__(/*! ./src/census/WeaponAPI.ts */"./src/census/WeaponAPI.ts");
-__webpack_require__(/*! ./src/core/Core.ts */"./src/core/Core.ts");
-__webpack_require__(/*! ./src/core/CoreConnection.ts */"./src/core/CoreConnection.ts");
-__webpack_require__(/*! ./src/core/CoreProcessing.ts */"./src/core/CoreProcessing.ts");
-__webpack_require__(/*! ./src/core/index.ts */"./src/core/index.ts");
-__webpack_require__(/*! ./src/core/TrackedPlayer.ts */"./src/core/TrackedPlayer.ts");
 __webpack_require__(/*! ./src/Event.ts */"./src/Event.ts");
 __webpack_require__(/*! ./src/EventReporter.ts */"./src/EventReporter.ts");
-__webpack_require__(/*! ./src/events/index.ts */"./src/events/index.ts");
-__webpack_require__(/*! ./src/events/TCaptureEvent.ts */"./src/events/TCaptureEvent.ts");
-__webpack_require__(/*! ./src/events/TDeathEvent.ts */"./src/events/TDeathEvent.ts");
-__webpack_require__(/*! ./src/events/TDefendEvent.ts */"./src/events/TDefendEvent.ts");
-__webpack_require__(/*! ./src/events/TEvent.ts */"./src/events/TEvent.ts");
-__webpack_require__(/*! ./src/events/TEventHandlers.ts */"./src/events/TEventHandlers.ts");
-__webpack_require__(/*! ./src/events/TExpEvent.ts */"./src/events/TExpEvent.ts");
-__webpack_require__(/*! ./src/events/TKillEvent.ts */"./src/events/TKillEvent.ts");
-__webpack_require__(/*! ./src/events/TLoadoutEvent.ts */"./src/events/TLoadoutEvent.ts");
-__webpack_require__(/*! ./src/events/TLoginEvent.ts */"./src/events/TLoginEvent.ts");
-__webpack_require__(/*! ./src/events/TLogoutEvent.ts */"./src/events/TLogoutEvent.ts");
-__webpack_require__(/*! ./src/events/TTargetEvent.ts */"./src/events/TTargetEvent.ts");
-__webpack_require__(/*! ./src/events/TTeamkillEvent.ts */"./src/events/TTeamkillEvent.ts");
-__webpack_require__(/*! ./src/events/TVehicleKillEvent.ts */"./src/events/TVehicleKillEvent.ts");
-__webpack_require__(/*! ./src/events/TZoneEvent.ts */"./src/events/TZoneEvent.ts");
 __webpack_require__(/*! ./src/index.ts */"./src/index.ts");
 __webpack_require__(/*! ./src/InvididualGenerator.ts */"./src/InvididualGenerator.ts");
 __webpack_require__(/*! ./src/Killfeed.ts */"./src/Killfeed.ts");

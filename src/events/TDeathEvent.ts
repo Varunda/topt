@@ -1,27 +1,50 @@
-import { TLoadoutEvent } from "./TLoadoutEvent";
 import { TExpEvent } from "./TExpEvent";
-import { TZoneEvent } from "./TZoneEvent";
-import { TTargetEvent } from "./TTargetEvent";
 
 /**
  * Occurs when a character that is being tracked is killed by a character on a different faction
  */
-export interface TDeathEvent extends TLoadoutEvent, TZoneEvent, TTargetEvent {
-    
+export type TDeathEvent = {
+
     /**
      * Type of event
      */
     type: "death";
 
     /**
-     * Loadout ID of the character who killed the source
+     * Character ID of the character that produced the TEvent
      */
-    targetLoadoutID: string;
+    sourceID: string;
+
+    /**
+     * Timestamp in UTC milliseconds of when this TEvent was produced
+     */
+    timestamp: number;
+
+    /**
+     * ID of the zone (continent) the source was on when the event was produced
+     */
+    zoneID: string;
+
+    /**
+     * ID of the loadout that the source was when this event was produced
+     */
+    loadoutID: string;
 
     /**
      * ID of the weapon used to kill the source
      */
     weaponID: string;
+
+    /**
+     * Entity ID of the target that this event effected. This is usually a character ID,
+     * but is not always. For example, it may be an NPC when someone spawns on a router
+     */
+    targetID: string;
+
+    /**
+     * Loadout ID of the character who killed the source
+     */
+    targetLoadoutID: string;
 
     /**
      * If this death from a headshot?

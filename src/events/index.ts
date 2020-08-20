@@ -1,8 +1,5 @@
 import { TEvent, TEventType } from "./TEvent";
 
-import { TLoadoutEvent } from "./TLoadoutEvent";
-import { TZoneEvent } from "./TZoneEvent";
-
 import { TExpEvent } from "./TExpEvent";
 import { TKillEvent } from "./TKillEvent";
 import { TDeathEvent } from "./TDeathEvent";
@@ -16,7 +13,7 @@ import { TLogoutEvent } from "./TLogoutEvent";
 import { TEventHandler } from "./TEventHandlers";
 
 export {
-    TEvent, TEventType, TLoadoutEvent, TZoneEvent,
+    TEvent, TEventType,
     TExpEvent, TKillEvent, TDeathEvent, TTeamkillEvent,
     TCaptureEvent, TDefendEvent,
     TVehicleKillEvent,

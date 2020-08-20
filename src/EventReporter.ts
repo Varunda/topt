@@ -1,13 +1,20 @@
 import { ApiResponse } from "census/ApiWrapper";
 import { Character, CharacterAPI } from "census/CharacterAPI";
 import { Weapon, WeaponAPI } from "census/WeaponAPI";
-import { Event, EventExp, EventKill, EventDeath, EventCapture, EventDefend } from "Event";
 import StatMap from "StatMap";
 import { PsLoadout, PsLoadouts, PsLoadoutType } from "census/PsLoadout";
 import { Vehicle, VehicleAPI, VehicleTypes } from "census/VehicleAPI";
 
 import * as moment from "moment";
 import { PsEvent } from "PsEvent";
+
+import {
+    TEvent, TEventType,
+    TExpEvent, TKillEvent, TDeathEvent, TTeamkillEvent,
+    TCaptureEvent, TDefendEvent,
+    TVehicleKillEvent,
+    TEventHandler
+} from "events/index";
 
 import { TrackedPlayer, IndividualReporter, TimeTracking, Playtime, FacilityCapture } from "InvididualGenerator";
 import OutfitAPI, { Outfit } from "census/OutfitAPI";
@@ -152,13 +159,13 @@ export function defaultVehicleMapper(elem: Vehicle | undefined, ID: string): str
 
 export default class EventReporter {
 
-    public static facilityCaptures(data: {captures: FacilityCapture[], players: (EventDefend | EventCapture)[]}): ApiResponse<BaseCapture[]> {
+    public static facilityCaptures(data: {captures: FacilityCapture[], players: (TCaptureEvent | TDefendEvent)[]}): ApiResponse<BaseCapture[]> {
         const response: ApiResponse<BaseCapture[]> = new ApiResponse();
 
         const baseCaptures: BaseCapture[] = [];
 
         const captures: FacilityCapture[] = data.captures;
-        const players: (EventCapture | EventDefend)[] = data.players;
+        const players: (TCaptureEvent | TDefendEvent)[] = data.players;
 
         const outfitIDs: string[] = players
             .map(iter => iter.outfitID)
@@ -186,7 +193,7 @@ export default class EventReporter {
                     continue;
                 }
 
-                const helpers: (EventCapture | EventDefend)[] = players.filter(iter => iter.timestamp == capture.timestamp.getTime());
+                const helpers: (TDefendEvent | TCaptureEvent)[] = players.filter(iter => iter.timestamp == capture.timestamp.getTime());
                 const outfits: BaseCaptureOutfit[] = [{ name: "No outfit", ID: "-1", amount: 0, tag: "" }];
                 for (const helper of helpers) {
                     let outfitEntry: BaseCaptureOutfit | undefined = undefined;
@@ -232,7 +239,7 @@ export default class EventReporter {
         return response;
     }
 
-    public static experience(expID: string, events: Event[]): ApiResponse<BreakdownArray> {
+    public static experience(expID: string, events: TEvent[]): ApiResponse<BreakdownArray> {
         const exp: StatMap = new StatMap();
 
         for (const event of events) {
@@ -249,7 +256,7 @@ export default class EventReporter {
         );
     }
 
-    public static experienceSource(ids: string[], targetID: string, events: Event[]): ApiResponse<BreakdownArray> {
+    public static experienceSource(ids: string[], targetID: string, events: TEvent[]): ApiResponse<BreakdownArray> {
         const exp: StatMap = new StatMap();
 
         for (const event of events) {
@@ -272,7 +279,7 @@ export default class EventReporter {
         );
     }
 
-    public static outfitVersusBreakdown(events: Event[]): ApiResponse<OutfitVersusBreakdown[]> {
+    public static outfitVersusBreakdown(events: TEvent[]): ApiResponse<OutfitVersusBreakdown[]> {
         const response: ApiResponse<OutfitVersusBreakdown[]> = new ApiResponse();
 
         const outfitBreakdowns: Map<string, OutfitVersusBreakdown> = new Map();
@@ -281,8 +288,8 @@ export default class EventReporter {
        const killCount: number = events.filter(iter => iter.type == "kill").length;
        const deathCount: number = events.filter(iter => iter.type == "death" && iter.revived == false).length;
 
-        const charIDs: string[] = events.filter((iter: Event) => iter.type == "kill" || (iter.type == "death" && iter.revived == false)) 
-            .map((iter: Event) => {
+        const charIDs: string[] = events.filter((iter: TEvent) => iter.type == "kill" || (iter.type == "death" && iter.revived == false)) 
+            .map((iter: TEvent) => {
                 if (iter.type == "kill") {
                     return iter.targetID;
                 } else if (iter.type == "death" && iter.revived == false) {
@@ -397,7 +404,7 @@ export default class EventReporter {
             }
 
             let count: number = 0;
-            const kills: EventKill[] = player.events.filter(iter => iter.type == "kill") as EventKill[];
+            const kills: TKillEvent[] = player.events.filter(iter => iter.type == "kill") as TKillEvent[];
 
             for (const kill of kills) {
                 const psloadout = PsLoadouts.get(kill.loadoutID)
@@ -430,7 +437,7 @@ export default class EventReporter {
             if (player.secondsOnline <= 0) { continue; }
 
             let killCount: number = 0;
-            const kills: EventKill[] = player.events.filter(iter => iter.type == "kill") as EventKill[];
+            const kills: TKillEvent[] = player.events.filter(iter => iter.type == "kill") as TKillEvent[];
 
             for (const kill of kills) {
                 const psloadout = PsLoadouts.get(kill.loadoutID)
@@ -440,7 +447,7 @@ export default class EventReporter {
             }
 
             let deathCount: number = 0;
-            const deaths: EventDeath[] = player.events.filter(iter => iter.type == "death" && iter.revived == false) as EventDeath[];
+            const deaths: TDeathEvent[] = player.events.filter(iter => iter.type == "death" && iter.revived == false) as TDeathEvent[];
 
             for (const death of deaths) {
                 const psloadout = PsLoadouts.get(death.loadoutID)
@@ -464,11 +471,11 @@ export default class EventReporter {
         return kds;
     }
 
-    public static weaponDeathBreakdown(events: Event[]): ApiResponse<BreakdownWeaponType[]> {
+    public static weaponDeathBreakdown(events: TEvent[]): ApiResponse<BreakdownWeaponType[]> {
         const response: ApiResponse<BreakdownWeaponType[]> = new ApiResponse();
 
-        const weapons: string[] = (events.filter((ev: Event) => ev.type == "death") as EventDeath[])
-            .map((ev: EventDeath) => ev.weaponID)
+        const weapons: string[] = (events.filter((ev: TEvent) => ev.type == "death") as TDeathEvent[])
+            .map((ev: TDeathEvent) => ev.weaponID)
             .filter((ID: string, index: number, arr: string[]) => arr.indexOf(ID) == index);
 
         let types: BreakdownWeaponType[] = [];
@@ -479,7 +486,7 @@ export default class EventReporter {
         const missingWeapons: Set<string> = new Set();
 
         WeaponAPI.getByIDs(weapons).ok((data: Weapon[]) => {
-            const deaths: EventDeath[] = events.filter(ev => ev.type == "death") as EventDeath[];
+            const deaths: TDeathEvent[] = events.filter(ev => ev.type == "death") as TDeathEvent[];
 
             for (const death of deaths) {
                 const weapon = data.find(iter => iter.ID == death.weaponID);
@@ -554,7 +561,7 @@ export default class EventReporter {
         return response;
     }
 
-    public static vehicleKills(events: Event[]): ApiResponse<BreakdownArray> {
+    public static vehicleKills(events: TEvent[]): ApiResponse<BreakdownArray> {
         const vehKills: StatMap = new StatMap();
 
         for (const event of events) {
@@ -570,7 +577,7 @@ export default class EventReporter {
         );
     }
 
-    public static vehicleWeaponKills(events: Event[]): ApiResponse<BreakdownArray> {
+    public static vehicleWeaponKills(events: TEvent[]): ApiResponse<BreakdownArray> {
         const vehKills: StatMap = new StatMap();
 
         for (const event of events) {
@@ -586,7 +593,7 @@ export default class EventReporter {
         );
     }
 
-    public static weaponKills(events: Event[]): ApiResponse<BreakdownArray> {
+    public static weaponKills(events: TEvent[]): ApiResponse<BreakdownArray> {
         const wepKills: StatMap = new StatMap();
 
         for (const event of events) {
@@ -602,7 +609,7 @@ export default class EventReporter {
         );
     }
 
-    public static weaponDeaths(events: Event[], revived: boolean | undefined = undefined): ApiResponse<BreakdownArray> {
+    public static weaponDeaths(events: TEvent[], revived: boolean | undefined = undefined): ApiResponse<BreakdownArray> {
         const amounts: StatMap = new StatMap();
 
         for (const event of events) {
@@ -618,7 +625,7 @@ export default class EventReporter {
         );
     }
 
-    public static weaponTypeKills(events: Event[]): ApiResponse<BreakdownArray> {
+    public static weaponTypeKills(events: TEvent[]): ApiResponse<BreakdownArray> {
         const amounts: StatMap = new StatMap();
         const response: ApiResponse<BreakdownArray> = new ApiResponse();
 
@@ -665,7 +672,7 @@ export default class EventReporter {
         return response;
     }
 
-    public static weaponTypeDeaths(events: Event[], revived: boolean | undefined = undefined): ApiResponse<BreakdownArray> {
+    public static weaponTypeDeaths(events: TEvent[], revived: boolean | undefined = undefined): ApiResponse<BreakdownArray> {
         const amounts: StatMap = new StatMap();
         const response: ApiResponse<BreakdownArray> = new ApiResponse();
 
@@ -712,12 +719,12 @@ export default class EventReporter {
         return response;
     }
 
-    public static factionKills(events: Event[]): ApiResponse<BreakdownArray> {
+    public static factionKills(events: TEvent[]): ApiResponse<BreakdownArray> {
         const response: ApiResponse<BreakdownArray> = new ApiResponse();
 
         const arr: BreakdownArray = new BreakdownArray();
 
-        const countKills = function(ev: Event, faction: string) {
+        const countKills = function(ev: TEvent, faction: string) {
             if (ev.type != "kill") {
                 return false;
             }
@@ -760,10 +767,10 @@ export default class EventReporter {
         return response;
     }
 
-    public static factionDeaths(events: Event[]): ApiResponse<BreakdownArray> {
+    public static factionDeaths(events: TEvent[]): ApiResponse<BreakdownArray> {
         const response: ApiResponse<BreakdownArray> = new ApiResponse();
 
-        const countDeaths = function(ev: Event, faction: string) {
+        const countDeaths = function(ev: TEvent, faction: string) {
             if (ev.type != "death" || ev.revived == true) {
                 return false;
             }
@@ -807,10 +814,10 @@ export default class EventReporter {
         return response;
     }
 
-    public static continentKills(events: Event[]): ApiResponse<BreakdownArray> {
+    public static continentKills(events: TEvent[]): ApiResponse<BreakdownArray> {
         const response: ApiResponse<BreakdownArray> = new ApiResponse();
 
-        const countKills = function(ev: Event, zoneID: string) {
+        const countKills = function(ev: TEvent, zoneID: string) {
             return ev.type == "kill" && ev.zoneID == zoneID;
         }
 
@@ -850,10 +857,10 @@ export default class EventReporter {
         return response;
     }
 
-    public static continentDeaths(events: Event[]): ApiResponse<BreakdownArray> {
+    public static continentDeaths(events: TEvent[]): ApiResponse<BreakdownArray> {
         const response: ApiResponse<BreakdownArray> = new ApiResponse();
 
-        const countDeaths = function(ev: Event, zoneID: string) {
+        const countDeaths = function(ev: TEvent, zoneID: string) {
             return ev.type == "death" && ev.revived == false && ev.zoneID == zoneID;
         }
 
@@ -893,7 +900,7 @@ export default class EventReporter {
         return response;
     }
 
-    public static characterKills(events: Event[]): ApiResponse<BreakdownArray> {
+    public static characterKills(events: TEvent[]): ApiResponse<BreakdownArray> {
         const amounts: StatMap = new StatMap();
 
         for (const event of events) {
@@ -909,7 +916,7 @@ export default class EventReporter {
         );
     }
 
-    public static characterDeaths(events: Event[]): ApiResponse<BreakdownArray> {
+    public static characterDeaths(events: TEvent[]): ApiResponse<BreakdownArray> {
         const amounts: StatMap = new StatMap();
 
         for (const event of events) {
@@ -925,9 +932,9 @@ export default class EventReporter {
         );
     }
 
-    public static kpmOverTime(events: Event[], timeWidth: number = 300000): BreakdownTimeslot[] { 
-        const kills: EventKill[] = events.filter(iter => iter.type == "kill")
-            .sort((a, b) => a.timestamp - b.timestamp) as EventKill[];
+    public static kpmOverTime(events: TEvent[], timeWidth: number = 300000): BreakdownTimeslot[] { 
+        const kills: TKillEvent[] = events.filter(iter => iter.type == "kill")
+            .sort((a, b) => a.timestamp - b.timestamp) as TKillEvent[];
 
         const players: Set<string> = new Set();
 
@@ -945,7 +952,7 @@ export default class EventReporter {
 
         while (true) {
             const end = start + timeWidth;
-            const section: EventKill[] = kills.filter(iter => iter.timestamp >= start && iter.timestamp < end);
+            const section: TKillEvent[] = kills.filter(iter => iter.timestamp >= start && iter.timestamp < end);
 
             for (const ev of section) {
                 players.add(ev.sourceID);
@@ -970,8 +977,8 @@ export default class EventReporter {
         return slots;
     }
 
-    public static kdOverTime(events: Event[], timeWidth: number = 300000): BreakdownTimeslot[] {
-        const evs: Event[] = events.filter(iter => iter.type == "kill" || (iter.type == "death" && iter.revived == false));
+    public static kdOverTime(events: TEvent[], timeWidth: number = 300000): BreakdownTimeslot[] {
+        const evs: TEvent[] = events.filter(iter => iter.type == "kill" || (iter.type == "death" && iter.revived == false));
 
         if (evs.length == 0) {
             return [];
@@ -984,10 +991,10 @@ export default class EventReporter {
 
         while (true) {
             const end = start + timeWidth;
-            const section: Event[] = evs.filter(iter => iter.timestamp >= start && iter.timestamp < end);
+            const section: TEvent[] = evs.filter(iter => iter.timestamp >= start && iter.timestamp < end);
 
-            const kills: EventKill[] = section.filter(iter => iter.type == "kill") as EventKill[];
-            const deaths: EventDeath[] = section.filter(iter => iter.type == "death" && iter.revived == false) as EventDeath[];
+            const kills: TKillEvent[] = section.filter(iter => iter.type == "kill") as TKillEvent[];
+            const deaths: TDeathEvent[] = section.filter(iter => iter.type == "death" && iter.revived == false) as TDeathEvent[];
 
             slots.push({
                 startTime: start,
@@ -1005,8 +1012,8 @@ export default class EventReporter {
         return slots;
     }
 
-    public static kdPerUpdate(allEvents: Event[]): BreakdownTimeslot[] {
-        const events: Event[] = allEvents.filter(iter => iter.type == "kill" || (iter.type == "death" && iter.revived == false));
+    public static kdPerUpdate(allEvents: TEvent[]): BreakdownTimeslot[] {
+        const events: TEvent[] = allEvents.filter(iter => iter.type == "kill" || (iter.type == "death" && iter.revived == false));
 
         if (events.length == 0) {
             return [];
@@ -1041,8 +1048,8 @@ export default class EventReporter {
         return slots;
     }
 
-    public static revivesOverTime(events: Event[], timeWidth: number = 300000): BreakdownTimeslot[] {
-        const revives: Event[] = events.filter(iter => iter.type == "exp" && (iter.expID == PsEvent.revive || iter.expID == PsEvent.squadRevive));
+    public static revivesOverTime(events: TEvent[], timeWidth: number = 300000): BreakdownTimeslot[] {
+        const revives: TEvent[] = events.filter(iter => iter.type == "exp" && (iter.expID == PsEvent.revive || iter.expID == PsEvent.squadRevive));
 
         if (revives.length == 0) {
             return [];
@@ -1055,7 +1062,7 @@ export default class EventReporter {
 
         while (true) {
             const end = start + timeWidth;
-            const section: Event[] = revives.filter(iter => iter.timestamp >= start && iter.timestamp < end);
+            const section: TEvent[] = revives.filter(iter => iter.timestamp >= start && iter.timestamp < end);
 
             const players: number = section.map(iter => iter.sourceID)
                 .filter((value: string, index: number, arr: string[]) => arr.indexOf(value) == index).length;

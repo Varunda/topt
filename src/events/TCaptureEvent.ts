@@ -1,14 +1,28 @@
-import { TZoneEvent } from "./TZoneEvent";
 
 /**
  * Occurs when a character participates in the capture of a base
  */
-export interface TCaptureEvent extends TZoneEvent {
+export type TCaptureEvent = {
 
     /**
-     * What type of event this event is
+     * Type of event this TEvent is
      */
     type: "capture";
+
+    /**
+     * Character ID of the character that produced the TEvent
+     */
+    sourceID: string;
+
+    /**
+     * ID of the zone (continent) the source was on when the event was produced
+     */
+    zoneID: string;
+
+    /**
+     * Timestamp in UTC milliseconds of when this TEvent was produced
+     */
+    timestamp: number;
 
     /**
      * ID of the outfit the source is a part of. Is "0" if no outfit
