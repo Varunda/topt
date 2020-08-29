@@ -235,6 +235,15 @@
                         </div>
                     </div>
 
+                    <input class="form-control" v-model="parameters.autoStartTime"
+                        :class="[parameters.validStartTime == true ? '' : 'is-invalid']"
+                        type="text" pattern="\d{2}:?\d{2}" @blur="validateStartTime"
+                        placeholder="HH:mm (24 hour time)" title="Time to automatically start collecting data. Use 24 hour time">
+                    
+                    <span v-if="parameters.startTimeLeft">
+                        Starting in {{parameters.startTimeLeft}} seconds
+                    </span>
+
                     <button v-if="tracking.running == false && data.length == 0" @click="setSaveEvents(true)"
                             class="btn btn-primary w-100 mb-2">
                         Begin tracking
@@ -1186,53 +1195,16 @@
                     </div>
                 </div>
 
-                <h4 class="strike">Revived weapon deaths</h4>
+                <h4 class="strike">Teamkill weapons</h4>
                 <div class="row">
                     <div class="col-3">
-                        <breakdown :data="outfitReport.deathRevivedBreakdown" :show-all="false"
-                            left-title="Weapon deaths" right-title="Amount"
+                        <breakdown :data="outfitReport.teamkillBreakdown" :show-all="false"
+                            left-title="Teamkill weapons" right-title="Amount"
                             :clipped-amount="5" :show-total="true">
                         </breakdown>
                     </div>
                     <div class="col-3">
-                        <breakdown-chart :src="outfitReport.deathRevivedBreakdown"
-                            :show-all="false" :clipped-amount="8">
-                        </breakdown-chart>
-                    </div>
-                    <div class="col-3">
-                        <breakdown :data="outfitReport.deathRevivedTypeBreakdown" :show-all="false"
-                            left-title="Weapon type deaths" right-title="Amount"
-                            :show-percent="true" :clipped-amount="5" :show-total="true">
-                        </breakdown>
-                    </div>
-                    <div class="col-3">
-                        <breakdown-chart :src="outfitReport.deathRevivedTypeBreakdown"
-                            :show-all="false" :clipped-amount="8">
-                        </breakdown-chart>
-                    </div>
-                </div>
-
-                <h4 class="strike">Unrevived weapon deaths</h4>
-                <div class="row">
-                    <div class="col-3">
-                        <breakdown :data="outfitReport.deathKilledBreakdown" :show-all="false"
-                            left-title="Weapon deaths" right-title="Amount"
-                            :clipped-amount="5" :show-total="true">
-                        </breakdown>
-                    </div>
-                    <div class="col-3">
-                        <breakdown-chart :src="outfitReport.deathKilledBreakdown"
-                            :show-all="false" :clipped-amount="8">
-                        </breakdown-chart>
-                    </div>
-                    <div class="col-3">
-                        <breakdown :data="outfitReport.deathKilledTypeBreakdown" :show-all="false"
-                            left-title="Weapon type deaths" right-title="Amount"
-                            :show-percent="true" :clipped-amount="5" :show-total="true">
-                        </breakdown>
-                    </div>
-                    <div class="col-3">
-                        <breakdown-chart :src="outfitReport.deathKilledTypeBreakdown"
+                        <breakdown-chart :src="outfitReport.teamkillBreakdown"
                             :show-all="false" :clipped-amount="8">
                         </breakdown-chart>
                     </div>

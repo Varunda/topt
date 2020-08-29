@@ -44,9 +44,9 @@ export class WinterReportGenerator {
         report.fun.push(this.mostRevived(parameters));
         report.fun.push(this.mostTransportAssists(parameters));
         report.fun.push(this.mostReconAssists(parameters));
-        report.fun.push(this.mostConcAssists(parameters));
-        report.fun.push(this.mostEMPAssist(parameters));
-        report.fun.push(this.mostFlashAssists(parameters));
+        //report.fun.push(this.mostConcAssists(parameters));
+        //report.fun.push(this.mostEMPAssist(parameters));
+        //report.fun.push(this.mostFlashAssists(parameters));
         report.fun.push(this.mostSaviors(parameters));
         report.fun.push(this.mostAssists(parameters));
         report.fun.push(this.mostUniqueRevives(parameters));
@@ -142,7 +142,7 @@ export class WinterReportGenerator {
     private static kds(parameters: WinterReportParameters): WinterMetric {
         return this.value(
             parameters,
-            (player: TrackedPlayer) => player.stats.get(PsEvent.kill) / player.stats.get(PsEvent.death, 1),
+            (player: TrackedPlayer) => (player.stats.get(PsEvent.kill) > 24) ? player.stats.get(PsEvent.kill) / player.stats.get(PsEvent.death, 1) : 0,
             {
                 name: "K/D",
                 funName: "K/D",

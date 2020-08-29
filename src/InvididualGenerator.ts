@@ -122,6 +122,8 @@ export class OutfitReport {
     weaponKillBreakdown: BreakdownArray = new BreakdownArray();
     weaponTypeKillBreakdown: BreakdownArray = new BreakdownArray();
 
+    teamkillBreakdown: BreakdownArray = new BreakdownArray();
+
     deathAllBreakdown: BreakdownArray = new BreakdownArray();
     deathAllTypeBreakdown: BreakdownArray = new BreakdownArray();
     deathRevivedBreakdown: BreakdownArray = new BreakdownArray();

@@ -58333,6 +58333,15 @@ class EventReporter {
         }
         return statMapToBreakdown(amounts, census_WeaponAPI__WEBPACK_IMPORTED_MODULE_2__["WeaponAPI"].getByIDs, (elem, ID) => elem.ID == ID, defaultWeaponMapper);
     }
+    static weaponTeamkills(events) {
+        const amounts = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        for (const event of events) {
+            if (event.type == "teamkill") {
+                amounts.increment(event.weaponID);
+            }
+        }
+        return statMapToBreakdown(amounts, census_WeaponAPI__WEBPACK_IMPORTED_MODULE_2__["WeaponAPI"].getByIDs, (elem, ID) => elem.ID == ID, defaultWeaponMapper);
+    }
     static weaponTypeKills(events) {
         const amounts = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
         const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
@@ -58828,6 +58837,7 @@ class OutfitReport {
         };
         this.weaponKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
         this.weaponTypeKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
+        this.teamkillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
         this.deathAllBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
         this.deathAllTypeBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
         this.deathRevivedBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
@@ -63492,6 +63502,7 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
+window.moment = moment__WEBPACK_IMPORTED_MODULE_6__;
 
 
 
@@ -63567,6 +63578,10 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
         parameters: {
             outfitTag: "",
             playerName: "",
+            autoStartTime: "",
+            validStartTime: true,
+            startTimerID: -1,
+            startTimeLeft: 0,
             report: "",
             importing: false,
             outfitRequest: Loadable__WEBPACK_IMPORTED_MODULE_5__["Loadable"].loaded(""),
@@ -63700,6 +63715,43 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             }
             if (this.sockets.facility != null) {
                 this.sockets.facility.close();
+            }
+        },
+        validateStartTime: function (ev) {
+            const value = ev.target.value;
+            clearInterval(this.parameters.startTimerID);
+            if (!value || value.trim().length == 0) {
+                console.log(`Canceling start timer`);
+                this.parameters.validStartTime = true;
+                return;
+            }
+            if (value.match(/^\d{2}:\d{2}$/)) {
+                console.log(`Valid value: ${value}`);
+                this.parameters.validStartTime = true;
+            }
+            else {
+                this.parameters.validStartTime = false;
+                return;
+            }
+            const now = new Date();
+            const current = moment__WEBPACK_IMPORTED_MODULE_6__(now).local();
+            const monthPart = String(`${now.getMonth() + 1}`).padStart(2, "0");
+            const dayPart = String(`${now.getDate()}`).padStart(2, "0");
+            const timeString = `${now.getFullYear()}-${monthPart}-${dayPart}T${value}:00`;
+            console.log(timeString);
+            const when = moment__WEBPACK_IMPORTED_MODULE_6__(timeString).local();
+            const diff = when.diff(current, "seconds");
+            console.log(`Timer set for ${diff} seconds`);
+            this.parameters.startTimeLeft = diff;
+            this.parameters.startTimerID = setInterval(this.timerCountdown, 1000);
+        },
+        timerCountdown: function () {
+            if (this.parameters.startTimeLeft <= 0) {
+                this.setSaveEvents(true);
+                clearInterval(this.parameters.startTimerID);
+            }
+            else {
+                --this.parameters.startTimeLeft;
             }
         },
         importData: function () {
@@ -64055,6 +64107,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].factionDeaths(this.outfitReport.events).ok(data => this.outfitReport.factionDeathBreakdown = data);
             EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].continentKills(this.outfitReport.events).ok(data => this.outfitReport.continentKillBreakdown = data);
             EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].continentDeaths(this.outfitReport.events).ok(data => this.outfitReport.continentDeathBreakdown = data);
+            EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].weaponTeamkills(this.outfitReport.events).ok(data => this.outfitReport.teamkillBreakdown = data);
             EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].weaponDeaths(this.outfitReport.events).ok(data => this.outfitReport.deathAllBreakdown = data);
             EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].weaponDeaths(this.outfitReport.events, true).ok(data => this.outfitReport.deathRevivedBreakdown = data);
             EventReporter__WEBPACK_IMPORTED_MODULE_17__["default"].weaponDeaths(this.outfitReport.events, false).ok(data => this.outfitReport.deathKilledBreakdown = data);
@@ -65145,9 +65198,9 @@ class WinterReportGenerator {
         report.fun.push(this.mostRevived(parameters));
         report.fun.push(this.mostTransportAssists(parameters));
         report.fun.push(this.mostReconAssists(parameters));
-        report.fun.push(this.mostConcAssists(parameters));
-        report.fun.push(this.mostEMPAssist(parameters));
-        report.fun.push(this.mostFlashAssists(parameters));
+        //report.fun.push(this.mostConcAssists(parameters));
+        //report.fun.push(this.mostEMPAssist(parameters));
+        //report.fun.push(this.mostFlashAssists(parameters));
         report.fun.push(this.mostSaviors(parameters));
         report.fun.push(this.mostAssists(parameters));
         report.fun.push(this.mostUniqueRevives(parameters));
@@ -65228,7 +65281,7 @@ class WinterReportGenerator {
         });
     }
     static kds(parameters) {
-        return this.value(parameters, (player) => player.stats.get(PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].kill) / player.stats.get(PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].death, 1), {
+        return this.value(parameters, (player) => (player.stats.get(PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].kill) > 24) ? player.stats.get(PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].kill) / player.stats.get(PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].death, 1) : 0, {
             name: "K/D",
             funName: "K/D",
             description: "Highest K/D",

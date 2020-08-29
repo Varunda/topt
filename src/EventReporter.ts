@@ -618,6 +618,22 @@ export default class EventReporter {
         );
     }
 
+    public static weaponTeamkills(events: Event[]): ApiResponse<BreakdownArray> {
+        const amounts: StatMap = new StatMap();
+
+        for (const event of events) {
+            if (event.type == "teamkill") {
+                amounts.increment(event.weaponID);
+            }
+        }
+
+        return statMapToBreakdown(amounts,
+            WeaponAPI.getByIDs,
+            (elem: Weapon, ID: string) => elem.ID == ID,
+            defaultWeaponMapper
+        );
+    }
+
     public static weaponTypeKills(events: Event[]): ApiResponse<BreakdownArray> {
         const amounts: StatMap = new StatMap();
         const response: ApiResponse<BreakdownArray> = new ApiResponse();
