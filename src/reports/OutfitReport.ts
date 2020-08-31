@@ -69,37 +69,70 @@ export class OutfitReport {
     score: number = 0;
     players: ({ name: string } & Playtime)[] = [];
     events: TEvent[] = [];
+    tracking: TimeTracking = {
+        startTime: 0,
+        endTime: 0,
+        running: false
+    };
 
     facilityCaptures: FacilityCapture[] = [];
-
-    continent: string = "Unknown";
 
     classStats: Map<string, ClassCollection<number>> = new Map();
 
     scoreBreakdown: ExpBreakdown[] = [];
 
+    /**
+     * Collection of stats per 5 minute blocks
+     */
     overtimePer5 = {
         kpm: [] as BreakdownTimeslot[],
         kd: [] as BreakdownTimeslot[],
         rpm: [] as BreakdownTimeslot[],
     };
 
+    /**
+     * Collection of stats per 1 minute blocks
+     */
     overtimePer1 = {
         kpm: [] as BreakdownTimeslot[],
         kd: [] as BreakdownTimeslot[],
         rpm: [] as BreakdownTimeslot[],
     };
 
+    /**
+     * Collection of stats updated everytime a relevant event is performed
+     */
     perUpdate = {
         kpm: [] as BreakdownTimeslot[],
         kd: [] as BreakdownTimeslot[],
         rpm: [] as BreakdownTimeslot[]
     };
 
-    trends = {
-        kpm: classCollectionBreakdownTrend(),
-        kd: classCollectionBreakdownTrend()
+    /**
+     * Numbers used to create the boxplot of KPMs
+     */
+    kpmBoxPlot = {
+        total: [] as number[],
+        infil: [] as number[],
+        lightAssault: [] as number[],
+        medic: [] as number[],
+        engineer: [] as number[],
+        heavy: [] as number[],
+        max: [] as number[]
     };
+
+    /**
+     * Numbers used to create the boxplot of KDs
+     */
+    kdBoxPlot = {
+        total: [] as number[],
+        infil: [] as number[],
+        lightAssault: [] as number[],
+        medic: [] as number[],
+        engineer: [] as number[],
+        heavy: [] as number[],
+        max: [] as number[]
+    }
 
     weaponKillBreakdown: BreakdownArray = new BreakdownArray();
     weaponTypeKillBreakdown: BreakdownArray = new BreakdownArray();
@@ -162,9 +195,10 @@ export class OutfitReport {
 export class OutfitReportGenerator {
 
     public static generate(parameters: OutfitReportParameters): ApiResponse<OutfitReport> {
-        const response: ApiResponse = new ApiResponse();
+        const response: ApiResponse<OutfitReport> = new ApiResponse();
 
         const report: OutfitReport = new OutfitReport();
+        report.tracking = parameters.tracking;
 
         let filterZoneID: boolean = parameters.settings.zoneID != null;
 
@@ -177,33 +211,73 @@ export class OutfitReportGenerator {
             return a.timestamp.getTime() - b.timestamp.getTime();
         });
 
+        let opsLeft: number =
+            + 1 // Facility captures
+            + 1 // Weapon kills
+            + 1 // Weapon type kills
+            + 1 // Faction kills
+            + 1 // Faction deaths
+            + 1 // Cont kills
+            + 1 // Cont deaths
+            + 1 // All weapon deaths
+            + 1 // Unrevived weapon deaths
+            + 1 // Revived weapon deaths
+            + 1 // All weapon type deaths
+            + 1 // Unrevived weapon type deaths
+            + 1 // Revived weapon type deaths
+            + 1 // Weapon death breakdown
+            + 6 // Weapon kill types for all classes
+            + 6 // Weapon death types for all classes
+            + 1 // Outfit VS KD
+            + 1 // Vehicle kills
+            + 1 // Vehicle weapon kills
+
+        const totalOps: number = opsLeft;
+
+        const callback = (step: string) => {
+            return () => {
+                console.log(`Finished ${step}: Have ${opsLeft - 1} ops left outta ${totalOps}`);
+                if (--opsLeft == 0) {
+                    response.resolveOk(report);
+                }
+            }
+        }
+
         EventReporter.facilityCaptures({
             captures: report.facilityCaptures,
             players: parameters.playerCaptures
-        }).ok(data => report.baseCaptures = data);
+        }).ok(data => report.baseCaptures = data).always(callback("Facility captuers"));
 
-        const sessions: SessionV1[] = this.outfitTrends.sessions
-            .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+        const chars: TrackedPlayer[] = Array.from(parameters.players.values());
 
-        report.trends.kpm.total = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kpms.total }; });
-        report.trends.kpm.infil = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kpms.infil }; });
-        report.trends.kpm.lightAssault = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kpms.lightAssault }; });
-        report.trends.kpm.medic = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kpms.medic }; });
-        report.trends.kpm.engineer = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kpms.engineer }; });
-        report.trends.kpm.heavy = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kpms.heavy }; });
+        report.kpmBoxPlot = {
+            total: EventReporter.kpmBoxplot(chars, parameters.tracking),
+            infil: EventReporter.kpmBoxplot(chars, parameters.tracking, "infil"),
+            lightAssault: EventReporter.kpmBoxplot(chars, parameters.tracking, "lightAssault"),
+            medic: EventReporter.kpmBoxplot(chars, parameters.tracking, "medic"),
+            engineer: EventReporter.kpmBoxplot(chars, parameters.tracking, "engineer"),
+            heavy: EventReporter.kpmBoxplot(chars, parameters.tracking, "heavy"),
+            max: EventReporter.kpmBoxplot(chars, parameters.tracking, "max"),
+        }
 
-        report.trends.kd.total = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kds.total }; });
-        report.trends.kd.infil = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kds.infil }; });
-        report.trends.kd.lightAssault = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kds.lightAssault }; });
-        report.trends.kd.medic = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kds.medic }; });
-        report.trends.kd.engineer = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kds.engineer }; });
-        report.trends.kd.heavy = sessions.map(iter => { return { timestamp: iter.timestamp, values: iter.kds.heavy }; });
+        report.kdBoxPlot = {
+            total: EventReporter.kdBoxplot(chars, parameters.tracking),
+            infil: EventReporter.kdBoxplot(chars, parameters.tracking, "infil"),
+            lightAssault: EventReporter.kdBoxplot(chars, parameters.tracking, "lightAssault"),
+            medic: EventReporter.kdBoxplot(chars, parameters.tracking, "medic"),
+            engineer: EventReporter.kdBoxplot(chars, parameters.tracking, "engineer"),
+            heavy: EventReporter.kdBoxplot(chars, parameters.tracking, "heavy"),
+            max: EventReporter.kdBoxplot(chars, parameters.tracking, "max")
+        }
 
-        this.core.statTotals.getMap().forEach((amount: number, expID: string) => {
-            const event: PsEvent | undefined = PsEvents.get(expID);
-            if (event == undefined) { return; }
+        parameters.players.forEach((player: TrackedPlayer, charID: string) => {
+            player.stats.getMap().forEach((amount: number, expID: string) => {
+                const event: PsEvent | undefined = PsEvents.get(expID);
+                if (event == undefined) { return; }
 
-            report.stats.set(event.name, amount);
+                const reportAmount: number = report.stats.get(event.name) ?? 0;
+                report.stats.set(event.name, reportAmount + amount);
+            });
         });
 
         parameters.players.forEach((player: TrackedPlayer, charID: string) => {
@@ -227,6 +301,7 @@ export class OutfitReportGenerator {
 
         report.events = report.events.sort((a, b) => a.timestamp - b.timestamp);
 
+        // Track how many headshots each class got
         const headshots: ClassCollection<number> = classCollectionNumber();
         for (const ev of report.events) {
             if (ev.type != "kill" || ev.isHeadshot == false) {
@@ -283,23 +358,23 @@ export class OutfitReportGenerator {
             else if (loadout.type == "max") { ++classCollection.max; }
         }
 
-        EventReporter.weaponKills(report.events).ok(data => report.weaponKillBreakdown = data);
-        EventReporter.weaponTypeKills(report.events).ok(data => report.weaponTypeKillBreakdown = data);
+        EventReporter.weaponKills(report.events).ok(data => report.weaponKillBreakdown = data).always(callback("Weapon kills"));
+        EventReporter.weaponTypeKills(report.events).ok(data => report.weaponTypeKillBreakdown = data).always(callback("Weapon type kills"));
 
-        EventReporter.factionKills(report.events).ok(data => report.factionKillBreakdown = data);
-        EventReporter.factionDeaths(report.events).ok(data => report.factionDeathBreakdown = data);
+        EventReporter.factionKills(report.events).ok(data => report.factionKillBreakdown = data).always(callback("Faction kills"));
+        EventReporter.factionDeaths(report.events).ok(data => report.factionDeathBreakdown = data).always(callback("Faction deaths"));
 
-        EventReporter.continentKills(report.events).ok(data => report.continentKillBreakdown = data);
-        EventReporter.continentDeaths(report.events).ok(data => report.continentDeathBreakdown = data);
+        EventReporter.continentKills(report.events).ok(data => report.continentKillBreakdown = data).always(callback("Cont kills"));
+        EventReporter.continentDeaths(report.events).ok(data => report.continentDeathBreakdown = data).always(callback("Cont deaths"));
 
-        EventReporter.weaponDeaths(report.events).ok(data => report.deathAllBreakdown = data);
-        EventReporter.weaponDeaths(report.events, true).ok(data => report.deathRevivedBreakdown = data);
-        EventReporter.weaponDeaths(report.events, false).ok(data => report.deathKilledBreakdown = data);
-        EventReporter.weaponTypeDeaths(report.events).ok(data => report.deathAllTypeBreakdown = data);
-        EventReporter.weaponTypeDeaths(report.events, true).ok(data => report.deathRevivedTypeBreakdown = data);
-        EventReporter.weaponTypeDeaths(report.events, false).ok(data => report.deathKilledTypeBreakdown = data);
+        EventReporter.weaponDeaths(report.events).ok(data => report.deathAllBreakdown = data).always(callback("All weapon deaths"));
+        EventReporter.weaponDeaths(report.events, true).ok(data => report.deathRevivedBreakdown = data).always(callback("Revived weapon deaths"));
+        EventReporter.weaponDeaths(report.events, false).ok(data => report.deathKilledBreakdown = data).always(callback("Unrevived weapon deaths"));
+        EventReporter.weaponTypeDeaths(report.events).ok(data => report.deathAllTypeBreakdown = data).always(callback("All weapon type deaths"));
+        EventReporter.weaponTypeDeaths(report.events, true).ok(data => report.deathRevivedTypeBreakdown = data).always(callback("Revived weapon type deaths"));
+        EventReporter.weaponTypeDeaths(report.events, false).ok(data => report.deathKilledTypeBreakdown = data).always(callback("Unrevived weapon type deaths"));
 
-        EventReporter.weaponDeathBreakdown(report.events).ok(data => report.weaponTypeDeathBreakdown = data);
+        EventReporter.weaponDeathBreakdown(report.events).ok(data => report.weaponTypeDeathBreakdown = data).always(callback("Weapon death breakdown"));
 
         /* Not super useful and take a long time to generate
         report.timeUnrevived = IndividualReporter.unrevivedTime(report.events);
@@ -316,30 +391,30 @@ export class OutfitReportGenerator {
         };
 
         EventReporter.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["1", "8", "15"])))
-            .ok(data => report.classTypeKills.infil = data);
+            .ok(data => report.classTypeKills.infil = data).always(callback("Weapon type kills: Infil"));
         EventReporter.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["3", "10", "17"])))
-            .ok(data => report.classTypeKills.lightAssault = data);
+            .ok(data => report.classTypeKills.lightAssault = data).always(callback("Weapon type kills: LA"));
         EventReporter.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["4", "11", "18"])))
-            .ok(data => report.classTypeKills.medic = data);
+            .ok(data => report.classTypeKills.medic = data).always(callback("Weapon type kills: Medic"));
         EventReporter.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["5", "12", "19"])))
-            .ok(data => report.classTypeKills.engineer = data);
+            .ok(data => report.classTypeKills.engineer = data).always(callback("Weapon type kills: Eng"));
         EventReporter.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["6", "13", "20"])))
-            .ok(data => report.classTypeKills.heavy = data);
+            .ok(data => report.classTypeKills.heavy = data).always(callback("Weapon type kills: Heavy"));
         EventReporter.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["7", "14", "21"])))
-            .ok(data => report.classTypeKills.max = data);
+            .ok(data => report.classTypeKills.max = data).always(callback("Weapon type kills: MAX"));
 
         EventReporter.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["1", "8", "15"])))
-            .ok(data => report.classTypeDeaths.infil = data);
+            .ok(data => report.classTypeDeaths.infil = data).always(callback("Weapon type deaths: Infil"));
         EventReporter.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["3", "10", "17"])))
-            .ok(data => report.classTypeDeaths.lightAssault = data);
+            .ok(data => report.classTypeDeaths.lightAssault = data).always(callback("Weapon type deaths: LA"));
         EventReporter.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["4", "11", "18"])))
-            .ok(data => report.classTypeDeaths.medic = data);
+            .ok(data => report.classTypeDeaths.medic = data).always(callback("Weapon type deaths: Medic"));
         EventReporter.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["5", "12", "19"])))
-            .ok(data => report.classTypeDeaths.engineer = data);
+            .ok(data => report.classTypeDeaths.engineer = data).always(callback("Weapon type deaths: Eng"));
         EventReporter.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["6", "13", "20"])))
-            .ok(data => report.classTypeDeaths.heavy = data);
+            .ok(data => report.classTypeDeaths.heavy = data).always(callback("Weapon type deaths: Heavy"));
         EventReporter.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["7", "14", "21"])))
-            .ok(data => report.classTypeDeaths.max = data);
+            .ok(data => report.classTypeDeaths.max = data).always(callback("Weapon type deaths: MAX"));
 
         report.classKds.infil = IndividualReporter.classVersusKd(report.events, "infil");
         report.classKds.lightAssault = IndividualReporter.classVersusKd(report.events, "lightAssault");
@@ -349,10 +424,10 @@ export class OutfitReportGenerator {
         report.classKds.max = IndividualReporter.classVersusKd(report.events, "max");
         report.classKds.total = IndividualReporter.classVersusKd(report.events);
 
-        EventReporter.outfitVersusBreakdown(report.events).ok(data => report.outfitVersusBreakdown = data);
+        EventReporter.outfitVersusBreakdown(report.events).ok(data => report.outfitVersusBreakdown = data).always(callback("Outfit VS KD"));
 
-        EventReporter.vehicleKills(report.events).ok(data => report.vehicleKillBreakdown = data);
-        EventReporter.vehicleWeaponKills(report.events).ok(data => report.vehicleKillWeaponBreakdown = data);
+        EventReporter.vehicleKills(report.events).ok(data => report.vehicleKillBreakdown = data).always(callback("Vehicle type kills"));
+        EventReporter.vehicleWeaponKills(report.events).ok(data => report.vehicleKillWeaponBreakdown = data).always(callback("Vehicle weapon kills"));
 
         let otherIDs: string[] = [];
         const breakdown: Map<string, ExpBreakdown> = new Map<string, ExpBreakdown>();
@@ -381,8 +456,6 @@ export class OutfitReportGenerator {
                 || (b[1].amount - a[1].amount)
                 || (b[0].localeCompare(a[0]))
         }).map((a) => a[1]); // Transform the tuple into the ExpBreakdown
-
-        report.continent = IndividualReporter.generateContinentPlayedOn(report.events);
 
         report.overtimePer1.kpm = EventReporter.kpmOverTime(report.events, 60000);
         report.overtimePer1.kd = EventReporter.kdOverTime(report.events, 60000);

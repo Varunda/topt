@@ -126,23 +126,6 @@
 
                 <hr>
 
-                <div v-if="storage.enabled == true">
-                    <h6>Saved trends:</h6>
-
-                    <select class="form-control mb-2" v-model="storage.pendingTrend">
-                        <option :value="null">New trends file</option>
-                        <option :value="undefined">Skip</option>
-                        <option v-for="trend in storage.trends" :value="trend.name">
-                            {{trend.name}}
-                        </option>
-                    </select>
-
-                    <input v-if="storage.pendingTrend === null" v-model="storage.newTrendFile"
-                        class="form-control" type="text" placeholder="New trend file name">
-                </div>
-
-                <hr>
-
                 <button @click="connect" type="button" class="btn btn-primary w-100"
                     :disabled="canConnect == false">
                     Connect
@@ -162,20 +145,6 @@
                 </div>
 
                 <hr>
-
-                <span v-if="socketStatus.state == 'idle'"></span>
-                <span v-else-if="socketStatus.state == 'saving'">
-                    Progress: {{socketStatus.data}}
-                </span>
-                <span v-else-if="socketStatus.state == 'loaded'">
-                    Connected!
-                </span>
-                <span v-else-if="socketStatus.state == 'error'">
-                    Error connecting to event stream: {{socketStatus.message}}
-                </span>
-                <span v-else>
-                    Unchecked socketStatus state: '{{socketStatus.state}}'
-                </span>
             </div>
         </div>
 
@@ -208,8 +177,6 @@
                                     class="btn btn-primary"
                                     type="button">
 
-                                    <span v-if="parameters.outfitRequest.state == 'loading'" class="spinner-border spinner-border-sm">
-                                    </span>
                                     Add
                                 </button>
                             </div>
@@ -235,11 +202,11 @@
                         </div>
                     </div>
 
-                    <button v-if="tracking.running == false && data.length == 0" @click="setSaveEvents(true)"
+                    <button v-if="core.tracking.running == false && core.rawData.length == 0" @click="setSaveEvents(true)"
                             class="btn btn-primary w-100 mb-2">
                         Begin tracking
                     </button>
-                    <button v-else-if="tracking.running == true" @click="setSaveEvents(false)"
+                    <button v-else-if="core.tracking.running == true" @click="setSaveEvents(false)"
                             class="btn btn-secondary w-100 mb-2">
                         End tracking
                     </button>
@@ -270,49 +237,12 @@
                         </button>
                     </div>
 
-                    <hr/>
-
-                    <div class="form-group">
-                        <label>Trends file</label>
-
-                        <br>
-
-                        <label><b>File:</b> {{storage.trendFileName}}</label>
-
-                        <button @click="view = 'trends'"
-                            class="btn btn-info w-100 mb-2"
-                            type="button">
-                            Edit trends file
-                        </button>
-
-                        <div class="w-100 mb-2 d-flex">
-                            <label class="btn btn-light btn-outline-dark col-form-label flex-grow-1" for="data-import-outfit-trends">
-                                <input type="file" id="data-import-outfit-trends" class="d-none">
-                                Select file
-                            </label>
-                            <button @click="importOutfitTrends" type="button" class="btn btn-success">
-                                Import trends
-                            </button>
-                        </div>
-
-                        <button @click="exportTrends"
-                            class="btn btn-info w-100 mb-2"
-                            type="button">
-                            Export trends
-                        </button>
-                    </div>
-
                     <hr>
 
                     <div class="form-groupw flex-grow-1">
                         <label class="d-block">
                             <b>Players: </b>
                             Tracking {{core.characters.length}} players
-                        </label>
-
-                        <label class="d-block">
-                            <b>Sessions: </b>
-                            {{outfitTrends.sessions.length}}
                         </label>
                     </div>
 
@@ -349,10 +279,6 @@
                                     Generate
                                 </button>
                             </div>
-                        </div>
-
-                        <div class="col-2 border-right">
-                            Events: {{totalTicks}} ({{totalBytes}})
                         </div>
 
                         <div class="col-8">
@@ -672,9 +598,9 @@
                         </div>
 
                         <div class="flex-grow-1">
-                            <div><b>Start:</b> {{tracking.startTime | moment}}</div>
-                            <div><b>End:</b> {{tracking.endTime | moment}}</div>
-                            <div><b>Duration:</b> {{tracking.startTime | between(tracking.endTime)}}</div>
+                            <div><b>Start:</b> {{outfitReport.tracking.startTime | moment}}</div>
+                            <div><b>End:</b> {{outfitReport.tracking.endTime | moment}}</div>
+                            <div><b>Duration:</b> {{outfitReport.tracking.startTime | between(outfitReport.tracking.endTime)}}</div>
                             <div><b>Players:</b> {{outfitReport.players.length}}</div>
                         </div>
 
@@ -813,59 +739,59 @@
             </div>
 
             <div class="col-12"> <!-- K/D trend -->
-                <h2 class="strike">KPM trends</h2>
+                <h2 class="strike">KPM boxplot</h2>
                 <div class="row">
                     <div class="col-2 pr-0">
                         <h4>Average</h4>
-                        <breakdown-box :src="outfitReport.trends.kpm.total" :show-label="true"></breakdown-box>
+                        <breakdown-box :src="outfitReport.kpmBoxPlot.total"></breakdown-box>
                     </div>
                     <div class="col-2 px-0">
                         <h4>Infiltrator</h4>
-                        <breakdown-box :src="outfitReport.trends.kpm.infil"></breakdown-box>
+                        <breakdown-box :src="outfitReport.kpmBoxPlot.infil"></breakdown-box>
                     </div>
                     <div class="col-2 px-0">
                         <h4>Light assault</h4>
-                        <breakdown-box :src="outfitReport.trends.kpm.lightAssault"></breakdown-box>
+                        <breakdown-box :src="outfitReport.kpmBoxPlot.lightAssault"></breakdown-box>
                     </div>
                     <div class="col-2 px-0">
                         <h4>Medic</h4>
-                        <breakdown-box :src="outfitReport.trends.kpm.medic"></breakdown-box>
+                        <breakdown-box :src="outfitReport.kpmBoxPlot.medic"></breakdown-box>
                     </div>
                     <div class="col-2 px-0">
                         <h4>Engineer</h4>
-                        <breakdown-box :src="outfitReport.trends.kpm.engineer"></breakdown-box>
+                        <breakdown-box :src="outfitReport.kpmBoxPlot.engineer"></breakdown-box>
                     </div>
                     <div class="col-2 pl-0">
                         <h4>Heavy</h4>
-                        <breakdown-box :src="outfitReport.trends.kpm.heavy"></breakdown-box>
+                        <breakdown-box :src="outfitReport.kpmBoxPlot.heavy"></breakdown-box>
                     </div>
                 </div>
 
-                <h2 class="strike">KD trends</h2>
+                <h2 class="strike">KD boxplot</h2>
                 <div class="row">
                     <div class="col-2 pr-0">
                         <h4>Average</h4>
-                        <breakdown-box :src="outfitReport.trends.kd.total" :show-label="true"></breakdown-box>
+                        <breakdown-box :src="outfitReport.kdBoxPlot.total"></breakdown-box>
                     </div>
                     <div class="col-2 px-0">
                         <h4>Infiltrator</h4>
-                        <breakdown-box :src="outfitReport.trends.kd.infil"></breakdown-box>
+                        <breakdown-box :src="outfitReport.kdBoxPlot.infil"></breakdown-box>
                     </div>
                     <div class="col-2 px-0">
                         <h4>Light assault</h4>
-                        <breakdown-box :src="outfitReport.trends.kd.lightAssault"></breakdown-box>
+                        <breakdown-box :src="outfitReport.kdBoxPlot.lightAssault"></breakdown-box>
                     </div>
                     <div class="col-2 px-0">
                         <h4>Medic</h4>
-                        <breakdown-box :src="outfitReport.trends.kd.medic"></breakdown-box>
+                        <breakdown-box :src="outfitReport.kdBoxPlot.medic"></breakdown-box>
                     </div>
                     <div class="col-2 px-0">
                         <h4>Engineer</h4>
-                        <breakdown-box :src="outfitReport.trends.kd.engineer"></breakdown-box>
+                        <breakdown-box :src="outfitReport.kdBoxPlot.engineer"></breakdown-box>
                     </div>
                     <div class="col-2 pl-0">
                         <h4>Heavy</h4>
-                        <breakdown-box :src="outfitReport.trends.kd.heavy"></breakdown-box>
+                        <breakdown-box :src="outfitReport.kdBoxPlot.heavy"></breakdown-box>
                     </div>
                 </div>
 
@@ -989,7 +915,7 @@
                             <td>{{(exp.score / outfitReport.score * 100).toFixed(0)}}%</td>
                             <td>{{exp.amount.toLocaleString()}}</td>
                             <td>
-                                {{(exp.amount / (((tracking.endTime - tracking.startTime) / 60000))).toFixed(2)}}
+                                {{(exp.amount / (((outfitReport.tracking.endTime - outfitReport.tracking.startTime) / 60000))).toFixed(2)}}
                             </td>
                         </tr>
                     </tbody>

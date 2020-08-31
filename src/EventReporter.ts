@@ -420,7 +420,7 @@ export default class EventReporter {
             const minutesOnline: number = secondsOnline / 60;
             const kpm = Number.parseFloat((count / minutesOnline).toFixed(2));
 
-            //console.log(`${player.name} got ${count} kills on ${loadout} in ${minutesOnline} minutes (${kpm})`);
+            console.log(`${player.name} got ${count} kills on ${loadout} in ${minutesOnline} minutes (${kpm})`);
 
             kpms.push(kpm);
         }

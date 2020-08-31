@@ -37,13 +37,14 @@ import EventReporter, { statMapToBreakdown,
     OutfitVersusBreakdown, ClassCollection, classCollectionNumber
 } from "EventReporter";
 import {
-    ExpBreakdown, FacilityCapture, ClassBreakdown, IndividualReporter, OutfitReport,
+    ExpBreakdown, FacilityCapture, ClassBreakdown, IndividualReporter,
     CountedRibbon, Report, TimeTracking, BreakdownCollection, BreakdownSection, BreakdownMeta,
     TrackedRouter,
     ReportParameters
 } from "InvididualGenerator";
 
 import { PersonalReportGenerator } from "PersonalReportGenerator";
+import { OutfitReport, OutfitReportGenerator, OutfitReportSettings } from "reports/OutfitReport";
 
 // @ts-ignore
 import * as FileSaver from "../node_modules/file-saver/dist/FileSaver.js";
@@ -75,7 +76,6 @@ import { WinterReportParameters, WinterReportSettings } from "winter/WinterRepor
 
 import Core from "core/index";
 import { TrackedPlayer } from "core/TrackedPlayer";
-import { OutfitReportGenerator } from "reports/OutfitReport.js";
 
 class OpReportSettings {
     public zoneID: string | null = null;
@@ -456,27 +456,38 @@ export const vm = new Vue({
         generateReport: function(): void {
             if (this.parameters.report == "ops") {
                 this.generateOutfitReport();
-                this.view = "ops";
             } else if (this.parameters.report == "winter") {
                 this.generateWinterReport();
-                this.view = "winter";
             }
 
             this.parameters.report = "";
         },
 
         generateOutfitReport: function(): void {
+            let events: TEvent[] = [];
+
+            this.core.stats.forEach((player: TrackedPlayer, charID: string) => {
+                events.push(...player.events);
+            });
+
+            events.push(...this.core.miscEvents);
+
+            events = events.sort((a, b) => a.timestamp - b.timestamp);
+
             OutfitReportGenerator.generate({
                 settings: {
                     zoneID: null
                 },
-                captures: [],
-                playerCaptures: [],
-                players: new Map(),
-                outfits: [],
-                events: [],
+                captures: this.core.facilityCaptures,
+                playerCaptures: this.core.playerCaptures,
+                players: this.core.stats,
+                outfits: this.core.outfits,
+                events: events,
                 tracking: this.core.tracking
-            }).ok(data => this.outfitReport = data);
+            }).ok((data: OutfitReport) => { 
+                this.outfitReport = data;
+                this.view = "ops";
+            });
         },
 
         generateWinterReport: function(): void {
@@ -494,6 +505,7 @@ export const vm = new Vue({
             this.winter.report = Loadable.loading();
             WinterReportGenerator.generate(params).ok((data: WinterReport) => {
                 this.winter.report = Loadable.loaded(data);
+                this.view = "winter";
             });
         },
 
@@ -671,33 +683,6 @@ export const vm = new Vue({
                 this.core.start();
             } else {
                 this.core.stop();
-
-                const chars: TrackedPlayer[] = Array.from(this.core.stats.values());
-                this.outfitTrends.sessions.push({
-                    timestamp: new Date(this.core.tracking.startTime),
-                    kds: {
-                        total: EventReporter.kdBoxplot(chars, this.core.tracking),
-                        infil: EventReporter.kdBoxplot(chars, this.core.tracking, "infil"),
-                        lightAssault: EventReporter.kdBoxplot(chars, this.core.tracking, "lightAssault"),
-                        medic: EventReporter.kdBoxplot(chars, this.core.tracking, "medic"),
-                        engineer: EventReporter.kdBoxplot(chars, this.core.tracking, "engineer"),
-                        heavy: EventReporter.kdBoxplot(chars, this.core.tracking, "heavy"),
-                        max: EventReporter.kdBoxplot(chars, this.core.tracking, "max")
-                    },
-                    kpms: {
-                        total: EventReporter.kpmBoxplot(chars, this.core.tracking),
-                        infil: EventReporter.kpmBoxplot(chars, this.core.tracking, "infil"),
-                        lightAssault: EventReporter.kpmBoxplot(chars, this.core.tracking, "lightAssault"),
-                        medic: EventReporter.kpmBoxplot(chars, this.core.tracking, "medic"),
-                        engineer: EventReporter.kpmBoxplot(chars, this.core.tracking, "engineer"),
-                        heavy: EventReporter.kpmBoxplot(chars, this.core.tracking, "heavy"),
-                        max: EventReporter.kpmBoxplot(chars, this.core.tracking, "max"),
-                    }
-                });
-
-                if (this.storage.enabled == true) {
-                    StorageHelper.setTrends(this.storage.newTrendFile, this.outfitTrends);
-                }
             }
         },
 
