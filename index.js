@@ -65184,6 +65184,7 @@ WinterMetricIndex.REPAIRS = 5;
 class WinterReportGenerator {
     static generate(parameters) {
         const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        parameters.events = parameters.events.sort((a, b) => b.timestamp - a.timestamp);
         const report = new _WinterReport__WEBPACK_IMPORTED_MODULE_1__["WinterReport"]();
         report.start = new Date(parameters.events[0].timestamp);
         report.end = new Date(parameters.events[parameters.events.length - 1].timestamp);

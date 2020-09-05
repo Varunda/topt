@@ -27,6 +27,8 @@ export class WinterReportGenerator {
     public static generate(parameters: WinterReportParameters): ApiResponse<WinterReport> {
         const response: ApiResponse<WinterReport> = new ApiResponse();
 
+        parameters.events = parameters.events.sort((a, b) => b.timestamp - a.timestamp);
+
         const report: WinterReport = new WinterReport();
         report.start = new Date(parameters.events[0].timestamp);
         report.end = new Date(parameters.events[parameters.events.length - 1].timestamp);
