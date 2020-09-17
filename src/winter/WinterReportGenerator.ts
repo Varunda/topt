@@ -381,7 +381,7 @@ export class WinterReportGenerator {
 
     private static mostSunderersKilled(parameters: WinterReportParameters): WinterMetric {
         return this.vehicle(parameters, [Vehicles.sunderer], {
-            name: "Sunderes killed",
+            name: "Sunderers killed",
             funName: "Bus Bully",
             description: "Most sundies destroyed",
             entries: []
