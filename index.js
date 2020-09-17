@@ -65474,7 +65474,7 @@ class WinterReportGenerator {
     }
     static mostSunderersKilled(parameters) {
         return this.vehicle(parameters, [census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].sunderer], {
-            name: "Sunderes killed",
+            name: "Sunderers killed",
             funName: "Bus Bully",
             description: "Most sundies destroyed",
             entries: []
