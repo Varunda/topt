@@ -54,6 +54,7 @@ export class PsEvent {
     public static resupply: string = "34";
     public static squadResupply: string = "55";
     public static squadMaxRepair: string = "142";
+    public static drawfire: string = "1394";
 
     // Recon events
     public static spotKill: string = "36";

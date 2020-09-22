@@ -58795,6 +58795,7 @@ class OutfitReport {
         };
         this.weaponKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
         this.weaponTypeKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
+        this.teamkillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
         this.deathAllBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
         this.deathAllTypeBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
         this.deathRevivedBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
@@ -61030,6 +61031,7 @@ PsEvent.vehicleRepair = "90";
 PsEvent.resupply = "34";
 PsEvent.squadResupply = "55";
 PsEvent.squadMaxRepair = "142";
+PsEvent.drawfire = "1394";
 // Recon events
 PsEvent.spotKill = "36";
 PsEvent.squadSpotKill = "54";
@@ -65066,6 +65068,7 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
+window.moment = moment__WEBPACK_IMPORTED_MODULE_6__;
 
 
 
@@ -65118,6 +65121,10 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
         parameters: {
             outfitTag: "",
             playerName: "",
+            autoStartTime: "",
+            validStartTime: true,
+            startTimerID: -1,
+            startTimeLeft: 0,
             report: "",
             importing: false,
             outfitRequest: Loadable__WEBPACK_IMPORTED_MODULE_5__["Loadable"].loaded(""),
@@ -65188,6 +65195,43 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             this.coreObject.connect().ok(() => {
                 this.view = "realtime";
             });
+        },
+        validateStartTime: function (ev) {
+            const value = ev.target.value;
+            clearInterval(this.parameters.startTimerID);
+            if (!value || value.trim().length == 0) {
+                console.log(`Canceling start timer`);
+                this.parameters.validStartTime = true;
+                return;
+            }
+            if (value.match(/^\d{2}:\d{2}$/)) {
+                console.log(`Valid value: ${value}`);
+                this.parameters.validStartTime = true;
+            }
+            else {
+                this.parameters.validStartTime = false;
+                return;
+            }
+            const now = new Date();
+            const current = moment__WEBPACK_IMPORTED_MODULE_6__(now).local();
+            const monthPart = String(`${now.getMonth() + 1}`).padStart(2, "0");
+            const dayPart = String(`${now.getDate()}`).padStart(2, "0");
+            const timeString = `${now.getFullYear()}-${monthPart}-${dayPart}T${value}:00`;
+            console.log(timeString);
+            const when = moment__WEBPACK_IMPORTED_MODULE_6__(timeString).local();
+            const diff = when.diff(current, "seconds");
+            console.log(`Timer set for ${diff} seconds`);
+            this.parameters.startTimeLeft = diff;
+            this.parameters.startTimerID = setInterval(this.timerCountdown, 1000);
+        },
+        timerCountdown: function () {
+            if (this.parameters.startTimeLeft <= 0) {
+                this.setSaveEvents(true);
+                clearInterval(this.parameters.startTimerID);
+            }
+            else {
+                --this.parameters.startTimeLeft;
+            }
         },
         importData: function () {
             const elem = document.getElementById("data-import-input");
@@ -66171,12 +66215,16 @@ class WinterReportGenerator {
         report.fun.push(this.highestHSR(parameters));
         report.fun.push(this.getDifferentWeapons(parameters));
         report.fun.push(this.mostESFSKills(parameters));
+        report.fun.push(this.mostLightningKills(parameters));
+        report.fun.push(this.mostHarasserKills(parameters));
+        report.fun.push(this.mostMBTKills(parameters));
         report.fun.push(this.mostSunderersKilled(parameters));
         report.fun.push(this.mostRoadkills(parameters));
         report.fun.push(this.mostUsefulRevives(parameters));
         report.fun.push(this.highestAverageLifeExpectance(parameters));
         report.fun.push(this.mostC4Kills(parameters));
         report.fun.push(this.mostPercentRevive(parameters));
+        report.fun.push(this.mostDrawfireAssists(parameters));
         let opsLeft = +1 // Knife kills
             + 1 // Pistol kills
             + 1 // Grenade kills
@@ -66268,6 +66316,14 @@ class WinterReportGenerator {
             name: "Recon detections",
             funName: "Flies on the Wall",
             description: "Most recon detection ticks",
+            entries: []
+        });
+    }
+    static mostDrawfireAssists(parameters) {
+        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].drawfire], {
+            name: "Drawfire Assists",
+            funName: "Decoy placer",
+            description: "Most drawfire assists",
             entries: []
         });
     }
@@ -66395,6 +66451,30 @@ class WinterReportGenerator {
             name: "ESFs destroyed",
             funName: "Fly Swatter",
             description: "Most ESFs destroyed",
+            entries: []
+        });
+    }
+    static mostMBTKills(parameters) {
+        return this.vehicle(parameters, [census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].vanguard, census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].prowler, census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].magrider], {
+            name: "MBTs destroyed",
+            funName: "Heavy Hitter",
+            description: "Most MBTs destroyed",
+            entries: []
+        });
+    }
+    static mostHarasserKills(parameters) {
+        return this.vehicle(parameters, [census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].harasser], {
+            name: "Harassers destroyed",
+            funName: "Rasser Harasser",
+            description: "Most harassers destroyed",
+            entries: []
+        });
+    }
+    static mostLightningKills(parameters) {
+        return this.vehicle(parameters, [census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].lightning], {
+            name: "Lightnings destroyed",
+            funName: "Thunder stealer",
+            description: "Most lightnings destroyed",
             entries: []
         });
     }

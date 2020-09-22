@@ -10,6 +10,7 @@ import { Loading, Loadable } from "Loadable";
 import * as moment from "moment";
 import * as $ from "jquery";
 import * as JSZip from "jszip";
+(window as any).moment = moment;
 
 import CensusAPI from "census/CensusAPI";
 import OutfitAPI, { Outfit } from "census/OutfitAPI";
@@ -72,6 +73,7 @@ import { KillfeedGeneration, KillfeedEntry, KillfeedOptions, Killfeed } from "Ki
 import { WinterReportGenerator } from "winter/WinterReportGenerator";
 import { WinterReport } from "winter/WinterReport";
 import { WinterReportParameters, WinterReportSettings } from "winter/WinterReportParameters";
+import { timers } from "jquery";
 
 import Core from "core/index";
 import { TrackedPlayer } from "core/TrackedPlayer";
@@ -109,6 +111,11 @@ export const vm = new Vue({
         parameters: {
             outfitTag: "" as string,
             playerName: "" as string,
+
+            autoStartTime: "" as string,
+            validStartTime: true as boolean,
+            startTimerID: -1 as number,
+            startTimeLeft: 0 as number,
 
             report: "" as string,
 
@@ -205,6 +212,52 @@ export const vm = new Vue({
             this.coreObject.connect().ok(() => {
                 this.view = "realtime";
             });
+        },
+
+        validateStartTime: function(ev: InputEvent): void {
+            const value: string = (ev.target as any).value;
+
+            clearInterval(this.parameters.startTimerID);
+
+            if (!value || value.trim().length == 0) {
+                console.log(`Canceling start timer`);
+                this.parameters.validStartTime = true;
+                return;
+            }
+
+            if (value.match(/^\d{2}:\d{2}$/)) {
+                console.log(`Valid value: ${value}`);
+                this.parameters.validStartTime = true;
+            } else {
+                this.parameters.validStartTime = false;
+                return;
+            }
+
+            const now: Date = new Date();
+            const current: moment.Moment = moment(now).local();
+
+            const monthPart: string = String(`${now.getMonth() + 1}`).padStart(2, "0");
+            const dayPart: string = String(`${now.getDate()}`).padStart(2, "0");
+
+            const timeString: string = `${now.getFullYear()}-${monthPart}-${dayPart}T${value}:00`;
+            console.log(timeString);
+            const when: moment.Moment = moment(timeString).local();
+
+            const diff: number = when.diff(current, "seconds");
+            console.log(`Timer set for ${diff} seconds`);
+
+            this.parameters.startTimeLeft = diff;
+
+            this.parameters.startTimerID = setInterval(this.timerCountdown, 1000) as unknown as number;
+        },
+
+        timerCountdown: function(): void {
+            if (this.parameters.startTimeLeft <= 0) {
+                this.setSaveEvents(true);
+                clearInterval(this.parameters.startTimerID);
+            } else {
+                --this.parameters.startTimeLeft;
+            }
         },
 
         importData: function(): void {
