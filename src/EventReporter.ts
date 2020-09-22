@@ -609,6 +609,22 @@ export default class EventReporter {
         );
     }
 
+    public static weaponTeamkills(events: TEvent[]): ApiResponse<BreakdownArray> {
+        const wepKills: StatMap = new StatMap();
+
+        for (const ev of events) {
+            if (ev.type == "teamkill") {
+                wepKills.increment(ev.weaponID);
+            }
+        }
+
+        return statMapToBreakdown(wepKills,
+            WeaponAPI.getByIDs,
+            (elem: Weapon, ID: string) => elem.ID == ID,
+            defaultWeaponMapper
+        );
+    }
+
     public static weaponDeaths(events: TEvent[], revived: boolean | undefined = undefined): ApiResponse<BreakdownArray> {
         const amounts: StatMap = new StatMap();
 

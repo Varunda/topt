@@ -1,9 +1,8 @@
 import Vue from "vue";
 import { BreakdownTimeslot } from "EventReporter";
+import { ColorHelper } from "ColorHelper";
 
 import { Chart } from "chart.js";
-
-import * as moment from "moment";
 
 // @ts-ignore
 import ChartDataLabels from "../node_modules/chartjs-plugin-datalabels/dist/chartjs-plugin-datalabels.js";
@@ -30,6 +29,8 @@ Vue.component("breakdown-interval", {
 
             data: [] as BreakdownTimeslot[],
 
+            darkMode: false as boolean,
+
             chart: {
                 instance: {} as any,
                 options: {} as Chart.ChartOptions,
@@ -51,16 +52,20 @@ Vue.component("breakdown-interval", {
 
     methods: {
         setup: function(): void {
+
+            this.darkMode = ColorHelper.usingDarkTheme();
+
             this.data = [...this.src] as BreakdownTimeslot[];
             this.chart.data = this.data.map(iter => { return { t: new Date(iter.startTime), y: iter.value }; });
 
             this.chart.options = {
                 plugins: {
                     datalabels: {
+                        color: this.darkMode == true ? "#C0C0C0" : "",
                         textAlign: "center",
                         font: {
                             size: 18,
-                            lineHeight: 2
+                            lineHeight: 2,
                         },
                         offset: 10,
                         padding: {
@@ -76,8 +81,9 @@ Vue.component("breakdown-interval", {
                             stepSize: this.YAxisTickStep
                         },
                         gridLines: {
-                            display: this.ShowYAxis
-                        }
+                            display: this.ShowYAxis,
+                            color: this.darkMode == true ? "#FFFFFF" : ""
+                        },
                     }],
                     xAxes: [{
                         type: "time",
@@ -86,7 +92,8 @@ Vue.component("breakdown-interval", {
                             unit: "minute"
                         },
                         gridLines: {
-                            display: this.ShowXAxis
+                            display: this.ShowXAxis,
+                            color: this.darkMode == true ? "#FFFFFF" : ""
                         }
                     }]
                 },
@@ -113,7 +120,8 @@ Vue.component("breakdown-interval", {
                     data: {
                         labels: this.chart.labels,
                         datasets: [{
-                            data: this.chart.data
+                            data: this.chart.data,
+                            backgroundColor: ColorHelper.usingDarkTheme() == true ? "#e7e7e7" : "",
                         }]
                     },
                     options: this.chart.options

@@ -226,7 +226,7 @@
                         Starting in {{parameters.startTimeLeft}} seconds
                     </span>
 
-                    <button v-if="tracking.running == false && data.length == 0" @click="setSaveEvents(true)"
+                    <button v-if="core.tracking.running == false && core.rawData.length == 0" @click="setSaveEvents(true)"
                             class="btn btn-primary w-100 mb-2">
                         Begin tracking
                     </button>
@@ -628,7 +628,7 @@
         <div v-else-if="view == 'ops'" class="row">
             <div class="col-12"> <!-- Header -->
                 <div class="d-flex align-items-center mb-2">
-                    <img :src="showFrog == false ? '/logo.png' : '/frog.png'" class="mr-1" style="max-width: 128px; max-height: 128px; border-radius: 30%;" title="Tide logo">
+                    <img :src="showFrog == false ? '/data/logo.png' : '/data/frog.png'" class="mr-1" style="max-width: 128px; max-height: 128px; border-radius: 30%;" title="Tide logo">
                     <div class="d-flex flex-row flex-grow-1">
                         <div class="flex-grow-1">
                             <h2>Tide OP Tracker (TOPT)</h2>

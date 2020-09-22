@@ -57554,15 +57554,17 @@ window.randomColor = randomColor;
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var vue__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! vue */ "./node_modules/vue/dist/vue.esm.js");
-/* harmony import */ var chart_js__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! chart.js */ "./node_modules/chart.js/dist/Chart.js");
-/* harmony import */ var chart_js__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(chart_js__WEBPACK_IMPORTED_MODULE_1__);
-/* harmony import */ var _node_modules_chartjs_plugin_datalabels_dist_chartjs_plugin_datalabels_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../node_modules/chartjs-plugin-datalabels/dist/chartjs-plugin-datalabels.js */ "./node_modules/chartjs-plugin-datalabels/dist/chartjs-plugin-datalabels.js");
-/* harmony import */ var _node_modules_chartjs_plugin_datalabels_dist_chartjs_plugin_datalabels_js__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(_node_modules_chartjs_plugin_datalabels_dist_chartjs_plugin_datalabels_js__WEBPACK_IMPORTED_MODULE_2__);
+/* harmony import */ var ColorHelper__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ColorHelper */ "./src/ColorHelper.ts");
+/* harmony import */ var chart_js__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! chart.js */ "./node_modules/chart.js/dist/Chart.js");
+/* harmony import */ var chart_js__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(chart_js__WEBPACK_IMPORTED_MODULE_2__);
+/* harmony import */ var _node_modules_chartjs_plugin_datalabels_dist_chartjs_plugin_datalabels_js__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../node_modules/chartjs-plugin-datalabels/dist/chartjs-plugin-datalabels.js */ "./node_modules/chartjs-plugin-datalabels/dist/chartjs-plugin-datalabels.js");
+/* harmony import */ var _node_modules_chartjs_plugin_datalabels_dist_chartjs_plugin_datalabels_js__WEBPACK_IMPORTED_MODULE_3___default = /*#__PURE__*/__webpack_require__.n(_node_modules_chartjs_plugin_datalabels_dist_chartjs_plugin_datalabels_js__WEBPACK_IMPORTED_MODULE_3__);
+
 
 
 // @ts-ignore
 
-chart_js__WEBPACK_IMPORTED_MODULE_1__["Chart"].plugins.unregister(_node_modules_chartjs_plugin_datalabels_dist_chartjs_plugin_datalabels_js__WEBPACK_IMPORTED_MODULE_2___default.a);
+chart_js__WEBPACK_IMPORTED_MODULE_2__["Chart"].plugins.unregister(_node_modules_chartjs_plugin_datalabels_dist_chartjs_plugin_datalabels_js__WEBPACK_IMPORTED_MODULE_3___default.a);
 vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("breakdown-interval", {
     props: {
         src: { type: Array, required: true },
@@ -57580,6 +57582,7 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("breakdown-interval", {
         return {
             ID: Math.round(Math.random() * 100000),
             data: [],
+            darkMode: false,
             chart: {
                 instance: {},
                 options: {},
@@ -57598,15 +57601,17 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("breakdown-interval", {
     },
     methods: {
         setup: function () {
+            this.darkMode = ColorHelper__WEBPACK_IMPORTED_MODULE_1__["ColorHelper"].usingDarkTheme();
             this.data = [...this.src];
             this.chart.data = this.data.map(iter => { return { t: new Date(iter.startTime), y: iter.value }; });
             this.chart.options = {
                 plugins: {
                     datalabels: {
+                        color: this.darkMode == true ? "#C0C0C0" : "",
                         textAlign: "center",
                         font: {
                             size: 18,
-                            lineHeight: 2
+                            lineHeight: 2,
                         },
                         offset: 10,
                         padding: {
@@ -57622,8 +57627,9 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("breakdown-interval", {
                                 stepSize: this.YAxisTickStep
                             },
                             gridLines: {
-                                display: this.ShowYAxis
-                            }
+                                display: this.ShowYAxis,
+                                color: this.darkMode == true ? "#FFFFFF" : ""
+                            },
                         }],
                     xAxes: [{
                             type: "time",
@@ -57632,7 +57638,8 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("breakdown-interval", {
                                 unit: "minute"
                             },
                             gridLines: {
-                                display: this.ShowXAxis
+                                display: this.ShowXAxis,
+                                color: this.darkMode == true ? "#FFFFFF" : ""
                             }
                         }]
                 },
@@ -57651,13 +57658,14 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("breakdown-interval", {
                 if (this.chart.instance != null && this.chart.instance.destroy) {
                     this.chart.instance.destroy();
                 }
-                this.chart.instance = new chart_js__WEBPACK_IMPORTED_MODULE_1__["Chart"](document.getElementById(`breakdown-interval-${this.ID}`), {
+                this.chart.instance = new chart_js__WEBPACK_IMPORTED_MODULE_2__["Chart"](document.getElementById(`breakdown-interval-${this.ID}`), {
                     type: "line",
-                    plugins: this.ShowLabels == true ? [_node_modules_chartjs_plugin_datalabels_dist_chartjs_plugin_datalabels_js__WEBPACK_IMPORTED_MODULE_2___default.a] : [],
+                    plugins: this.ShowLabels == true ? [_node_modules_chartjs_plugin_datalabels_dist_chartjs_plugin_datalabels_js__WEBPACK_IMPORTED_MODULE_3___default.a] : [],
                     data: {
                         labels: this.chart.labels,
                         datasets: [{
-                                data: this.chart.data
+                                data: this.chart.data,
+                                backgroundColor: ColorHelper__WEBPACK_IMPORTED_MODULE_1__["ColorHelper"].usingDarkTheme() == true ? "#e7e7e7" : "",
                             }]
                     },
                     options: this.chart.options
@@ -57740,6 +57748,26 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("breakdown", {
         }
     }
 });
+
+
+/***/ }),
+
+/***/ "./src/ColorHelper.ts":
+/*!****************************!*\
+  !*** ./src/ColorHelper.ts ***!
+  \****************************/
+/*! exports provided: ColorHelper */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "ColorHelper", function() { return ColorHelper; });
+class ColorHelper {
+    static usingDarkTheme() {
+        return window.getComputedStyle(document.body).getPropertyValue("background-color") == "rgb(34, 34, 34)";
+    }
+}
+window.ColorHelper = ColorHelper;
 
 
 /***/ }),
@@ -58279,6 +58307,15 @@ class EventReporter {
         for (const event of events) {
             if (event.type == "kill") {
                 wepKills.increment(event.weaponID);
+            }
+        }
+        return statMapToBreakdown(wepKills, census_WeaponAPI__WEBPACK_IMPORTED_MODULE_2__["WeaponAPI"].getByIDs, (elem, ID) => elem.ID == ID, defaultWeaponMapper);
+    }
+    static weaponTeamkills(events) {
+        const wepKills = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        for (const ev of events) {
+            if (ev.type == "teamkill") {
+                wepKills.increment(ev.weaponID);
             }
         }
         return statMapToBreakdown(wepKills, census_WeaponAPI__WEBPACK_IMPORTED_MODULE_2__["WeaponAPI"].getByIDs, (elem, ID) => elem.ID == ID, defaultWeaponMapper);
@@ -63307,13 +63344,18 @@ class WeaponAPI {
         };
     }
     static loadJson() {
-        const response = new _ApiWrapper__WEBPACK_IMPORTED_MODULE_1__["ApiResponse"](jquery__WEBPACK_IMPORTED_MODULE_2__["get"]("/weapons.json"), ((data) => {
+        const response = new _ApiWrapper__WEBPACK_IMPORTED_MODULE_1__["ApiResponse"](jquery__WEBPACK_IMPORTED_MODULE_2__["get"]("/data/weapons_new.json"), ((data) => {
             const weapons = Array.isArray(data) ? data : JSON.parse(data);
             for (const datum of weapons) {
                 const wep = WeaponAPI.parseCharacter(datum);
                 this._cache.set(wep.ID, wep);
             }
         }));
+    }
+    static getEntires() {
+        // P sure this is safe
+        return Array.from(WeaponAPI._cache.values())
+            .filter(iter => iter != null);
     }
     static precache(weaponID) {
         clearTimeout(this._pendingTimerID);
@@ -63325,12 +63367,16 @@ class WeaponAPI {
         }, 100);
     }
     static getByID(weaponID) {
+        if (WeaponAPI._pendingRequests.has(weaponID)) {
+            return WeaponAPI._pendingRequests.get(weaponID);
+        }
         const response = new _ApiWrapper__WEBPACK_IMPORTED_MODULE_1__["ApiResponse"]();
         if (WeaponAPI._cache.has(weaponID)) {
             response.resolveOk(WeaponAPI._cache.get(weaponID));
         }
         else {
             const request = _CensusAPI__WEBPACK_IMPORTED_MODULE_0__["default"].get(`item?item_id=${weaponID}&c:hide=description,max_stack_size,image_set_id,image_id,image_path&c:lang=en&c:join=item_category^inject_at:category`);
+            WeaponAPI._pendingRequests.set(weaponID, response);
             request.ok((data) => {
                 if (data.returned != 1) {
                     response.resolve({ code: 404, data: `No or multiple weapons returned from ${name}` });
@@ -63345,6 +63391,8 @@ class WeaponAPI {
             }).internalError((err) => {
                 WeaponAPI._cache.set(weaponID, null);
                 console.error(err);
+            }).always(() => {
+                WeaponAPI._pendingRequests.delete(weaponID);
             });
         }
         return response;
@@ -63406,6 +63454,8 @@ class WeaponAPI {
 WeaponAPI._cache = new Map([["0", null]]);
 WeaponAPI._pendingCaches = [];
 WeaponAPI._pendingTimerID = -1;
+// <weapon ID, response>
+WeaponAPI._pendingRequests = new Map();
 window.WeaponAPI = WeaponAPI;
 
 
@@ -65592,6 +65642,23 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             }
             this.core.addPlayer(this.parameters.playerName);
         },
+        exportWeaponData: function () {
+            const weapons = census_WeaponAPI__WEBPACK_IMPORTED_MODULE_9__["WeaponAPI"].getEntires();
+            const lines = weapons.map((iter) => {
+                return {
+                    item_id: iter.ID,
+                    name: {
+                        en: iter.name
+                    },
+                    category: {
+                        name: {
+                            en: iter.type
+                        }
+                    }
+                };
+            });
+            _node_modules_file_saver_dist_FileSaver_js__WEBPACK_IMPORTED_MODULE_15__["saveAs"](new File([JSON.stringify(lines, null, 2)], `weapons.json`, { type: "text/json" }));
+        }
     },
     computed: {
         canConnect: function () {
@@ -65769,6 +65836,8 @@ class OutfitReport {
         };
         this.weaponKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
         this.weaponTypeKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
+        this.teamkillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
+        this.teamkillTypeBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
         this.deathAllBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
         this.deathAllTypeBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
         this.deathRevivedBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
@@ -65837,6 +65906,7 @@ class OutfitReportGenerator {
         let opsLeft = +1 // Facility captures
             + 1 // Weapon kills
             + 1 // Weapon type kills
+            + 1 // Teamkills
             + 1 // Faction kills
             + 1 // Faction deaths
             + 1 // Cont kills
@@ -65993,6 +66063,7 @@ class OutfitReportGenerator {
         }
         EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponKills(report.events).ok(data => report.weaponKillBreakdown = data).always(callback("Weapon kills"));
         EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeKills(report.events).ok(data => report.weaponTypeKillBreakdown = data).always(callback("Weapon type kills"));
+        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTeamkills(report.events).ok(data => report.teamkillBreakdown = data).always(callback("Teamkills"));
         EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].factionKills(report.events).ok(data => report.factionKillBreakdown = data).always(callback("Faction kills"));
         EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].factionDeaths(report.events).ok(data => report.factionDeathBreakdown = data).always(callback("Faction deaths"));
         EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].continentKills(report.events).ok(data => report.continentKillBreakdown = data).always(callback("Cont kills"));

@@ -11,7 +11,7 @@ export class Weapon {
 
 export class WeaponAPI {
 
-    private static _cache: Map<string, Weapon | null> = new Map(
+    public static _cache: Map<string, Weapon | null> = new Map(
         [["0", null]]
     );
 
@@ -32,6 +32,9 @@ export class WeaponAPI {
 
     private static _pendingTimerID: number = -1;
 
+    // <weapon ID, response>
+    private static _pendingRequests: Map<string, ApiResponse<Weapon | null>> = new Map();
+
     public static parseCharacter(elem: any): Weapon {
         return {
             ID: elem.item_id,
@@ -42,7 +45,7 @@ export class WeaponAPI {
 
     public static loadJson(): void {
         const response = new ApiResponse(
-            $.get("/weapons.json"),
+            $.get("/data/weapons_new.json"),
             ((data: any) => {
                 const weapons: any[] = Array.isArray(data) ? data : JSON.parse(data);
                 for (const datum of weapons) {
@@ -51,6 +54,12 @@ export class WeaponAPI {
                 }
             })
         )
+    }
+
+    public static getEntires(): Weapon[] {
+        // P sure this is safe
+        return Array.from(WeaponAPI._cache.values())
+            .filter(iter => iter != null) as Weapon[];
     }
 
     public static precache(weaponID: string): void {
@@ -66,6 +75,10 @@ export class WeaponAPI {
     }
 
     public static getByID(weaponID: string): ApiResponse<Weapon | null> {
+        if (WeaponAPI._pendingRequests.has(weaponID)) {
+            return WeaponAPI._pendingRequests.get(weaponID)!;
+        }
+
         const response: ApiResponse<Weapon | null> = new ApiResponse();
 
         if (WeaponAPI._cache.has(weaponID)) {
@@ -74,6 +87,8 @@ export class WeaponAPI {
             const request: ApiResponse<any> = CensusAPI.get(
                 `item?item_id=${weaponID}&c:hide=description,max_stack_size,image_set_id,image_id,image_path&c:lang=en&c:join=item_category^inject_at:category`
             );
+
+            WeaponAPI._pendingRequests.set(weaponID, response);
 
             request.ok((data: any) => {
                 if (data.returned != 1) {
@@ -88,6 +103,8 @@ export class WeaponAPI {
             }).internalError((err: string) => {
                 WeaponAPI._cache.set(weaponID, null);
                 console.error(err);
+            }).always(() => {
+                WeaponAPI._pendingRequests.delete(weaponID);
             });
         }
 

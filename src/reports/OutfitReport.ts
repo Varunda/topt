@@ -178,6 +178,9 @@ export class OutfitReport {
     weaponKillBreakdown: BreakdownArray = new BreakdownArray();
     weaponTypeKillBreakdown: BreakdownArray = new BreakdownArray();
 
+    teamkillBreakdown: BreakdownArray = new BreakdownArray();
+    teamkillTypeBreakdown: BreakdownArray = new BreakdownArray();
+
     deathAllBreakdown: BreakdownArray = new BreakdownArray();
     deathAllTypeBreakdown: BreakdownArray = new BreakdownArray();
     deathRevivedBreakdown: BreakdownArray = new BreakdownArray();
@@ -262,6 +265,7 @@ export class OutfitReportGenerator {
             + 1 // Facility captures
             + 1 // Weapon kills
             + 1 // Weapon type kills
+            + 1 // Teamkills
             + 1 // Faction kills
             + 1 // Faction deaths
             + 1 // Cont kills
@@ -407,6 +411,8 @@ export class OutfitReportGenerator {
 
         EventReporter.weaponKills(report.events).ok(data => report.weaponKillBreakdown = data).always(callback("Weapon kills"));
         EventReporter.weaponTypeKills(report.events).ok(data => report.weaponTypeKillBreakdown = data).always(callback("Weapon type kills"));
+
+        EventReporter.weaponTeamkills(report.events).ok(data => report.teamkillBreakdown = data).always(callback("Teamkills"));
 
         EventReporter.factionKills(report.events).ok(data => report.factionKillBreakdown = data).always(callback("Faction kills"));
         EventReporter.factionDeaths(report.events).ok(data => report.factionDeathBreakdown = data).always(callback("Faction deaths"));

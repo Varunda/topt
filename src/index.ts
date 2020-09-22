@@ -78,6 +78,7 @@ import { timers } from "jquery";
 import Core from "core/index";
 import { TrackedPlayer } from "core/TrackedPlayer";
 import { CoreSettings } from "core/CoreSettings";
+import { isTemplateExpression } from "../node_modules/typescript/lib/typescript.js";
 
 class OpReportSettings {
     public zoneID: string | null = null;
@@ -693,6 +694,26 @@ export const vm = new Vue({
 
             this.core.addPlayer(this.parameters.playerName);
         },
+
+        exportWeaponData: function(): void {
+            const weapons: Weapon[] = WeaponAPI.getEntires();
+
+            const lines: object[] = weapons.map((iter: Weapon) => {
+                return {
+                    item_id: iter.ID,
+                    name: {
+                        en: iter.name
+                    },
+                    category: {
+                        name: {
+                            en: iter.type
+                        }
+                    }
+                };
+            });
+
+            FileSaver.saveAs(new File([JSON.stringify(lines, null, 2)], `weapons.json`, { type: "text/json"}));
+        }
 
     },
 
