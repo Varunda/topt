@@ -226,7 +226,7 @@
                         Starting in {{parameters.startTimeLeft}} seconds
                     </span>
 
-                    <button v-if="tracking.running == false && data.length == 0" @click="setSaveEvents(true)"
+                    <button v-if="core.tracking.running == false && core.rawData.length == 0" @click="setSaveEvents(true)"
                             class="btn btn-primary w-100 mb-2">
                         Begin tracking
                     </button>
