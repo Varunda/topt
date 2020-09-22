@@ -112,36 +112,36 @@ export const PsEvents: Map<string, PsEvent> = new Map<string, PsEvent>([
         types: [],
         track: false
     }],
-    [PsEvent.kill, {
+    [PsEvent.kill, { // 1
         name: "Kill",
         types: ["general", "versus"],
         track: false
     }],
-    [PsEvent.killAssist, {
+    [PsEvent.killAssist, { // 2
         name: "Kill assist",
         types: ["versus"],
         track: true,
         alsoIncrement: undefined
     }],
-    [PsEvent.heal, {
+    [PsEvent.heal, { // 4
         name: "Heal",
         types: ["medic"],
         track: true,
         alsoIncrement: undefined
     }],
-    [PsEvent.healAssist, {
+    [PsEvent.healAssist, { // 5
         name: "Heal assist",
         types: [],
         track: true,
         alsoIncrement: undefined
     }],
-    [PsEvent.maxRepair, {
+    [PsEvent.maxRepair, { // 6
         name: "MAX repair",
         types: ["engineer"],
         track: true,
         alsoIncrement: undefined
     }],
-    [PsEvent.revive, {
+    [PsEvent.revive, { // 7
         name: "Revive",
         types: ["medic"],
         track: true,
@@ -239,7 +239,7 @@ export const PsEvents: Map<string, PsEvent> = new Map<string, PsEvent>([
         track: false,
         alsoIncrement: undefined
     }],
-    [PsEvent.squadSpawn, {
+    [PsEvent.squadSpawn, { // 56
         name: "Squad spawn",
         types: ["logistics"],
         track: true,

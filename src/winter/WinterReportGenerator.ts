@@ -34,6 +34,8 @@ export class WinterReportGenerator {
     public static generate(parameters: WinterReportParameters): ApiResponse<WinterReport> {
         const response: ApiResponse<WinterReport> = new ApiResponse();
 
+        parameters.events = parameters.events.sort((a, b) => a.timestamp - b.timestamp);
+
         const report: WinterReport = new WinterReport();
         report.start = new Date(parameters.events[0].timestamp);
         report.end = new Date(parameters.events[parameters.events.length - 1].timestamp);
@@ -51,9 +53,9 @@ export class WinterReportGenerator {
         report.fun.push(this.mostRevived(parameters));
         report.fun.push(this.mostTransportAssists(parameters));
         report.fun.push(this.mostReconAssists(parameters));
-        report.fun.push(this.mostConcAssists(parameters));
-        report.fun.push(this.mostEMPAssist(parameters));
-        report.fun.push(this.mostFlashAssists(parameters));
+        //report.fun.push(this.mostConcAssists(parameters));
+        //report.fun.push(this.mostEMPAssist(parameters));
+        //report.fun.push(this.mostFlashAssists(parameters));
         report.fun.push(this.mostSaviors(parameters));
         report.fun.push(this.mostAssists(parameters));
         report.fun.push(this.mostUniqueRevives(parameters));
@@ -145,7 +147,7 @@ export class WinterReportGenerator {
     private static kds(parameters: WinterReportParameters): WinterMetric {
         return this.value(
             parameters,
-            (player: TrackedPlayer) => player.stats.get(PsEvent.kill) / player.stats.get(PsEvent.death, 1),
+            (player: TrackedPlayer) => (player.stats.get(PsEvent.kill) > 24) ? player.stats.get(PsEvent.kill) / player.stats.get(PsEvent.death, 1) : 0,
             {
                 name: "K/D",
                 funName: "K/D",
@@ -346,7 +348,7 @@ export class WinterReportGenerator {
 
     private static mostSunderersKilled(parameters: WinterReportParameters): WinterMetric {
         return this.vehicle(parameters, [Vehicles.sunderer], {
-            name: "Sunderes killed",
+            name: "Sunderers killed",
             funName: "Bus Bully",
             description: "Most sundies destroyed",
             entries: []

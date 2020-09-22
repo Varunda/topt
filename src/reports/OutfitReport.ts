@@ -1,18 +1,8 @@
 import { ApiResponse } from "census/ApiWrapper";
 import { Loading, Loadable } from "Loadable";
 
-import CensusAPI from "census/CensusAPI";
-import OutfitAPI, { Outfit } from "census/OutfitAPI";
-import { CharacterAPI, Character } from "census/CharacterAPI";
-import { Weapon, WeaponAPI } from "census/WeaponAPI";
-import { EventAPI } from "census/EventAPI";
-import { Achievement, AchievementAPI } from "census/AchievementAPI";
-import { FacilityAPI, Facility } from "census/FacilityAPI";
-
 import { PsLoadout, PsLoadouts } from "census/PsLoadout";
 import { PsEventType, PsEvent, PsEvents } from "PsEvent";
-import { Event, EventExp, EventKill, EventDeath, EventVehicleKill, EventCapture, EventTeamkill, EventDefend } from "Event";
-import StatMap from "StatMap";
 
 import {
     TEvent, TEventType,
@@ -28,11 +18,10 @@ import EventReporter, { statMapToBreakdown,
     BreakdownTimeslot, BreakdownTrend, BreakdownWeaponType, BaseCapture, BaseCaptureOutfit
 } from "EventReporter";
 import {
-    ExpBreakdown, FacilityCapture, ClassBreakdown, IndividualReporter,
-    CountedRibbon, Report, TimeTracking, BreakdownCollection, BreakdownSection, BreakdownMeta,
-    TrackedRouter, ClassUsage, ClassKdCollection, classKdCollection,
-    ReportParameters, BreakdownSingle, BreakdownSingleCollection, BreakdownSpawn, PlayerVersus,
-    ClassCollectionBreakdownTrend, classCollectionBreakdownTrend, Playtime, PlayerVersusEntry
+    ExpBreakdown, FacilityCapture, IndividualReporter,
+     TimeTracking, 
+    ClassKdCollection, classKdCollection,
+    Playtime, PlayerVersusEntry
 } from "InvididualGenerator";
 
 import { TrackedPlayer } from "core/TrackedPlayer";
@@ -46,39 +35,91 @@ export class OutfitReportSettings {
 
 }
 
+/**
+ * Parameters used to generate an outfit report
+ */
 export class OutfitReportParameters {
 
+    /**
+     * Settings used to generate the report
+     */
     public settings: OutfitReportSettings = new OutfitReportSettings();
 
+    /**
+     * Facility captures that will be included in the report
+     */
     public captures: FacilityCapture[] = [];
 
+    /**
+     * List of all the capture events related to players that will be included in the report
+     */
     public playerCaptures: (TCaptureEvent | TDefendEvent)[] = [];
 
+    /**
+     * List of events that will be included in the report
+     */
     public events: TEvent[] = [];
 
+    /**
+     * Map of players that will be part of the report <Character ID, TrackedPlayer>
+     */
     public players: Map<string, TrackedPlayer> = new Map();
 
+    /**
+     * List of outfit IDs that will be included in the report
+     */
     public outfits: string[] = [];
 
-    public tracking: TimeTracking = new TimeTracking()
+    /**
+     * The period of time that the report will be generated over
+     */
+    public tracking: TimeTracking = new TimeTracking();
 
 }
 
+/**
+ * Outfit report
+ */
 export class OutfitReport {
-    stats: Map<string, number> = new Map();
-    score: number = 0;
-    players: ({ name: string } & Playtime)[] = [];
-    events: TEvent[] = [];
-    tracking: TimeTracking = {
-        startTime: 0,
-        endTime: 0,
-        running: false
-    };
 
+    /**
+     * The various stats and how many the outfit got, based on the exp events
+     */
+    stats: Map<string, number> = new Map();
+
+    /**
+     * Total score that was gained during the ops
+     */
+    score: number = 0;
+
+    /**
+     * The players that make the outfit report
+     */
+    players: ({ name: string } & Playtime)[] = [];
+    
+    /**
+     * List of events that was generated during the outfit report
+     */
+    events: TEvent[] = [];
+    
+    /**
+     * The start and stop times that tracking was done over
+     */
+    tracking: TimeTracking = new TimeTracking();
+
+    /**
+     * The facility captures that took place
+     */
     facilityCaptures: FacilityCapture[] = [];
 
+    /**
+     * Breakdown of each class and how many of each exp event each class got
+     */
     classStats: Map<string, ClassCollection<number>> = new Map();
 
+    /**
+     * Breakdown of the score, what how many of each event and how much score
+     */
     scoreBreakdown: ExpBreakdown[] = [];
 
     /**
@@ -150,6 +191,9 @@ export class OutfitReport {
     vehicleKillBreakdown: BreakdownArray = new BreakdownArray();
     vehicleKillWeaponBreakdown: BreakdownArray = new BreakdownArray();
 
+    /**
+     * Unused
+     */
     timeUnrevived: number[] = [];
     revivedLifeExpectance: number[] = [];
     kmLifeExpectance: number[] = [];
@@ -163,6 +207,9 @@ export class OutfitReport {
 
     baseCaptures: BaseCapture[] = [];
 
+    /**
+     * The KD of class against all other classes, i.e. how many kills/deaths medics got against heavies
+     */
     classKds = {
         infil: classKdCollection() as ClassKdCollection,
         lightAssault: classKdCollection() as ClassKdCollection,

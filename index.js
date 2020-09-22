@@ -60880,6 +60880,21 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].filter("minutes", (input) => {
     }
     return `${(val / 60).toFixed(0)} minutes`;
 });
+vue__WEBPACK_IMPORTED_MODULE_0__["default"].filter("server", (input) => {
+    const val = (typeof (input) == "string") ? Number.parseInt(input) : input;
+    if (Number.isNaN(val)) {
+        return `Bad value ${input}`;
+    }
+    switch (val) {
+        case 1: return "Connery";
+        case 17: return "Emerald";
+        case 10: return "Miller";
+        case 13: return "Cobalt";
+        case 19: return "Jaeger";
+        case 40: return "SolTech";
+    }
+    return `Unknown ${val}`;
+});
 
 
 /***/ }),
@@ -61520,30 +61535,15 @@ class StatMap {
 /*!************************!*\
   !*** ./src/Storage.ts ***!
   \************************/
-/*! exports provided: StorageTrend, StorageSession, StorageMetadata, StorageHelper */
+/*! exports provided: StorageMetadata, StorageHelper */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "StorageTrend", function() { return StorageTrend; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "StorageSession", function() { return StorageSession; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "StorageMetadata", function() { return StorageMetadata; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "StorageHelper", function() { return StorageHelper; });
-/* harmony import */ var OutfitTrends__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! OutfitTrends */ "./src/OutfitTrends.ts");
+/* harmony import */ var core_CoreSettings__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! core/CoreSettings */ "./src/core/CoreSettings.ts");
 
-class StorageTrend {
-    constructor() {
-        this.name = "";
-        this.trend = new OutfitTrends__WEBPACK_IMPORTED_MODULE_0__["OutfitTrendsV1"]();
-    }
-}
-class StorageSession {
-    constructor() {
-        this.timestamp = new Date();
-        this.serviceID = "";
-        this.events = [];
-    }
-}
 class StorageMetadata {
     constructor(data) {
         this.tag = "";
@@ -61566,86 +61566,51 @@ class StorageHelper {
         }
         return this._enabled;
     }
-    static setTrendsData(data) {
-        if (this.isEnabled() == false) {
-            return console.error(`Cannot set trends data: localStorage is not enabled`);
-        }
-        localStorage.setItem(this.KEY_TREND, JSON.stringify({
-            tag: "trends",
-            data: data
-        }));
-        this._trends = undefined;
-    }
-    static getTrends() {
-        if (this._trends == undefined) {
+    static getSettings() {
+        if (this._settings == undefined) {
             if (this.isEnabled() == false) {
-                console.error(`Cannot get trends: localStorage is not enabled`);
-                return [];
+                return null;
             }
             let item = {
-                tag: "trends",
-                data: []
+                tag: "settings",
+                data: new core_CoreSettings__WEBPACK_IMPORTED_MODULE_0__["CoreSettings"]()
             };
-            const itemStr = localStorage.getItem(this.KEY_TREND);
+            const itemStr = localStorage.getItem(this.KEY_SETTINGS);
             if (itemStr == null) {
-                console.warn(`Creating new trends in localStorage`);
-                localStorage.setItem(this.KEY_TREND, JSON.stringify(item));
+                return null;
             }
             else {
                 item = JSON.parse(itemStr);
             }
-            if (item.tag == undefined || item.tag != "trends") {
-                console.warn(`Cannot get trends: localStorage item ${this.KEY_TREND} contained the wrong tag: ${item.tag}`);
-                return [];
+            if (item.tag == undefined || item.tag != "settings") {
+                console.warn(`Cannot get settings: localStorage item ${this.KEY_SETTINGS} contained the wrong tag: ${item.tag}`);
+                return null;
             }
-            const trends = item.data;
-            for (const trend of trends) {
-                for (const session of trend.trend.sessions) {
-                    if (typeof session.timestamp == "string") {
-                        session.timestamp = new Date(session.timestamp);
-                    }
-                }
-            }
-            console.log(`Loaded ${trends.length} trends`);
-            this._trends = trends;
+            this._settings = item.data;
         }
-        return this._trends;
+        return this._settings;
     }
-    static setTrends(name, trend) {
+    static setSettings(settings) {
         if (this.isEnabled() == false) {
-            return console.error(`Cannot set trends for ${name}: localStorage is not enabled`);
+            return console.warn(`Cannot save settings: localStorage is not enabled`);
         }
-        const storageData = this.getTrends();
-        const index = storageData.findIndex(iter => iter.name == name);
-        if (index == -1) {
-            storageData.push({
-                name: name,
-                trend: trend
-            });
+        if (settings == null) {
+            localStorage.removeItem(this.KEY_SETTINGS);
         }
         else {
-            storageData[index] = {
-                name: name,
-                trend: trend
+            let item = {
+                tag: "settings",
+                data: settings
             };
+            localStorage.setItem(this.KEY_SETTINGS, JSON.stringify(item));
         }
-        this.setTrendsData(storageData);
-    }
-    static getTrend(name) {
-        var _a;
-        if (this.isEnabled() == false) {
-            throw `Cannot get trend data for storage ${name}: localStorage is not enabled`;
-        }
-        const trends = this.getTrends();
-        const trend = trends.find(iter => iter.name == name);
-        return ((_a = trend) === null || _a === void 0 ? void 0 : _a.trend) || null;
     }
 }
 StorageHelper._enabled = undefined;
-StorageHelper._trends = undefined;
-StorageHelper._sessions = undefined;
+StorageHelper._settings = undefined;
 StorageHelper.KEY_TREND = "topt.trends";
 StorageHelper.KEY_SESSION = "topt.session";
+StorageHelper.KEY_SETTINGS = "topt.settings";
 window.StorageHelper = StorageHelper;
 
 
@@ -63459,18 +63424,25 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var census_OutfitAPI__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! census/OutfitAPI */ "./src/census/OutfitAPI.ts");
 /* harmony import */ var census_CharacterAPI__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! census/CharacterAPI */ "./src/census/CharacterAPI.ts");
 /* harmony import */ var core_TrackedPlayer__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! core/TrackedPlayer */ "./src/core/TrackedPlayer.ts");
+/* harmony import */ var Killfeed__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! Killfeed */ "./src/Killfeed.ts");
+/* harmony import */ var InvididualGenerator__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! InvididualGenerator */ "./src/InvididualGenerator.ts");
+/* harmony import */ var _squad_Squad__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./squad/Squad */ "./src/core/squad/Squad.ts");
+
+
+
 
 
 
 
 
 class Core {
-    constructor(serviceID) {
+    constructor(serviceID, serverID) {
         this.sockets = {
             tracked: null,
             logistics: null,
             logins: null,
-            facility: null
+            facility: null,
+            debug: null
         };
         this.routerTracking = {
             // key - Who placed the router
@@ -63478,7 +63450,18 @@ class Core {
             routerNpcs: new Map(),
             routers: [] // All routers that have been placed
         };
+        this.squad = {
+            squad1: new _squad_Squad__WEBPACK_IMPORTED_MODULE_7__["Squad"](),
+            squad2: new _squad_Squad__WEBPACK_IMPORTED_MODULE_7__["Squad"](),
+            squad3: new _squad_Squad__WEBPACK_IMPORTED_MODULE_7__["Squad"](),
+            squad4: new _squad_Squad__WEBPACK_IMPORTED_MODULE_7__["Squad"](),
+            guessSquads: [],
+            selected: null,
+            member: null,
+            members: new Map(),
+        };
         this.socketMessageQueue = [];
+        this.debugSocketMessages = [];
         this.stats = new Map();
         this.outfits = [];
         this.characters = [];
@@ -63486,11 +63469,7 @@ class Core {
         this.playerCaptures = [];
         this.facilityCaptures = [];
         this.rawData = [];
-        this.tracking = {
-            running: false,
-            startTime: new Date().getTime(),
-            endTime: new Date().getTime()
-        };
+        this.tracking = new InvididualGenerator__WEBPACK_IMPORTED_MODULE_6__["TimeTracking"]();
         this.connected = false;
         this.handlers = {
             exp: [],
@@ -63504,6 +63483,7 @@ class Core {
             logout: []
         };
         this.serviceID = serviceID;
+        this.serverID = serverID;
         this.socketMessageQueue.length = 5;
         census_CensusAPI__WEBPACK_IMPORTED_MODULE_1__["default"].init(this.serviceID);
     }
@@ -63631,6 +63611,7 @@ class Core {
         census_OutfitAPI__WEBPACK_IMPORTED_MODULE_2__["default"].getCharactersByTag(tag).ok((data) => {
             this.subscribeToEvents(data);
             loading.state = "loaded";
+            Killfeed__WEBPACK_IMPORTED_MODULE_5__["KillfeedGeneration"].addCharacters(data);
         });
         return loading;
     }
@@ -63652,6 +63633,7 @@ class Core {
         }
         census_CharacterAPI__WEBPACK_IMPORTED_MODULE_3__["CharacterAPI"].getByName(name).ok((data) => {
             this.subscribeToEvents([data]);
+            Killfeed__WEBPACK_IMPORTED_MODULE_5__["KillfeedGeneration"].addCharacters([data]);
         });
         return loading;
     }
@@ -63740,7 +63722,8 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.connect = function () {
     let opsLeft = +1 // Tracker
         + 1 // Logins
         + 1 // Logistics
-        + 1; // Facilities
+        + 1 // Facilities
+        + 1; // Debug
     setupTrackerSocket(self).always(() => { if (--opsLeft == 0) {
         response.resolveOk();
     } });
@@ -63753,6 +63736,9 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.connect = function () {
     setupFacilitySocket(self).always(() => { if (--opsLeft == 0) {
         response.resolveOk();
     } });
+    setupDebugSocket(self).always(() => { if (--opsLeft == 0) {
+        response.resolveOk();
+    } });
     self.connected = true;
     return response;
 };
@@ -63760,15 +63746,23 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.disconnect = function (
     const self = this;
     if (self.sockets.tracked != null) {
         self.sockets.tracked.close();
+        self.sockets.tracked = null;
     }
     if (self.sockets.logins != null) {
         self.sockets.logins.close();
+        self.sockets.logins = null;
     }
     if (self.sockets.logistics != null) {
         self.sockets.logistics.close();
+        self.sockets.logistics = null;
     }
     if (self.sockets.facility != null) {
         self.sockets.facility.close();
+        self.sockets.facility = null;
+    }
+    if (self.sockets.debug != null) {
+        self.sockets.debug.close();
+        self.sockets.debug = null;
     }
     self.connected = false;
 };
@@ -63789,6 +63783,22 @@ function setupTrackerSocket(core) {
     };
     return response;
 }
+function setupDebugSocket(core) {
+    const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_1__["ApiResponse"]();
+    core.sockets.debug = new WebSocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${core.serviceID}`);
+    core.sockets.debug.onopen = () => {
+    };
+    core.sockets.debug.onerror = () => {
+        response.resolve({ code: 500, data: `` });
+    };
+    core.sockets.debug.onmessage = () => {
+        response.resolveOk();
+        core.sockets.debug.onmessage = (ev) => {
+            core.debugSocketMessages.push(JSON.parse(ev.data));
+        };
+    };
+    return response;
+}
 function setupLogisticsSocket(core) {
     const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_1__["ApiResponse"]();
     core.sockets.logistics = new WebSocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${core.serviceID}`);
@@ -63801,8 +63811,7 @@ function setupLogisticsSocket(core) {
             action: "subscribe",
             characters: ["all"],
             worlds: [
-                //core.settings.serverID
-                "1"
+                core.serverID
             ],
             eventNames: [
                 "GainExperience_experience_id_1409",
@@ -63828,8 +63837,7 @@ function setupLoginSocket(core) {
             action: "subscribe",
             characters: ["all"],
             worlds: [
-                //core.settings.serverID
-                "1"
+                core.serverID
             ],
             eventNames: [
                 "PlayerLogin",
@@ -63857,8 +63865,7 @@ function setupFacilitySocket(core) {
             action: "subscribe",
             characters: ["all"],
             worlds: [
-                //this.settings.serverID
-                "1"
+                core.serverID
             ],
             eventNames: [
                 "PlayerFacilityCapture",
@@ -63873,6 +63880,80 @@ function setupFacilitySocket(core) {
     core.sockets.facility.onerror = (ev) => core.onSocketError("facility", ev);
     return response;
 }
+
+
+/***/ }),
+
+/***/ "./src/core/CoreDebugHelper.ts":
+/*!*************************************!*\
+  !*** ./src/core/CoreDebugHelper.ts ***!
+  \*************************************/
+/*! no exports provided */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var core_Core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! core/Core */ "./src/core/Core.ts");
+
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.printExpEvent = function (expID) {
+    const self = this;
+    const events = Array.from(self.stats.values())
+        .map(iter => iter.events)
+        .reduce((acc, cur) => { acc.push(...cur); return acc; }, [])
+        .filter(iter => iter.type == "exp" && iter.expID == expID);
+    console.log(events);
+};
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.subscribeToEvent = function (...expID) {
+    if (this.sockets.debug == null) {
+        return console.error(`Cannot globally subscribe to ${expID}: debug socket is null`);
+    }
+    const msg = {
+        service: "event",
+        action: "subscribe",
+        characters: ["all"],
+        worlds: [
+            this.serverID
+        ],
+        eventNames: [
+            ...expID.map(iter => `GainExperience_experience_id_${iter}`)
+        ],
+        logicalAndCharactersWithWorlds: true
+    };
+    this.sockets.debug.send(JSON.stringify(msg));
+};
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.subscribeToAllEvent = function (...expID) {
+    if (this.sockets.debug == null) {
+        return console.error(`Cannot globally subscribe to ${expID}: debug socket is null`);
+    }
+    const msg = {
+        service: "event",
+        action: "subscribe",
+        characters: ["all"],
+        worlds: ["all"],
+        eventNames: [
+            ...expID.map(iter => `GainExperience_experience_id_${iter}`)
+        ]
+    };
+    this.sockets.debug.send(JSON.stringify(msg));
+};
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.subscribeToItemAdded = function () {
+    if (this.sockets.debug == null) {
+        return console.error(`Cannot subscribe to ItemAdded events: debug socket is null`);
+    }
+    const msg = {
+        service: "event",
+        action: "subscribe",
+        characters: ["all"],
+        worlds: [
+            this.serverID
+        ],
+        eventNames: [
+            "ItemAdded"
+        ],
+        logicalAndCharactersWithWorlds: true
+    };
+    this.sockets.debug.send(JSON.stringify(msg));
+};
 
 
 /***/ }),
@@ -63892,6 +63973,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var census_WeaponAPI__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! census/WeaponAPI */ "./src/census/WeaponAPI.ts");
 /* harmony import */ var census_FacilityAPI__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! census/FacilityAPI */ "./src/census/FacilityAPI.ts");
 /* harmony import */ var census_CharacterAPI__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! census/CharacterAPI */ "./src/census/CharacterAPI.ts");
+/* harmony import */ var Killfeed__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! Killfeed */ "./src/Killfeed.ts");
+
 
 
 
@@ -64011,6 +64094,7 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processMessage = functi
                 self.miscEvents.push(ev);
             }
             self.emit(ev);
+            Killfeed__WEBPACK_IMPORTED_MODULE_6__["KillfeedGeneration"].exp(ev);
             if (eventID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].revive || eventID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadRevive) {
                 const target = self.stats.get(targetID);
                 if (target != undefined) {
@@ -64063,6 +64147,7 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processMessage = functi
                 targetTicks.recentDeath = ev;
                 census_WeaponAPI__WEBPACK_IMPORTED_MODULE_3__["WeaponAPI"].precache(ev.weaponID);
                 self.emit(ev);
+                Killfeed__WEBPACK_IMPORTED_MODULE_6__["KillfeedGeneration"].add(ev);
                 save = true;
             }
             let sourceTicks = self.stats.get(sourceID);
@@ -64102,6 +64187,7 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processMessage = functi
                     sourceTicks.events.push(ev);
                     census_WeaponAPI__WEBPACK_IMPORTED_MODULE_3__["WeaponAPI"].precache(ev.weaponID);
                     self.emit(ev);
+                    Killfeed__WEBPACK_IMPORTED_MODULE_6__["KillfeedGeneration"].add(ev);
                 }
                 save = true;
             }
@@ -64288,6 +64374,269 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processMessage = functi
 
 /***/ }),
 
+/***/ "./src/core/CoreSettings.ts":
+/*!**********************************!*\
+  !*** ./src/core/CoreSettings.ts ***!
+  \**********************************/
+/*! exports provided: CoreSettings */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "CoreSettings", function() { return CoreSettings; });
+class CoreSettings {
+    constructor() {
+        /**
+         * Service ID used to connect to the event stream
+         */
+        this.serviceID = "";
+        /**
+         * If the dark mode CSS will be added
+         */
+        this.darkMode = false;
+        /**
+         * ID of the server to listen to login/logout and facility events
+         */
+        this.serverID = "1";
+    }
+}
+
+
+/***/ }),
+
+/***/ "./src/core/CoreSquad.ts":
+/*!*******************************!*\
+  !*** ./src/core/CoreSquad.ts ***!
+  \*******************************/
+/*! no exports provided */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var core_Core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! core/Core */ "./src/core/Core.ts");
+/* harmony import */ var census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! census/PsLoadout */ "./src/census/PsLoadout.ts");
+/* harmony import */ var PsEvent__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! PsEvent */ "./src/PsEvent.ts");
+/* harmony import */ var _squad_Squad__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./squad/Squad */ "./src/core/squad/Squad.ts");
+
+
+
+
+const squadEvents = [
+    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadResupply,
+    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadHeal,
+    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadMaxRepair,
+    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadMotionDetect,
+    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadRadarDetect,
+    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadRevive,
+    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadShieldRepair,
+    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadSpawn,
+    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadSpotKill
+];
+const nonSquadEvents = [
+    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].heal,
+    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].revive,
+    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].resupply,
+    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].shieldRepair,
+    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].motionDetect,
+    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].radarDetect,
+    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].spotKill,
+];
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.setSelectedSquad = function (squadName) {
+    const squad = this.getSquad(squadName);
+    this.squad.selected = squad;
+};
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.clearSelectedSquad = function () {
+    this.squad.selected = null;
+};
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processKillDeathEvent = function (event) {
+    var _a, _b;
+    if (event.type == "kill") {
+        if (this.squad.members.has(event.sourceID)) {
+            const member = this.squad.members.get(event.sourceID);
+            member.state = "alive";
+            const loadout = (_a = census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadouts"].get(event.loadoutID), (_a !== null && _a !== void 0 ? _a : census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadout"].default));
+            switch (loadout.type) {
+                case "infil":
+                    member.class = "I";
+                    break;
+                case "lightAssault":
+                    member.class = "L";
+                    break;
+                case "medic":
+                    member.class = "M";
+                    break;
+                case "engineer":
+                    member.class = "E";
+                    break;
+                case "heavy":
+                    member.class = "H";
+                    break;
+                case "max":
+                    member.class = "W";
+                    break;
+                case "unknown":
+                    member.class = "";
+                    break;
+            }
+        }
+    }
+    else if (event.type == "death") {
+        if (this.squad.members.has(event.sourceID)) {
+            const member = this.squad.members.get(event.sourceID);
+            member.state = "dead";
+            const loadout = (_b = census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadouts"].get(event.loadoutID), (_b !== null && _b !== void 0 ? _b : census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadout"].default));
+            switch (loadout.type) {
+                case "infil":
+                    member.class = "I";
+                    break;
+                case "lightAssault":
+                    member.class = "L";
+                    break;
+                case "medic":
+                    member.class = "M";
+                    break;
+                case "engineer":
+                    member.class = "E";
+                    break;
+                case "heavy":
+                    member.class = "H";
+                    break;
+                case "max":
+                    member.class = "W";
+                    break;
+                case "unknown":
+                    member.class = "";
+                    break;
+            }
+        }
+    }
+};
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processExperienceEvent = function (event) {
+    var _a;
+    if (event.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].revive || event.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadRevive) {
+        if (this.squad.members.has(event.targetID)) {
+            const member = this.squad.members.get(event.targetID);
+            member.state = "alive";
+            member.timeDead = 0;
+        }
+    }
+    if (this.squad.members.has(event.sourceID)) {
+        const member = this.squad.members.get(event.sourceID);
+        member.state = "alive";
+        const loadout = (_a = census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadouts"].get(event.loadoutID), (_a !== null && _a !== void 0 ? _a : census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadout"].default));
+        switch (loadout.type) {
+            case "infil":
+                member.class = "I";
+                break;
+            case "lightAssault":
+                member.class = "L";
+                break;
+            case "medic":
+                member.class = "M";
+                break;
+            case "engineer":
+                member.class = "E";
+                break;
+            case "heavy":
+                member.class = "H";
+                break;
+            case "max":
+                member.class = "W";
+                break;
+            case "unknown":
+                member.class = "";
+                break;
+        }
+    }
+    const sourceMember = this.squad.members.get(event.sourceID);
+    const targetMember = this.squad.members.get(event.targetID);
+    if (sourceMember == undefined || targetMember == undefined) {
+        return;
+    }
+    let sourceSquad = this.getSquadOfMember(event.sourceID);
+    let targetSquad = this.getSquadOfMember(event.targetID);
+    if (sourceSquad == null) {
+        sourceSquad = new _squad_Squad__WEBPACK_IMPORTED_MODULE_3__["Squad"]();
+        sourceSquad.members.push(sourceMember);
+    }
+    if (targetSquad == null) {
+        targetSquad = new _squad_Squad__WEBPACK_IMPORTED_MODULE_3__["Squad"]();
+        targetSquad.members.push(targetMember);
+    }
+    // Check if the squads need to be merged into one another if this was a squad exp source
+    if (squadEvents.indexOf(event.trueExpID) > -1) {
+        if (sourceSquad.ID == targetSquad.ID) {
+            //console.log(`${sourceMember.name} // ${targetMember.name} are already in a squad`);
+        }
+        else {
+            // 3 cases:
+            //      1. Both squads are guesses => Merge squads
+            //      2. One squad isn't a guess => Move guess squad into non-guess squad
+            //      3. Neither squad is a guess => Move member who performed action into other squad
+            if (targetSquad.guess == true && sourceSquad.guess == true) {
+                console.log(`Both squads are guesses, merging ${sourceMember.name} (${sourceSquad.name}) into ${targetMember.name} (${targetSquad.name})`);
+                this.mergeSquads(sourceSquad.name, targetSquad.name);
+            }
+            else if (targetSquad.guess == false && sourceSquad.guess == true) {
+                console.log(`Target is not a guess, merging ${sourceMember.name} (${sourceSquad.name}) into ${targetMember.name} (${targetSquad.name})`);
+                this.mergeSquads(targetSquad.name, sourceSquad.name);
+            }
+            else if (targetSquad.guess == true && sourceSquad.guess == false) {
+                console.log(`Source is not a guess, merging ${targetMember.name} (${targetSquad.name}) into ${sourceMember.name} (${sourceSquad.name})`);
+                this.mergeSquads(sourceSquad.name, targetSquad.name);
+            }
+            else if (targetSquad.guess == false && sourceSquad.guess == false) {
+                console.log(`Neither squad is a guess, moving ${targetMember.name} into ${sourceMember.name} (${sourceSquad.name})`);
+                sourceSquad.members.push(targetMember);
+                targetSquad.members = targetSquad.members.filter(iter => iter.charID != targetMember.charID);
+            }
+        }
+    }
+    // Check if the squad is no longer valid and needs to be removed, i.e. moved squads
+    if (nonSquadEvents.indexOf(event.trueExpID) > -1) {
+        //console.log(`Non squad event: ${event.trueExpID}`);
+        if (sourceSquad.ID == targetSquad.ID) {
+            console.log(`${sourceMember.name} was in squad with ${targetMember.name}, but didn't get an expect squad exp event`);
+            targetSquad.members = targetSquad.members.filter(iter => iter.charID != sourceMember.charID);
+            const squad = new _squad_Squad__WEBPACK_IMPORTED_MODULE_3__["Squad"]();
+            squad.members.push(sourceMember);
+            this.squad.guessSquads.push(squad);
+        }
+    }
+};
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.getSquad = function (squadName) {
+    const self = this;
+    if (squadName == "1") {
+        return self.squad.squad1;
+    }
+    else if (squadName == "2") {
+        return self.squad.squad2;
+    }
+    else if (squadName == "3") {
+        return self.squad.squad3;
+    }
+    else if (squadName == "4") {
+        return self.squad.squad4;
+    }
+    else {
+        return self.squad.guessSquads.find(iter => iter.name == squadName) || null;
+    }
+};
+
+
+/***/ }),
+
+/***/ "./src/core/Squad.ts":
+/*!***************************!*\
+  !*** ./src/core/Squad.ts ***!
+  \***************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+
+
+/***/ }),
+
 /***/ "./src/core/TrackedPlayer.ts":
 /*!***********************************!*\
   !*** ./src/core/TrackedPlayer.ts ***!
@@ -64300,19 +64649,58 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "TrackedPlayer", function() { return TrackedPlayer; });
 /* harmony import */ var StatMap__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! StatMap */ "./src/StatMap.ts");
 
+/**
+ * Represents a character that is being tracked
+ */
 class TrackedPlayer {
     constructor() {
+        /**
+         * Unique character ID of the tracked player
+         */
         this.characterID = "";
+        /**
+         * Tag of the outfit, if the character is in one
+         */
         this.outfitTag = "";
+        /**
+         * Name of the character
+         */
         this.name = "";
+        /**
+         * What faction the character is a part of
+         */
         this.faction = "";
+        /**
+         * How much accumulated score a character has gotten during tracking
+         */
         this.score = 0;
+        /**
+         * If this character is currently online
+         */
         this.online = true;
+        /**
+         * What time (in MS) the character more recently joined, to a minimum of when the tracker started
+         */
         this.joinTime = 0;
+        /**
+         * How many seconds the character has been online for
+         */
         this.secondsOnline = 0;
+        /**
+         * How many times a character has gotten each experience event
+         */
         this.stats = new StatMap__WEBPACK_IMPORTED_MODULE_0__["default"]();
+        /**
+         * How many times a character has gotten each ribbon
+         */
         this.ribbons = new StatMap__WEBPACK_IMPORTED_MODULE_0__["default"]();
+        /**
+         * Reference to the most recent death event, used for tracking revives
+         */
         this.recentDeath = null;
+        /**
+         * The events that have occured because of a player
+         */
         this.events = [];
     }
 }
@@ -64332,10 +64720,96 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _Core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./Core */ "./src/core/Core.ts");
 /* harmony import */ var _CoreProcessing__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./CoreProcessing */ "./src/core/CoreProcessing.ts");
 /* harmony import */ var _CoreConnection__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./CoreConnection */ "./src/core/CoreConnection.ts");
+/* harmony import */ var _CoreDebugHelper__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./CoreDebugHelper */ "./src/core/CoreDebugHelper.ts");
+
 
 
 
 /* harmony default export */ __webpack_exports__["default"] = (_Core__WEBPACK_IMPORTED_MODULE_0__["Core"]);
+
+
+/***/ }),
+
+/***/ "./src/core/squad/Squad.ts":
+/*!*********************************!*\
+  !*** ./src/core/squad/Squad.ts ***!
+  \*********************************/
+/*! exports provided: Squad */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Squad", function() { return Squad; });
+class Squad {
+    constructor() {
+        /**
+         * Display name of the squad
+         */
+        this.name = "";
+        /**
+         * Members that are currently in the squad
+         */
+        this.members = [];
+        /**
+         * If this squad is a guess squad or not, affects how automatic merging is done
+         */
+        this.guess = true;
+        this.ID = ++Squad._previousID;
+        this.name = Squad.squadNames[(Squad.squadNameIndex++) % 26];
+    }
+    /**
+     * Check if a member is within this squad
+     *
+     * @param charID Character ID to check membership of
+     */
+    isMember(charID) {
+        return this.members.find(iter => iter.charID == charID) != null;
+    }
+}
+Squad._previousID = 0;
+Squad.squadNameIndex = 0;
+Squad.squadNames = [
+    "q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "a", "s", "d",
+    "f", "g", "h", "j", "k", "l", "z", "x", "c", "v", "b", "n", "m"
+];
+
+
+/***/ }),
+
+/***/ "./src/core/squad/SquadMember.ts":
+/*!***************************************!*\
+  !*** ./src/core/squad/SquadMember.ts ***!
+  \***************************************/
+/*! exports provided: SquadMember */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "SquadMember", function() { return SquadMember; });
+class SquadMember {
+    constructor() {
+        /**
+         * Display name of the squad member
+         */
+        this.name = "";
+        /**
+         * Character ID of the squad member
+         */
+        this.charID = "";
+        /**
+         * What class the squad member currently is
+         */
+        this.class = "";
+        /**
+         * The current state of the squad member
+         */
+        this.state = "alive";
+        /**
+         * How many seconds the squad member has been dead for
+         */
+        this.timeDead = 0;
+    }
+}
 
 
 /***/ }),
@@ -64577,13 +65051,12 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var BreakdownBar__WEBPACK_IMPORTED_MODULE_23__ = __webpack_require__(/*! BreakdownBar */ "./src/BreakdownBar.ts");
 /* harmony import */ var MomentFilter__WEBPACK_IMPORTED_MODULE_24__ = __webpack_require__(/*! MomentFilter */ "./src/MomentFilter.ts");
 /* harmony import */ var KillfeedSquad__WEBPACK_IMPORTED_MODULE_25__ = __webpack_require__(/*! KillfeedSquad */ "./src/KillfeedSquad.ts");
-/* harmony import */ var OutfitTrends__WEBPACK_IMPORTED_MODULE_26__ = __webpack_require__(/*! OutfitTrends */ "./src/OutfitTrends.ts");
-/* harmony import */ var Storage__WEBPACK_IMPORTED_MODULE_27__ = __webpack_require__(/*! Storage */ "./src/Storage.ts");
-/* harmony import */ var Killfeed__WEBPACK_IMPORTED_MODULE_28__ = __webpack_require__(/*! Killfeed */ "./src/Killfeed.ts");
-/* harmony import */ var winter_WinterReportGenerator__WEBPACK_IMPORTED_MODULE_29__ = __webpack_require__(/*! winter/WinterReportGenerator */ "./src/winter/WinterReportGenerator.ts");
-/* harmony import */ var winter_WinterReportParameters__WEBPACK_IMPORTED_MODULE_30__ = __webpack_require__(/*! winter/WinterReportParameters */ "./src/winter/WinterReportParameters.ts");
-/* harmony import */ var core_index__WEBPACK_IMPORTED_MODULE_31__ = __webpack_require__(/*! core/index */ "./src/core/index.ts");
-/* harmony import */ var core_TrackedPlayer__WEBPACK_IMPORTED_MODULE_32__ = __webpack_require__(/*! core/TrackedPlayer */ "./src/core/TrackedPlayer.ts");
+/* harmony import */ var Storage__WEBPACK_IMPORTED_MODULE_26__ = __webpack_require__(/*! Storage */ "./src/Storage.ts");
+/* harmony import */ var Killfeed__WEBPACK_IMPORTED_MODULE_27__ = __webpack_require__(/*! Killfeed */ "./src/Killfeed.ts");
+/* harmony import */ var winter_WinterReportGenerator__WEBPACK_IMPORTED_MODULE_28__ = __webpack_require__(/*! winter/WinterReportGenerator */ "./src/winter/WinterReportGenerator.ts");
+/* harmony import */ var winter_WinterReportParameters__WEBPACK_IMPORTED_MODULE_29__ = __webpack_require__(/*! winter/WinterReportParameters */ "./src/winter/WinterReportParameters.ts");
+/* harmony import */ var core_index__WEBPACK_IMPORTED_MODULE_30__ = __webpack_require__(/*! core/index */ "./src/core/index.ts");
+/* harmony import */ var core_TrackedPlayer__WEBPACK_IMPORTED_MODULE_31__ = __webpack_require__(/*! core/TrackedPlayer */ "./src/core/TrackedPlayer.ts");
 
 
 
@@ -64620,7 +65093,6 @@ chart_js__WEBPACK_IMPORTED_MODULE_17__["Chart"].plugins.unregister(_node_modules
 
 
 
-
 class OpReportSettings {
     constructor() {
         this.zoneID = null;
@@ -64638,6 +65110,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             updateRate: 1,
             eventType: "general",
             sortColumn: "name",
+            fromStorage: false,
             serverID: "1",
             darkMode: false
         },
@@ -64651,18 +65124,14 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
         },
         storage: {
             enabled: false,
-            trends: [],
-            pendingTrend: null,
-            newTrendFile: "",
-            trendFileName: ""
         },
         generation: {
             names: [],
             state: []
         },
         killfeed: {
-            entry: new Killfeed__WEBPACK_IMPORTED_MODULE_28__["Killfeed"](),
-            options: new Killfeed__WEBPACK_IMPORTED_MODULE_28__["KillfeedOptions"]()
+            entry: new Killfeed__WEBPACK_IMPORTED_MODULE_27__["Killfeed"](),
+            options: new Killfeed__WEBPACK_IMPORTED_MODULE_27__["KillfeedOptions"]()
         },
         // Used to make iteration thru classes easier
         classIterator: [
@@ -64675,25 +65144,32 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
         ],
         winter: {
             report: Loadable__WEBPACK_IMPORTED_MODULE_5__["Loadable"].idle(),
-            settings: new winter_WinterReportParameters__WEBPACK_IMPORTED_MODULE_30__["WinterReportSettings"](),
+            settings: new winter_WinterReportParameters__WEBPACK_IMPORTED_MODULE_29__["WinterReportSettings"](),
         },
         outfitReport: new reports_OutfitReport__WEBPACK_IMPORTED_MODULE_14__["OutfitReport"](),
         opsReportSettings: new OpReportSettings(),
-        outfitTrends: new OutfitTrends__WEBPACK_IMPORTED_MODULE_26__["OutfitTrendsV1"](),
         refreshIntervalID: -1,
         showFrog: false,
         display: [] // The currently displayed stats
     },
     created: function () {
         this.refreshIntervalID = setInterval(this.updateDisplay, this.settings.updateRate * 1000);
-        this.storage.enabled = Storage__WEBPACK_IMPORTED_MODULE_27__["StorageHelper"].isEnabled();
+        this.storage.enabled = Storage__WEBPACK_IMPORTED_MODULE_26__["StorageHelper"].isEnabled();
         census_WeaponAPI__WEBPACK_IMPORTED_MODULE_9__["WeaponAPI"].loadJson();
         census_FacilityAPI__WEBPACK_IMPORTED_MODULE_10__["FacilityAPI"].loadJson();
+        this.settings.fromStorage = false;
+        if (this.storage.enabled == true) {
+            const settings = Storage__WEBPACK_IMPORTED_MODULE_26__["StorageHelper"].getSettings();
+            if (settings != null) {
+                this.settings.darkMode = settings.darkMode;
+                this.settings.serverID = settings.serverID;
+                this.settings.serviceToken = settings.serviceID;
+                this.settings.fromStorage = true;
+                this.connect();
+            }
+        }
     },
     mounted: function () {
-        if (this.storage.enabled == true) {
-            this.storage.trends = Storage__WEBPACK_IMPORTED_MODULE_27__["StorageHelper"].getTrends();
-        }
         window.onbeforeunload = (ev) => {
             this.core.disconnect();
         };
@@ -64706,40 +65182,17 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             }
             if (this.coreObject != null) {
                 this.coreObject.disconnect();
+                this.coreObject = null;
             }
-            this.coreObject = new core_index__WEBPACK_IMPORTED_MODULE_31__["default"](this.settings.serviceToken);
+            this.coreObject = new core_index__WEBPACK_IMPORTED_MODULE_30__["default"](this.settings.serviceToken, this.settings.serverID);
             this.coreObject.connect().ok(() => {
                 this.view = "realtime";
             });
-            if (this.storage.pendingTrend !== null && this.storage.pendingTrend !== undefined) {
-                console.log(`Loading trends from storage: ${this.storage.pendingTrend}`);
-                const trend = Storage__WEBPACK_IMPORTED_MODULE_27__["StorageHelper"].getTrend(this.storage.pendingTrend);
-                if (trend != null) {
-                    console.log(`Successfully loaded trends file for ${this.storage.pendingTrend}`);
-                    this.outfitTrends = Object.assign({}, trend);
-                    this.storage.trendFileName = this.storage.pendingTrend;
-                }
-                else {
-                    throw `Failed to load trends file for ${this.storage.pendingTrend}`;
-                }
-            }
-            else if (this.storage.pendingTrend === null) {
-                Storage__WEBPACK_IMPORTED_MODULE_27__["StorageHelper"].setTrends(this.storage.newTrendFile, new OutfitTrends__WEBPACK_IMPORTED_MODULE_26__["OutfitTrendsV1"]());
-                this.storage.trendFileName = this.storage.newTrendFile;
-                this.outfitTrends = new OutfitTrends__WEBPACK_IMPORTED_MODULE_26__["OutfitTrendsV1"]();
-                console.log(`Created new trends file named ${this.storage.trendFileName}`);
-            }
-            else if (this.storage.pendingTrend === undefined) {
-                this.storage.enabled = false;
-            }
-            else {
-                throw `Messed up logic: storage.pendingTrends is null or undefined, and not null, and not undefined`;
-            }
         },
         importData: function () {
             const elem = document.getElementById("data-import-input");
             if (elem == null) {
-                throw ``;
+                throw `Missing #data-import-input element to import data`;
             }
             const input = elem;
             if (input.files == null) {
@@ -64780,41 +65233,6 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             });
             reader.readAsText(file);
         },
-        importOutfitTrends: function () {
-            const elem = document.getElementById("data-import-outfit-trends");
-            if (elem == null) {
-                throw `Missing <input> #data-import-outfit-trends`;
-            }
-            const input = elem;
-            if (input.files == null) {
-                throw `Input is not type of 'file'`;
-            }
-            if (input.files.length == 0) {
-                return console.warn(`Cannot import trends, no file selected`);
-            }
-            const file = input.files[0];
-            const reader = new FileReader();
-            reader.onload = ((ev) => {
-                const data = JSON.parse(reader.result);
-                if (!data.version) {
-                    console.error(`Missing version from import`);
-                }
-                else if (data.version == "1") {
-                    console.log(`Reading version 1 of trends file`);
-                    this.outfitTrends = Object.assign(Object.assign({}, data), { sessions: data.sessions.map((iter) => {
-                            return {
-                                kds: iter.kds,
-                                kpms: iter.kpms,
-                                timestamp: new Date(iter.timestamp)
-                            };
-                        }) });
-                }
-                else {
-                    console.error(`Unchecked version: ${data.version}`);
-                }
-            });
-            reader.readAsText(file);
-        },
         exportData: function () {
             const json = {
                 version: "1",
@@ -64825,16 +65243,23 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             const file = new File([JSON.stringify(json)], "data.json", { type: "text/json" });
             _node_modules_file_saver_dist_FileSaver_js__WEBPACK_IMPORTED_MODULE_15__["saveAs"](file);
         },
-        exportTrends: function () {
-            const file = new File([JSON.stringify(this.outfitTrends)], "trends.json", { type: "text/json" });
-            _node_modules_file_saver_dist_FileSaver_js__WEBPACK_IMPORTED_MODULE_15__["saveAs"](file);
-        },
-        saveTrends: function () {
-            const name = prompt("What to name this trends file as? Leave blank to cancel");
-            if (name == null || name.length == 0) {
+        saveSettings: function () {
+            if (this.storage.enabled == false) {
                 return;
             }
-            Storage__WEBPACK_IMPORTED_MODULE_27__["StorageHelper"].setTrends(name, this.outfitTrends);
+            const settings = {
+                serviceID: this.settings.serviceToken,
+                serverID: this.settings.serverID,
+                darkMode: this.settings.darkMode
+            };
+            Storage__WEBPACK_IMPORTED_MODULE_26__["StorageHelper"].setSettings(settings);
+            this.connect();
+        },
+        clearSettings: function () {
+            if (this.storage.enabled == false) {
+                return;
+            }
+            Storage__WEBPACK_IMPORTED_MODULE_26__["StorageHelper"].setSettings(null);
         },
         updateDisplay: function () {
             //console.time("update display");
@@ -64846,7 +65271,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             }
         },
         updateKillfeedDisplay: function () {
-            this.killfeed.entry = Killfeed__WEBPACK_IMPORTED_MODULE_28__["KillfeedGeneration"].generate(this.killfeed.options);
+            this.killfeed.entry = Killfeed__WEBPACK_IMPORTED_MODULE_27__["KillfeedGeneration"].generate(this.killfeed.options);
         },
         updateRealtimeDisplay: function () {
             const nowMs = new Date().getTime();
@@ -64855,7 +65280,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 if (char.stats.size() == 0) {
                     return;
                 }
-                const collection = new core_TrackedPlayer__WEBPACK_IMPORTED_MODULE_32__["TrackedPlayer"]();
+                const collection = new core_TrackedPlayer__WEBPACK_IMPORTED_MODULE_31__["TrackedPlayer"]();
                 collection.name = char.name;
                 collection.outfitTag = char.outfitTag;
                 collection.characterID = char.characterID;
@@ -64911,13 +65336,13 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             if (this.view != "killfeed") {
                 return;
             }
-            const whatHovered = Killfeed__WEBPACK_IMPORTED_MODULE_28__["KillfeedGeneration"].getHovered();
+            const whatHovered = Killfeed__WEBPACK_IMPORTED_MODULE_27__["KillfeedGeneration"].getHovered();
             if (whatHovered == "squad") {
-                Killfeed__WEBPACK_IMPORTED_MODULE_28__["KillfeedGeneration"].mergeSquads(ev.key);
+                Killfeed__WEBPACK_IMPORTED_MODULE_27__["KillfeedGeneration"].mergeSquads(ev.key);
                 this.updateDisplay();
             }
             else if (whatHovered == "member") {
-                Killfeed__WEBPACK_IMPORTED_MODULE_28__["KillfeedGeneration"].moveMember(ev.key);
+                Killfeed__WEBPACK_IMPORTED_MODULE_27__["KillfeedGeneration"].moveMember(ev.key);
                 this.updateDisplay();
             }
             else {
@@ -64955,7 +65380,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             });
         },
         generateWinterReport: function () {
-            const params = new winter_WinterReportParameters__WEBPACK_IMPORTED_MODULE_30__["WinterReportParameters"]();
+            const params = new winter_WinterReportParameters__WEBPACK_IMPORTED_MODULE_29__["WinterReportParameters"]();
             params.players = Array.from(this.core.stats.values());
             params.timeTracking = this.core.tracking;
             params.settings = this.winter.settings;
@@ -64966,7 +65391,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 params.events.push(...player.events);
             });
             this.winter.report = Loadable__WEBPACK_IMPORTED_MODULE_5__["Loadable"].loading();
-            winter_WinterReportGenerator__WEBPACK_IMPORTED_MODULE_29__["WinterReportGenerator"].generate(params).ok((data) => {
+            winter_WinterReportGenerator__WEBPACK_IMPORTED_MODULE_28__["WinterReportGenerator"].generate(params).ok((data) => {
                 this.winter.report = Loadable__WEBPACK_IMPORTED_MODULE_5__["Loadable"].loaded(data);
                 this.view = "winter";
             });
@@ -64993,14 +65418,6 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 const str = PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_13__["PersonalReportGenerator"].generate(html, report);
                 _node_modules_file_saver_dist_FileSaver_js__WEBPACK_IMPORTED_MODULE_15__["saveAs"](new File([str], `topt-${(_a = report.player) === null || _a === void 0 ? void 0 : _a.name}.html`, { type: "text/html" }));
             };
-        },
-        removeTrendSession: function (index) {
-            const conf = confirm(`Are you sure you want to remove this trend entry?`);
-            if (conf == false) {
-                return;
-            }
-            this.outfitTrends.sessions.splice(index, 1);
-            Storage__WEBPACK_IMPORTED_MODULE_27__["StorageHelper"].setTrends(this.storage.trendFileName, this.outfitTrends);
         },
         generatePlayerReport: function (charID) {
             const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_4__["ApiResponse"]();
@@ -65134,10 +65551,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
     },
     computed: {
         canConnect: function () {
-            return this.settings.serviceToken.trim().length > 0
-                && (this.storage.pendingTrend != null
-                    || this.storage.newTrendFile.length > 0
-                    || this.storage.pendingTrend == undefined);
+            return this.settings.serviceToken.trim().length > 0;
         },
         core: function () {
             if (this.coreObject == null) {
@@ -65189,30 +65603,77 @@ class OutfitReportSettings {
         this.zoneID = null;
     }
 }
+/**
+ * Parameters used to generate an outfit report
+ */
 class OutfitReportParameters {
     constructor() {
+        /**
+         * Settings used to generate the report
+         */
         this.settings = new OutfitReportSettings();
+        /**
+         * Facility captures that will be included in the report
+         */
         this.captures = [];
+        /**
+         * List of all the capture events related to players that will be included in the report
+         */
         this.playerCaptures = [];
+        /**
+         * List of events that will be included in the report
+         */
         this.events = [];
+        /**
+         * Map of players that will be part of the report <Character ID, TrackedPlayer>
+         */
         this.players = new Map();
+        /**
+         * List of outfit IDs that will be included in the report
+         */
         this.outfits = [];
+        /**
+         * The period of time that the report will be generated over
+         */
         this.tracking = new InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["TimeTracking"]();
     }
 }
+/**
+ * Outfit report
+ */
 class OutfitReport {
     constructor() {
+        /**
+         * The various stats and how many the outfit got, based on the exp events
+         */
         this.stats = new Map();
+        /**
+         * Total score that was gained during the ops
+         */
         this.score = 0;
+        /**
+         * The players that make the outfit report
+         */
         this.players = [];
+        /**
+         * List of events that was generated during the outfit report
+         */
         this.events = [];
-        this.tracking = {
-            startTime: 0,
-            endTime: 0,
-            running: false
-        };
+        /**
+         * The start and stop times that tracking was done over
+         */
+        this.tracking = new InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["TimeTracking"]();
+        /**
+         * The facility captures that took place
+         */
         this.facilityCaptures = [];
+        /**
+         * Breakdown of each class and how many of each exp event each class got
+         */
         this.classStats = new Map();
+        /**
+         * Breakdown of the score, what how many of each event and how much score
+         */
         this.scoreBreakdown = [];
         /**
          * Collection of stats per 5 minute blocks
@@ -65274,6 +65735,9 @@ class OutfitReport {
         this.weaponTypeDeathBreakdown = [];
         this.vehicleKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
         this.vehicleKillWeaponBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
+        /**
+         * Unused
+         */
         this.timeUnrevived = [];
         this.revivedLifeExpectance = [];
         this.kmLifeExpectance = [];
@@ -65283,6 +65747,9 @@ class OutfitReport {
         this.continentKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
         this.continentDeathBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
         this.baseCaptures = [];
+        /**
+         * The KD of class against all other classes, i.e. how many kills/deaths medics got against heavies
+         */
         this.classKds = {
             infil: Object(InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["classKdCollection"])(),
             lightAssault: Object(InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["classKdCollection"])(),
@@ -65588,45 +66055,6 @@ class OutfitReportGenerator {
 
 /***/ }),
 
-/***/ "./src/routers/app.ts":
-/*!****************************!*\
-  !*** ./src/routers/app.ts ***!
-  \****************************/
-/*! no exports provided */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony import */ var vue__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! vue */ "./node_modules/vue/dist/vue.esm.js");
-/* harmony import */ var _core_index__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../core/index */ "./src/core/index.ts");
-
-
-const vm = new vue__WEBPACK_IMPORTED_MODULE_0__["default"]({
-    el: "app",
-    data: {
-        core: new _core_index__WEBPACK_IMPORTED_MODULE_1__["default"]("cikserviceid80")
-    },
-    created: function () {
-        this.core.connect().ok(() => {
-            var _a;
-            this.core.start();
-            (_a = this.core.sockets.logistics) === null || _a === void 0 ? void 0 : _a.send(JSON.stringify({
-                service: "event",
-                action: "subscribe",
-                characters: ["all"],
-                worlds: ["1"],
-                eventNames: ["GainExperience_experience_id_1410"],
-                logicalAndCharctersWithWorlds: true
-            }));
-        });
-    },
-    methods: {}
-});
-window.vm = vm;
-
-
-/***/ }),
-
 /***/ "./src/winter/WinterMetric.ts":
 /*!************************************!*\
   !*** ./src/winter/WinterMetric.ts ***!
@@ -65718,6 +66146,7 @@ WinterMetricIndex.REPAIRS = 5;
 class WinterReportGenerator {
     static generate(parameters) {
         const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        parameters.events = parameters.events.sort((a, b) => a.timestamp - b.timestamp);
         const report = new _WinterReport__WEBPACK_IMPORTED_MODULE_1__["WinterReport"]();
         report.start = new Date(parameters.events[0].timestamp);
         report.end = new Date(parameters.events[parameters.events.length - 1].timestamp);
@@ -65732,9 +66161,9 @@ class WinterReportGenerator {
         report.fun.push(this.mostRevived(parameters));
         report.fun.push(this.mostTransportAssists(parameters));
         report.fun.push(this.mostReconAssists(parameters));
-        report.fun.push(this.mostConcAssists(parameters));
-        report.fun.push(this.mostEMPAssist(parameters));
-        report.fun.push(this.mostFlashAssists(parameters));
+        //report.fun.push(this.mostConcAssists(parameters));
+        //report.fun.push(this.mostEMPAssist(parameters));
+        //report.fun.push(this.mostFlashAssists(parameters));
         report.fun.push(this.mostSaviors(parameters));
         report.fun.push(this.mostAssists(parameters));
         report.fun.push(this.mostUniqueRevives(parameters));
@@ -65811,7 +66240,7 @@ class WinterReportGenerator {
         });
     }
     static kds(parameters) {
-        return this.value(parameters, (player) => player.stats.get(PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].kill) / player.stats.get(PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].death, 1), {
+        return this.value(parameters, (player) => (player.stats.get(PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].kill) > 24) ? player.stats.get(PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].kill) / player.stats.get(PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].death, 1) : 0, {
             name: "K/D",
             funName: "K/D",
             description: "Highest K/D",
@@ -65971,7 +66400,7 @@ class WinterReportGenerator {
     }
     static mostSunderersKilled(parameters) {
         return this.vehicle(parameters, [census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].sunderer], {
-            name: "Sunderes killed",
+            name: "Sunderers killed",
             funName: "Bus Bully",
             description: "Most sundies destroyed",
             entries: []
@@ -66223,9 +66652,9 @@ class WinterReportSettings {
 /***/ }),
 
 /***/ 0:
-/*!********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
-  !*** multi ./src/app/App.ts ./src/app/AppRealtime.ts ./src/BreakdownBar.ts ./src/BreakdownBox.ts ./src/BreakdownChart.ts ./src/BreakdownInterval.ts ./src/BreakdownList.ts ./src/census/AchievementAPI.ts ./src/census/ApiWrapper.ts ./src/census/CensusAPI.ts ./src/census/CharacterAPI.ts ./src/census/EventAPI.ts ./src/census/FacilityAPI.ts ./src/census/OutfitAPI.ts ./src/census/PsLoadout.ts ./src/census/VehicleAPI.ts ./src/census/WeaponAPI.ts ./src/core/Core.ts ./src/core/CoreConnection.ts ./src/core/CoreProcessing.ts ./src/core/index.ts ./src/core/TrackedPlayer.ts ./src/Event.ts ./src/EventReporter.ts ./src/events/index.ts ./src/events/TCaptureEvent.ts ./src/events/TDeathEvent.ts ./src/events/TDefendEvent.ts ./src/events/TEvent.ts ./src/events/TEventHandlers.ts ./src/events/TExpEvent.ts ./src/events/TKillEvent.ts ./src/events/TLoginEvent.ts ./src/events/TLogoutEvent.ts ./src/events/TTeamkillEvent.ts ./src/events/TVehicleKillEvent.ts ./src/index.ts ./src/InvididualGenerator.ts ./src/Killfeed.ts ./src/KillfeedSquad.ts ./src/Loadable.ts ./src/MomentFilter.ts ./src/OutfitTrends.ts ./src/PersonalReportGenerator.ts ./src/PsEvent.ts ./src/Quartile.ts ./src/reports/OutfitReport.ts ./src/reports/PersonalReport.ts ./src/routers/app.ts ./src/StatMap.ts ./src/Storage.ts ./src/winter/WinterMetric.ts ./src/winter/WinterReport.ts ./src/winter/WinterReportGenerator.ts ./src/winter/WinterReportParameters.ts ***!
-  \********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+/*!**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** multi ./src/app/App.ts ./src/app/AppRealtime.ts ./src/BreakdownBar.ts ./src/BreakdownBox.ts ./src/BreakdownChart.ts ./src/BreakdownInterval.ts ./src/BreakdownList.ts ./src/census/AchievementAPI.ts ./src/census/ApiWrapper.ts ./src/census/CensusAPI.ts ./src/census/CharacterAPI.ts ./src/census/EventAPI.ts ./src/census/FacilityAPI.ts ./src/census/OutfitAPI.ts ./src/census/PsLoadout.ts ./src/census/VehicleAPI.ts ./src/census/WeaponAPI.ts ./src/core/Core.ts ./src/core/CoreConnection.ts ./src/core/CoreDebugHelper.ts ./src/core/CoreProcessing.ts ./src/core/CoreSettings.ts ./src/core/CoreSquad.ts ./src/core/index.ts ./src/core/Squad.ts ./src/core/squad/Squad.ts ./src/core/squad/SquadMember.ts ./src/core/TrackedPlayer.ts ./src/Event.ts ./src/EventReporter.ts ./src/events/index.ts ./src/events/TCaptureEvent.ts ./src/events/TDeathEvent.ts ./src/events/TDefendEvent.ts ./src/events/TEvent.ts ./src/events/TEventHandlers.ts ./src/events/TExpEvent.ts ./src/events/TKillEvent.ts ./src/events/TLoginEvent.ts ./src/events/TLogoutEvent.ts ./src/events/TTeamkillEvent.ts ./src/events/TVehicleKillEvent.ts ./src/index.ts ./src/InvididualGenerator.ts ./src/Killfeed.ts ./src/KillfeedSquad.ts ./src/Loadable.ts ./src/MomentFilter.ts ./src/OutfitTrends.ts ./src/PersonalReportGenerator.ts ./src/PsEvent.ts ./src/Quartile.ts ./src/reports/OutfitReport.ts ./src/reports/PersonalReport.ts ./src/StatMap.ts ./src/Storage.ts ./src/winter/WinterMetric.ts ./src/winter/WinterReport.ts ./src/winter/WinterReportGenerator.ts ./src/winter/WinterReportParameters.ts ***!
+  \**************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -66248,8 +66677,14 @@ __webpack_require__(/*! ./src/census/VehicleAPI.ts */"./src/census/VehicleAPI.ts
 __webpack_require__(/*! ./src/census/WeaponAPI.ts */"./src/census/WeaponAPI.ts");
 __webpack_require__(/*! ./src/core/Core.ts */"./src/core/Core.ts");
 __webpack_require__(/*! ./src/core/CoreConnection.ts */"./src/core/CoreConnection.ts");
+__webpack_require__(/*! ./src/core/CoreDebugHelper.ts */"./src/core/CoreDebugHelper.ts");
 __webpack_require__(/*! ./src/core/CoreProcessing.ts */"./src/core/CoreProcessing.ts");
+__webpack_require__(/*! ./src/core/CoreSettings.ts */"./src/core/CoreSettings.ts");
+__webpack_require__(/*! ./src/core/CoreSquad.ts */"./src/core/CoreSquad.ts");
 __webpack_require__(/*! ./src/core/index.ts */"./src/core/index.ts");
+__webpack_require__(/*! ./src/core/Squad.ts */"./src/core/Squad.ts");
+__webpack_require__(/*! ./src/core/squad/Squad.ts */"./src/core/squad/Squad.ts");
+__webpack_require__(/*! ./src/core/squad/SquadMember.ts */"./src/core/squad/SquadMember.ts");
 __webpack_require__(/*! ./src/core/TrackedPlayer.ts */"./src/core/TrackedPlayer.ts");
 __webpack_require__(/*! ./src/Event.ts */"./src/Event.ts");
 __webpack_require__(/*! ./src/EventReporter.ts */"./src/EventReporter.ts");
@@ -66277,7 +66712,6 @@ __webpack_require__(/*! ./src/PsEvent.ts */"./src/PsEvent.ts");
 __webpack_require__(/*! ./src/Quartile.ts */"./src/Quartile.ts");
 __webpack_require__(/*! ./src/reports/OutfitReport.ts */"./src/reports/OutfitReport.ts");
 __webpack_require__(/*! ./src/reports/PersonalReport.ts */"./src/reports/PersonalReport.ts");
-__webpack_require__(/*! ./src/routers/app.ts */"./src/routers/app.ts");
 __webpack_require__(/*! ./src/StatMap.ts */"./src/StatMap.ts");
 __webpack_require__(/*! ./src/Storage.ts */"./src/Storage.ts");
 __webpack_require__(/*! ./src/winter/WinterMetric.ts */"./src/winter/WinterMetric.ts");

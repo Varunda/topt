@@ -10,17 +10,12 @@ import { Achievement, AchievementAPI } from "census/AchievementAPI";
 import { FacilityAPI, Facility } from "census/FacilityAPI";
 import { CharacterAPI, Character } from "census/CharacterAPI";
 
-import {
-    ExpBreakdown, FacilityCapture, ClassBreakdown, IndividualReporter, OutfitReport,
-    CountedRibbon, Report,  TimeTracking, BreakdownCollection, BreakdownSection, BreakdownMeta,
-    TrackedRouter,
-    ReportParameters
-} from "InvididualGenerator";
+import { FacilityCapture, TrackedRouter } from "InvididualGenerator";
 
 import { TrackedPlayer } from "core/TrackedPlayer";
 
 import {
-    TEvent, TEventType, TLoadoutEvent, TZoneEvent,
+    TEvent, TEventType,
     TExpEvent, TKillEvent, TDeathEvent, TTeamkillEvent,
     TCaptureEvent, TDefendEvent,
     TVehicleKillEvent,
@@ -28,6 +23,7 @@ import {
 } from "events/index";
 import { TLogoutEvent } from "events/TLogoutEvent";
 import { TLoginEvent } from "events/TLoginEvent";
+import { KillfeedGeneration } from "Killfeed";
 
 declare module "Core" {
 
@@ -173,6 +169,8 @@ declare module "Core" {
 
             self.emit(ev);
 
+            KillfeedGeneration.exp(ev);
+
             if (eventID == PsEvent.revive || eventID == PsEvent.squadRevive) {
                 const target = self.stats.get(targetID);
                 if (target != undefined) {
@@ -234,6 +232,7 @@ declare module "Core" {
                 WeaponAPI.precache(ev.weaponID);
 
                 self.emit(ev);
+                KillfeedGeneration.add(ev);
 
                 save = true;
             }
@@ -280,9 +279,12 @@ declare module "Core" {
 
                     WeaponAPI.precache(ev.weaponID);
                     self.emit(ev);
+
+                    KillfeedGeneration.add(ev);
                 }
 
                 save = true;
+
             }
         } else if (event == "PlayerFacilityCapture") {
             const playerID: string = msg.payload.character_id;

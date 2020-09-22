@@ -66,8 +66,7 @@ import "BreakdownBar";
 import "MomentFilter";
 import "KillfeedSquad";
 
-import { OutfitTrendsV1, OutfitTrends, SessionV1 } from "OutfitTrends";
-import { StorageHelper, StorageSession, StorageTrend } from "Storage";
+import { StorageHelper } from "Storage";
 import { KillfeedGeneration, KillfeedEntry, KillfeedOptions, Killfeed } from "Killfeed";
 
 import { WinterReportGenerator } from "winter/WinterReportGenerator";
@@ -76,6 +75,7 @@ import { WinterReportParameters, WinterReportSettings } from "winter/WinterRepor
 
 import Core from "core/index";
 import { TrackedPlayer } from "core/TrackedPlayer";
+import { CoreSettings } from "core/CoreSettings";
 
 class OpReportSettings {
     public zoneID: string | null = null;
@@ -98,6 +98,8 @@ export const vm = new Vue({
             eventType: "general" as PsEventType,
             sortColumn: "name" as string,
 
+            fromStorage: false as boolean,
+
             serverID: "1" as string,
 
             darkMode: false as boolean
@@ -117,12 +119,6 @@ export const vm = new Vue({
 
         storage: {
             enabled: false as boolean,
-
-            trends: [] as StorageTrend[],
-            pendingTrend: null as string | null,
-            newTrendFile: "" as string,
-
-            trendFileName: "" as string
         },
 
         generation: {
@@ -153,8 +149,6 @@ export const vm = new Vue({
         outfitReport: new OutfitReport() as OutfitReport,
         opsReportSettings: new OpReportSettings() as OpReportSettings,
 
-        outfitTrends: new OutfitTrendsV1() as OutfitTrends,
-
         refreshIntervalID: -1 as number, // ID of the timed interval to refresh the realtime view
 
         showFrog: false as boolean,
@@ -169,13 +163,26 @@ export const vm = new Vue({
 
         WeaponAPI.loadJson();
         FacilityAPI.loadJson();
+
+        this.settings.fromStorage = false;
+
+        if (this.storage.enabled == true) {
+            const settings: CoreSettings | null = StorageHelper.getSettings();
+
+            if (settings != null) {
+                this.settings.darkMode = settings.darkMode;
+                this.settings.serverID = settings.serverID;
+                this.settings.serviceToken = settings.serviceID;
+
+                this.settings.fromStorage = true;
+
+                this.connect();
+            }
+        }
+
     },
 
     mounted: function(): void {
-        if (this.storage.enabled == true) {
-            this.storage.trends = StorageHelper.getTrends();
-        }
-
         window.onbeforeunload = (ev: BeforeUnloadEvent) => {
             this.core.disconnect();
         };
@@ -191,43 +198,19 @@ export const vm = new Vue({
 
             if (this.coreObject != null) {
                 this.coreObject.disconnect();
+                this.coreObject = null;
             }
 
-            this.coreObject = new Core(this.settings.serviceToken);
+            this.coreObject = new Core(this.settings.serviceToken, this.settings.serverID);
             this.coreObject.connect().ok(() => {
                 this.view = "realtime";
             });
-
-            if (this.storage.pendingTrend !== null && this.storage.pendingTrend !== undefined) {
-                console.log(`Loading trends from storage: ${this.storage.pendingTrend}`);
-
-                const trend: OutfitTrendsV1 | null = StorageHelper.getTrend(this.storage.pendingTrend);
-                if (trend != null) {
-                    console.log(`Successfully loaded trends file for ${this.storage.pendingTrend}`);
-                    this.outfitTrends = {...trend};
-
-                    this.storage.trendFileName = this.storage.pendingTrend;
-                } else {
-                    throw `Failed to load trends file for ${this.storage.pendingTrend}`;
-                }
-            } else if (this.storage.pendingTrend === null) {
-                StorageHelper.setTrends(this.storage.newTrendFile, new OutfitTrendsV1());
-                this.storage.trendFileName = this.storage.newTrendFile;
-
-                this.outfitTrends = new OutfitTrendsV1();
-
-                console.log(`Created new trends file named ${this.storage.trendFileName}`);
-            } else if (this.storage.pendingTrend === undefined) {
-                this.storage.enabled = false;
-            } else {
-                throw `Messed up logic: storage.pendingTrends is null or undefined, and not null, and not undefined`;
-            }
         },
 
         importData: function(): void {
             const elem: HTMLElement | null = document.getElementById("data-import-input");
             if (elem == null) {
-                throw ``;
+                throw `Missing #data-import-input element to import data`;
             }
 
             const input: HTMLInputElement = elem as HTMLInputElement;
@@ -281,51 +264,6 @@ export const vm = new Vue({
             reader.readAsText(file);
         },
 
-        importOutfitTrends: function(): void {
-            const elem: HTMLElement | null = document.getElementById("data-import-outfit-trends");
-            if (elem == null) {
-                throw `Missing <input> #data-import-outfit-trends`;
-            }
-
-            const input: HTMLInputElement = elem as HTMLInputElement;
-            if (input.files == null) {
-                throw `Input is not type of 'file'`;
-            }
-
-            if (input.files.length == 0) {
-                return console.warn(`Cannot import trends, no file selected`);
-            }
-
-            const file: File = input.files[0];
-
-            const reader: FileReader = new FileReader();
-
-            reader.onload = ((ev: ProgressEvent<FileReader>) => {
-                const data: any = JSON.parse(reader.result as string);
-
-                if (!data.version) {
-                    console.error(`Missing version from import`);
-                } else if (data.version == "1") {
-                    console.log(`Reading version 1 of trends file`);
-                    this.outfitTrends = {
-                        ...data,
-                        sessions: data.sessions.map((iter: SessionV1) => {
-                            return {
-                                kds: iter.kds,
-                                kpms: iter.kpms,
-                                timestamp: new Date(iter.timestamp)
-                            }
-                        })
-                    };
-
-                } else {
-                    console.error(`Unchecked version: ${data.version}`);
-                }
-            });
-
-            reader.readAsText(file);
-        },
-
         exportData: function(): void {
             const json: object = {
                 version: "1" as string,
@@ -339,20 +277,28 @@ export const vm = new Vue({
             FileSaver.saveAs(file);
         },
 
-        exportTrends: function(): void {
-            const file = new File([JSON.stringify(this.outfitTrends)], "trends.json", { type: "text/json"});
-
-            FileSaver.saveAs(file);
-        },
-
-        saveTrends: function(): void {
-            const name: string | null = prompt("What to name this trends file as? Leave blank to cancel");
-            
-            if (name == null || name.length == 0) {
+        saveSettings: function(): void {
+            if (this.storage.enabled == false) {
                 return;
             }
 
-            StorageHelper.setTrends(name, this.outfitTrends);
+            const settings: CoreSettings = {
+                serviceID: this.settings.serviceToken,
+                serverID: this.settings.serverID,
+                darkMode: this.settings.darkMode
+            };
+
+            StorageHelper.setSettings(settings);
+
+            this.connect();
+        },
+
+        clearSettings: function(): void {
+            if (this.storage.enabled == false) {
+                return;
+            }
+
+            StorageHelper.setSettings(null);
         },
 
         updateDisplay: function(): void {
@@ -537,17 +483,6 @@ export const vm = new Vue({
             };
         },
 
-        removeTrendSession: function(index: number): void {
-            const conf: boolean = confirm(`Are you sure you want to remove this trend entry?`);
-            if (conf == false) {
-                return;
-            }
-
-            this.outfitTrends.sessions.splice(index, 1);
-
-            StorageHelper.setTrends(this.storage.trendFileName, this.outfitTrends);
-        },
-
         generatePlayerReport: function(charID: string): ApiResponse<Report> {
             const response: ApiResponse<Report> = new ApiResponse();
 
@@ -711,11 +646,6 @@ export const vm = new Vue({
     computed: {
         canConnect: function(): boolean {
             return this.settings.serviceToken.trim().length > 0
-                && (
-                    this.storage.pendingTrend != null
-                    || this.storage.newTrendFile.length > 0
-                    || this.storage.pendingTrend == undefined
-                );
         },
 
         core: function(): Core {

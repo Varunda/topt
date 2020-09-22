@@ -85,12 +85,12 @@
                         <option value="10">Miller</option>
                         <option value="13">Cobalt</option>
                         <option value="40">SolTech</option>
-                        <option value="19">Jaegar</option>
+                        <option value="19">Jaeger</option>
                     </select>
                 </div>
 
                 <small class="text-muted">
-                    Used to track logins and logistics
+                    Used to track logins, facility captures and router kills
                 </small>
 
                 <hr/>
@@ -109,6 +109,7 @@
                         class="form-control"
                         autofocus
                         type="text"
+                        @keyup.enter="connect"
                         placeholder="Service token"
                     >
                 </div>
@@ -130,6 +131,20 @@
                     :disabled="canConnect == false">
                     Connect
                 </button>
+
+                <small class="text-muted">
+                    You can also hit enter while in the service ID field to connect
+                </small>
+
+                <hr>
+
+                <button v-if="storage.enabled" @click="saveSettings" type="button" class="btn btn-success w-100">
+                    Save and connect
+                </button>
+
+                <span class="text-muted">
+                    Save these settings and load them next time instead of inputing them, saving seconds
+                </span>
 
                 <hr>
 
@@ -239,14 +254,31 @@
 
                     <hr>
 
-                    <div class="form-groupw flex-grow-1">
+                    <div class="form-group flex-grow-1">
                         <label class="d-block">
                             <b>Players: </b>
                             Tracking {{core.characters.length}} players
                         </label>
                     </div>
 
-                    <div class="btn-group w-100 mt-2">
+                    <div class="form-group flex-grow-1">
+                        <label class="d-block">
+                            <b>Server: </b>
+                            {{settings.serverID | server}}
+                        </label>
+                    </div>
+
+                    <div class="w-100 mt-2">
+                        <span v-if="settings.fromStorage == true">
+                            Loaded saved settings, click below to clear
+                        </span>
+
+                        <button v-if="settings.fromStorage == true" @click="clearSettings" type="button" class="btn btn-warning w-100">
+                            Clear settings
+                        </button>
+                    </div>
+
+                    <div class="btn-group w-100 my-2">
                         <button type="button" class="btn btn-success" data-toggle="modal" data-target="#contact-modal">
                             Info/Contact
                         </button>
@@ -1458,67 +1490,6 @@
                     </tbody>
                 </table>
             </div>
-        </div>
-
-        <div v-else-if="view == 'trends'" class="row">
-            <div class="col-12">
-                <h2 class="strike">Loaded trends</h2>
-
-                <button type="button" class="close" @click="view = 'realtime';">
-                    &times;
-                </button>
-            </div>
-
-            <div class="col-12">
-                <div class="alert alert-danger">
-                    Danger zone! Make sure you have your trends file exported in case something goes wrong
-                </div>
-            </div>
-
-            <table class="table table-striped table-sm">
-                <thead class="table-secondary">
-                    <tr>
-                        <th>Timestamp</th>
-                        <th>Remove</th>
-                        <th>Avg KPM</th>
-                        <th>Infil KPM</th>
-                        <th>LA KPM</th>
-                        <th>Medic KPM</th>
-                        <th>Eng KPM</th>
-                        <th>Heavy KPM</th>
-                        <th>Avg KD</th>
-                        <th>Infil KD</th>
-                        <th>LA KD</th>
-                        <th>Medic KD</th>
-                        <th>Eng KD</th>
-                        <th>Heavy KD</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-                    <tr v-for="(session, index) in outfitTrends.sessions">
-                        <td>{{session.timestamp | moment}}</td>
-                        <td>
-                            <a @click="removeTrendSession(index)" href="#">
-                                Remove
-                            </a>
-                        </td>
-                        <td>{{session.kpms.total.length}}</td>
-                        <td>{{session.kpms.infil.length}}</td>
-                        <td>{{session.kpms.lightAssault.length}}</td>
-                        <td>{{session.kpms.medic.length}}</td>
-                        <td>{{session.kpms.engineer.length}}</td>
-                        <td>{{session.kpms.heavy.length}}</td>
-                        <td>{{session.kds.total.length}}</td>
-                        <td>{{session.kds.infil.length}}</td>
-                        <td>{{session.kds.lightAssault.length}}</td>
-                        <td>{{session.kds.medic.length}}</td>
-                        <td>{{session.kds.engineer.length}}</td>
-                        <td>{{session.kds.heavy.length}}</td>
-                    </tr>
-                </tbody>
-            </table>
-
         </div>
 
         <div v-else-if="view == 'winter'" class="row">

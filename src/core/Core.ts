@@ -4,35 +4,32 @@ import { Loading, Loadable } from "Loadable";
 import CensusAPI from "census/CensusAPI";
 import OutfitAPI, { Outfit } from "census/OutfitAPI";
 import { CharacterAPI, Character } from "census/CharacterAPI";
-import { Weapon, WeaponAPI } from "census/WeaponAPI";
-import { EventAPI } from "census/EventAPI";
-import { Achievement, AchievementAPI } from "census/AchievementAPI";
-import { FacilityAPI, Facility } from "census/FacilityAPI";
 
 import StatMap from "StatMap";
 
 import { TrackedPlayer } from "core/TrackedPlayer";
 
-import {
-    ExpBreakdown, FacilityCapture, ClassBreakdown, IndividualReporter, OutfitReport,
-    CountedRibbon, Report, TimeTracking, BreakdownCollection, BreakdownSection, BreakdownMeta,
-    TrackedRouter,
-    ReportParameters
-} from "InvididualGenerator";
+import { KillfeedGeneration } from "Killfeed";
+
+import { FacilityCapture, TimeTracking, TrackedRouter } from "InvididualGenerator";
 
 import {
-    TEvent, TEventType, TLoadoutEvent, TZoneEvent,
+    TEvent, TEventType, 
     TExpEvent, TKillEvent, TDeathEvent, TTeamkillEvent,
     TCaptureEvent, TDefendEvent,
     TVehicleKillEvent,
     TEventHandler
 } from "events/index";
 
+import { Squad } from "./squad/Squad";
+import { SquadMember } from "./squad/SquadMember"
+
 interface Sockets {
     tracked: WebSocket | null;
     logistics: WebSocket | null;
     logins: WebSocket | null;
     facility: WebSocket | null;
+    debug: WebSocket | null;
 }
 
 export class Core {
@@ -41,7 +38,8 @@ export class Core {
         tracked: null,
         logistics: null,
         logins: null,
-        facility: null
+        facility: null,
+        debug: null
     };
 
     public routerTracking = {
@@ -52,9 +50,24 @@ export class Core {
         routers: [] as TrackedRouter[] // All routers that have been placed
     };
 
+    public squad = {
+        squad1: new Squad() as Squad,
+        squad2: new Squad() as Squad,
+        squad3: new Squad() as Squad,
+        squad4: new Squad() as Squad,
+        guessSquads: [] as Squad[],
+
+        selected: null as Squad | null,
+        member: null as SquadMember | null,
+
+        members: new Map() as Map<string, SquadMember>,
+    };
+
     public socketMessageQueue: string[] = [];
+    public debugSocketMessages: string[] = [];
 
     public serviceID: string;
+    public serverID: string;
 
     public stats: Map<string, TrackedPlayer> = new Map<string, TrackedPlayer>();
     public outfits: string[] = [];
@@ -65,16 +78,14 @@ export class Core {
 
     public rawData: any[] = [];
 
-    public tracking: TimeTracking = {
-        running: false as boolean,
-        startTime: new Date().getTime() as number,
-        endTime: new Date().getTime() as number
-    };
+    public tracking: TimeTracking = new TimeTracking();
 
     public connected: boolean = false;
 
-    public constructor(serviceID: string) {
+    public constructor(serviceID: string, serverID: string) {
         this.serviceID = serviceID;
+        this.serverID = serverID;
+
         this.socketMessageQueue.length = 5;
 
         CensusAPI.init(this.serviceID);
@@ -210,6 +221,8 @@ export class Core {
         OutfitAPI.getCharactersByTag(tag).ok((data: Character[]) => {
             this.subscribeToEvents(data);
             loading.state = "loaded";
+
+            KillfeedGeneration.addCharacters(data);
         });
 
         return loading;
@@ -236,6 +249,7 @@ export class Core {
 
         CharacterAPI.getByName(name).ok((data: Character) => {
             this.subscribeToEvents([data]);
+            KillfeedGeneration.addCharacters([data]);
         });
 
         return loading;

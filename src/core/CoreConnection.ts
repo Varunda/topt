@@ -36,11 +36,13 @@ declare module "Core" {
         + 1 // Logins
         + 1 // Logistics
         + 1 // Facilities
+        + 1 // Debug
 
     setupTrackerSocket(self).always(() => { if (--opsLeft == 0) { response.resolveOk(); } });
     setupLoginSocket(self).always(() => { if (--opsLeft == 0) { response.resolveOk(); }});
     setupLogisticsSocket(self).always(() => { if (--opsLeft == 0) { response.resolveOk(); }});
     setupFacilitySocket(self).always(() => { if (--opsLeft == 0) { response.resolveOk(); }});
+    setupDebugSocket(self).always(() => { if (--opsLeft == 0) { response.resolveOk(); }});
 
     self.connected = true;
 
@@ -50,10 +52,11 @@ declare module "Core" {
 (Core as any).prototype.disconnect = function(): void {
     const self: Core = (this as Core);
 
-    if (self.sockets.tracked != null) { self.sockets.tracked.close(); }
-    if (self.sockets.logins != null) { self.sockets.logins.close(); }
-    if (self.sockets.logistics != null) { self.sockets.logistics.close(); }
-    if (self.sockets.facility != null) { self.sockets.facility.close(); }
+    if (self.sockets.tracked != null) { self.sockets.tracked.close(); self.sockets.tracked = null; }
+    if (self.sockets.logins != null) { self.sockets.logins.close(); self.sockets.logins = null; }
+    if (self.sockets.logistics != null) { self.sockets.logistics.close(); self.sockets.logistics = null; }
+    if (self.sockets.facility != null) { self.sockets.facility.close(); self.sockets.facility = null; }
+    if (self.sockets.debug != null) { self.sockets.debug.close(); self.sockets.debug = null; }
 
     self.connected = false;
 };
@@ -80,6 +83,26 @@ function setupTrackerSocket(core: Core): ApiResponse {
     return response;
 }
 
+function setupDebugSocket(core: Core): ApiResponse {
+    const response: ApiResponse = new ApiResponse();
+
+    core.sockets.debug = new WebSocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${core.serviceID}`);
+    core.sockets.debug.onopen = () => {
+
+    };
+    core.sockets.debug.onerror = () => {
+        response.resolve({ code: 500, data: `` });
+    };
+    core.sockets.debug.onmessage = () => {
+        response.resolveOk();
+        core.sockets.debug!.onmessage = (ev: MessageEvent) => {
+            core.debugSocketMessages.push(JSON.parse(ev.data));
+        };
+    };
+
+    return response;
+}
+
 function setupLogisticsSocket(core: Core): ApiResponse {
     const response: ApiResponse = new ApiResponse();
 
@@ -94,8 +117,7 @@ function setupLogisticsSocket(core: Core): ApiResponse {
             action: "subscribe",
             characters: ["all"],
             worlds: [
-                //core.settings.serverID
-                "1"
+                core.serverID
             ],
             eventNames: [
                 "GainExperience_experience_id_1409",    // Router kill
@@ -127,8 +149,7 @@ function setupLoginSocket(core: Core): ApiResponse {
             action: "subscribe",
             characters: ["all"],
             worlds: [
-                //core.settings.serverID
-                "1"
+                core.serverID
             ],
             eventNames: [
                 "PlayerLogin",
@@ -163,8 +184,7 @@ function setupFacilitySocket(core: Core): ApiResponse {
             action: "subscribe",
             characters: ["all"],
             worlds: [
-                //this.settings.serverID
-                "1"
+                core.serverID
             ],
             eventNames: [
                 "PlayerFacilityCapture",
