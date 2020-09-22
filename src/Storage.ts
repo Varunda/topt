@@ -1,15 +1,4 @@
-import { OutfitTrendsV1 } from "OutfitTrends";
-
-export class StorageTrend {
-    public name: string = "";
-    public trend: OutfitTrendsV1 = new OutfitTrendsV1();
-}
-
-export class StorageSession {
-    public timestamp: Date = new Date();
-    public serviceID: string = "";
-    public events: any[] = [];
-}
+import { CoreSettings } from "core/CoreSettings";
 
 export class StorageMetadata<T> {
     public tag: string = "";
@@ -23,11 +12,11 @@ export class StorageMetadata<T> {
 export class StorageHelper {
 
     private static _enabled: boolean | undefined = undefined;
-    private static _trends: StorageTrend[] | undefined = undefined;
-    private static _sessions: StorageSession | undefined = undefined;
+    private static _settings: CoreSettings | undefined = undefined;
 
     public static KEY_TREND: string = "topt.trends";
     public static KEY_SESSION: string = "topt.session";
+    public static KEY_SETTINGS:string = "topt.settings";
 
     public static isEnabled(): boolean {
         if (this._enabled == undefined) {
@@ -47,95 +36,50 @@ export class StorageHelper {
         return this._enabled;
     }
 
-    private static setTrendsData(data: StorageTrend[]): void {
-        if (this.isEnabled() == false) {
-            return console.error(`Cannot set trends data: localStorage is not enabled`);
-        }
-
-        localStorage.setItem(this.KEY_TREND, JSON.stringify({
-            tag: "trends",
-            data: data
-        }));
-
-        this._trends = undefined;
-    }
-
-    public static getTrends(): StorageTrend[] {
-        if (this._trends == undefined) {
+    public static getSettings(): CoreSettings | null {
+        if (this._settings == undefined) {
             if (this.isEnabled() == false) {
-                console.error(`Cannot get trends: localStorage is not enabled`);
-                return [];
+                return null;
             }
 
-            let item: StorageMetadata<StorageTrend[]> = {
-                tag: "trends",
-                data: [] as StorageTrend[]
+            let item: StorageMetadata<CoreSettings> = {
+                tag: "settings",
+                data: new CoreSettings() as CoreSettings
             };
 
-            const itemStr: string | null = localStorage.getItem(this.KEY_TREND);
+            const itemStr: string | null = localStorage.getItem(this.KEY_SETTINGS);
             if (itemStr == null) {
-                console.warn(`Creating new trends in localStorage`);
-                localStorage.setItem(this.KEY_TREND, JSON.stringify(item));
+                return null;
             } else {
                 item = JSON.parse(itemStr);
             }
 
-            if (item.tag == undefined || item.tag != "trends") {
-                console.warn(`Cannot get trends: localStorage item ${this.KEY_TREND} contained the wrong tag: ${item.tag}`);
-                return [];
+            if (item.tag == undefined || item.tag != "settings") {
+                console.warn(`Cannot get settings: localStorage item ${this.KEY_SETTINGS} contained the wrong tag: ${item.tag}`);
+                return null;
             }
 
-            const trends: StorageTrend[] = item.data;
-
-            for (const trend of trends) {
-                for (const session of trend.trend.sessions) {
-                    if (typeof session.timestamp == "string") {
-                        session.timestamp = new Date(session.timestamp);
-                    }
-                }
-            }
-
-            console.log(`Loaded ${trends.length} trends`);
-
-            this._trends = trends;
+            this._settings = item.data;
         }
 
-        return this._trends;
+        return this._settings;
     }
 
-    public static setTrends(name: string, trend: OutfitTrendsV1): void {
+    public static setSettings(settings: CoreSettings | null): void {
         if (this.isEnabled() == false) {
-            return console.error(`Cannot set trends for ${name}: localStorage is not enabled`);
+            return console.warn(`Cannot save settings: localStorage is not enabled`);
         }
 
-        const storageData: StorageTrend[] = this.getTrends();
-
-        const index: number = storageData.findIndex(iter => iter.name == name);
-        if (index == -1) {
-            storageData.push({
-                name: name,
-                trend: trend
-            });
+        if (settings == null) {
+            localStorage.removeItem(this.KEY_SETTINGS);
         } else {
-            storageData[index] = {
-                name: name,
-                trend: trend
+            let item: StorageMetadata<CoreSettings> = {
+                tag: "settings",
+                data: settings
             };
+
+            localStorage.setItem(this.KEY_SETTINGS, JSON.stringify(item));
         }
-
-        this.setTrendsData(storageData);
-    }
-
-    public static getTrend(name: string): OutfitTrendsV1 | null {
-        if (this.isEnabled() == false) {
-            throw `Cannot get trend data for storage ${name}: localStorage is not enabled`;
-        }
-
-        const trends: StorageTrend[] = this.getTrends();
-
-        const trend = trends.find(iter => iter.name == name);
-
-        return trend?.trend || null;
     }
 
 }

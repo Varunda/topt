@@ -6,12 +6,19 @@ import { WinterMetric, WinterMetricEntry } from "./WinterMetric";
 import { WinterReportParameters } from "./WinterReportParameters";
 
 import StatMap from "StatMap";
-import { Event, EventKill, EventExp } from "Event";
 import { PsEvent } from "PsEvent";
 import { TrackedPlayer } from "InvididualGenerator";
 import { VehicleTypes, Vehicle, VehicleAPI, Vehicles } from "census/VehicleAPI";
 import { WeaponAPI, Weapon } from "census/WeaponAPI";
 import { PsLoadout, PsLoadouts } from "census/PsLoadout";
+
+import {
+    TEvent, TEventType,
+    TExpEvent, TKillEvent, TDeathEvent, TTeamkillEvent,
+    TCaptureEvent, TDefendEvent,
+    TVehicleKillEvent,
+    TEventHandler
+} from "events/index";
 
 export class WinterMetricIndex {
     public static KILLS: number = 0;
@@ -27,7 +34,7 @@ export class WinterReportGenerator {
     public static generate(parameters: WinterReportParameters): ApiResponse<WinterReport> {
         const response: ApiResponse<WinterReport> = new ApiResponse();
 
-        parameters.events = parameters.events.sort((a, b) => b.timestamp - a.timestamp);
+        parameters.events = parameters.events.sort((a, b) => a.timestamp - b.timestamp);
 
         const report: WinterReport = new WinterReport();
         report.start = new Date(parameters.events[0].timestamp);
@@ -242,8 +249,8 @@ export class WinterReportGenerator {
 
     private static mostUniqueRevives(parameters: WinterReportParameters): WinterMetric {
         return this.value(parameters, ((player: TrackedPlayer) => {
-            const ev: EventExp[] = player.events.filter(iter => iter.type == "exp"
-                && (iter.expID == PsEvent.revive || iter.expID == PsEvent.squadRevive)) as EventExp[];
+            const ev: TExpEvent[] = player.events.filter(iter => iter.type == "exp"
+                && (iter.expID == PsEvent.revive || iter.expID == PsEvent.squadRevive)) as TExpEvent[];
 
             return ev.map(iter => iter.targetID).filter((value, index, array) => array.indexOf(value) == index).length;
         }), {
@@ -406,10 +413,10 @@ export class WinterReportGenerator {
         const amounts: StatMap = new StatMap();
 
         for (const player of parameters.players) {
-            const revives: Event[] = player.events.filter(iter => iter.type == "death" && iter.revivedEvent != null);
+            const revives: TEvent[] = player.events.filter(iter => iter.type == "death" && iter.revivedEvent != null);
 
             for (const ev of revives) {
-                const kills: Event[] = player.events.filter(iter => {
+                const kills: TEvent[] = player.events.filter(iter => {
                     return iter.type == "kill" && iter.timestamp >= ev.timestamp && iter.timestamp < ev.timestamp + 10000;
                 });
 
@@ -535,7 +542,7 @@ export class WinterReportGenerator {
         const wepIDs: Set<string> = new Set();
 
         for (const player of parameters.players) {
-            const IDs: string[] = (player.events.filter(iter => iter.type == "kill") as EventKill[])
+            const IDs: string[] = (player.events.filter(iter => iter.type == "kill") as TKillEvent[])
                 .map(iter => iter.weaponID);
 
             for (const id of IDs) {
@@ -547,7 +554,7 @@ export class WinterReportGenerator {
 
         WeaponAPI.getByIDs(Array.from(wepIDs.keys())).ok((data: Weapon[]) => {
             for (const player of parameters.players) {
-                const kills: EventKill[] = player.events.filter(iter => iter.type == "kill") as EventKill[];
+                const kills: TKillEvent[] = player.events.filter(iter => iter.type == "kill") as TKillEvent[];
 
                 for (const kill of kills) {
                     const weapon: Weapon | undefined = data.find(iter => iter.ID == kill.weaponID);
@@ -624,7 +631,7 @@ export class WinterReportGenerator {
         const amounts: StatMap = new StatMap();
 
         for (const player of parameters.players) {
-            const evs: Event[] = player.events.filter(iter => iter.type == "exp" && events.indexOf(iter.expID) > -1);
+            const evs: TEvent[] = player.events.filter(iter => iter.type == "exp" && events.indexOf(iter.expID) > -1);
             if (evs.length > 0) {
                 amounts.set(player.name, evs.length);
             }

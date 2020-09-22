@@ -146,4 +146,22 @@ Vue.filter("minutes", (input: string | number): string => {
     }
 
     return `${(val / 60).toFixed(0)} minutes`;
-})
+});
+
+Vue.filter("server", (input: string | number): string => {
+    const val: number = (typeof(input) == "string") ? Number.parseInt(input) : input;
+    if (Number.isNaN(val)) {
+        return `Bad value ${input}`;
+    }
+
+    switch (val) {
+        case 1: return "Connery";
+        case 17: return "Emerald";
+        case 10: return "Miller";
+        case 13: return "Cobalt";
+        case 19: return "Jaeger";
+        case 40: return "SolTech";
+    }
+
+    return `Unknown ${val}`;
+});

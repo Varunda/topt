@@ -1,6 +1,6 @@
 import { WinterMetric } from "./WinterMetric";
 
-import { TrackedPlayer } from "InvididualGenerator";
+import { TrackedPlayer } from "core/TrackedPlayer";
 
 export class WinterReport {
     public start: Date = new Date();

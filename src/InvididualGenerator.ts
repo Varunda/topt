@@ -13,7 +13,6 @@ import { FacilityAPI, Facility } from "census/FacilityAPI";
 
 import { PsLoadout, PsLoadouts, PsLoadoutType } from "census/PsLoadout";
 import { PsEventType, PsEvent, PsEvents } from "PsEvent";
-import { Event, EventExp, EventKill, EventDeath, EventVehicleKill, EventCapture } from "Event";
 import StatMap from "StatMap";
 import EventReporter, { 
     statMapToBreakdown, BreakdownWeaponType,
@@ -21,6 +20,14 @@ import EventReporter, {
     OutfitVersusBreakdown, ClassCollection, classCollectionNumber, BreakdownTimeslot, BreakdownTrend, BaseCapture
 } from "EventReporter";
 import { classCollectionTrend } from "OutfitTrends";
+
+import {
+    TEvent, TEventType,
+    TExpEvent, TKillEvent, TDeathEvent, TTeamkillEvent,
+    TCaptureEvent, TDefendEvent,
+    TVehicleKillEvent,
+    TEventHandler
+} from "events/index";
 
 export class ClassBreakdown {
     secondsAs: number = 0;
@@ -48,10 +55,10 @@ export class ExpBreakdown {
     amount: number = 0;
 }
 
-export type TimeTracking = {
-    running: boolean;
-    startTime: number;
-    endTime: number;
+export class TimeTracking {
+    public running: boolean = false;
+    public startTime: number = 0;
+    public endTime: number = 0;
 }
 
 export type ClassKdCollection = ClassCollection<ClassBreakdown>;
@@ -313,9 +320,9 @@ export class TrackedPlayer {
     public stats: StatMap = new StatMap();
     public ribbons: StatMap = new StatMap();
 
-    public recentDeath: EventDeath | null = null;
+    public recentDeath: TDeathEvent | null = null;
 
-    public events: Event[] = [];
+    public events: TEvent[] = [];
 }
 
 export class BreakdownCollection {
@@ -362,9 +369,9 @@ export class ReportParameters {
     public player: TrackedPlayer = new TrackedPlayer();
 
     /**
-     * Contains all events collected during tracking. If you need just the player's events, use @see player
+     * Contains all events collected during tracking. If you need just the player's events, use player
      */
-    public events: Event[] = [];
+    public events: TEvent[] = [];
 
     /**
      * Tracking information about the current state the tracker
@@ -375,6 +382,7 @@ export class ReportParameters {
      * All routers tracked
      */
     public routers: TrackedRouter[] = [];
+
 }
 
 export class IndividualReporter {
@@ -405,8 +413,8 @@ export class IndividualReporter {
 
         const totalOps: number = opsLeft;
 
-        const firstPlayerEvent: Event = parameters.player.events[0];
-        const lastPlayerEvent: Event = parameters.player.events[parameters.player.events.length - 1];
+        const firstPlayerEvent: TEvent = parameters.player.events[0];
+        const lastPlayerEvent: TEvent = parameters.player.events[parameters.player.events.length - 1];
 
         report.player = {...parameters.player};
         report.player.events = [];
@@ -702,7 +710,7 @@ export class IndividualReporter {
     private static breakdownSection(parameters: ReportParameters, name: string, expID: string, squadExpID: string): ApiResponse<BreakdownSection> {
         const response: ApiResponse<BreakdownSection> = new ApiResponse();
 
-        const ticks: EventExp[] = parameters.player.events.filter(iter => iter.type == "exp" && iter.expID == expID) as EventExp[];
+        const ticks: TExpEvent[] = parameters.player.events.filter(iter => iter.type == "exp" && iter.expID == expID) as TExpEvent[];
         if (ticks.length > 0) {
             const section: BreakdownSection = new BreakdownSection();
             section.title = name;
@@ -833,13 +841,13 @@ export class IndividualReporter {
             "1409", // Router
         ];
 
-        const ticks: EventExp[] = parameters.player.events.filter((iter: Event) => {
+        const ticks: TExpEvent[] = parameters.player.events.filter((iter: TEvent) => {
             if (iter.type != "exp") {
                 return false;
             }
 
             return expIDs.indexOf(iter.expID) > -1;
-        }) as EventExp[];
+        }) as TExpEvent[];
 
         if (ticks.length > 0) {
             const meta: BreakdownSingle = new BreakdownSingle();
@@ -893,7 +901,7 @@ export class IndividualReporter {
     private static transportAssists(parameters: ReportParameters): ApiResponse<BreakdownMeta | null> {
         const response: ApiResponse<BreakdownMeta | null> = new ApiResponse();
         
-        const transAssists: EventExp[] = parameters.player.events.filter(iter => iter.type == "exp" && iter.expID == "30") as EventExp[];
+        const transAssists: TExpEvent[] = parameters.player.events.filter(iter => iter.type == "exp" && iter.expID == "30") as TExpEvent[];
         if (transAssists.length > 0) {
             const killedIDs: string[] = transAssists.map(iter => iter.targetID).filter((iter, index, arr) => arr.indexOf(iter) == index);
 
@@ -906,7 +914,7 @@ export class IndividualReporter {
             meta.title = "Transport assists";
             meta.data = new BreakdownArray();
 
-            EventAPI.getMultiDeaths(killedIDs, firstEv, lastEv).ok((data: EventDeath[]) => {
+            EventAPI.getMultiDeaths(killedIDs, firstEv, lastEv).ok((data: TDeathEvent[]) => {
                 const killers: string[] = [];
 
                 for (const assist of transAssists) {
@@ -1026,10 +1034,10 @@ export class IndividualReporter {
         }).map((a) => a[1]); // Transform the tuple into the ExpBreakdown
     }
 
-    public static classVersusKd(events: Event[], classLimit?: PsLoadoutType): ClassKdCollection {
+    public static classVersusKd(events: TEvent[], classLimit?: PsLoadoutType): ClassKdCollection {
         const kds: ClassKdCollection = classKdCollection();
 
-        events.forEach((event: Event) => {
+        events.forEach((event: TEvent) => {
             if (event.type == "kill" || event.type == "death") {
                 const sourceLoadoutID: string = event.loadoutID;
                 const sourceLoadout = PsLoadouts.get(sourceLoadoutID);
@@ -1099,8 +1107,8 @@ export class IndividualReporter {
         usage.characterID = parameters.player.characterID;
         usage.secondsOnline = (finalTimestamp - lastTimestamp) / 1000;
 
-        parameters.player.events.forEach((event: Event) => {
-            if (event.type == "capture" || event.type == "defend") {
+        parameters.player.events.forEach((event: TEvent) => {
+            if (event.type == "capture" || event.type == "defend" || event.type == "login" || event.type == "logout") {
                 return;
             }
 
@@ -1187,7 +1195,7 @@ export class IndividualReporter {
         return usage;
     }
 
-    public static unrevivedTime(events: Event[]): number[] {
+    public static unrevivedTime(events: TEvent[]): number[] {
         const array: number[] = [];
 
         for (const ev of events) {
@@ -1207,7 +1215,7 @@ export class IndividualReporter {
         return array.sort((a, b) => b - a);
     }
 
-    public static reviveLifeExpectance(events: Event[]): number[] {
+    public static reviveLifeExpectance(events: TEvent[]): number[] {
         const array: number[] = [];
 
         for (const ev of events) {
@@ -1215,7 +1223,7 @@ export class IndividualReporter {
                 continue;
             }
 
-            const charEvents: Event[] = events.filter(iter => iter.sourceID == ev.sourceID);
+            const charEvents: TEvent[] = events.filter(iter => iter.sourceID == ev.sourceID);
 
             const index: number = charEvents.findIndex(iter => {
                 return iter.type == "death" && iter.timestamp == ev.timestamp && iter.targetID == ev.targetID;
@@ -1226,10 +1234,10 @@ export class IndividualReporter {
                 continue;
             }
 
-            let nextDeath: EventDeath | null = null;
+            let nextDeath: TDeathEvent | null = null;
             for (let i = index + 1; i < charEvents.length; ++i) {
                 if (charEvents[i].type == "death") {
-                    nextDeath = charEvents[i] as EventDeath;
+                    nextDeath = charEvents[i] as TDeathEvent;
                     break;
                 }
             }
@@ -1248,7 +1256,7 @@ export class IndividualReporter {
         return array.sort((a, b) => b - a);
     }
 
-    public static lifeExpectanceRate(events: Event[]): number[] {
+    public static lifeExpectanceRate(events: TEvent[]): number[] {
         const array: number[] = [];
 
         for (const ev of events) {
@@ -1256,7 +1264,7 @@ export class IndividualReporter {
                 continue;
             }
 
-            const charEvents: Event[] = events.filter(iter => iter.sourceID == ev.sourceID);
+            const charEvents: TEvent[] = events.filter(iter => iter.sourceID == ev.sourceID);
 
             const index: number = charEvents.findIndex(iter => {
                 return iter.type == "death" && iter.timestamp == ev.timestamp && iter.targetID == ev.targetID;
@@ -1267,10 +1275,10 @@ export class IndividualReporter {
                 continue;
             }
 
-            let nextDeath: EventDeath | null = null;
+            let nextDeath: TDeathEvent | null = null;
             for (let i = index + 1; i < charEvents.length; ++i) {
                 if (charEvents[i].type == "death") {
-                    nextDeath = charEvents[i] as EventDeath;
+                    nextDeath = charEvents[i] as TDeathEvent;
                     break;
                 }
             }
@@ -1289,7 +1297,7 @@ export class IndividualReporter {
         return probs;
     }
 
-    public static timeUntilReviveRate(events: Event[]): number[] {
+    public static timeUntilReviveRate(events: TEvent[]): number[] {
         const array: number[] = [];
 
         for (const ev of events) {
@@ -1332,7 +1340,7 @@ export class IndividualReporter {
         return probs;
     }
 
-    public static generateContinentPlayedOn(events: Event[]): string {
+    public static generateContinentPlayedOn(events: TEvent[]): string {
         let indar: number = 0;
         let esamir: number = 0;
         let amerish: number = 0;

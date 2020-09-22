@@ -90,7 +90,7 @@
                 </div>
 
                 <small class="text-muted">
-                    Used to track logins and logistics
+                    Used to track logins, facility captures and router kills
                 </small>
 
                 <hr/>
@@ -109,6 +109,7 @@
                         class="form-control"
                         autofocus
                         type="text"
+                        @keyup.enter="connect"
                         placeholder="Service token"
                     >
                 </div>
@@ -126,27 +127,24 @@
 
                 <hr>
 
-                <div v-if="storage.enabled == true">
-                    <h6>Saved trends:</h6>
-
-                    <select class="form-control mb-2" v-model="storage.pendingTrend">
-                        <option :value="null">New trends file</option>
-                        <option :value="undefined">Skip</option>
-                        <option v-for="trend in storage.trends" :value="trend.name">
-                            {{trend.name}}
-                        </option>
-                    </select>
-
-                    <input v-if="storage.pendingTrend === null" v-model="storage.newTrendFile"
-                        class="form-control" type="text" placeholder="New trend file name">
-                </div>
-
-                <hr>
-
                 <button @click="connect" type="button" class="btn btn-primary w-100"
                     :disabled="canConnect == false">
                     Connect
                 </button>
+
+                <small class="text-muted">
+                    You can also hit enter while in the service ID field to connect
+                </small>
+
+                <hr>
+
+                <button v-if="storage.enabled" @click="saveSettings" type="button" class="btn btn-success w-100">
+                    Save and connect
+                </button>
+
+                <span class="text-muted">
+                    Save these settings and load them next time instead of inputing them, saving seconds
+                </span>
 
                 <hr>
 
@@ -162,20 +160,6 @@
                 </div>
 
                 <hr>
-
-                <span v-if="socketStatus.state == 'idle'"></span>
-                <span v-else-if="socketStatus.state == 'saving'">
-                    Progress: {{socketStatus.data}}
-                </span>
-                <span v-else-if="socketStatus.state == 'loaded'">
-                    Connected!
-                </span>
-                <span v-else-if="socketStatus.state == 'error'">
-                    Error connecting to event stream: {{socketStatus.message}}
-                </span>
-                <span v-else>
-                    Unchecked socketStatus state: '{{socketStatus.state}}'
-                </span>
             </div>
         </div>
 
@@ -208,8 +192,6 @@
                                     class="btn btn-primary"
                                     type="button">
 
-                                    <span v-if="parameters.outfitRequest.state == 'loading'" class="spinner-border spinner-border-sm">
-                                    </span>
                                     Add
                                 </button>
                             </div>
@@ -248,7 +230,7 @@
                             class="btn btn-primary w-100 mb-2">
                         Begin tracking
                     </button>
-                    <button v-else-if="tracking.running == true" @click="setSaveEvents(false)"
+                    <button v-else-if="core.tracking.running == true" @click="setSaveEvents(false)"
                             class="btn btn-secondary w-100 mb-2">
                         End tracking
                     </button>
@@ -279,53 +261,33 @@
                         </button>
                     </div>
 
-                    <hr/>
-
-                    <div class="form-group">
-                        <label>Trends file</label>
-
-                        <br>
-
-                        <label><b>File:</b> {{storage.trendFileName}}</label>
-
-                        <button @click="view = 'trends'"
-                            class="btn btn-info w-100 mb-2"
-                            type="button">
-                            Edit trends file
-                        </button>
-
-                        <div class="w-100 mb-2 d-flex">
-                            <label class="btn btn-light btn-outline-dark col-form-label flex-grow-1" for="data-import-outfit-trends">
-                                <input type="file" id="data-import-outfit-trends" class="d-none">
-                                Select file
-                            </label>
-                            <button @click="importOutfitTrends" type="button" class="btn btn-success">
-                                Import trends
-                            </button>
-                        </div>
-
-                        <button @click="exportTrends"
-                            class="btn btn-info w-100 mb-2"
-                            type="button">
-                            Export trends
-                        </button>
-                    </div>
-
                     <hr>
 
-                    <div class="form-groupw flex-grow-1">
+                    <div class="form-group flex-grow-1">
                         <label class="d-block">
                             <b>Players: </b>
-                            Tracking {{characters.length}} player{{characters.length == 1 ? "" : "s"}}
-                        </label>
-
-                        <label class="d-block">
-                            <b>Sessions: </b>
-                            {{outfitTrends.sessions.length}}
+                            Tracking {{core.characters.length}} players
                         </label>
                     </div>
 
-                    <div class="btn-group w-100 mt-2">
+                    <div class="form-group flex-grow-1">
+                        <label class="d-block">
+                            <b>Server: </b>
+                            {{settings.serverID | server}}
+                        </label>
+                    </div>
+
+                    <div class="w-100 mt-2">
+                        <span v-if="settings.fromStorage == true">
+                            Loaded saved settings, click below to clear
+                        </span>
+
+                        <button v-if="settings.fromStorage == true" @click="clearSettings" type="button" class="btn btn-warning w-100">
+                            Clear settings
+                        </button>
+                    </div>
+
+                    <div class="btn-group w-100 my-2">
                         <button type="button" class="btn btn-success" data-toggle="modal" data-target="#contact-modal">
                             Info/Contact
                         </button>
@@ -358,10 +320,6 @@
                                     Generate
                                 </button>
                             </div>
-                        </div>
-
-                        <div class="col-2 border-right">
-                            Events: {{totalTicks}} ({{totalBytes}})
                         </div>
 
                         <div class="col-8">
@@ -681,9 +639,9 @@
                         </div>
 
                         <div class="flex-grow-1">
-                            <div><b>Start:</b> {{tracking.startTime | moment}}</div>
-                            <div><b>End:</b> {{tracking.endTime | moment}}</div>
-                            <div><b>Duration:</b> {{tracking.startTime | between(tracking.endTime)}}</div>
+                            <div><b>Start:</b> {{outfitReport.tracking.startTime | moment}}</div>
+                            <div><b>End:</b> {{outfitReport.tracking.endTime | moment}}</div>
+                            <div><b>Duration:</b> {{outfitReport.tracking.startTime | between(outfitReport.tracking.endTime)}}</div>
                             <div><b>Players:</b> {{outfitReport.players.length}}</div>
                         </div>
 
@@ -822,59 +780,59 @@
             </div>
 
             <div class="col-12"> <!-- K/D trend -->
-                <h2 class="strike">KPM trends</h2>
+                <h2 class="strike">KPM boxplot</h2>
                 <div class="row">
                     <div class="col-2 pr-0">
                         <h4>Average</h4>
-                        <breakdown-box :src="outfitReport.trends.kpm.total" :show-label="true"></breakdown-box>
+                        <breakdown-box :src="outfitReport.kpmBoxPlot.total"></breakdown-box>
                     </div>
                     <div class="col-2 px-0">
                         <h4>Infiltrator</h4>
-                        <breakdown-box :src="outfitReport.trends.kpm.infil"></breakdown-box>
+                        <breakdown-box :src="outfitReport.kpmBoxPlot.infil"></breakdown-box>
                     </div>
                     <div class="col-2 px-0">
                         <h4>Light assault</h4>
-                        <breakdown-box :src="outfitReport.trends.kpm.lightAssault"></breakdown-box>
+                        <breakdown-box :src="outfitReport.kpmBoxPlot.lightAssault"></breakdown-box>
                     </div>
                     <div class="col-2 px-0">
                         <h4>Medic</h4>
-                        <breakdown-box :src="outfitReport.trends.kpm.medic"></breakdown-box>
+                        <breakdown-box :src="outfitReport.kpmBoxPlot.medic"></breakdown-box>
                     </div>
                     <div class="col-2 px-0">
                         <h4>Engineer</h4>
-                        <breakdown-box :src="outfitReport.trends.kpm.engineer"></breakdown-box>
+                        <breakdown-box :src="outfitReport.kpmBoxPlot.engineer"></breakdown-box>
                     </div>
                     <div class="col-2 pl-0">
                         <h4>Heavy</h4>
-                        <breakdown-box :src="outfitReport.trends.kpm.heavy"></breakdown-box>
+                        <breakdown-box :src="outfitReport.kpmBoxPlot.heavy"></breakdown-box>
                     </div>
                 </div>
 
-                <h2 class="strike">KD trends</h2>
+                <h2 class="strike">KD boxplot</h2>
                 <div class="row">
                     <div class="col-2 pr-0">
                         <h4>Average</h4>
-                        <breakdown-box :src="outfitReport.trends.kd.total" :show-label="true"></breakdown-box>
+                        <breakdown-box :src="outfitReport.kdBoxPlot.total"></breakdown-box>
                     </div>
                     <div class="col-2 px-0">
                         <h4>Infiltrator</h4>
-                        <breakdown-box :src="outfitReport.trends.kd.infil"></breakdown-box>
+                        <breakdown-box :src="outfitReport.kdBoxPlot.infil"></breakdown-box>
                     </div>
                     <div class="col-2 px-0">
                         <h4>Light assault</h4>
-                        <breakdown-box :src="outfitReport.trends.kd.lightAssault"></breakdown-box>
+                        <breakdown-box :src="outfitReport.kdBoxPlot.lightAssault"></breakdown-box>
                     </div>
                     <div class="col-2 px-0">
                         <h4>Medic</h4>
-                        <breakdown-box :src="outfitReport.trends.kd.medic"></breakdown-box>
+                        <breakdown-box :src="outfitReport.kdBoxPlot.medic"></breakdown-box>
                     </div>
                     <div class="col-2 px-0">
                         <h4>Engineer</h4>
-                        <breakdown-box :src="outfitReport.trends.kd.engineer"></breakdown-box>
+                        <breakdown-box :src="outfitReport.kdBoxPlot.engineer"></breakdown-box>
                     </div>
                     <div class="col-2 pl-0">
                         <h4>Heavy</h4>
-                        <breakdown-box :src="outfitReport.trends.kd.heavy"></breakdown-box>
+                        <breakdown-box :src="outfitReport.kdBoxPlot.heavy"></breakdown-box>
                     </div>
                 </div>
 
@@ -998,7 +956,7 @@
                             <td>{{(exp.score / outfitReport.score * 100).toFixed(0)}}%</td>
                             <td>{{exp.amount.toLocaleString()}}</td>
                             <td>
-                                {{(exp.amount / (((tracking.endTime - tracking.startTime) / 60000))).toFixed(2)}}
+                                {{(exp.amount / (((outfitReport.tracking.endTime - outfitReport.tracking.startTime) / 60000))).toFixed(2)}}
                             </td>
                         </tr>
                     </tbody>
@@ -1504,67 +1462,6 @@
                     </tbody>
                 </table>
             </div>
-        </div>
-
-        <div v-else-if="view == 'trends'" class="row">
-            <div class="col-12">
-                <h2 class="strike">Loaded trends</h2>
-
-                <button type="button" class="close" @click="view = 'realtime';">
-                    &times;
-                </button>
-            </div>
-
-            <div class="col-12">
-                <div class="alert alert-danger">
-                    Danger zone! Make sure you have your trends file exported in case something goes wrong
-                </div>
-            </div>
-
-            <table class="table table-striped table-sm">
-                <thead class="table-secondary">
-                    <tr>
-                        <th>Timestamp</th>
-                        <th>Remove</th>
-                        <th>Avg KPM</th>
-                        <th>Infil KPM</th>
-                        <th>LA KPM</th>
-                        <th>Medic KPM</th>
-                        <th>Eng KPM</th>
-                        <th>Heavy KPM</th>
-                        <th>Avg KD</th>
-                        <th>Infil KD</th>
-                        <th>LA KD</th>
-                        <th>Medic KD</th>
-                        <th>Eng KD</th>
-                        <th>Heavy KD</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-                    <tr v-for="(session, index) in outfitTrends.sessions">
-                        <td>{{session.timestamp | moment}}</td>
-                        <td>
-                            <a @click="removeTrendSession(index)" href="#">
-                                Remove
-                            </a>
-                        </td>
-                        <td>{{session.kpms.total.length}}</td>
-                        <td>{{session.kpms.infil.length}}</td>
-                        <td>{{session.kpms.lightAssault.length}}</td>
-                        <td>{{session.kpms.medic.length}}</td>
-                        <td>{{session.kpms.engineer.length}}</td>
-                        <td>{{session.kpms.heavy.length}}</td>
-                        <td>{{session.kds.total.length}}</td>
-                        <td>{{session.kds.infil.length}}</td>
-                        <td>{{session.kds.lightAssault.length}}</td>
-                        <td>{{session.kds.medic.length}}</td>
-                        <td>{{session.kds.engineer.length}}</td>
-                        <td>{{session.kds.heavy.length}}</td>
-                    </tr>
-                </tbody>
-            </table>
-
         </div>
 
         <div v-else-if="view == 'winter'" class="row">

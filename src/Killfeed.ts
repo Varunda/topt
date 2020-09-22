@@ -1,10 +1,12 @@
 import { ApiResponse } from "census/ApiWrapper";
 import { Loadable, Loading } from "Loadable";
-import { EventKill, EventDeath, EventExp } from "Event";
+
 import { CharacterAPI, Character } from "census/CharacterAPI";
 import { WeaponAPI, Weapon } from "census/WeaponAPI";
 import { PsLoadout, PsLoadouts } from "census/PsLoadout";
+
 import { PsEvent } from "PsEvent";
+import { TKillEvent, TDeathEvent, TExpEvent } from "events/index";
 
 export class KillfeedEntry {
     public name: string = "";
@@ -177,7 +179,7 @@ export class KillfeedGeneration {
         this._hoveredMember = null;
     }
 
-    public static add(event: EventKill | EventDeath): void {
+    public static add(event: TKillEvent | TDeathEvent): void {
         const entry: KillfeedEntry = new KillfeedEntry();
 
         entry.timestamp = event.timestamp;
@@ -234,7 +236,7 @@ export class KillfeedGeneration {
         this._entries.unshift(entry);
     }
 
-    public static exp(event: EventExp): void {
+    public static exp(event: TExpEvent): void {
         if (event.expID == PsEvent.revive || event.expID == PsEvent.squadRevive) {
             if (this._members.has(event.targetID)) {
                 const member: KillfeedMember = this._members.get(event.targetID)!;

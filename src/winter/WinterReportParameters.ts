@@ -1,9 +1,10 @@
 import { TrackedPlayer, TimeTracking } from "InvididualGenerator";
-import { Event } from "Event";
+
+import { TEvent } from "events/index";
 
 export class WinterReportParameters {
     public players: TrackedPlayer[] = [];
-    public events: Event[] = [];
+    public events: TEvent[] = [];
     public timeTracking: TimeTracking = { startTime: 0, endTime: 0, running: false };
     public settings: WinterReportSettings = new WinterReportSettings();
 }
