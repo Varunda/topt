@@ -57607,7 +57607,6 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("breakdown-interval", {
             this.chart.options = {
                 plugins: {
                     datalabels: {
-                        color: this.darkMode == true ? "#C0C0C0" : "",
                         textAlign: "center",
                         font: {
                             size: 18,
@@ -57624,11 +57623,10 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("breakdown-interval", {
                     yAxes: [{
                             ticks: {
                                 min: this.YAxisMin,
-                                stepSize: this.YAxisTickStep
+                                stepSize: this.YAxisTickStep,
                             },
                             gridLines: {
                                 display: this.ShowYAxis,
-                                color: this.darkMode == true ? "#FFFFFF" : ""
                             },
                         }],
                     xAxes: [{
@@ -57639,9 +57637,8 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("breakdown-interval", {
                             },
                             gridLines: {
                                 display: this.ShowXAxis,
-                                color: this.darkMode == true ? "#FFFFFF" : ""
                             }
-                        }]
+                        }],
                 },
                 elements: {
                     line: {
@@ -57649,8 +57646,8 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("breakdown-interval", {
                     }
                 },
                 legend: {
-                    display: false
-                }
+                    display: false,
+                },
             };
         },
         draw: function () {
@@ -65675,6 +65672,10 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
         "settings.updateRate": function () {
             clearInterval(this.refreshIntervalID);
             this.refreshIntervalID = setInterval(this.updateDisplay, this.settings.updateRate * 1000);
+        },
+        "settings.darkMode": function () {
+            chart_js__WEBPACK_IMPORTED_MODULE_17__["Chart"].defaults.global.defaultFontColor = (this.settings.darkMode == true) ? "#CCCCCC" : "#666";
+            console.log(`Default color is now: ${chart_js__WEBPACK_IMPORTED_MODULE_17__["Chart"].defaults.global.defaultFontColor}`);
         }
     }
 });

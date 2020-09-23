@@ -61,7 +61,6 @@ Vue.component("breakdown-interval", {
             this.chart.options = {
                 plugins: {
                     datalabels: {
-                        color: this.darkMode == true ? "#C0C0C0" : "",
                         textAlign: "center",
                         font: {
                             size: 18,
@@ -78,11 +77,10 @@ Vue.component("breakdown-interval", {
                     yAxes: [{
                         ticks: {
                             min: this.YAxisMin,
-                            stepSize: this.YAxisTickStep
+                            stepSize: this.YAxisTickStep,
                         },
                         gridLines: {
                             display: this.ShowYAxis,
-                            color: this.darkMode == true ? "#FFFFFF" : ""
                         },
                     }],
                     xAxes: [{
@@ -93,9 +91,8 @@ Vue.component("breakdown-interval", {
                         },
                         gridLines: {
                             display: this.ShowXAxis,
-                            color: this.darkMode == true ? "#FFFFFF" : ""
                         }
-                    }]
+                    }],
                 },
                 elements: {
                     line: {
@@ -103,8 +100,8 @@ Vue.component("breakdown-interval", {
                     }
                 },
                 legend: {
-                    display: false
-                }
+                    display: false,
+                },
             };
         },
 

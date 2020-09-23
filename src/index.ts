@@ -737,6 +737,11 @@ export const vm = new Vue({
                 this.updateDisplay,
                 this.settings.updateRate * 1000
             ) as unknown as number;
+        },
+
+        "settings.darkMode": function(): void {
+            Chart.defaults.global.defaultFontColor = (this.settings.darkMode == true) ? "#CCCCCC" : "#666";
+            console.log(`Default color is now: ${Chart.defaults.global.defaultFontColor}`);
         }
     }
 });
