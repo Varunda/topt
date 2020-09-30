@@ -78,7 +78,8 @@ import { timers } from "jquery";
 import Core from "core/index";
 import { TrackedPlayer } from "core/TrackedPlayer";
 import { CoreSettings } from "core/CoreSettings";
-import { isTemplateExpression } from "../node_modules/typescript/lib/typescript.js";
+import { SquadAddon } from "addons/SquadAddon";
+import { Squad } from "core/squad/Squad";
 
 class OpReportSettings {
     public zoneID: string | null = null;
@@ -132,6 +133,14 @@ export const vm = new Vue({
         generation: {
             names: [] as string[],
             state: [] as string[]
+        },
+
+        squad: {
+            squad1: null as (Squad | null),
+            squad2: null as Squad | null,
+            squad3: null as Squad | null,
+            squad4: null as Squad | null,
+            guessSquads: [] as Squad[]
         },
 
         killfeed: {
@@ -366,7 +375,13 @@ export const vm = new Vue({
         },
 
         updateKillfeedDisplay: function(): void {
-            this.killfeed.entry = KillfeedGeneration.generate(this.killfeed.options);
+            this.squad = {
+                squad1: this.core.squad.squad1,
+                squad2: this.core.squad.squad2,
+                squad3: this.core.squad.squad3,
+                squad4: this.core.squad.squad4,
+                guessSquads: this.core.squad.guessSquads
+            }
         },
 
         updateRealtimeDisplay: function(): void {
@@ -440,13 +455,19 @@ export const vm = new Vue({
                 return;
             }
 
-            const whatHovered = KillfeedGeneration.getHovered();
+            const whatHovered = SquadAddon.getHovered()
 
-            if (whatHovered == "squad") {
-                KillfeedGeneration.mergeSquads(ev.key);
+            //const whatHovered = KillfeedGeneration.getHovered();
+
+            if (whatHovered == "squad" && SquadAddon.selectedSquadName != null) {
+                //KillfeedGeneration.mergeSquads(ev.key);
+
+                this.core.mergeSquads(ev.key, SquadAddon.selectedSquadName);
                 this.updateDisplay();
-            } else if (whatHovered == "member") {
-                KillfeedGeneration.moveMember(ev.key);
+            } else if (whatHovered == "member" && SquadAddon.selectedMemberID != null) {
+                //KillfeedGeneration.moveMember(ev.key);
+
+                this.core.addMemberToSquad(SquadAddon.selectedMemberID, ev.key);
                 this.updateDisplay();
             } else {
 
@@ -714,7 +735,6 @@ export const vm = new Vue({
 
             FileSaver.saveAs(new File([JSON.stringify(lines, null, 2)], `weapons.json`, { type: "text/json"}));
         }
-
     },
 
     computed: {

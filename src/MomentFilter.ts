@@ -165,3 +165,18 @@ Vue.filter("server", (input: string | number): string => {
 
     return `Unknown ${val}`;
 });
+
+Vue.filter("secondsAgo", (input: string | number): string => {
+    if (typeof(input) == "string" && input == "") {
+        return "";
+    }
+
+    const val: number = (typeof(input) == "string") ? Number.parseInt(input) : input;
+    if (Number.isNaN(val)) {
+        return `Bad value ${input}`;
+    }
+
+    const now: number = new Date().getTime();
+
+    return `0:${((now - val) / 1000).toFixed(2)}`;
+});

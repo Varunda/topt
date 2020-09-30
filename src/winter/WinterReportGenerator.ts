@@ -311,7 +311,7 @@ export class WinterReportGenerator {
                 continue;
             }
 
-            if (kills == 1 || hsKills == 1) {
+            if (kills == 1 || hsKills == 1 || kills < 25) {
                 continue;
             }
 
@@ -442,7 +442,7 @@ export class WinterReportGenerator {
             {
                 name: "Percent revived",
                 funName: "Makes me strong",
-                description: "Highest ratio of revived deaths to deaths",
+                description: "Highest percentage of revived deaths to respawns",
                 entries: []
             },
             (value: number) => `${(value * 100).toFixed(2)}%`

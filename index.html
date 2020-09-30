@@ -539,88 +539,49 @@
         <div v-else-if="view == 'killfeed'" class="h-100">
             <div class="d-flex flex-column">
                 <div class="flex-grow-1">
-                    <div class="row">
-                        <div class="col-6">
-                            <h2 class="strike" @click="view = 'realtime'">Killfeed</h2>
-                            <button @click="killfeed.options.viewKills = !killfeed.options.viewKills" type="button" class="btn btn-primary btn-sm">
-                                Kills
-                            </button>
+                    <h2 class="strike" @click="view = 'realtime'">Squads</h2>
+                    <div class="d-flex flex-column">
+                        <div class="row flex-grow-1">
+                            <div class="col-3">
+                                <h5 class="strike mt-0">Squad 1</h5>
+                                <killfeed-squad :squad="squad.squad1" :show-state="true" :debug="core.squad.debug">
+                                </killfeed-squad>
+                            </div>
 
-                            <button @click="killfeed.options.viewDeaths = !killfeed.options.viewDeaths" type="button" class="btn btn-primary btn-sm">
-                                Deaths
-                            </button>
+                            <div class="col-3">
+                                <h5 class="strike mt-0">Squad 2</h5>
+                                <killfeed-squad :squad="squad.squad2" :show-state="true" :debug="core.squad.debug">
+                                </killfeed-squad>
+                            </div>
 
-                            <div class="list-group list-group-small">
-                                <div v-for="entry in killfeed.entry.entries" class="list-group-item">
-                                    <div class="row">
-                                        <div class="col-1">
-                                            {{entry.timestamp | moment("hh:mm:ss")}}
-                                        </div>
-                                        <div class="col-1">
-                                            <span v-if="entry.type == 'kill'">
-                                                Kill
-                                            </span>
-                                            <span v-else-if="entry.type == 'death'">
-                                                Death
-                                            </span>
-                                        </div>
-                                        <div class="col-4">
-                                            {{entry.name}}
-                                        </div>
-                                        <div class="col-6">
-                                            <span v-if="entry.weapon.state == 'loading'">
-                                                Loading...
-                                            </span>
-                                            <span v-else-if="entry.weapon.state == 'loaded'">
-                                                {{entry.weapon.data.name}} / {{entry.weapon.data.type}}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
+                            <div class="col-3">
+                                <h5 class="strike mt-0">Squad 3</h5>
+                                <killfeed-squad :squad="squad.squad3" :show-state="true" :debug="core.squad.debug">
+                                </killfeed-squad>
+                            </div>
+
+                            <div class="col-3">
+                                <h5 class="strike mt-0">Squad 4</h5>
+                                <killfeed-squad :squad="squad.squad4" :show-state="true" :debug="core.squad.debug">
+                                </killfeed-squad>
                             </div>
                         </div>
 
-                        <div class="col-6">
-                            <div class="d-flex flex-column">
-                                <div class="row flex-grow-1">
-                                    <div class="col-3">
-                                        <h5 class="strike mt-0">Squad 1</h5>
-                                        <killfeed-squad :squad="killfeed.entry.squad1" :show-state="true"></killfeed-squad>
-                                    </div>
+                        <hr>
 
-                                    <div class="col-3">
-                                        <h5 class="strike mt-0">Squad 2</h5>
-                                        <killfeed-squad :squad="killfeed.entry.squad2" :show-state="true"></killfeed-squad>
-                                    </div>
+                        <div class="row flex-grow-1">
+                            <div class="col-12">
+                                Possible squads
+                            </div>
 
-                                    <div class="col-3">
-                                        <h5 class="strike mt-0">Squad 3</h5>
-                                        <killfeed-squad :squad="killfeed.entry.squad3" :show-state="true"></killfeed-squad>
-                                    </div>
-
-                                    <div class="col-3">
-                                        <h5 class="strike mt-0">Squad 4</h5>
-                                        <killfeed-squad :squad="killfeed.entry.squad4" :show-state="true"></killfeed-squad>
-                                    </div>
-                                </div>
-
-                                <hr>
-
-                                <div class="row flex-grow-1">
-                                    <div class="col-12">
-                                        Possible squads
-                                    </div>
-
-                                    <div class="col-12">
-                                        <template v-for="squad in killfeed.entry.otherSquads">
-                                            <killfeed-squad :squad="squad" style="display: inline-flex;"></killfeed-squad>
-                                        </template>
-                                    </div>
-                                </div>
+                            <div class="col-12">
+                                <template v-for="squad in squad.guessSquads">
+                                    <killfeed-squad :squad="squad" style="display: inline-flex;" :debug="core.squad.debug">
+                                    </killfeed-squad>
+                                </template>
                             </div>
                         </div>
                     </div>
-
                 </div>
             </div>
         </div>

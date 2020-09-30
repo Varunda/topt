@@ -1,6 +1,8 @@
 
 import Vue, { PropType } from "vue";
+
 import { KillfeedGeneration, KillfeedSquad, KillfeedMember } from "Killfeed";
+import { SquadAddon } from "addons/SquadAddon";
 
 type GroupInfo = {
     total: number;
@@ -56,6 +58,7 @@ Vue.component("killfeed-squad", {
     props: {
         squad: { type: Object as PropType<KillfeedSquad>, required: true },
         ShowState: { type: Boolean, required: false, default: false },
+        debug: { type: Boolean, required: false, default: false }
     },
 
     data: function() {
@@ -70,12 +73,13 @@ Vue.component("killfeed-squad", {
 
             if (elem) {
                 const squadName: string | undefined = elem.dataset["squadName"] ?? "";
-                KillfeedGeneration.setHoveredSquad(squadName);
+                SquadAddon.selectedSquadName = squadName;
             }
         },
 
         squadMouseLeave: function(ev: MouseEvent): void {
-            KillfeedGeneration.clearHoveredSquad();
+
+            SquadAddon.selectedSquadName = null;
         },
 
         memberMouseOver: function(ev: MouseEvent): void {
@@ -83,12 +87,12 @@ Vue.component("killfeed-squad", {
 
             if (elem) {
                 const memberID: string | undefined = elem.dataset["memberId"] ?? "";
-                KillfeedGeneration.setHoveredMember(memberID);
+                SquadAddon.selectedMemberID = memberID;
             }
         },
 
         memberMouseLeave: function(ev: MouseEvent): void {
-            KillfeedGeneration.clearHoveredMember();
+            SquadAddon.selectedMemberID = null;
         },
 
         resetMembers: function(): void {
@@ -105,6 +109,7 @@ Vue.component("killfeed-squad", {
                 :data-squad-name="squad.name">
 
                 {{squad.name}}
+                &nbsp;
 
                 <button class="btn btn-sm btn-warning m-n1 mr-n2 float-right" @click="resetMembers">
                     Reset
@@ -113,6 +118,7 @@ Vue.component("killfeed-squad", {
             <div v-if="ShowState" class="list-group-item p-0">
                 <div class="pl-1" :style="{
                     width: '100%',
+                    color: 'black',
                     background: 'linear-gradient(90deg,' + all.aliveColor + (all.percentAlive * 100) + '%, transparent ' + (all.percentAlive * 100) + '% ' +  ((1 - all.percentAlive) * 100) + '%)'
                 }">
 
@@ -133,11 +139,27 @@ Vue.component("killfeed-squad", {
                         </td>
 
                         <td>
-                            {{member.name}}
+                            {{member.name}} {{debug == true ? member.charID : ""}}
                         </td>
 
                         <td>
-                            {{member.state == "alive" ? "A" : "D"}}
+                            {{member.state == "alive" ? "A" : member.state == "dying" ? "R" : "D"}}
+                            <span v-if="member.state == 'dying'">
+                                / 0:{{(30 - member.timeDead).toFixed(0).padStart(2, "0")}}
+                            </span>
+                            <span v-else>
+                                &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+                            </span>
+                        </td>
+
+                        <td>
+                            <span v-if="member.whenBeacon == null">
+                                B/0:00
+                            </span>
+
+                            <span v-else>
+                                U/{{(300 - member.beaconCooldown).toFixed(0)}}
+                            </span>
                         </td>
                     </tr>
                 </table>
@@ -148,19 +170,25 @@ Vue.component("killfeed-squad", {
                     <tr>
                         <td><b>Medics</b></td>
                         <td>{{medics.alive}} / {{medics.total}}</td>
-                        <td><span class="border-rounded px-0" :style="{ 'background-color': medics.aliveColor }">&nbsp;&nbsp;</span></td>
+                        <td>
+                            <span class="border-rounded px-0" :style="{ 'background-color': medics.aliveColor, 'width': '20px' }">&nbsp;&nbsp;</span>
+                        </td>
                     </tr>
 
                     <tr>
                         <td><b>Heavies</b></td>
                         <td>{{heavies.alive}} / {{heavies.total}}</td>
-                        <td><span class="border-rounded px-0" :style="{ 'background-color': heavies.aliveColor }">&nbsp;&nbsp;</span></td>
+                        <td>
+                            <span class="border-rounded px-0" :style="{ 'background-color': heavies.aliveColor, 'width': '20px' }">&nbsp;&nbsp;</span>
+                        </td>
                     </tr>
 
                     <tr>
                         <td><b>Other</b></td>
                         <td>{{notBattle.alive}} / {{notBattle.total}}</td>
-                        <td><span class="border-rounded px-0" :style="{ 'background-color': notBattle.aliveColor }">&nbsp;&nbsp;</span></td>
+                        <td>
+                            <span class="border-rounded px-0" :style="{ 'background-color': notBattle.aliveColor, 'width': '20px' }">&nbsp;&nbsp;</span>
+                        </td>
                     </tr>
                 </table>
             </div>

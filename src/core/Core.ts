@@ -24,22 +24,14 @@ import {
 import { Squad } from "./squad/Squad";
 import { SquadMember } from "./squad/SquadMember"
 
-interface Sockets {
-    tracked: WebSocket | null;
-    logistics: WebSocket | null;
-    logins: WebSocket | null;
-    facility: WebSocket | null;
-    debug: WebSocket | null;
-}
-
 export class Core {
 
-    public sockets: Sockets = {
-        tracked: null,
-        logistics: null,
-        logins: null,
-        facility: null,
-        debug: null
+    public sockets = {
+        tracked: null as WebSocket | null,
+        logistics: null as WebSocket | null,
+        logins: null as WebSocket | null,
+        facility: null as WebSocket | null,
+        debug: null as WebSocket | null
     };
 
     public routerTracking = {
@@ -51,14 +43,13 @@ export class Core {
     };
 
     public squad = {
+        debug: false as boolean,
+
         squad1: new Squad() as Squad,
         squad2: new Squad() as Squad,
         squad3: new Squad() as Squad,
         squad4: new Squad() as Squad,
         guessSquads: [] as Squad[],
-
-        selected: null as Squad | null,
-        member: null as SquadMember | null,
 
         members: new Map() as Map<string, SquadMember>,
     };
@@ -89,6 +80,8 @@ export class Core {
         this.socketMessageQueue.length = 5;
 
         CensusAPI.init(this.serviceID);
+
+        this.squadInit();
     }
 
     public handlers = {
@@ -222,6 +215,12 @@ export class Core {
             this.subscribeToEvents(data);
             loading.state = "loaded";
 
+            for (const char of data) {
+                if (char.online == true) {
+                    this.addMember({ ID: char.ID, name: char.name });
+                }
+            }
+
             KillfeedGeneration.addCharacters(data);
         });
 
@@ -249,7 +248,7 @@ export class Core {
 
         CharacterAPI.getByName(name).ok((data: Character) => {
             this.subscribeToEvents([data]);
-            KillfeedGeneration.addCharacters([data]);
+            this.addMember({ ID: data.ID, name: data.name });
         });
 
         return loading;

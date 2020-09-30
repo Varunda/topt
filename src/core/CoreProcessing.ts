@@ -169,6 +169,7 @@ declare module "Core" {
 
             self.emit(ev);
 
+            self.processExperienceEvent(ev);
             KillfeedGeneration.exp(ev);
 
             if (eventID == PsEvent.revive || eventID == PsEvent.squadRevive) {
@@ -232,6 +233,7 @@ declare module "Core" {
                 WeaponAPI.precache(ev.weaponID);
 
                 self.emit(ev);
+                self.processKillDeathEvent(ev);
                 KillfeedGeneration.add(ev);
 
                 save = true;
@@ -280,6 +282,7 @@ declare module "Core" {
                     WeaponAPI.precache(ev.weaponID);
                     self.emit(ev);
 
+                    self.processKillDeathEvent(ev);
                     KillfeedGeneration.add(ev);
                 }
 
@@ -438,6 +441,8 @@ declare module "Core" {
                 char.events.push(ev);
 
                 self.emit(ev);
+
+                self.addMember({ ID: char.characterID, name: char.name });
             }
         } else if (event == "PlayerLogout") {
             const charID: string = msg.payload.character_id;
@@ -459,6 +464,8 @@ declare module "Core" {
                 char.events.push(ev);
 
                 self.emit(ev);
+
+                self.removeMember(charID);
             }
         } else {
             console.warn(`Unknown event type: ${event}\n${JSON.stringify(msg)}`);

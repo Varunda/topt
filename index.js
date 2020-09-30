@@ -60519,7 +60519,7 @@ KillfeedGeneration.init();
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var vue__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! vue */ "./node_modules/vue/dist/vue.esm.js");
-/* harmony import */ var Killfeed__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! Killfeed */ "./src/Killfeed.ts");
+/* harmony import */ var addons_SquadAddon__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! addons/SquadAddon */ "./src/addons/SquadAddon.ts");
 
 
 function getGroupInfo(members) {
@@ -60567,6 +60567,7 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("killfeed-squad", {
     props: {
         squad: { type: Object, required: true },
         ShowState: { type: Boolean, required: false, default: false },
+        debug: { type: Boolean, required: false, default: false }
     },
     data: function () {
         return {};
@@ -60577,22 +60578,22 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("killfeed-squad", {
             const elem = ev.currentTarget;
             if (elem) {
                 const squadName = (_a = elem.dataset["squadName"], (_a !== null && _a !== void 0 ? _a : ""));
-                Killfeed__WEBPACK_IMPORTED_MODULE_1__["KillfeedGeneration"].setHoveredSquad(squadName);
+                addons_SquadAddon__WEBPACK_IMPORTED_MODULE_1__["SquadAddon"].selectedSquadName = squadName;
             }
         },
         squadMouseLeave: function (ev) {
-            Killfeed__WEBPACK_IMPORTED_MODULE_1__["KillfeedGeneration"].clearHoveredSquad();
+            addons_SquadAddon__WEBPACK_IMPORTED_MODULE_1__["SquadAddon"].selectedSquadName = null;
         },
         memberMouseOver: function (ev) {
             var _a;
             const elem = ev.currentTarget;
             if (elem) {
                 const memberID = (_a = elem.dataset["memberId"], (_a !== null && _a !== void 0 ? _a : ""));
-                Killfeed__WEBPACK_IMPORTED_MODULE_1__["KillfeedGeneration"].setHoveredMember(memberID);
+                addons_SquadAddon__WEBPACK_IMPORTED_MODULE_1__["SquadAddon"].selectedMemberID = memberID;
             }
         },
         memberMouseLeave: function (ev) {
-            Killfeed__WEBPACK_IMPORTED_MODULE_1__["KillfeedGeneration"].clearHoveredMember();
+            addons_SquadAddon__WEBPACK_IMPORTED_MODULE_1__["SquadAddon"].selectedMemberID = null;
         },
         resetMembers: function () {
             for (const member of this.squad.members) {
@@ -60607,6 +60608,7 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("killfeed-squad", {
                 :data-squad-name="squad.name">
 
                 {{squad.name}}
+                &nbsp;
 
                 <button class="btn btn-sm btn-warning m-n1 mr-n2 float-right" @click="resetMembers">
                     Reset
@@ -60615,6 +60617,7 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("killfeed-squad", {
             <div v-if="ShowState" class="list-group-item p-0">
                 <div class="pl-1" :style="{
                     width: '100%',
+                    color: 'black',
                     background: 'linear-gradient(90deg,' + all.aliveColor + (all.percentAlive * 100) + '%, transparent ' + (all.percentAlive * 100) + '% ' +  ((1 - all.percentAlive) * 100) + '%)'
                 }">
 
@@ -60635,11 +60638,27 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("killfeed-squad", {
                         </td>
 
                         <td>
-                            {{member.name}}
+                            {{member.name}} {{debug == true ? member.charID : ""}}
                         </td>
 
                         <td>
-                            {{member.state == "alive" ? "A" : "D"}}
+                            {{member.state == "alive" ? "A" : member.state == "dying" ? "R" : "D"}}
+                            <span v-if="member.state == 'dying'">
+                                / 0:{{(30 - member.timeDead).toFixed(0).padStart(2, "0")}}
+                            </span>
+                            <span v-else>
+                                &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+                            </span>
+                        </td>
+
+                        <td>
+                            <span v-if="member.whenBeacon == null">
+                                B/0:00
+                            </span>
+
+                            <span v-else>
+                                U/{{(300 - member.beaconCooldown).toFixed(0)}}
+                            </span>
                         </td>
                     </tr>
                 </table>
@@ -60650,19 +60669,25 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("killfeed-squad", {
                     <tr>
                         <td><b>Medics</b></td>
                         <td>{{medics.alive}} / {{medics.total}}</td>
-                        <td><span class="border-rounded px-0" :style="{ 'background-color': medics.aliveColor }">&nbsp;&nbsp;</span></td>
+                        <td>
+                            <span class="border-rounded px-0" :style="{ 'background-color': medics.aliveColor, 'width': '20px' }">&nbsp;&nbsp;</span>
+                        </td>
                     </tr>
 
                     <tr>
                         <td><b>Heavies</b></td>
                         <td>{{heavies.alive}} / {{heavies.total}}</td>
-                        <td><span class="border-rounded px-0" :style="{ 'background-color': heavies.aliveColor }">&nbsp;&nbsp;</span></td>
+                        <td>
+                            <span class="border-rounded px-0" :style="{ 'background-color': heavies.aliveColor, 'width': '20px' }">&nbsp;&nbsp;</span>
+                        </td>
                     </tr>
 
                     <tr>
                         <td><b>Other</b></td>
                         <td>{{notBattle.alive}} / {{notBattle.total}}</td>
-                        <td><span class="border-rounded px-0" :style="{ 'background-color': notBattle.aliveColor }">&nbsp;&nbsp;</span></td>
+                        <td>
+                            <span class="border-rounded px-0" :style="{ 'background-color': notBattle.aliveColor, 'width': '20px' }">&nbsp;&nbsp;</span>
+                        </td>
                     </tr>
                 </table>
             </div>
@@ -60929,6 +60954,17 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].filter("server", (input) => {
         case 40: return "SolTech";
     }
     return `Unknown ${val}`;
+});
+vue__WEBPACK_IMPORTED_MODULE_0__["default"].filter("secondsAgo", (input) => {
+    if (typeof (input) == "string" && input == "") {
+        return "";
+    }
+    const val = (typeof (input) == "string") ? Number.parseInt(input) : input;
+    if (Number.isNaN(val)) {
+        return `Bad value ${input}`;
+    }
+    const now = new Date().getTime();
+    return `0:${((now - val) / 1000).toFixed(2)}`;
 });
 
 
@@ -61648,6 +61684,34 @@ StorageHelper.KEY_TREND = "topt.trends";
 StorageHelper.KEY_SESSION = "topt.session";
 StorageHelper.KEY_SETTINGS = "topt.settings";
 window.StorageHelper = StorageHelper;
+
+
+/***/ }),
+
+/***/ "./src/addons/SquadAddon.ts":
+/*!**********************************!*\
+  !*** ./src/addons/SquadAddon.ts ***!
+  \**********************************/
+/*! exports provided: SquadAddon */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "SquadAddon", function() { return SquadAddon; });
+class SquadAddon {
+    static getHovered() {
+        if (SquadAddon.selectedSquadName != null) {
+            return "squad";
+        }
+        if (SquadAddon.selectedMemberID != null) {
+            return "member";
+        }
+        return null;
+    }
+}
+SquadAddon.selectedSquadName = null;
+SquadAddon.selectedMemberID = null;
+Window.SquadAddon = SquadAddon;
 
 
 /***/ }),
@@ -63500,13 +63564,12 @@ class Core {
             routers: [] // All routers that have been placed
         };
         this.squad = {
+            debug: false,
             squad1: new _squad_Squad__WEBPACK_IMPORTED_MODULE_7__["Squad"](),
             squad2: new _squad_Squad__WEBPACK_IMPORTED_MODULE_7__["Squad"](),
             squad3: new _squad_Squad__WEBPACK_IMPORTED_MODULE_7__["Squad"](),
             squad4: new _squad_Squad__WEBPACK_IMPORTED_MODULE_7__["Squad"](),
             guessSquads: [],
-            selected: null,
-            member: null,
             members: new Map(),
         };
         this.socketMessageQueue = [];
@@ -63535,6 +63598,7 @@ class Core {
         this.serverID = serverID;
         this.socketMessageQueue.length = 5;
         census_CensusAPI__WEBPACK_IMPORTED_MODULE_1__["default"].init(this.serviceID);
+        this.squadInit();
     }
     /**
      * Emit an event and execute all handlers on it
@@ -63660,6 +63724,11 @@ class Core {
         census_OutfitAPI__WEBPACK_IMPORTED_MODULE_2__["default"].getCharactersByTag(tag).ok((data) => {
             this.subscribeToEvents(data);
             loading.state = "loaded";
+            for (const char of data) {
+                if (char.online == true) {
+                    this.addMember({ ID: char.ID, name: char.name });
+                }
+            }
             Killfeed__WEBPACK_IMPORTED_MODULE_5__["KillfeedGeneration"].addCharacters(data);
         });
         return loading;
@@ -63682,7 +63751,7 @@ class Core {
         }
         census_CharacterAPI__WEBPACK_IMPORTED_MODULE_3__["CharacterAPI"].getByName(name).ok((data) => {
             this.subscribeToEvents([data]);
-            Killfeed__WEBPACK_IMPORTED_MODULE_5__["KillfeedGeneration"].addCharacters([data]);
+            this.addMember({ ID: data.ID, name: data.name });
         });
         return loading;
     }
@@ -64143,6 +64212,7 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processMessage = functi
                 self.miscEvents.push(ev);
             }
             self.emit(ev);
+            self.processExperienceEvent(ev);
             Killfeed__WEBPACK_IMPORTED_MODULE_6__["KillfeedGeneration"].exp(ev);
             if (eventID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].revive || eventID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadRevive) {
                 const target = self.stats.get(targetID);
@@ -64196,6 +64266,7 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processMessage = functi
                 targetTicks.recentDeath = ev;
                 census_WeaponAPI__WEBPACK_IMPORTED_MODULE_3__["WeaponAPI"].precache(ev.weaponID);
                 self.emit(ev);
+                self.processKillDeathEvent(ev);
                 Killfeed__WEBPACK_IMPORTED_MODULE_6__["KillfeedGeneration"].add(ev);
                 save = true;
             }
@@ -64236,6 +64307,7 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processMessage = functi
                     sourceTicks.events.push(ev);
                     census_WeaponAPI__WEBPACK_IMPORTED_MODULE_3__["WeaponAPI"].precache(ev.weaponID);
                     self.emit(ev);
+                    self.processKillDeathEvent(ev);
                     Killfeed__WEBPACK_IMPORTED_MODULE_6__["KillfeedGeneration"].add(ev);
                 }
                 save = true;
@@ -64376,6 +64448,7 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processMessage = functi
                 };
                 char.events.push(ev);
                 self.emit(ev);
+                self.addMember({ ID: char.characterID, name: char.name });
             }
         }
         else if (event == "PlayerLogout") {
@@ -64394,6 +64467,7 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processMessage = functi
                 };
                 char.events.push(ev);
                 self.emit(ev);
+                self.removeMember(charID);
             }
         }
         else {
@@ -64490,12 +64564,58 @@ const nonSquadEvents = [
     PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].radarDetect,
     PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].spotKill,
 ];
-core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.setSelectedSquad = function (squadName) {
-    const squad = this.getSquad(squadName);
-    this.squad.selected = squad;
+const log = (msg) => {
+    console.log(`[CoreSquad] ${msg}`);
 };
-core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.clearSelectedSquad = function () {
-    this.squad.selected = null;
+const warn = (msg) => {
+    console.warn(`[CoreSquad] ${msg}`);
+};
+const debug = (msg) => {
+    console.log(`[CoreSquad] ${msg}`);
+};
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.squadInit = function () {
+    this.squad.squad1.name = "1";
+    this.squad.squad1.guess = false;
+    this.squad.squad2.name = "2";
+    this.squad.squad2.guess = false;
+    this.squad.squad3.name = "3";
+    this.squad.squad3.guess = false;
+    this.squad.squad4.name = "4";
+    this.squad.squad4.guess = false;
+    setInterval(() => {
+        const time = new Date().getTime();
+        this.squad.members.forEach((member, charID) => {
+            if (member.state == "dying" && member.whenDied != null) {
+                member.timeDead = (time - member.whenDied) / 1000;
+                if (member.timeDead > 29) {
+                    member.state = "dead";
+                }
+            }
+            if (member.whenBeacon) {
+                member.beaconCooldown = (time - member.whenBeacon) / 1000;
+                if (member.beaconCooldown > 299) {
+                    member.whenBeacon = null;
+                    member.beaconCooldown = 0;
+                }
+            }
+        });
+    }, 1000);
+};
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.addMember = function (char) {
+    this.squad.members.set(char.ID, {
+        name: char.name,
+        charID: char.ID,
+        class: "",
+        state: "alive",
+        timeDead: 0,
+        whenDied: null,
+        whenBeacon: null,
+        beaconCooldown: 0
+    });
+    const member = this.squad.members.get(char.ID);
+    debug(`Started squad tracking ${char.name}/${char.ID}`);
+    const squad = this.createSquad();
+    squad.members.push(member);
 };
 core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processKillDeathEvent = function (event) {
     var _a, _b;
@@ -64503,6 +64623,8 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processKillDeathEvent =
         if (this.squad.members.has(event.sourceID)) {
             const member = this.squad.members.get(event.sourceID);
             member.state = "alive";
+            member.timeDead = 0;
+            member.whenDied = null;
             const loadout = (_a = census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadouts"].get(event.loadoutID), (_a !== null && _a !== void 0 ? _a : census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadout"].default));
             switch (loadout.type) {
                 case "infil":
@@ -64532,7 +64654,9 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processKillDeathEvent =
     else if (event.type == "death") {
         if (this.squad.members.has(event.sourceID)) {
             const member = this.squad.members.get(event.sourceID);
-            member.state = "dead";
+            member.state = "dying";
+            member.whenDied = new Date().getTime();
+            member.timeDead = 0;
             const loadout = (_b = census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadouts"].get(event.loadoutID), (_b !== null && _b !== void 0 ? _b : census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadout"].default));
             switch (loadout.type) {
                 case "infil":
@@ -64567,11 +64691,21 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processExperienceEvent 
             const member = this.squad.members.get(event.targetID);
             member.state = "alive";
             member.timeDead = 0;
+            member.whenDied = null;
+        }
+    }
+    if (event.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadSpawn) {
+        if (this.squad.members.has(event.sourceID)) {
+            const member = this.squad.members.get(event.sourceID);
+            member.beaconCooldown = 300;
+            member.whenBeacon = new Date().getTime();
         }
     }
     if (this.squad.members.has(event.sourceID)) {
         const member = this.squad.members.get(event.sourceID);
         member.state = "alive";
+        member.whenDied = null;
+        member.timeDead = 0;
         const loadout = (_a = census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadouts"].get(event.loadoutID), (_a !== null && _a !== void 0 ? _a : census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadout"].default));
         switch (loadout.type) {
             case "infil":
@@ -64593,6 +64727,7 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processExperienceEvent 
                 member.class = "W";
                 break;
             case "unknown":
+                warn(`Unknown class from event: ${event}`);
                 member.class = "";
                 break;
         }
@@ -64605,11 +64740,11 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processExperienceEvent 
     let sourceSquad = this.getSquadOfMember(event.sourceID);
     let targetSquad = this.getSquadOfMember(event.targetID);
     if (sourceSquad == null) {
-        sourceSquad = new _squad_Squad__WEBPACK_IMPORTED_MODULE_3__["Squad"]();
+        sourceSquad = this.createSquad();
         sourceSquad.members.push(sourceMember);
     }
     if (targetSquad == null) {
-        targetSquad = new _squad_Squad__WEBPACK_IMPORTED_MODULE_3__["Squad"]();
+        targetSquad = this.createSquad();
         targetSquad.members.push(targetMember);
     }
     // Check if the squads need to be merged into one another if this was a squad exp source
@@ -64623,19 +64758,19 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processExperienceEvent 
             //      2. One squad isn't a guess => Move guess squad into non-guess squad
             //      3. Neither squad is a guess => Move member who performed action into other squad
             if (targetSquad.guess == true && sourceSquad.guess == true) {
-                console.log(`Both squads are guesses, merging ${sourceMember.name} (${sourceSquad.name}) into ${targetMember.name} (${targetSquad.name})`);
+                debug(`Both squads are guesses, merging ${sourceMember.name} (${sourceSquad.name}) into ${targetMember.name} (${targetSquad.name})`);
                 this.mergeSquads(sourceSquad.name, targetSquad.name);
             }
             else if (targetSquad.guess == false && sourceSquad.guess == true) {
-                console.log(`Target is not a guess, merging ${sourceMember.name} (${sourceSquad.name}) into ${targetMember.name} (${targetSquad.name})`);
+                debug(`Target is not a guess, merging ${sourceMember.name} (${sourceSquad.name}) into ${targetMember.name} (${targetSquad.name})`);
                 this.mergeSquads(targetSquad.name, sourceSquad.name);
             }
             else if (targetSquad.guess == true && sourceSquad.guess == false) {
-                console.log(`Source is not a guess, merging ${targetMember.name} (${targetSquad.name}) into ${sourceMember.name} (${sourceSquad.name})`);
+                debug(`Source is not a guess, merging ${targetMember.name} (${targetSquad.name}) into ${sourceMember.name} (${sourceSquad.name})`);
                 this.mergeSquads(sourceSquad.name, targetSquad.name);
             }
             else if (targetSquad.guess == false && sourceSquad.guess == false) {
-                console.log(`Neither squad is a guess, moving ${targetMember.name} into ${sourceMember.name} (${sourceSquad.name})`);
+                debug(`Neither squad is a guess, moving ${targetMember.name} into ${sourceMember.name} (${sourceSquad.name})`);
                 sourceSquad.members.push(targetMember);
                 targetSquad.members = targetSquad.members.filter(iter => iter.charID != targetMember.charID);
             }
@@ -64645,11 +64780,10 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processExperienceEvent 
     if (nonSquadEvents.indexOf(event.trueExpID) > -1) {
         //console.log(`Non squad event: ${event.trueExpID}`);
         if (sourceSquad.ID == targetSquad.ID) {
-            console.log(`${sourceMember.name} was in squad with ${targetMember.name}, but didn't get an expect squad exp event`);
+            debug(`${sourceMember.name} was in squad with ${targetMember.name}, but didn't get an expect squad exp event`);
             targetSquad.members = targetSquad.members.filter(iter => iter.charID != sourceMember.charID);
-            const squad = new _squad_Squad__WEBPACK_IMPORTED_MODULE_3__["Squad"]();
+            const squad = this.createSquad();
             squad.members.push(sourceMember);
-            this.squad.guessSquads.push(squad);
         }
     }
 };
@@ -64669,6 +64803,87 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.getSquad = function (sq
     }
     else {
         return self.squad.guessSquads.find(iter => iter.name == squadName) || null;
+    }
+};
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.addMemberToSquad = function (charID, squadName) {
+    const member = this.squad.members.get(charID);
+    if (member == undefined) {
+        return warn(`Cannot move ${charID} to ${squadName}: ${charID} is not a squad member`);
+    }
+    const squad = this.getSquad(squadName);
+    if (squad == null) {
+        return warn(`Cannot move ${charID} to ${squadName}: squad ${squadName} does not exist`);
+    }
+    if (squad.members.find(iter => iter.charID == charID) != null) {
+        return debug(`${charID} is already part of squad ${squadName}, no need to move`);
+    }
+    const oldSquad = this.getSquadOfMember(charID);
+    if (oldSquad != null) {
+        debug(`${charID} is currently in ${oldSquad.name}, moving out of it`);
+        oldSquad.members = oldSquad.members.filter(iter => iter.charID != charID);
+    }
+    squad.members.push(member);
+};
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.getSquadOfMember = function (charID) {
+    const check = (squad) => {
+        return squad.members.find(iter => iter.charID == charID) != null;
+    };
+    if (check(this.squad.squad1)) {
+        return this.squad.squad1;
+    }
+    else if (check(this.squad.squad2)) {
+        return this.squad.squad2;
+    }
+    else if (check(this.squad.squad3)) {
+        return this.squad.squad3;
+    }
+    else if (check(this.squad.squad4)) {
+        return this.squad.squad4;
+    }
+    for (const squad of this.squad.guessSquads) {
+        if (check(squad)) {
+            return squad;
+        }
+    }
+    return null;
+};
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.mergeSquads = function (into, from) {
+    const intoSquad = this.getSquad(into);
+    const fromSquad = this.getSquad(from);
+    if (intoSquad == null || fromSquad == null) {
+        console.warn(`Cannot merge ${from} into ${into}: either is null`);
+        return;
+    }
+    intoSquad.members.push(...fromSquad.members);
+    fromSquad.members = [];
+    if (fromSquad.guess == true) {
+        debug(`${fromSquad.name} is a guess, removing from list`);
+        this.squad.guessSquads = this.squad.guessSquads.filter(iter => iter.name != fromSquad.name);
+    }
+};
+let squadNameIndex = 0;
+let squadNames = [
+    "q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "a", "s", "d",
+    "f", "g", "h", "j", "k", "l", "z", "x", "c", "v", "b", "n", "m"
+];
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.createSquad = function () {
+    const squad = new _squad_Squad__WEBPACK_IMPORTED_MODULE_3__["Squad"]();
+    squad.name = squadNames[(squadNameIndex++) % 26];
+    this.squad.guessSquads.push(squad);
+    return squad;
+};
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.removeMember = function (charID) {
+    log(`Removing ${charID} from squads`);
+    const squad = this.getSquadOfMember(charID);
+    if (squad != null) {
+        debug(`${charID} was in squad ${squad.name}, removing`);
+        squad.members = squad.members.filter(iter => iter.charID != charID);
+        if (squad.members.length == 0 && squad.guess == true) {
+            this.squad.guessSquads = this.squad.guessSquads.filter(iter => iter.name != squad.name);
+        }
+    }
+    if (this.squad.members.has(charID)) {
+        this.squad.members.delete(charID);
     }
 };
 
@@ -64804,7 +65019,6 @@ class Squad {
          */
         this.guess = true;
         this.ID = ++Squad._previousID;
-        this.name = Squad.squadNames[(Squad.squadNameIndex++) % 26];
     }
     /**
      * Check if a member is within this squad
@@ -64816,11 +65030,6 @@ class Squad {
     }
 }
 Squad._previousID = 0;
-Squad.squadNameIndex = 0;
-Squad.squadNames = [
-    "q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "a", "s", "d",
-    "f", "g", "h", "j", "k", "l", "z", "x", "c", "v", "b", "n", "m"
-];
 
 
 /***/ }),
@@ -65106,6 +65315,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var winter_WinterReportParameters__WEBPACK_IMPORTED_MODULE_29__ = __webpack_require__(/*! winter/WinterReportParameters */ "./src/winter/WinterReportParameters.ts");
 /* harmony import */ var core_index__WEBPACK_IMPORTED_MODULE_30__ = __webpack_require__(/*! core/index */ "./src/core/index.ts");
 /* harmony import */ var core_TrackedPlayer__WEBPACK_IMPORTED_MODULE_31__ = __webpack_require__(/*! core/TrackedPlayer */ "./src/core/TrackedPlayer.ts");
+/* harmony import */ var addons_SquadAddon__WEBPACK_IMPORTED_MODULE_32__ = __webpack_require__(/*! addons/SquadAddon */ "./src/addons/SquadAddon.ts");
 
 
 
@@ -65129,6 +65339,7 @@ window.moment = moment__WEBPACK_IMPORTED_MODULE_6__;
 chart_js__WEBPACK_IMPORTED_MODULE_17__["Chart"].plugins.unregister(_node_modules_chartjs_plugin_datalabels_dist_chartjs_plugin_datalabels_js__WEBPACK_IMPORTED_MODULE_16___default.a);
 
 // @ts-ignore
+
 
 
 
@@ -65182,6 +65393,13 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
         generation: {
             names: [],
             state: []
+        },
+        squad: {
+            squad1: null,
+            squad2: null,
+            squad3: null,
+            squad4: null,
+            guessSquads: []
         },
         killfeed: {
             entry: new Killfeed__WEBPACK_IMPORTED_MODULE_27__["Killfeed"](),
@@ -65362,7 +65580,13 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             }
         },
         updateKillfeedDisplay: function () {
-            this.killfeed.entry = Killfeed__WEBPACK_IMPORTED_MODULE_27__["KillfeedGeneration"].generate(this.killfeed.options);
+            this.squad = {
+                squad1: this.core.squad.squad1,
+                squad2: this.core.squad.squad2,
+                squad3: this.core.squad.squad3,
+                squad4: this.core.squad.squad4,
+                guessSquads: this.core.squad.guessSquads
+            };
         },
         updateRealtimeDisplay: function () {
             const nowMs = new Date().getTime();
@@ -65427,13 +65651,16 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             if (this.view != "killfeed") {
                 return;
             }
-            const whatHovered = Killfeed__WEBPACK_IMPORTED_MODULE_27__["KillfeedGeneration"].getHovered();
-            if (whatHovered == "squad") {
-                Killfeed__WEBPACK_IMPORTED_MODULE_27__["KillfeedGeneration"].mergeSquads(ev.key);
+            const whatHovered = addons_SquadAddon__WEBPACK_IMPORTED_MODULE_32__["SquadAddon"].getHovered();
+            //const whatHovered = KillfeedGeneration.getHovered();
+            if (whatHovered == "squad" && addons_SquadAddon__WEBPACK_IMPORTED_MODULE_32__["SquadAddon"].selectedSquadName != null) {
+                //KillfeedGeneration.mergeSquads(ev.key);
+                this.core.mergeSquads(ev.key, addons_SquadAddon__WEBPACK_IMPORTED_MODULE_32__["SquadAddon"].selectedSquadName);
                 this.updateDisplay();
             }
-            else if (whatHovered == "member") {
-                Killfeed__WEBPACK_IMPORTED_MODULE_27__["KillfeedGeneration"].moveMember(ev.key);
+            else if (whatHovered == "member" && addons_SquadAddon__WEBPACK_IMPORTED_MODULE_32__["SquadAddon"].selectedMemberID != null) {
+                //KillfeedGeneration.moveMember(ev.key);
+                this.core.addMemberToSquad(addons_SquadAddon__WEBPACK_IMPORTED_MODULE_32__["SquadAddon"].selectedMemberID, ev.key);
                 this.updateDisplay();
             }
             else {
@@ -66491,7 +66718,7 @@ class WinterReportGenerator {
             if (player.secondsOnline < 10) {
                 continue;
             }
-            if (kills == 1 || hsKills == 1) {
+            if (kills == 1 || hsKills == 1 || kills < 25) {
                 continue;
             }
             map.set(player.name, hsKills / kills);
@@ -66595,7 +66822,7 @@ class WinterReportGenerator {
         }, {
             name: "Percent revived",
             funName: "Makes me strong",
-            description: "Highest ratio of revived deaths to deaths",
+            description: "Highest percentage of revived deaths to respawns",
             entries: []
         }, (value) => `${(value * 100).toFixed(2)}%`);
     }
