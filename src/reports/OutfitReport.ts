@@ -123,6 +123,11 @@ export class OutfitReport {
     scoreBreakdown: ExpBreakdown[] = [];
 
     /**
+     * How many seconds each class is played over all members
+     */
+    classPlaytimes: BreakdownArray = new BreakdownArray();
+
+    /**
      * Collection of stats per 5 minute blocks
      */
     overtimePer5 = {
@@ -331,6 +336,8 @@ export class OutfitReportGenerator {
             });
         });
 
+        const playtimes: Playtime[] = [];
+
         parameters.players.forEach((player: TrackedPlayer, charID: string) => {
             if (player.events.length == 0) { return; }
 
@@ -344,11 +351,15 @@ export class OutfitReportGenerator {
                 tracking: parameters.tracking
             });
 
+            playtimes.push(playtime);
+
             report.players.push({
                 name: `${(player.outfitTag != '' ? `[${player.outfitTag}] ` : '')}${player.name}`,
                 ...playtime 
             });
         });
+
+        EventReporter.classPlaytimes(playtimes).ok(data => report.classPlaytimes = data).always(() => callback("Class playtimes"));
 
         report.events = report.events.sort((a, b) => a.timestamp - b.timestamp);
 

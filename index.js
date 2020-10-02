@@ -57700,7 +57700,8 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("breakdown", {
         ShowAll: { type: Boolean, required: false, default: true },
         ClippedAmount: { type: Number, required: false, default: 5 },
         ShowPercent: { type: Boolean, required: false, default: false },
-        ShowTotal: { type: Boolean, required: false, default: false }
+        ShowTotal: { type: Boolean, required: false, default: false },
+        DisplayFunction: { type: Function, required: false, default: null }
     },
     template: `
         <div class="list-group list-group-small">
@@ -57712,9 +57713,9 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("breakdown", {
             </div>
             <div v-for="datum in entries" class="list-group-item">
                 <div class="row">
-                    <div class="col-8 text-truncate">{{datum.display}}</div>
+                    <div class="col-8 text-truncate">{{datum.name}}</div>
                     <div class="col-4">
-                        {{datum.amount}}
+                        {{datum.display}}
                         <span v-if="ShowPercent == true">
                             ({{(datum.amount / data.total * 100).toFixed(0)}}%)
                         </span>
@@ -57731,17 +57732,25 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("breakdown", {
     `,
     computed: {
         entries: function () {
-            if (this.ShowAll) {
-                return this.data.data;
+            let data = this.data.data;
+            if (this.ShowAll == false) {
+                data = this.data.data.slice(0, this.ClippedAmount);
             }
-            return this.data.data.slice(0, this.ClippedAmount);
+            data = data.map(iter => {
+                return {
+                    name: iter.display,
+                    amount: iter.amount,
+                    display: (this.data.display == null) ? iter.amount : this.data.display(iter.amount)
+                };
+            });
+            return data;
         },
         total: function () {
             let amt = 0;
             for (const datum of this.data.data) {
                 amt += datum.amount;
             }
-            return amt;
+            return (this.data.display == null) ? amt : this.data.display(amt);
         }
     }
 });
@@ -57826,6 +57835,7 @@ class BreakdownArray {
     constructor() {
         this.data = [];
         this.total = 0;
+        this.display = null;
     }
 }
 class Breakdown {
@@ -58006,7 +58016,8 @@ class EventReporter {
                             sortField: `${iter.amount}`
                         };
                     }),
-                    total: outfits.reduce(((acc, iter) => acc += iter.amount), 0)
+                    total: outfits.reduce(((acc, iter) => acc += iter.amount), 0),
+                    display: null
                 };
                 entry.outfits = breakdown;
                 baseCaptures.push(entry);
@@ -58408,6 +58419,64 @@ class EventReporter {
             });
             response.resolveOk(arr);
         });
+        return response;
+    }
+    static classPlaytimes(times) {
+        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        const arr = new BreakdownArray();
+        times[0].infil.secondsAs;
+        const infil = {
+            amount: 0,
+            color: undefined,
+            display: "Infiltrator",
+            sortField: "infil"
+        };
+        const la = {
+            amount: 0,
+            color: undefined,
+            display: "Light Assault",
+            sortField: "LA"
+        };
+        const medic = {
+            amount: 0,
+            color: undefined,
+            display: "Medic playtime",
+            sortField: "medic"
+        };
+        const eng = {
+            amount: 0,
+            color: undefined,
+            display: "Engineer",
+            sortField: "engineer"
+        };
+        const heavy = {
+            amount: 0,
+            color: undefined,
+            display: "Heavy Assault",
+            sortField: "heavy"
+        };
+        const max = {
+            amount: 0,
+            color: undefined,
+            display: "MAX",
+            sortField: "max"
+        };
+        for (const time of times) {
+            infil.amount += time.infil.secondsAs;
+            la.amount += time.lightAssault.secondsAs;
+            medic.amount += time.medic.secondsAs;
+            eng.amount += time.engineer.secondsAs;
+            heavy.amount += time.heavy.secondsAs;
+            max.amount += time.max.secondsAs;
+        }
+        arr.data.push(infil, la, medic, eng, heavy, max);
+        arr.total = infil.amount + la.amount + medic.amount + eng.amount + heavy.amount + max.amount;
+        arr.display = (seconds) => {
+            const hours = Math.floor(seconds / 3600);
+            const mins = Math.floor((seconds - (3600 * hours)) / 60);
+            return `${hours.toFixed(0).padStart(2, "0")}:${mins.toFixed(0).padStart(2, "0")}:${(seconds % 60).toFixed(0).padStart(2, "0")}`;
+        };
+        response.resolveOk(arr);
         return response;
     }
     static factionKills(events) {
@@ -63696,6 +63765,7 @@ class Core {
                 const last = char.events[char.events.length - 1];
                 char.joinTime = first.timestamp;
                 char.secondsOnline = (last.timestamp - first.timestamp) / 1000;
+                //this.characters.find(chr => chr.ID === char.characterID)?.secondsPlayed = char.secondsOnline;
             }
             else {
                 char.secondsOnline = 0;
@@ -64602,6 +64672,10 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.squadInit = function ()
     }, 1000);
 };
 core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.addMember = function (char) {
+    if (this.squad.members.has(char.ID)) {
+        warn(`Not adding duplicate member ${char.name}`);
+        return;
+    }
     this.squad.members.set(char.ID, {
         name: char.name,
         charID: char.ID,
@@ -64697,6 +64771,7 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processExperienceEvent 
     if (event.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadSpawn) {
         if (this.squad.members.has(event.sourceID)) {
             const member = this.squad.members.get(event.sourceID);
+            console.log(`${member.name} placed a beacon`);
             member.beaconCooldown = 300;
             member.whenBeacon = new Date().getTime();
         }
@@ -66015,6 +66090,10 @@ class OutfitReport {
          */
         this.scoreBreakdown = [];
         /**
+         * How many seconds each class is played over all members
+         */
+        this.classPlaytimes = new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
+        /**
          * Collection of stats per 5 minute blocks
          */
         this.overtimePer5 = {
@@ -66194,6 +66273,7 @@ class OutfitReportGenerator {
                 report.stats.set(event.name, reportAmount + amount);
             });
         });
+        const playtimes = [];
         parameters.players.forEach((player, charID) => {
             if (player.events.length == 0) {
                 return;
@@ -66206,8 +66286,10 @@ class OutfitReportGenerator {
                 routers: [],
                 tracking: parameters.tracking
             });
+            playtimes.push(playtime);
             report.players.push(Object.assign({ name: `${(player.outfitTag != '' ? `[${player.outfitTag}] ` : '')}${player.name}` }, playtime));
         });
+        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].classPlaytimes(playtimes).ok(data => report.classPlaytimes = data).always(() => callback("Class playtimes"));
         report.events = report.events.sort((a, b) => a.timestamp - b.timestamp);
         // Track how many headshots each class got
         const headshots = Object(EventReporter__WEBPACK_IMPORTED_MODULE_3__["classCollectionNumber"])();

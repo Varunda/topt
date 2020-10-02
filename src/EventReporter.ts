@@ -22,6 +22,7 @@ import OutfitAPI, { Outfit } from "census/OutfitAPI";
 export class BreakdownArray {
     data: Breakdown[] = [];
     total: number = 0;
+    display: ((_: number) => string) | null = null;
 }
 
 export class Breakdown { 
@@ -225,7 +226,8 @@ export default class EventReporter {
                             sortField: `${iter.amount}`
                         }
                     }),
-                    total: outfits.reduce(((acc, iter) => acc += iter.amount), 0)
+                    total: outfits.reduce(((acc, iter) => acc += iter.amount), 0),
+                    display: null
                 };
 
                 entry.outfits = breakdown;
@@ -731,6 +733,77 @@ export default class EventReporter {
             });
             response.resolveOk(arr);
         });
+
+        return response;
+    }
+
+    public static classPlaytimes(times: Playtime[]): ApiResponse<BreakdownArray> {
+        const response: ApiResponse<BreakdownArray> = new ApiResponse();
+
+        const arr: BreakdownArray = new BreakdownArray();
+
+        times[0].infil.secondsAs
+
+        const infil: Breakdown = {
+            amount: 0,
+            color: undefined,
+            display: "Infiltrator",
+            sortField: "infil"
+        };
+
+        const la: Breakdown = {
+            amount: 0,
+            color: undefined,
+            display: "Light Assault",
+            sortField: "LA"
+        };
+
+        const medic: Breakdown = {
+            amount: 0,
+            color: undefined,
+            display: "Medic playtime",
+            sortField: "medic"
+        };
+
+        const eng: Breakdown = {
+            amount: 0,
+            color: undefined,
+            display: "Engineer",
+            sortField: "engineer"
+        };
+
+        const heavy: Breakdown = {
+            amount: 0,
+            color: undefined,
+            display: "Heavy Assault",
+            sortField: "heavy"
+        };
+
+        const max: Breakdown = {
+            amount: 0,
+            color: undefined,
+            display: "MAX",
+            sortField: "max"
+        };
+
+        for (const time of times) {
+            infil.amount += time.infil.secondsAs;
+            la.amount += time.lightAssault.secondsAs;
+            medic.amount += time.medic.secondsAs;
+            eng.amount += time.engineer.secondsAs;
+            heavy.amount += time.heavy.secondsAs;
+            max.amount += time.max.secondsAs;
+        }
+
+        arr.data.push(infil, la, medic, eng, heavy, max);
+        arr.total = infil.amount + la.amount + medic.amount + eng.amount + heavy.amount + max.amount;
+        arr.display = (seconds: number) => {
+            const hours = Math.floor(seconds / 3600);
+            const mins = Math.floor((seconds - (3600 * hours)) / 60);
+            return `${hours.toFixed(0).padStart(2, "0")}:${mins.toFixed(0).padStart(2, "0")}:${(seconds % 60).toFixed(0).padStart(2, "0")}`;
+        }
+
+        response.resolveOk(arr);
 
         return response;
     }

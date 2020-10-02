@@ -182,7 +182,7 @@ export class Core {
 
                 char.joinTime = first.timestamp;
                 char.secondsOnline = (last.timestamp - first.timestamp) / 1000;
-                this.characters.find(chr => chr.ID === char.characterID).secondsPlayed = char.secondsOnline;
+                //this.characters.find(chr => chr.ID === char.characterID)?.secondsPlayed = char.secondsOnline;
             } else {
                 char.secondsOnline = 0;
             }

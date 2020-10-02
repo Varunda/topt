@@ -740,6 +740,24 @@
                 </table>
             </div>
 
+            <div class="col-12">
+                <h2 class="strike">Class playtime</h2>
+                <div class="row">
+                    <div class="col-6">
+                        <breakdown-chart :src="outfitReport.classPlaytimes"
+                            :show-all="true" :clipped-amount="8">
+                        </breakdown-chart>
+                    </div>
+
+                    <div class="col-6">
+                        <breakdown :data="outfitReport.classPlaytimes" :show-all="true"
+                            left-title="Class" right-title="Hours:Minutes:Seconds"
+                            :show-percent="true" :clipped-amount="10" :show-total="true">
+                        </breakdown>
+                    </div>
+                </div>
+            </div>
+
             <div class="col-12"> <!-- K/D trend -->
                 <h2 class="strike">KPM boxplot</h2>
                 <div class="row">

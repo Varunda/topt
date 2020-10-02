@@ -154,6 +154,11 @@ Core.prototype.squadInit = function(): void {
 }
 
 Core.prototype.addMember = function (char: { ID: string, name: string }): void {
+    if (this.squad.members.has(char.ID)) {
+        warn(`Not adding duplicate member ${char.name}`);
+        return;
+    }
+
     this.squad.members.set(char.ID, {
         name: char.name,
         charID: char.ID,
@@ -214,6 +219,7 @@ Core.prototype.processKillDeathEvent = function(event: TKillEvent | TDeathEvent)
 }
 
 Core.prototype.processExperienceEvent = function(event: TExpEvent): void {
+
     if (event.expID == PsEvent.revive || event.expID == PsEvent.squadRevive) {
         if (this.squad.members.has(event.targetID)) {
             const member: SquadMember = this.squad.members.get(event.targetID)!;
@@ -227,6 +233,8 @@ Core.prototype.processExperienceEvent = function(event: TExpEvent): void {
     if (event.expID == PsEvent.squadSpawn) {
         if (this.squad.members.has(event.sourceID)) {
             const member: SquadMember = this.squad.members.get(event.sourceID)!;
+
+            console.log(`${member.name} placed a beacon`);
 
             member.beaconCooldown = 300;
             member.whenBeacon = new Date().getTime();

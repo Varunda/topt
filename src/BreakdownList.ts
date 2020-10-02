@@ -9,7 +9,8 @@ Vue.component("breakdown", {
         ShowAll: { type: Boolean, required: false, default: true },
         ClippedAmount: { type: Number, required: false, default: 5 },
         ShowPercent: { type: Boolean, required: false, default: false },
-        ShowTotal: { type: Boolean, required: false, default: false }
+        ShowTotal: { type: Boolean, required: false, default: false },
+        DisplayFunction: { type: Function, required: false, default: null }
     },
 
     template: `
@@ -22,9 +23,9 @@ Vue.component("breakdown", {
             </div>
             <div v-for="datum in entries" class="list-group-item">
                 <div class="row">
-                    <div class="col-8 text-truncate">{{datum.display}}</div>
+                    <div class="col-8 text-truncate">{{datum.name}}</div>
                     <div class="col-4">
-                        {{datum.amount}}
+                        {{datum.display}}
                         <span v-if="ShowPercent == true">
                             ({{(datum.amount / data.total * 100).toFixed(0)}}%)
                         </span>
@@ -42,18 +43,28 @@ Vue.component("breakdown", {
 
     computed: {
         entries: function(): any {
-            if (this.ShowAll) {
-                return this.data.data;
+            let data: any[] = this.data.data;
+            if (this.ShowAll == false) {
+                data = this.data.data.slice(0, this.ClippedAmount);
             }
-            return this.data.data.slice(0, this.ClippedAmount);
+
+            data = data.map(iter => {
+                return { 
+                    name: iter.display,
+                    amount: iter.amount,
+                    display: (this.data.display == null) ? iter.amount : this.data.display!(iter.amount)
+                };
+            });
+
+            return data;
         },
 
-        total: function(): number {
+        total: function(): number | string {
             let amt: number = 0;
             for (const datum of this.data.data) {
                 amt += datum.amount;
             }
-            return amt;
+            return (this.data.display == null) ? amt : this.data.display(amt);
         }
     }
 });
