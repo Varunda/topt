@@ -24,6 +24,28 @@ import {
 import { Squad } from "./squad/Squad";
 import { SquadMember } from "./squad/SquadMember"
 
+export class SquadStats {
+
+    public name: string = "";
+
+    public members: string[] = [];
+
+    public kills: number = 0;
+
+    public deaths: number = 0;
+
+    public revives: number = 0;
+
+    public heals: number = 0;
+
+    public resupplies: number = 0;
+
+    public repairs: number = 0;
+
+    public vKills: number = 0;
+
+}
+
 export class Core {
 
     public sockets = {
@@ -182,7 +204,14 @@ export class Core {
 
                 char.joinTime = first.timestamp;
                 char.secondsOnline = (last.timestamp - first.timestamp) / 1000;
-                //this.characters.find(chr => chr.ID === char.characterID)?.secondsPlayed = char.secondsOnline;
+
+                const character: Character | undefined = this.characters.find(iter => iter.ID == char.characterID);
+                if (character != undefined) {
+                    character.secondsPlayed = char.secondsOnline;
+                    if (character.secondsPlayed > 0) {
+                        character.online = true;
+                    }
+                }
             } else {
                 char.secondsOnline = 0;
             }
@@ -287,6 +316,7 @@ export class Core {
             player.name = character.name;
             if (character.online == true) {
                 player.joinTime = new Date().getTime();
+                this.addMember({ ID: player.characterID, name: player.name });
             }
             this.stats.set(character.ID, player);
         });

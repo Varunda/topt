@@ -24,7 +24,10 @@ import {
     Playtime, PlayerVersusEntry
 } from "InvididualGenerator";
 
+import { SquadStats }  from "core/Core";
 import { TrackedPlayer } from "core/TrackedPlayer";
+import { Squad } from "core/squad/Squad";
+import { param } from "jquery";
 
 export class OutfitReportSettings {
 
@@ -32,6 +35,11 @@ export class OutfitReportSettings {
      * ID of the zone to limit events to. Leaven null for all zones
      */
     public zoneID: string | null = null;
+
+    /**
+     * If squad stats will be generated and displayed
+     */
+    public showSquadStats: boolean = false;
 
 }
 
@@ -64,6 +72,17 @@ export class OutfitReportParameters {
      * Map of players that will be part of the report <Character ID, TrackedPlayer>
      */
     public players: Map<string, TrackedPlayer> = new Map();
+
+    /**
+     * Squad stats
+     */
+    public squads = {
+        squad1: new Squad() as Squad,
+        squad2: new Squad() as Squad,
+        squad3: new Squad() as Squad,
+        squad4: new Squad() as Squad,
+        others: [] as Squad[]
+    };
 
     /**
      * List of outfit IDs that will be included in the report
@@ -178,7 +197,12 @@ export class OutfitReport {
         engineer: [] as number[],
         heavy: [] as number[],
         max: [] as number[]
-    }
+    };
+
+    public squadStats = {
+        data: [] as SquadStats[],
+        all: new SquadStats() as SquadStats
+    };
 
     weaponKillBreakdown: BreakdownArray = new BreakdownArray();
     weaponTypeKillBreakdown: BreakdownArray = new BreakdownArray();
@@ -492,6 +516,58 @@ export class OutfitReportGenerator {
 
         EventReporter.vehicleKills(report.events).ok(data => report.vehicleKillBreakdown = data).always(callback("Vehicle type kills"));
         EventReporter.vehicleWeaponKills(report.events).ok(data => report.vehicleKillWeaponBreakdown = data).always(callback("Vehicle weapon kills"));
+
+        const getSquadStats: (squad: Squad, name: string) => SquadStats = (squad: Squad, name: string) => {
+            const squadIDs: string[] = squad.members.map(iter => iter.charID);
+
+            return {
+                name: name,
+                members: squad.members.map(iter => iter.name),
+
+                kills: parameters.events.filter(iter => iter.type == "kill"
+                    && squadIDs.indexOf(iter.sourceID) > -1).length,
+
+                deaths: parameters.events.filter(iter => iter.type == "death" && iter.revived == false
+                    && squadIDs.indexOf(iter.sourceID) > -1).length,
+
+                revives: parameters.events.filter(iter => iter.type == "exp"
+                    && (iter.expID == PsEvent.revive || iter.expID == PsEvent.squadRevive)
+                    && squadIDs.indexOf(iter.sourceID) > -1).length,
+
+                heals: parameters.events.filter(iter => iter.type == "exp"
+                    && (iter.expID == PsEvent.heal || iter.expID == PsEvent.squadHeal)
+                    && squadIDs.indexOf(iter.sourceID) > -1).length,
+
+                resupplies: parameters.events.filter(iter => iter.type == "exp"
+                    && (iter.expID == PsEvent.resupply || iter.expID == PsEvent.squadResupply)
+                    && squadIDs.indexOf(iter.sourceID) > -1).length,
+
+                repairs: parameters.events.filter(iter => iter.type == "exp"
+                    && (iter.expID == PsEvent.maxRepair || iter.expID == PsEvent.squadMaxRepair)
+                    && squadIDs.indexOf(iter.sourceID) > -1).length,
+
+                vKills: parameters.events.filter(iter => iter.type == "vehicle"
+                    && squadIDs.indexOf(iter.sourceID) > -1).length,
+            }
+        }
+
+        report.squadStats.data.push(getSquadStats(parameters.squads.squad1, "Alpha"));
+        report.squadStats.data.push(getSquadStats(parameters.squads.squad2, "Bravo"));
+        report.squadStats.data.push(getSquadStats(parameters.squads.squad3, "Charlie"));
+        report.squadStats.data.push(getSquadStats(parameters.squads.squad4, "Delta"));
+
+        const otherSquad: Squad = new Squad();
+        otherSquad.name = "Other";
+        for (const squad of parameters.squads.others) {
+            otherSquad.members.push(...squad.members);
+        }
+        report.squadStats.data.push(getSquadStats(otherSquad, "Other"));
+
+        const allSquad: Squad = new Squad();
+        for (const squad of [parameters.squads.squad1, parameters.squads.squad2, parameters.squads.squad3, parameters.squads.squad4, ...parameters.squads.others]) {
+            allSquad.members.push(...squad.members);
+        }
+        report.squadStats.all = getSquadStats(allSquad, "All");
 
         let otherIDs: string[] = [];
         const breakdown: Map<string, ExpBreakdown> = new Map<string, ExpBreakdown>();

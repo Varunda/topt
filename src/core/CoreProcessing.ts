@@ -167,10 +167,8 @@ declare module "Core" {
                 self.miscEvents.push(ev);
             }
 
-            self.emit(ev);
-
             self.processExperienceEvent(ev);
-            KillfeedGeneration.exp(ev);
+            self.emit(ev);
 
             if (eventID == PsEvent.revive || eventID == PsEvent.squadRevive) {
                 const target = self.stats.get(targetID);
@@ -234,7 +232,6 @@ declare module "Core" {
 
                 self.emit(ev);
                 self.processKillDeathEvent(ev);
-                KillfeedGeneration.add(ev);
 
                 save = true;
             }
@@ -283,7 +280,6 @@ declare module "Core" {
                     self.emit(ev);
 
                     self.processKillDeathEvent(ev);
-                    KillfeedGeneration.add(ev);
                 }
 
                 save = true;

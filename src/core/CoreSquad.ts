@@ -2,7 +2,7 @@ import { Core } from "core/Core";
 
 import { TKillEvent, TDeathEvent, TExpEvent } from "events/index";
 import { PsLoadout, PsLoadouts } from "census/PsLoadout";
-import { PsEvent } from "PsEvent";
+import { PsEvent, PsEvents } from "PsEvent";
 import { CharacterAPI, Character } from "census/CharacterAPI";
 
 import { Squad } from "./squad/Squad";
@@ -48,7 +48,7 @@ declare module "Core" {
          * @param mergeInto Name of the squad being merged into
          * @param mergeFrom Name of the squad that the members will be moved out of
          */
-        mergeSquads(mergeInto: string, mergeFrom: string): void
+        mergeSquads(mergeInto: Squad, mergeFrom: Squad): void
 
         /**
          * Begin tracking a new character in the squad
@@ -86,12 +86,12 @@ const squadEvents: string[] = [
     PsEvent.squadResupply,
     PsEvent.squadHeal,
     PsEvent.squadMaxRepair,
-    PsEvent.squadMotionDetect,
-    PsEvent.squadRadarDetect,
+    //PsEvent.squadMotionDetect,
+    //PsEvent.squadRadarDetect,
     PsEvent.squadRevive,
     PsEvent.squadShieldRepair,
-    PsEvent.squadSpawn,
-    PsEvent.squadSpotKill
+    //PsEvent.squadSpawn,
+    //PsEvent.squadSpotKill
 ];
 
 const nonSquadEvents: string[] = [
@@ -99,9 +99,9 @@ const nonSquadEvents: string[] = [
     PsEvent.revive,
     PsEvent.resupply,
     PsEvent.shieldRepair,
-    PsEvent.motionDetect,
-    PsEvent.radarDetect,
-    PsEvent.spotKill,
+    //PsEvent.motionDetect,
+    //PsEvent.radarDetect,
+    //PsEvent.spotKill,
 ];
 
 const log = (msg: any): void => {
@@ -218,6 +218,38 @@ Core.prototype.processKillDeathEvent = function(event: TKillEvent | TDeathEvent)
     }
 }
 
+const validRespawnEvent = (ev: TExpEvent, whenDied: number | null): boolean => {
+    // These events can happen whenever and aren't useful for knowing if someone is alive or not
+    if (ev.expID == PsEvent.resupply || ev.expID == PsEvent.squadResupply
+        || ev.expID == PsEvent.shieldRepair || ev.expID == PsEvent.squadShieldRepair
+        || ev.expID == PsEvent.killAssist
+        || ev.expID == PsEvent.ribbon
+        || ev.expID == PsEvent.motionDetect || ev.expID == PsEvent.squadMotionDetect
+        || ev.expID == PsEvent.squadSpawn
+        || ev.expID == PsEvent.drawfire
+        //|| ev.expID == PsEvent.heal || ev.expID == PsEvent.squadHeal // People rarely run mending field to make this an issue
+        ) {
+        return false;
+    }
+
+    // These events might be useful, depending on how long ago the player died, for example if they get a revive
+    //      within 1 second of death it might be a revive nade, but if it's after 8 seconds we know they had to respawn
+    //      in some other way as a revive nade takes 2.5 seconds to prime
+
+    /*
+    if (whenDied != null) {
+        console.log(`It's been ${ev.timestamp - whenDied} ms since death`);
+        if (((ev.expID == PsEvent.revive || ev.expID == PsEvent.squadRevive) && (ev.timestamp - whenDied <= 5)) // Revive nades take 2.5 seconds to prime
+            || ((ev.expID == PsEvent.heal || ev.expID == PsEvent.squadHeal) && (ev.timestamp - whenDied <= 15)) // Heal nades last for 10? seconds
+        ) {
+            return false;
+        }
+    }
+    */
+
+    return true;
+}
+
 Core.prototype.processExperienceEvent = function(event: TExpEvent): void {
 
     if (event.expID == PsEvent.revive || event.expID == PsEvent.squadRevive) {
@@ -233,19 +265,27 @@ Core.prototype.processExperienceEvent = function(event: TExpEvent): void {
     if (event.expID == PsEvent.squadSpawn) {
         if (this.squad.members.has(event.sourceID)) {
             const member: SquadMember = this.squad.members.get(event.sourceID)!;
+            if (member.whenBeacon == null) {
+                console.log(`${member.name} placed a beacon`);
 
-            console.log(`${member.name} placed a beacon`);
-
-            member.beaconCooldown = 300;
-            member.whenBeacon = new Date().getTime();
+                member.beaconCooldown = 300;
+                member.whenBeacon = new Date().getTime();
+            }
         }
     }
 
     if (this.squad.members.has(event.sourceID)) {
         const member: SquadMember = this.squad.members.get(event.sourceID)!;
-        member.state = "alive";
-        member.whenDied = null;
-        member.timeDead = 0;
+
+        if (member.state != "alive") {
+            if (validRespawnEvent(event, member.whenDied) == true) {
+                member.state = "alive";
+                member.whenDied = null;
+                member.timeDead = 0;
+                debug(`${member.name} was revived from ${event}`);
+            } 
+        }
+
 
         const loadout: PsLoadout = PsLoadouts.get(event.loadoutID) ?? PsLoadout.default;
         switch (loadout.type) {
@@ -287,24 +327,26 @@ Core.prototype.processExperienceEvent = function(event: TExpEvent): void {
         if (sourceSquad.ID == targetSquad.ID) {
             //console.log(`${sourceMember.name} // ${targetMember.name} are already in a squad`);
         } else {
+            const ev: PsEvent | undefined = PsEvents.get(event.expID);
+
             // 3 cases:
             //      1. Both squads are guesses => Merge squads
             //      2. One squad isn't a guess => Move guess squad into non-guess squad
             //      3. Neither squad is a guess => Move member who performed action into other squad
             if (targetSquad.guess == true && sourceSquad.guess == true) {
-                debug(`Both squads are guesses, merging ${sourceMember.name} (${sourceSquad.name}) into ${targetMember.name} (${targetSquad.name})`);
+                debug(`Both guesses, merging ${sourceMember.name} (${sourceSquad}) into ${targetMember.name} (${targetSquad}) from ${ev?.name}`);
 
-                this.mergeSquads(sourceSquad.name, targetSquad.name);
+                this.mergeSquads(sourceSquad, targetSquad);
             } else if (targetSquad.guess == false && sourceSquad.guess == true) {
-                debug(`Target is not a guess, merging ${sourceMember.name} (${sourceSquad.name}) into ${targetMember.name} (${targetSquad.name})`);
+                debug(`Target is not a guess, merging ${sourceMember.name} (${sourceSquad}) into ${targetMember.name} (${targetSquad}) from ${ev?.name}`);
 
-                this.mergeSquads(targetSquad.name, sourceSquad.name);
+                this.mergeSquads(targetSquad, sourceSquad);
             } else if (targetSquad.guess == true && sourceSquad.guess == false) {
-                debug(`Source is not a guess, merging ${targetMember.name} (${targetSquad.name}) into ${sourceMember.name} (${sourceSquad.name})`);
+                debug(`Source is not a guess, merging ${targetMember.name} (${targetSquad}) into ${sourceMember.name} (${sourceSquad}) from ${ev?.name}`);
 
-                this.mergeSquads(sourceSquad.name, targetSquad.name);
+                this.mergeSquads(sourceSquad, targetSquad);
             } else if (targetSquad.guess == false && sourceSquad.guess == false) {
-                debug(`Neither squad is a guess, moving ${targetMember.name} into ${sourceMember.name} (${sourceSquad.name})`);
+                debug(`Neither squad is a guess, moving ${targetMember.name} into ${sourceMember} (${sourceSquad}) from ${ev?.name}`);
                 sourceSquad.members.push(targetMember);
                 targetSquad.members = targetSquad.members.filter(iter => iter.charID != targetMember.charID);
             }
@@ -361,6 +403,10 @@ Core.prototype.addMemberToSquad = function(charID: string, squadName: string): v
     if (oldSquad != null) {
         debug(`${charID} is currently in ${oldSquad.name}, moving out of it`);
         oldSquad.members = oldSquad.members.filter(iter => iter.charID != charID);
+
+        if (oldSquad.members.length == 0 && oldSquad.guess == true) {
+            this.squad.guessSquads = this.squad.guessSquads.filter(iter => iter.name != oldSquad.name);
+        }
     }
 
     squad.members.push(member);
@@ -390,21 +436,13 @@ Core.prototype.getSquadOfMember = function(charID: string): Squad | null {
     return null;
 }
 
-Core.prototype.mergeSquads = function(into: string, from: string): void {
-    const intoSquad: Squad | null = this.getSquad(into);
-    const fromSquad: Squad | null = this.getSquad(from);
+Core.prototype.mergeSquads = function(into: Squad, from: Squad): void {
+    into.members.push(...from.members);
+    from.members = [];
 
-    if (intoSquad == null || fromSquad == null) {
-        console.warn(`Cannot merge ${from} into ${into}: either is null`);
-        return;
-    }
-
-    intoSquad.members.push(...fromSquad.members);
-    fromSquad.members = [];
-
-    if (fromSquad.guess == true) {
-        debug(`${fromSquad.name} is a guess, removing from list`);
-        this.squad.guessSquads = this.squad.guessSquads.filter(iter => iter.name != fromSquad.name);
+    if (from.guess == true) {
+        debug(`${from.name} is a guess, removing from list`);
+        this.squad.guessSquads = this.squad.guessSquads.filter(iter => iter.name != from.name);
     }
 }
 

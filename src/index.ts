@@ -22,7 +22,6 @@ import { FacilityAPI, Facility } from "census/FacilityAPI";
 
 import { PsLoadout, PsLoadouts } from "census/PsLoadout";
 import { PsEventType, PsEvent, PsEvents } from "PsEvent";
-import { Event, EventExp, EventKill, EventDeath, EventVehicleKill, EventCapture, EventTeamkill, EventDefend } from "Event";
 import StatMap from "StatMap";
 
 import {
@@ -33,10 +32,6 @@ import {
     TEventHandler
 } from "events/index";
 
-import EventReporter, { statMapToBreakdown,
-    Breakdown, BreakdownArray,
-    OutfitVersusBreakdown, ClassCollection, classCollectionNumber
-} from "EventReporter";
 import {
     ExpBreakdown, FacilityCapture, ClassBreakdown, IndividualReporter,
     CountedRibbon, Report, TimeTracking, BreakdownCollection, BreakdownSection, BreakdownMeta,
@@ -80,6 +75,7 @@ import { TrackedPlayer } from "core/TrackedPlayer";
 import { CoreSettings } from "core/CoreSettings";
 import { SquadAddon } from "addons/SquadAddon";
 import { Squad } from "core/squad/Squad";
+import { Playback } from "addons/Playback";
 
 class OpReportSettings {
     public zoneID: string | null = null;
@@ -164,7 +160,7 @@ export const vm = new Vue({
         },
 
         outfitReport: new OutfitReport() as OutfitReport,
-        opsReportSettings: new OpReportSettings() as OpReportSettings,
+        opsReportSettings: new OutfitReportSettings() as OutfitReportSettings,
 
         refreshIntervalID: -1 as number, // ID of the timed interval to refresh the realtime view
 
@@ -287,44 +283,10 @@ export const vm = new Vue({
 
             const file: File = input.files[0];
 
-            const reader: FileReader = new FileReader();
-
-            reader.onload = ((ev: ProgressEvent<FileReader>) => {
-                const data: any = JSON.parse(reader.result as string);
-
-                if (!data.version) {
-                    console.error(`Missing version from import`);
-                } else if (data.version == "1") {
-                    const nowMs: number = new Date().getTime();
-
-                    console.log(`Exported data uses version 1`);
-                    const chars: Character[] = data.players;
-                    const outfits: string[] = data.outfits;
-                    const events: any[] = data.events;
-
-                    this.core.subscribeToEvents(chars);
-
-                    this.core.outfits = outfits;
-
-                    if (events != undefined && events.length != 0) {
-                        const parsedData = events.map(iter => JSON.parse(iter));
-                        this.core.tracking.startTime = Math.min(...parsedData.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
-                        this.core.tracking.endTime = Math.max(...parsedData.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
-
-                        for (const ev of events) {
-                            this.core.processMessage(ev, true);
-                        }
-
-                        this.setSaveEvents(false);
-                    }
-
-                    console.log(`Took ${new Date().getTime() - nowMs}ms to import data`);
-                } else {
-                    console.error(`Unchecked version: ${data.version}`);
-                }
+            Playback.setCore(this.core);
+            Playback.loadFile(file).ok(() => {
+                Playback.start({ speed: 0 });
             });
-
-            reader.readAsText(file);
         },
 
         exportData: function(): void {
@@ -457,16 +419,22 @@ export const vm = new Vue({
 
             const whatHovered = SquadAddon.getHovered()
 
-            //const whatHovered = KillfeedGeneration.getHovered();
-
             if (whatHovered == "squad" && SquadAddon.selectedSquadName != null) {
-                //KillfeedGeneration.mergeSquads(ev.key);
+                const squad: Squad | null = this.core.getSquad(ev.key);
+                if (squad == null) {
+                    console.log(`Squad ${ev.key} does not exist`);
+                    return;
+                }
 
-                this.core.mergeSquads(ev.key, SquadAddon.selectedSquadName);
+                const selectedSquad: Squad | null = this.core.getSquad(SquadAddon.selectedSquadName);
+                if (selectedSquad == null) {
+                    console.warn(`Failed to find squad ${SquadAddon.selectedSquadName}`);
+                    return;
+                }
+
+                this.core.mergeSquads(squad, selectedSquad);
                 this.updateDisplay();
             } else if (whatHovered == "member" && SquadAddon.selectedMemberID != null) {
-                //KillfeedGeneration.moveMember(ev.key);
-
                 this.core.addMemberToSquad(SquadAddon.selectedMemberID, ev.key);
                 this.updateDisplay();
             } else {
@@ -497,14 +465,22 @@ export const vm = new Vue({
 
             OutfitReportGenerator.generate({
                 settings: {
-                    zoneID: null
+                    zoneID: null,
+                    showSquadStats: this.opsReportSettings.showSquadStats = true
                 },
                 captures: this.core.facilityCaptures,
                 playerCaptures: this.core.playerCaptures,
                 players: this.core.stats,
                 outfits: this.core.outfits,
                 events: events,
-                tracking: this.core.tracking
+                tracking: this.core.tracking,
+                squads: {
+                    squad1: this.core.squad.squad1,
+                    squad2: this.core.squad.squad2,
+                    squad3: this.core.squad.squad3,
+                    squad4: this.core.squad.squad4,
+                    others: this.core.squad.guessSquads
+                }
             }).ok((data: OutfitReport) => { 
                 this.outfitReport = data;
                 this.view = "ops";

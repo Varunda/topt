@@ -740,7 +740,7 @@
                 </table>
             </div>
 
-            <div class="col-12">
+            <div class="col-12"> <!-- Class playtime -->
                 <h2 class="strike">Class playtime</h2>
                 <div class="row">
                     <div class="col-6">
@@ -1264,6 +1264,36 @@
                 </small>
             </div>
 
+            <div v-if="opsReportSettings.showSquadStats == true" class="col-12"> <!-- Squad stats -->
+                <h2 class="strike">Squad stats</h2>
+
+                <table class="table">
+                    <tr>
+                        <th>Squad</th>
+                        <th>Kills</th>
+                        <th>Deaths</th>
+                        <th>Avg K/D</th>
+                        <th>Revives</th>
+                        <th>Heals</th>
+                        <th>Resupplies</th>
+                        <th>Repairs</th>
+                        <th>V. Kills</th>
+                    </tr>
+
+                    <tr v-for="squad in outfitReport.squadStats.data">
+                        <td>{{squad.name}}</td>
+                        <td>{{squad.kills}} ({{(squad.kills / outfitReport.squadStats.all.kills * 100).toFixed(2)}}%)</td>
+                        <td>{{squad.deaths}}</td>
+                        <td>{{(squad.kills / (squad.deaths || 1)).toFixed(2)}}</td>
+                        <td>{{squad.revives}} ({{(squad.revives / outfitReport.squadStats.all.revives * 100).toFixed(2)}}%)</td>
+                        <td>{{squad.heals}} ({{(squad.heals / outfitReport.squadStats.all.heals * 100).toFixed(2)}}%)</td>
+                        <td>{{squad.resupplies}} ({{(squad.resupplies / outfitReport.squadStats.all.resupplies * 100).toFixed(2)}}%)</td>
+                        <td>{{squad.repairs}} ({{(squad.repairs / outfitReport.squadStats.all.repairs * 100).toFixed(2)}}%)</td>
+                        <td>{{squad.vKills}} ({{(squad.vKills / outfitReport.squadStats.all.vKills * 100).toFixed(2)}}%)</td>
+                    </tr>
+                </table>
+            </div>
+
             <div class="col-12">
                 <h2 class="strike">Class breakdown</h2>
             </div>
@@ -1377,7 +1407,7 @@
                 </div>
             </div>
 
-            <div class="col-12">
+            <div class="col-12"> <!-- Misc stats -->
                 <h2 class="strike">Misc</h2>
 
                 <template v-if="outfitReport.vehicleKillBreakdown.data.length > 0">

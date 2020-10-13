@@ -61170,7 +61170,7 @@ PsEvent.vehicleRepair = "90";
 PsEvent.resupply = "34";
 PsEvent.squadResupply = "55";
 PsEvent.squadMaxRepair = "142";
-PsEvent.drawfire = "1394";
+PsEvent.drawfire = "1393";
 // Recon events
 PsEvent.spotKill = "36";
 PsEvent.squadSpotKill = "54";
@@ -61187,6 +61187,7 @@ PsEvent.squadEmpAssist = "553";
 PsEvent.flashAssist = "554";
 PsEvent.squadFlashAssist = "555";
 PsEvent.savior = "335";
+PsEvent.ribbon = "291";
 const remap = (expID, toID) => {
     return [expID, { name: "", types: [], track: true, alsoIncrement: toID }];
 };
@@ -61390,7 +61391,7 @@ const PsEvents = new Map([
             track: true,
             alsoIncrement: undefined
         }],
-    ["291", {
+    [PsEvent.ribbon, {
             name: "Ribbon",
             types: [],
             track: false,
@@ -61753,6 +61754,136 @@ StorageHelper.KEY_TREND = "topt.trends";
 StorageHelper.KEY_SESSION = "topt.session";
 StorageHelper.KEY_SETTINGS = "topt.settings";
 window.StorageHelper = StorageHelper;
+
+
+/***/ }),
+
+/***/ "./src/addons/Playback.ts":
+/*!********************************!*\
+  !*** ./src/addons/Playback.ts ***!
+  \********************************/
+/*! exports provided: PlaybackOptions, Playback */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "PlaybackOptions", function() { return PlaybackOptions; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Playback", function() { return Playback; });
+/* harmony import */ var census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! census/ApiWrapper */ "./src/census/ApiWrapper.ts");
+
+const log = (msg) => {
+    console.log(`[Playback] ${msg}`);
+};
+const warn = (msg) => {
+    console.warn(`[Playback] ${msg}`);
+};
+const error = (msg) => {
+    console.error(`[Playback] ${msg}`);
+};
+const debug = (msg) => {
+    console.log(`[Playback] ${msg}`);
+};
+class PlaybackOptions {
+    constructor() {
+        this.speed = 0;
+    }
+}
+class Playback {
+    static setCore(core) {
+        Playback._core = core;
+    }
+    static loadFile(file) {
+        if (Playback._core == null) {
+            throw `Cannot load file: Core has not been set. Did you forget to use Playback.setCore()?`;
+        }
+        Playback._file = file;
+        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        const reader = new FileReader();
+        reader.onload = ((ev) => {
+            const data = JSON.parse(reader.result);
+            if (!data.version) {
+                error(`Missing version from import`);
+            }
+            else if (data.version == "1") {
+                const nowMs = new Date().getTime();
+                debug(`Exported data uses version 1`);
+                const chars = data.players;
+                const outfits = data.outfits;
+                const events = data.events;
+                // Force online for squad tracking
+                this._core.subscribeToEvents(chars.map(iter => { iter.online = iter.secondsPlayed > 0; return iter; }));
+                this._core.outfits = outfits;
+                if (events != undefined && events.length != 0) {
+                    Playback._events = events;
+                    const parsedData = events.map(iter => JSON.parse(iter));
+                    Playback._parsed = parsedData;
+                }
+                debug(`Took ${new Date().getTime() - nowMs}ms to import data`);
+                response.resolveOk();
+            }
+            else {
+                error(`Unchecked version: ${data.version}`);
+                response.resolve({ code: 400, data: `` });
+            }
+        });
+        reader.readAsText(file);
+        return response;
+    }
+    static start(parameters) {
+        if (this._core == null) {
+            throw `Cannot start playback, core is null. Did you forget to call Playback.setCore()?`;
+        }
+        // Instant playback
+        if (parameters.speed <= 0) {
+            debug(`Doing instant playback`);
+            this._core.tracking.startTime = Math.min(...Playback._parsed.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
+            this._core.tracking.endTime = Math.max(...Playback._parsed.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
+            for (const ev of Playback._events) {
+                this._core.processMessage(ev, true);
+            }
+            this._core.stop();
+        }
+        else {
+            const start = Math.min(...Playback._parsed.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
+            const end = Math.max(...Playback._parsed.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
+            this._core.tracking.startTime = start;
+            const slots = new Map();
+            for (const ev of Playback._parsed) {
+                const time = Number.parseInt(ev.payload.timestamp) * 1000;
+                if (Number.isNaN(time)) {
+                    warn(`Failed to get a timestamp from ${ev}`);
+                }
+                const diff = time - start;
+                if (!slots.has(diff)) {
+                    slots.set(diff, []);
+                }
+                slots.get(diff).push(ev);
+            }
+            let index = 0;
+            const intervalID = setInterval(() => {
+                if (!slots.has(index)) {
+                    debug(`Index ${index} has no events, skipping`);
+                }
+                else {
+                    const events = slots.get(index);
+                    for (const ev of events) {
+                        this._core.processMessage(JSON.stringify(ev), true);
+                    }
+                }
+                index += 1000;
+                if (index > end) {
+                    debug(`Ended on index ${index}`);
+                    clearInterval(intervalID);
+                }
+            }, 1000 * parameters.speed);
+        }
+    }
+}
+Playback._core = null;
+Playback._file = null;
+Playback._events = [];
+Playback._parsed = [];
+window.Playback = Playback;
 
 
 /***/ }),
@@ -63595,11 +63726,12 @@ window.WeaponAPI = WeaponAPI;
 /*!**************************!*\
   !*** ./src/core/Core.ts ***!
   \**************************/
-/*! exports provided: Core */
+/*! exports provided: SquadStats, Core */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "SquadStats", function() { return SquadStats; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Core", function() { return Core; });
 /* harmony import */ var Loadable__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! Loadable */ "./src/Loadable.ts");
 /* harmony import */ var census_CensusAPI__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! census/CensusAPI */ "./src/census/CensusAPI.ts");
@@ -63617,6 +63749,19 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
+class SquadStats {
+    constructor() {
+        this.name = "";
+        this.members = [];
+        this.kills = 0;
+        this.deaths = 0;
+        this.revives = 0;
+        this.heals = 0;
+        this.resupplies = 0;
+        this.repairs = 0;
+        this.vKills = 0;
+    }
+}
 class Core {
     constructor(serviceID, serverID) {
         this.sockets = {
@@ -63765,7 +63910,13 @@ class Core {
                 const last = char.events[char.events.length - 1];
                 char.joinTime = first.timestamp;
                 char.secondsOnline = (last.timestamp - first.timestamp) / 1000;
-                //this.characters.find(chr => chr.ID === char.characterID)?.secondsPlayed = char.secondsOnline;
+                const character = this.characters.find(iter => iter.ID == char.characterID);
+                if (character != undefined) {
+                    character.secondsPlayed = char.secondsOnline;
+                    if (character.secondsPlayed > 0) {
+                        character.online = true;
+                    }
+                }
             }
             else {
                 char.secondsOnline = 0;
@@ -63853,6 +64004,7 @@ class Core {
             player.name = character.name;
             if (character.online == true) {
                 player.joinTime = new Date().getTime();
+                this.addMember({ ID: player.characterID, name: player.name });
             }
             this.stats.set(character.ID, player);
         });
@@ -64161,8 +64313,6 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var census_WeaponAPI__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! census/WeaponAPI */ "./src/census/WeaponAPI.ts");
 /* harmony import */ var census_FacilityAPI__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! census/FacilityAPI */ "./src/census/FacilityAPI.ts");
 /* harmony import */ var census_CharacterAPI__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! census/CharacterAPI */ "./src/census/CharacterAPI.ts");
-/* harmony import */ var Killfeed__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! Killfeed */ "./src/Killfeed.ts");
-
 
 
 
@@ -64281,9 +64431,8 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processMessage = functi
             else {
                 self.miscEvents.push(ev);
             }
-            self.emit(ev);
             self.processExperienceEvent(ev);
-            Killfeed__WEBPACK_IMPORTED_MODULE_6__["KillfeedGeneration"].exp(ev);
+            self.emit(ev);
             if (eventID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].revive || eventID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadRevive) {
                 const target = self.stats.get(targetID);
                 if (target != undefined) {
@@ -64337,7 +64486,6 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processMessage = functi
                 census_WeaponAPI__WEBPACK_IMPORTED_MODULE_3__["WeaponAPI"].precache(ev.weaponID);
                 self.emit(ev);
                 self.processKillDeathEvent(ev);
-                Killfeed__WEBPACK_IMPORTED_MODULE_6__["KillfeedGeneration"].add(ev);
                 save = true;
             }
             let sourceTicks = self.stats.get(sourceID);
@@ -64378,7 +64526,6 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processMessage = functi
                     census_WeaponAPI__WEBPACK_IMPORTED_MODULE_3__["WeaponAPI"].precache(ev.weaponID);
                     self.emit(ev);
                     self.processKillDeathEvent(ev);
-                    Killfeed__WEBPACK_IMPORTED_MODULE_6__["KillfeedGeneration"].add(ev);
                 }
                 save = true;
             }
@@ -64618,21 +64765,16 @@ const squadEvents = [
     PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadResupply,
     PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadHeal,
     PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadMaxRepair,
-    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadMotionDetect,
-    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadRadarDetect,
+    //PsEvent.squadMotionDetect,
+    //PsEvent.squadRadarDetect,
     PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadRevive,
     PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadShieldRepair,
-    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadSpawn,
-    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadSpotKill
 ];
 const nonSquadEvents = [
     PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].heal,
     PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].revive,
     PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].resupply,
     PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].shieldRepair,
-    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].motionDetect,
-    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].radarDetect,
-    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].spotKill,
 ];
 const log = (msg) => {
     console.log(`[CoreSquad] ${msg}`);
@@ -64758,8 +64900,36 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processKillDeathEvent =
         }
     }
 };
+const validRespawnEvent = (ev, whenDied) => {
+    // These events can happen whenever and aren't useful for knowing if someone is alive or not
+    if (ev.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].resupply || ev.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadResupply
+        || ev.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].shieldRepair || ev.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadShieldRepair
+        || ev.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].killAssist
+        || ev.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].ribbon
+        || ev.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].motionDetect || ev.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadMotionDetect
+        || ev.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadSpawn
+        || ev.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].drawfire
+    //|| ev.expID == PsEvent.heal || ev.expID == PsEvent.squadHeal // People rarely run mending field to make this an issue
+    ) {
+        return false;
+    }
+    // These events might be useful, depending on how long ago the player died, for example if they get a revive
+    //      within 1 second of death it might be a revive nade, but if it's after 8 seconds we know they had to respawn
+    //      in some other way as a revive nade takes 2.5 seconds to prime
+    /*
+    if (whenDied != null) {
+        console.log(`It's been ${ev.timestamp - whenDied} ms since death`);
+        if (((ev.expID == PsEvent.revive || ev.expID == PsEvent.squadRevive) && (ev.timestamp - whenDied <= 5)) // Revive nades take 2.5 seconds to prime
+            || ((ev.expID == PsEvent.heal || ev.expID == PsEvent.squadHeal) && (ev.timestamp - whenDied <= 15)) // Heal nades last for 10? seconds
+        ) {
+            return false;
+        }
+    }
+    */
+    return true;
+};
 core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processExperienceEvent = function (event) {
-    var _a;
+    var _a, _b, _c, _d, _e;
     if (event.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].revive || event.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadRevive) {
         if (this.squad.members.has(event.targetID)) {
             const member = this.squad.members.get(event.targetID);
@@ -64771,16 +64941,23 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processExperienceEvent 
     if (event.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadSpawn) {
         if (this.squad.members.has(event.sourceID)) {
             const member = this.squad.members.get(event.sourceID);
-            console.log(`${member.name} placed a beacon`);
-            member.beaconCooldown = 300;
-            member.whenBeacon = new Date().getTime();
+            if (member.whenBeacon == null) {
+                console.log(`${member.name} placed a beacon`);
+                member.beaconCooldown = 300;
+                member.whenBeacon = new Date().getTime();
+            }
         }
     }
     if (this.squad.members.has(event.sourceID)) {
         const member = this.squad.members.get(event.sourceID);
-        member.state = "alive";
-        member.whenDied = null;
-        member.timeDead = 0;
+        if (member.state != "alive") {
+            if (validRespawnEvent(event, member.whenDied) == true) {
+                member.state = "alive";
+                member.whenDied = null;
+                member.timeDead = 0;
+                debug(`${member.name} was revived from ${event}`);
+            }
+        }
         const loadout = (_a = census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadouts"].get(event.loadoutID), (_a !== null && _a !== void 0 ? _a : census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadout"].default));
         switch (loadout.type) {
             case "infil":
@@ -64828,24 +65005,25 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processExperienceEvent 
             //console.log(`${sourceMember.name} // ${targetMember.name} are already in a squad`);
         }
         else {
+            const ev = PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvents"].get(event.expID);
             // 3 cases:
             //      1. Both squads are guesses => Merge squads
             //      2. One squad isn't a guess => Move guess squad into non-guess squad
             //      3. Neither squad is a guess => Move member who performed action into other squad
             if (targetSquad.guess == true && sourceSquad.guess == true) {
-                debug(`Both squads are guesses, merging ${sourceMember.name} (${sourceSquad.name}) into ${targetMember.name} (${targetSquad.name})`);
-                this.mergeSquads(sourceSquad.name, targetSquad.name);
+                debug(`Both guesses, merging ${sourceMember.name} (${sourceSquad}) into ${targetMember.name} (${targetSquad}) from ${(_b = ev) === null || _b === void 0 ? void 0 : _b.name}`);
+                this.mergeSquads(sourceSquad, targetSquad);
             }
             else if (targetSquad.guess == false && sourceSquad.guess == true) {
-                debug(`Target is not a guess, merging ${sourceMember.name} (${sourceSquad.name}) into ${targetMember.name} (${targetSquad.name})`);
-                this.mergeSquads(targetSquad.name, sourceSquad.name);
+                debug(`Target is not a guess, merging ${sourceMember.name} (${sourceSquad}) into ${targetMember.name} (${targetSquad}) from ${(_c = ev) === null || _c === void 0 ? void 0 : _c.name}`);
+                this.mergeSquads(targetSquad, sourceSquad);
             }
             else if (targetSquad.guess == true && sourceSquad.guess == false) {
-                debug(`Source is not a guess, merging ${targetMember.name} (${targetSquad.name}) into ${sourceMember.name} (${sourceSquad.name})`);
-                this.mergeSquads(sourceSquad.name, targetSquad.name);
+                debug(`Source is not a guess, merging ${targetMember.name} (${targetSquad}) into ${sourceMember.name} (${sourceSquad}) from ${(_d = ev) === null || _d === void 0 ? void 0 : _d.name}`);
+                this.mergeSquads(sourceSquad, targetSquad);
             }
             else if (targetSquad.guess == false && sourceSquad.guess == false) {
-                debug(`Neither squad is a guess, moving ${targetMember.name} into ${sourceMember.name} (${sourceSquad.name})`);
+                debug(`Neither squad is a guess, moving ${targetMember.name} into ${sourceMember} (${sourceSquad}) from ${(_e = ev) === null || _e === void 0 ? void 0 : _e.name}`);
                 sourceSquad.members.push(targetMember);
                 targetSquad.members = targetSquad.members.filter(iter => iter.charID != targetMember.charID);
             }
@@ -64896,6 +65074,9 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.addMemberToSquad = func
     if (oldSquad != null) {
         debug(`${charID} is currently in ${oldSquad.name}, moving out of it`);
         oldSquad.members = oldSquad.members.filter(iter => iter.charID != charID);
+        if (oldSquad.members.length == 0 && oldSquad.guess == true) {
+            this.squad.guessSquads = this.squad.guessSquads.filter(iter => iter.name != oldSquad.name);
+        }
     }
     squad.members.push(member);
 };
@@ -64923,17 +65104,11 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.getSquadOfMember = func
     return null;
 };
 core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.mergeSquads = function (into, from) {
-    const intoSquad = this.getSquad(into);
-    const fromSquad = this.getSquad(from);
-    if (intoSquad == null || fromSquad == null) {
-        console.warn(`Cannot merge ${from} into ${into}: either is null`);
-        return;
-    }
-    intoSquad.members.push(...fromSquad.members);
-    fromSquad.members = [];
-    if (fromSquad.guess == true) {
-        debug(`${fromSquad.name} is a guess, removing from list`);
-        this.squad.guessSquads = this.squad.guessSquads.filter(iter => iter.name != fromSquad.name);
+    into.members.push(...from.members);
+    from.members = [];
+    if (from.guess == true) {
+        debug(`${from.name} is a guess, removing from list`);
+        this.squad.guessSquads = this.squad.guessSquads.filter(iter => iter.name != from.name);
     }
 };
 let squadNameIndex = 0;
@@ -65102,6 +65277,9 @@ class Squad {
      */
     isMember(charID) {
         return this.members.find(iter => iter.charID == charID) != null;
+    }
+    toString() {
+        return `Squad ${this.name}: [${this.members.map(iter => iter.name).join(", ")}]`;
     }
 }
 Squad._previousID = 0;
@@ -65391,6 +65569,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var core_index__WEBPACK_IMPORTED_MODULE_30__ = __webpack_require__(/*! core/index */ "./src/core/index.ts");
 /* harmony import */ var core_TrackedPlayer__WEBPACK_IMPORTED_MODULE_31__ = __webpack_require__(/*! core/TrackedPlayer */ "./src/core/TrackedPlayer.ts");
 /* harmony import */ var addons_SquadAddon__WEBPACK_IMPORTED_MODULE_32__ = __webpack_require__(/*! addons/SquadAddon */ "./src/addons/SquadAddon.ts");
+/* harmony import */ var addons_Playback__WEBPACK_IMPORTED_MODULE_33__ = __webpack_require__(/*! addons/Playback */ "./src/addons/Playback.ts");
 
 
 
@@ -65414,6 +65593,7 @@ window.moment = moment__WEBPACK_IMPORTED_MODULE_6__;
 chart_js__WEBPACK_IMPORTED_MODULE_17__["Chart"].plugins.unregister(_node_modules_chartjs_plugin_datalabels_dist_chartjs_plugin_datalabels_js__WEBPACK_IMPORTED_MODULE_16___default.a);
 
 // @ts-ignore
+
 
 
 
@@ -65494,7 +65674,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             settings: new winter_WinterReportParameters__WEBPACK_IMPORTED_MODULE_29__["WinterReportSettings"](),
         },
         outfitReport: new reports_OutfitReport__WEBPACK_IMPORTED_MODULE_14__["OutfitReport"](),
-        opsReportSettings: new OpReportSettings(),
+        opsReportSettings: new reports_OutfitReport__WEBPACK_IMPORTED_MODULE_14__["OutfitReportSettings"](),
         refreshIntervalID: -1,
         showFrog: false,
         display: [] // The currently displayed stats
@@ -65586,36 +65766,10 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 return console.warn(`Cannot import data, no file selected`);
             }
             const file = input.files[0];
-            const reader = new FileReader();
-            reader.onload = ((ev) => {
-                const data = JSON.parse(reader.result);
-                if (!data.version) {
-                    console.error(`Missing version from import`);
-                }
-                else if (data.version == "1") {
-                    const nowMs = new Date().getTime();
-                    console.log(`Exported data uses version 1`);
-                    const chars = data.players;
-                    const outfits = data.outfits;
-                    const events = data.events;
-                    this.core.subscribeToEvents(chars);
-                    this.core.outfits = outfits;
-                    if (events != undefined && events.length != 0) {
-                        const parsedData = events.map(iter => JSON.parse(iter));
-                        this.core.tracking.startTime = Math.min(...parsedData.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
-                        this.core.tracking.endTime = Math.max(...parsedData.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
-                        for (const ev of events) {
-                            this.core.processMessage(ev, true);
-                        }
-                        this.setSaveEvents(false);
-                    }
-                    console.log(`Took ${new Date().getTime() - nowMs}ms to import data`);
-                }
-                else {
-                    console.error(`Unchecked version: ${data.version}`);
-                }
+            addons_Playback__WEBPACK_IMPORTED_MODULE_33__["Playback"].setCore(this.core);
+            addons_Playback__WEBPACK_IMPORTED_MODULE_33__["Playback"].loadFile(file).ok(() => {
+                addons_Playback__WEBPACK_IMPORTED_MODULE_33__["Playback"].start({ speed: 0 });
             });
-            reader.readAsText(file);
         },
         exportData: function () {
             const json = {
@@ -65727,14 +65881,21 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 return;
             }
             const whatHovered = addons_SquadAddon__WEBPACK_IMPORTED_MODULE_32__["SquadAddon"].getHovered();
-            //const whatHovered = KillfeedGeneration.getHovered();
             if (whatHovered == "squad" && addons_SquadAddon__WEBPACK_IMPORTED_MODULE_32__["SquadAddon"].selectedSquadName != null) {
-                //KillfeedGeneration.mergeSquads(ev.key);
-                this.core.mergeSquads(ev.key, addons_SquadAddon__WEBPACK_IMPORTED_MODULE_32__["SquadAddon"].selectedSquadName);
+                const squad = this.core.getSquad(ev.key);
+                if (squad == null) {
+                    console.log(`Squad ${ev.key} does not exist`);
+                    return;
+                }
+                const selectedSquad = this.core.getSquad(addons_SquadAddon__WEBPACK_IMPORTED_MODULE_32__["SquadAddon"].selectedSquadName);
+                if (selectedSquad == null) {
+                    console.warn(`Failed to find squad ${addons_SquadAddon__WEBPACK_IMPORTED_MODULE_32__["SquadAddon"].selectedSquadName}`);
+                    return;
+                }
+                this.core.mergeSquads(squad, selectedSquad);
                 this.updateDisplay();
             }
             else if (whatHovered == "member" && addons_SquadAddon__WEBPACK_IMPORTED_MODULE_32__["SquadAddon"].selectedMemberID != null) {
-                //KillfeedGeneration.moveMember(ev.key);
                 this.core.addMemberToSquad(addons_SquadAddon__WEBPACK_IMPORTED_MODULE_32__["SquadAddon"].selectedMemberID, ev.key);
                 this.updateDisplay();
             }
@@ -65759,14 +65920,22 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             events = events.sort((a, b) => a.timestamp - b.timestamp);
             reports_OutfitReport__WEBPACK_IMPORTED_MODULE_14__["OutfitReportGenerator"].generate({
                 settings: {
-                    zoneID: null
+                    zoneID: null,
+                    showSquadStats: this.opsReportSettings.showSquadStats = true
                 },
                 captures: this.core.facilityCaptures,
                 playerCaptures: this.core.playerCaptures,
                 players: this.core.stats,
                 outfits: this.core.outfits,
                 events: events,
-                tracking: this.core.tracking
+                tracking: this.core.tracking,
+                squads: {
+                    squad1: this.core.squad.squad1,
+                    squad2: this.core.squad.squad2,
+                    squad3: this.core.squad.squad3,
+                    squad4: this.core.squad.squad4,
+                    others: this.core.squad.guessSquads
+                }
             }).ok((data) => {
                 this.outfitReport = data;
                 this.view = "ops";
@@ -66004,6 +66173,10 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var PsEvent__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! PsEvent */ "./src/PsEvent.ts");
 /* harmony import */ var EventReporter__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! EventReporter */ "./src/EventReporter.ts");
 /* harmony import */ var InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! InvididualGenerator */ "./src/InvididualGenerator.ts");
+/* harmony import */ var core_Core__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! core/Core */ "./src/core/Core.ts");
+/* harmony import */ var core_squad_Squad__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! core/squad/Squad */ "./src/core/squad/Squad.ts");
+
+
 
 
 
@@ -66015,6 +66188,10 @@ class OutfitReportSettings {
          * ID of the zone to limit events to. Leaven null for all zones
          */
         this.zoneID = null;
+        /**
+         * If squad stats will be generated and displayed
+         */
+        this.showSquadStats = false;
     }
 }
 /**
@@ -66042,6 +66219,16 @@ class OutfitReportParameters {
          * Map of players that will be part of the report <Character ID, TrackedPlayer>
          */
         this.players = new Map();
+        /**
+         * Squad stats
+         */
+        this.squads = {
+            squad1: new core_squad_Squad__WEBPACK_IMPORTED_MODULE_6__["Squad"](),
+            squad2: new core_squad_Squad__WEBPACK_IMPORTED_MODULE_6__["Squad"](),
+            squad3: new core_squad_Squad__WEBPACK_IMPORTED_MODULE_6__["Squad"](),
+            squad4: new core_squad_Squad__WEBPACK_IMPORTED_MODULE_6__["Squad"](),
+            others: []
+        };
         /**
          * List of outfit IDs that will be included in the report
          */
@@ -66140,6 +66327,10 @@ class OutfitReport {
             engineer: [],
             heavy: [],
             max: []
+        };
+        this.squadStats = {
+            data: [],
+            all: new core_Core__WEBPACK_IMPORTED_MODULE_5__["SquadStats"]()
         };
         this.weaponKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
         this.weaponTypeKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
@@ -66431,6 +66622,46 @@ class OutfitReportGenerator {
         EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].outfitVersusBreakdown(report.events).ok(data => report.outfitVersusBreakdown = data).always(callback("Outfit VS KD"));
         EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].vehicleKills(report.events).ok(data => report.vehicleKillBreakdown = data).always(callback("Vehicle type kills"));
         EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].vehicleWeaponKills(report.events).ok(data => report.vehicleKillWeaponBreakdown = data).always(callback("Vehicle weapon kills"));
+        const getSquadStats = (squad, name) => {
+            const squadIDs = squad.members.map(iter => iter.charID);
+            return {
+                name: name,
+                members: squad.members.map(iter => iter.name),
+                kills: parameters.events.filter(iter => iter.type == "kill"
+                    && squadIDs.indexOf(iter.sourceID) > -1).length,
+                deaths: parameters.events.filter(iter => iter.type == "death" && iter.revived == false
+                    && squadIDs.indexOf(iter.sourceID) > -1).length,
+                revives: parameters.events.filter(iter => iter.type == "exp"
+                    && (iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].revive || iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadRevive)
+                    && squadIDs.indexOf(iter.sourceID) > -1).length,
+                heals: parameters.events.filter(iter => iter.type == "exp"
+                    && (iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].heal || iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadHeal)
+                    && squadIDs.indexOf(iter.sourceID) > -1).length,
+                resupplies: parameters.events.filter(iter => iter.type == "exp"
+                    && (iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].resupply || iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadResupply)
+                    && squadIDs.indexOf(iter.sourceID) > -1).length,
+                repairs: parameters.events.filter(iter => iter.type == "exp"
+                    && (iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].maxRepair || iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadMaxRepair)
+                    && squadIDs.indexOf(iter.sourceID) > -1).length,
+                vKills: parameters.events.filter(iter => iter.type == "vehicle"
+                    && squadIDs.indexOf(iter.sourceID) > -1).length,
+            };
+        };
+        report.squadStats.data.push(getSquadStats(parameters.squads.squad1, "Alpha"));
+        report.squadStats.data.push(getSquadStats(parameters.squads.squad2, "Bravo"));
+        report.squadStats.data.push(getSquadStats(parameters.squads.squad3, "Charlie"));
+        report.squadStats.data.push(getSquadStats(parameters.squads.squad4, "Delta"));
+        const otherSquad = new core_squad_Squad__WEBPACK_IMPORTED_MODULE_6__["Squad"]();
+        otherSquad.name = "Other";
+        for (const squad of parameters.squads.others) {
+            otherSquad.members.push(...squad.members);
+        }
+        report.squadStats.data.push(getSquadStats(otherSquad, "Other"));
+        const allSquad = new core_squad_Squad__WEBPACK_IMPORTED_MODULE_6__["Squad"]();
+        for (const squad of [parameters.squads.squad1, parameters.squads.squad2, parameters.squads.squad3, parameters.squads.squad4, ...parameters.squads.others]) {
+            allSquad.members.push(...squad.members);
+        }
+        report.squadStats.all = getSquadStats(allSquad, "All");
         let otherIDs = [];
         const breakdown = new Map();
         for (const event of report.events) {

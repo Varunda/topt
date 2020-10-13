@@ -38,4 +38,8 @@ export class Squad {
         return this.members.find(iter => iter.charID == charID) != null;
     }
 
+    public toString(): string {
+        return `Squad ${this.name}: [${this.members.map(iter => iter.name).join(", ")}]`;
+    }
+
 }

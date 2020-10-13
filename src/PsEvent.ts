@@ -54,7 +54,7 @@ export class PsEvent {
     public static resupply: string = "34";
     public static squadResupply: string = "55";
     public static squadMaxRepair: string = "142";
-    public static drawfire: string = "1394";
+    public static drawfire: string = "1393";
 
     // Recon events
     public static spotKill: string = "36";
@@ -74,6 +74,7 @@ export class PsEvent {
     public static flashAssist: string = "554";
     public static squadFlashAssist: string = "555";
     public static savior: string = "335";
+    public static ribbon: string = "291";
 
 }
 
@@ -282,7 +283,7 @@ export const PsEvents: Map<string, PsEvent> = new Map<string, PsEvent>([
         track: true,
         alsoIncrement: undefined
     }],
-    ["291", {
+    [PsEvent.ribbon, { // Ribbon gained
         name: "Ribbon",
         types: [],
         track: false,
