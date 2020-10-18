@@ -466,7 +466,7 @@ export const vm = new Vue({
             OutfitReportGenerator.generate({
                 settings: {
                     zoneID: null,
-                    showSquadStats: this.opsReportSettings.showSquadStats = true
+                    showSquadStats: this.opsReportSettings.showSquadStats == true
                 },
                 captures: this.core.facilityCaptures,
                 playerCaptures: this.core.playerCaptures,
