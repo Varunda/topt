@@ -163,20 +163,13 @@
             </div>
         </div>
 
-        <div v-else-if="view == 'realtime'" class="row" style="height: 100%;">
+        <div v-else-if="view == 'realtime' || view == 'killfeed'" class="row" style="height: 100%;">
             <div class="col-2 border-right" style="height: 100%;">
                 <div style="
                     display: flex;
                     flex-direction: column;
                     height: 100%
                 ">
-
-                    <h5 class="border-bottom">
-                        Tracking
-                        <a href="#" data-toggle="modal" data-target="#settings-modal">
-                            Settings
-                        </a>
-                    </h5>
 
                     <div class="form-group">
                         <label>Outfit tag</label>
@@ -198,7 +191,7 @@
                         </div>
                     </div>
 
-                    <div class="form-group">
+                    <div class="form-group mb-0">
                         <label>Player name</label>
                         <div class="input-group">
                             <input v-model="parameters.playerName"
@@ -217,34 +210,54 @@
                         </div>
                     </div>
 
-                    <input class="form-control" v-model="parameters.autoStartTime"
-                        :class="[parameters.validStartTime == true ? '' : 'is-invalid']"
-                        type="text" pattern="\d{2}:?\d{2}" @blur="validateStartTime"
-                        placeholder="HH:mm (24 hour time)" title="Time to automatically start collecting data. Use 24 hour time">
-                    
-                    <span v-if="parameters.startTimeLeft">
-                        Starting in {{parameters.startTimeLeft}} seconds
-                    </span>
+                    <hr/>
 
-                    <button v-if="core.tracking.running == false && core.rawData.length == 0" @click="setSaveEvents(true)"
-                            class="btn btn-primary w-100 mb-2">
-                        Begin tracking
-                    </button>
-                    <button v-else-if="core.tracking.running == true" @click="setSaveEvents(false)"
-                            class="btn btn-secondary w-100 mb-2">
-                        End tracking
-                    </button>
-                    <button v-else @click="exportData"
-                            class="btn btn-success w-100 mb-2">
-                        Export data
-                    </button>
+                    <div> <!-- View selection -->
+                        <label class="d-block">View</label>
+
+                        <button class="btn w-100 mb-1" :class="[ view == 'realtime' ? 'btn-success' : 'btn-outline-light' ]" @click="view = 'realtime'">
+                            Metrics
+                        </button>
+
+                        <button class="btn w-100" :class="[ view == 'killfeed' ? 'btn-success' : 'btn-outline-light' ]" @click="view = 'killfeed'">
+                            Squad tracker
+                        </button>
+                    </div>
 
                     <hr/>
 
-                    <div class="form-group">
+                    <div v-if="core.tracking.running == false && core.rawData.length == 0"> <!-- Auto start input -->
+                        <input class="form-control" v-model="parameters.autoStartTime"
+                            :class="[parameters.validStartTime == true ? '' : 'is-invalid']"
+                            type="text" pattern="\d{2}:?\d{2}" @blur="validateStartTime"
+                            placeholder="HH:mm (24 hour time)" title="Time to automatically start collecting data. Use 24 hour time">
+                        
+                        <span v-if="parameters.startTimeLeft">
+                            Starting in {{parameters.startTimeLeft}} seconds
+                        </span>
+                    </div>
+
+                    <div> <!-- Start/Stop buttons -->
+                        <button v-if="core.tracking.running == false && core.rawData.length == 0" @click="setSaveEvents(true)"
+                                class="btn btn-primary w-100 mb-2">
+                            Begin tracking
+                        </button>
+                        <button v-else-if="core.tracking.running == true" @click="setSaveEvents(false)"
+                                class="btn btn-secondary w-100 mb-2">
+                            End tracking
+                        </button>
+                        <button v-else @click="exportData"
+                                class="btn btn-success w-100 mb-2">
+                            Export data
+                        </button>
+                    </div>
+
+                    <hr/>
+
+                    <div class="form-group"> <!-- Data import/export -->
                         <label>Import/Export data</label>
 
-                        <div class="w-100 mb-2 d-flex">
+                        <div class="w-100 mb-1 d-flex">
                             <label class="btn btn-light btn-outline-dark col-form-label flex-grow-1" for="data-import-input">
                                 <input type="file" id="data-import-input" class="d-none">
                                 Select file
@@ -261,29 +274,41 @@
                         </button>
                     </div>
 
-                    <hr>
+                    <div> <!-- Report generation -->
+                        <label class="d-block">Reports</label>
 
-                    <div class="form-group flex-grow-1">
-                        <label class="d-block">
+                        <button class="btn btn-success w-100" data-toggle="modal" data-target="#report-modal">
+                            Reports
+                        </button>
+
+                        <button class="btn btn-primary w-100" @click="generateAllReports">
+                            Generate
+                        </button>
+                    </div>
+
+                    <hr/>
+
+                    <div> <!-- Misc info -->
+                        <div class="d-block">
                             <b>Players: </b>
                             Tracking {{core.characters.length}} players
-                        </label>
-                    </div>
+                        </div>
 
-                    <div class="form-group flex-grow-1">
-                        <label class="d-block">
+                        <div class="d-block">
                             <b>Server: </b>
                             {{settings.serverID | server}}
-                        </label>
+                        </div>
                     </div>
 
-                    <div class="w-100 mt-2">
+                    <hr/>
+
+                    <div class="w-100 mt-2"> <!-- Settings -->
                         <span v-if="settings.fromStorage == true">
-                            Loaded saved settings, click below to clear
+                            Loaded saved settings
                         </span>
 
                         <button v-if="settings.fromStorage == true" @click="clearSettings" type="button" class="btn btn-warning w-100">
-                            Clear settings
+                            Clear saved settings
                         </button>
                     </div>
 
@@ -300,73 +325,56 @@
                 </div>
             </div>
 
-            <div class="col-10" style="height: 100%;">
+            <div v-if="view == 'realtime'" class="col-10" style="height: 100%;">
                 <div style="
                     display: flex;
                     flex-direction: column;
                     height: 100%
                 ">
-                    <h5 class="border-bottom" @click="view = 'killfeed'">
-                        Data
-                    </h5>
-
                     <div class="row align-items-center">
-                        <div class="col-2 border-right">
-                            <div class="btn-group w-100">
-                                <button class="btn btn-success" data-toggle="modal" data-target="#report-modal">
-                                    Reports
-                                </button>
-                                <button class="btn btn-primary" @click="generateAllReports">
-                                    Generate
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="col-8">
-                            <div class="btn-group w-100 mb-1">
-                                <button @click="setEventType('general')"
-                                    class="btn"
-                                    :class=" [ settings.eventType == 'general' ? 'btn-primary' : 'btn-light' ] "
-                                    type="button">
-                                    General
-                                </button>
-                                <button @click="setEventType('versus')"
-                                    class="btn"
-                                    :class=" [ settings.eventType == 'versus' ? 'btn-primary' : 'btn-light' ] "
-                                    type="button">
-                                    Versus
-                                </button>
-                                <button @click="setEventType('recon')"
-                                    class="btn"
-                                    :class=" [ settings.eventType == 'recon' ? 'btn-primary' : 'btn-light' ] "
-                                    type="button">
-                                    Recon
-                                </button>
-                                <button @click="setEventType('logistics')"
-                                    class="btn"
-                                    :class=" [ settings.eventType == 'logistics' ? 'btn-primary' : 'btn-light' ] "
-                                    type="button">
-                                    Logistics
-                                </button>
-                                <button @click="setEventType('objective')"
-                                    class="btn"
-                                    :class=" [ settings.eventType == 'objective' ? 'btn-primary' : 'btn-light' ] "
-                                    type="button">
-                                    Objective
-                                </button>
-                                <button @click="setEventType('medic')"
-                                    class="btn"
-                                    :class=" [ settings.eventType == 'medic' ? 'btn-primary' : 'btn-light' ] "
-                                    type="button">
-                                    Medic
-                                </button>
-                                <button @click="setEventType('engineer')"
-                                    class="btn"
-                                    :class=" [ settings.eventType == 'engineer' ? 'btn-primary' : 'btn-light' ] "
-                                    type="button">
-                                    Engineer
-                                </button>
-                            </div>
+                        <div class="btn-group w-100 mb-1">
+                            <button @click="setEventType('general')"
+                                class="btn"
+                                :class=" [ settings.eventType == 'general' ? 'btn-primary' : 'btn-light' ] "
+                                type="button">
+                                General
+                            </button>
+                            <button @click="setEventType('versus')"
+                                class="btn"
+                                :class=" [ settings.eventType == 'versus' ? 'btn-primary' : 'btn-light' ] "
+                                type="button">
+                                Versus
+                            </button>
+                            <button @click="setEventType('recon')"
+                                class="btn"
+                                :class=" [ settings.eventType == 'recon' ? 'btn-primary' : 'btn-light' ] "
+                                type="button">
+                                Recon
+                            </button>
+                            <button @click="setEventType('logistics')"
+                                class="btn"
+                                :class=" [ settings.eventType == 'logistics' ? 'btn-primary' : 'btn-light' ] "
+                                type="button">
+                                Logistics
+                            </button>
+                            <button @click="setEventType('objective')"
+                                class="btn"
+                                :class=" [ settings.eventType == 'objective' ? 'btn-primary' : 'btn-light' ] "
+                                type="button">
+                                Objective
+                            </button>
+                            <button @click="setEventType('medic')"
+                                class="btn"
+                                :class=" [ settings.eventType == 'medic' ? 'btn-primary' : 'btn-light' ] "
+                                type="button">
+                                Medic
+                            </button>
+                            <button @click="setEventType('engineer')"
+                                class="btn"
+                                :class=" [ settings.eventType == 'engineer' ? 'btn-primary' : 'btn-light' ] "
+                                type="button">
+                                Engineer
+                            </button>
                         </div>
                     </div>
 
@@ -534,51 +542,44 @@
                     </table>
                 </div>
             </div>
-        </div>
 
-        <div v-else-if="view == 'killfeed'" class="h-100">
-            <div class="d-flex flex-column">
-                <div class="flex-grow-1">
-                    <h2 class="strike" @click="view = 'realtime'">Squads</h2>
-                    <div class="d-flex flex-column">
-                        <div class="row flex-grow-1">
-                            <div class="col-3">
-                                <h5 class="strike mt-0">Squad 1</h5>
-                                <killfeed-squad :squad="squad.squad1" :show-state="true" :debug="core.squad.debug">
-                                </killfeed-squad>
-                            </div>
+            <div v-else-if="view == 'killfeed'" class="col-10 h-100">
+                <h2 class="strike">
+                    Squads
 
-                            <div class="col-3">
-                                <h5 class="strike mt-0">Squad 2</h5>
-                                <killfeed-squad :squad="squad.squad2" :show-state="true" :debug="core.squad.debug">
-                                </killfeed-squad>
-                            </div>
+                    <button class="btn btn-sm btn-primary ml-2" @click="core.createPermSquad()">
+                        Add named squad
+                    </button>
 
-                            <div class="col-3">
-                                <h5 class="strike mt-0">Squad 3</h5>
-                                <killfeed-squad :squad="squad.squad3" :show-state="true" :debug="core.squad.debug">
-                                </killfeed-squad>
-                            </div>
+                    <button class="btn btn-sm btn-danger" @click="removeMostRecentPermSquad">
+                        Delete named squad
+                    </button>
+                </h2>
 
-                            <div class="col-3">
-                                <h5 class="strike mt-0">Squad 4</h5>
-                                <killfeed-squad :squad="squad.squad4" :show-state="true" :debug="core.squad.debug">
-                                </killfeed-squad>
-                            </div>
-                        </div>
-
-                        <hr>
-
-                        <div class="row flex-grow-1">
-                            <div class="col-12">
-                                Possible squads
-                            </div>
-
-                            <div class="col-12">
-                                <template v-for="squad in squad.guessSquads">
-                                    <killfeed-squad :squad="squad" style="display: inline-flex;" :debug="core.squad.debug">
+                <div class="d-flex flex-column">
+                    <div class="flex-grow-1">
+                        <div class="d-flex flex-column">
+                            <div class="row flex-grow-1">
+                                <div v-for="squad in squad.perm" :key="squad.ID" class="flex-grow-1">
+                                    <h5 v-if="squad.display != null" class="strike mt-0">{{squad.display}}</h5>
+                                    <killfeed-squad :squad="squad" :show-state="true" :debug="core.squad.debug">
                                     </killfeed-squad>
-                                </template>
+                                </div>
+                            </div>
+
+                            <hr>
+
+                            <div class="row flex-grow-1">
+                                <div class="col-12">
+                                    Possible squads
+                                </div>
+
+                                <div class="col-12">
+                                    <template v-for="squad in squad.guesses">
+                                        <killfeed-squad :squad="squad" style="display: inline-flex;" :debug="core.squad.debug">
+                                        </killfeed-squad>
+                                    </template>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1266,10 +1267,14 @@
 
             <div v-if="opsReportSettings.showSquadStats == true" class="col-12"> <!-- Squad stats -->
                 <h2 class="strike">Squad stats</h2>
+                <span class="text-muted">
+                    This requires prior setup to be functional. If you find any errors please export the data and send it to Varunda
+                </span>
 
                 <table class="table">
                     <tr>
                         <th>Squad</th>
+                        <th># Members</th>
                         <th>Kills</th>
                         <th>Deaths</th>
                         <th>Avg K/D</th>
@@ -1282,6 +1287,7 @@
 
                     <tr v-for="squad in outfitReport.squadStats.data">
                         <td>{{squad.name}}</td>
+                        <td>{{squad.members.length}}</td>
                         <td>{{squad.kills}} ({{(squad.kills / outfitReport.squadStats.all.kills * 100).toFixed(2)}}%)</td>
                         <td>{{squad.deaths}}</td>
                         <td>{{(squad.kills / (squad.deaths || 1)).toFixed(2)}}</td>

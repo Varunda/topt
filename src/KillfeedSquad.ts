@@ -78,7 +78,6 @@ Vue.component("killfeed-squad", {
         },
 
         squadMouseLeave: function(ev: MouseEvent): void {
-
             SquadAddon.selectedSquadName = null;
         },
 
@@ -111,7 +110,11 @@ Vue.component("killfeed-squad", {
                 {{squad.name}}
                 &nbsp;
 
-                <button class="btn btn-sm btn-warning m-n1 mr-n2 float-right" @click="resetMembers">
+                <button v-if="squad.display != null" class="btn btn-sm btn-danger my-n1 mr-n2 float-right">
+                    Delete
+                </button>
+
+                <button class="btn btn-sm btn-warning my-n1 float-right" @click="resetMembers">
                     Reset
                 </button>
             </div>

@@ -9,6 +9,11 @@ export class Squad {
     public name: string = "";
 
     /**
+     * Alternate display of a squad, such as Alpha/Bravo/etc.
+     */
+    public display: string | null = null;
+
+    /**
      * Members that are currently in the squad
      */
     public members: SquadMember[] = [];

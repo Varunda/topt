@@ -76,6 +76,7 @@ import { CoreSettings } from "core/CoreSettings";
 import { SquadAddon } from "addons/SquadAddon";
 import { Squad } from "core/squad/Squad";
 import { Playback } from "addons/Playback";
+import { isThisTypeNode } from "../node_modules/typescript/lib/typescript.js";
 
 class OpReportSettings {
     public zoneID: string | null = null;
@@ -132,11 +133,8 @@ export const vm = new Vue({
         },
 
         squad: {
-            squad1: null as (Squad | null),
-            squad2: null as Squad | null,
-            squad3: null as Squad | null,
-            squad4: null as Squad | null,
-            guessSquads: [] as Squad[]
+            perm: [] as Squad[],
+            guesses: [] as Squad[],
         },
 
         killfeed: {
@@ -285,7 +283,7 @@ export const vm = new Vue({
 
             Playback.setCore(this.core);
             Playback.loadFile(file).ok(() => {
-                Playback.start({ speed: 0 });
+                Playback.start({ speed: 0.0 });
             });
         },
 
@@ -338,11 +336,8 @@ export const vm = new Vue({
 
         updateKillfeedDisplay: function(): void {
             this.squad = {
-                squad1: this.core.squad.squad1,
-                squad2: this.core.squad.squad2,
-                squad3: this.core.squad.squad3,
-                squad4: this.core.squad.squad4,
-                guessSquads: this.core.squad.guessSquads
+                perm: this.core.squad.perm,
+                guesses: this.core.squad.guesses
             }
         },
 
@@ -475,11 +470,8 @@ export const vm = new Vue({
                 events: events,
                 tracking: this.core.tracking,
                 squads: {
-                    squad1: this.core.squad.squad1,
-                    squad2: this.core.squad.squad2,
-                    squad3: this.core.squad.squad3,
-                    squad4: this.core.squad.squad4,
-                    others: this.core.squad.guessSquads
+                    perm: this.core.squad.perm,
+                    guesses: this.core.squad.guesses
                 }
             }).ok((data: OutfitReport) => { 
                 this.outfitReport = data;
@@ -652,6 +644,19 @@ export const vm = new Vue({
             };
 
             generateReport();
+        },
+
+        removeMostRecentPermSquad: function(): void {
+            if (this.core.squad.perm.length == 1) {
+                return;
+            }
+
+            const squad: Squad = this.core.squad.perm[this.core.squad.perm.length - 1];
+            console.log(`Most recent perm squad is ${squad.name}`);
+
+            this.core.removePermSquad(squad.name);
+
+            this.updateKillfeedDisplay();
         },
 
         setEventType: function(type: PsEventType): void {

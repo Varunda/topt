@@ -58,9 +58,21 @@ declare module "Core" {
         addMember(char: { ID: string, name: string }): void;
 
         /**
-         * Create a new squad
+         * Create a new guess squad
          */
-        createSquad(): Squad;
+        createGuessSquad(): Squad;
+
+        /**
+         * Create a new permanent squad
+         */
+        createPermSquad(): Squad;
+
+        /**
+         * Remove a perm squad. Any members are moved to a new guess squad
+         * 
+         * @param squadName Name of the perm squad to remove
+         */
+        removePermSquad(squadName: string): void;
 
         /**
          * Character ID of the member to add to a squad, removing the character
@@ -86,12 +98,12 @@ const squadEvents: string[] = [
     PsEvent.squadResupply,
     PsEvent.squadHeal,
     PsEvent.squadMaxRepair,
-    //PsEvent.squadMotionDetect,
-    //PsEvent.squadRadarDetect,
+    PsEvent.squadMotionDetect,
+    PsEvent.squadRadarDetect,
     PsEvent.squadRevive,
     PsEvent.squadShieldRepair,
-    //PsEvent.squadSpawn,
-    //PsEvent.squadSpotKill
+    //PsEvent.squadSpawn, // Other ID isn't a char ID
+    PsEvent.squadSpotKill
 ];
 
 const nonSquadEvents: string[] = [
@@ -99,9 +111,9 @@ const nonSquadEvents: string[] = [
     PsEvent.revive,
     PsEvent.resupply,
     PsEvent.shieldRepair,
-    //PsEvent.motionDetect,
-    //PsEvent.radarDetect,
-    //PsEvent.spotKill,
+    PsEvent.motionDetect,
+    PsEvent.radarDetect,
+    PsEvent.spotKill,
 ];
 
 const log = (msg: any): void => {
@@ -117,17 +129,11 @@ const debug = (msg: any): void => {
 }
 
 Core.prototype.squadInit = function(): void {
-    this.squad.squad1.name = "1";
-    this.squad.squad1.guess = false;
-
-    this.squad.squad2.name = "2";
-    this.squad.squad2.guess = false;
-
-    this.squad.squad3.name = "3";
-    this.squad.squad3.guess = false;
-
-    this.squad.squad4.name = "4";
-    this.squad.squad4.guess = false;
+    // Make the four default squads
+    this.createPermSquad();
+    this.createPermSquad();
+    this.createPermSquad();
+    this.createPermSquad();
 
     setInterval(() => {
         const time: number = new Date().getTime();
@@ -174,7 +180,7 @@ Core.prototype.addMember = function (char: { ID: string, name: string }): void {
 
     debug(`Started squad tracking ${char.name}/${char.ID}`);
 
-    const squad: Squad = this.createSquad();
+    const squad: Squad = this.createGuessSquad();
     squad.members.push(member);
 }
 
@@ -286,7 +292,6 @@ Core.prototype.processExperienceEvent = function(event: TExpEvent): void {
             } 
         }
 
-
         const loadout: PsLoadout = PsLoadouts.get(event.loadoutID) ?? PsLoadout.default;
         switch (loadout.type) {
             case "infil": member.class = "I"; break;
@@ -313,12 +318,12 @@ Core.prototype.processExperienceEvent = function(event: TExpEvent): void {
     let targetSquad: Squad | null = this.getSquadOfMember(event.targetID);
 
     if (sourceSquad == null) {
-        sourceSquad = this.createSquad();
+        sourceSquad = this.createGuessSquad();
         sourceSquad.members.push(sourceMember);
     }
 
     if (targetSquad == null) {
-        targetSquad = this.createSquad();
+        targetSquad = this.createGuessSquad();
         targetSquad.members.push(targetMember);
     }
 
@@ -362,7 +367,7 @@ Core.prototype.processExperienceEvent = function(event: TExpEvent): void {
 
             targetSquad.members = targetSquad.members.filter(iter => iter.charID != sourceMember.charID);
 
-            const squad: Squad = this.createSquad();
+            const squad: Squad = this.createGuessSquad();
             squad.members.push(sourceMember);
         }
     }
@@ -371,17 +376,12 @@ Core.prototype.processExperienceEvent = function(event: TExpEvent): void {
 Core.prototype.getSquad = function(squadName: string): Squad | null {
     const self: Core = this as Core;
 
-    if (squadName == "1") {
-        return self.squad.squad1;
-    } else if (squadName == "2") {
-        return self.squad.squad2;
-    } else if (squadName == "3") {
-        return self.squad.squad3;
-    } else if (squadName == "4") {
-        return self.squad.squad4;
-    } else {
-        return self.squad.guessSquads.find(iter => iter.name == squadName) || null;
+    let squad: Squad | null = this.squad.perm.find(iter => iter.name == squadName) || null;
+    if (squad != null) {
+        return squad;
     }
+
+    return this.squad.guesses.find(iter => iter.name == squadName) || null;
 }
 
 Core.prototype.addMemberToSquad = function(charID: string, squadName: string): void {
@@ -405,7 +405,7 @@ Core.prototype.addMemberToSquad = function(charID: string, squadName: string): v
         oldSquad.members = oldSquad.members.filter(iter => iter.charID != charID);
 
         if (oldSquad.members.length == 0 && oldSquad.guess == true) {
-            this.squad.guessSquads = this.squad.guessSquads.filter(iter => iter.name != oldSquad.name);
+            this.squad.guesses = this.squad.guesses.filter(iter => iter.ID != oldSquad.ID);
         }
     }
 
@@ -417,18 +417,14 @@ Core.prototype.getSquadOfMember = function(charID: string): Squad | null {
         return squad.members.find(iter => iter.charID == charID) != null;
     }
 
-    if (check(this.squad.squad1)) {
-        return this.squad.squad1;
-    } else if (check(this.squad.squad2)) {
-        return this.squad.squad2;
-    } else if (check(this.squad.squad3)) {
-        return this.squad.squad3;
-    } else if (check(this.squad.squad4)) {
-        return this.squad.squad4;
+    for (const squad of this.squad.perm) {
+        if (check(squad) == true) {
+            return squad;
+        }
     }
 
-    for (const squad of this.squad.guessSquads) {
-        if (check(squad)) {
+    for (const squad of this.squad.guesses) {
+        if (check(squad) == true) {
             return squad;
         }
     }
@@ -442,7 +438,7 @@ Core.prototype.mergeSquads = function(into: Squad, from: Squad): void {
 
     if (from.guess == true) {
         debug(`${from.name} is a guess, removing from list`);
-        this.squad.guessSquads = this.squad.guessSquads.filter(iter => iter.name != from.name);
+        this.squad.guesses = this.squad.guesses.filter(iter => iter.ID != from.ID);
     }
 }
 
@@ -452,13 +448,48 @@ let squadNames: string[] = [
     "f", "g", "h", "j", "k", "l", "z", "x", "c", "v", "b", "n", "m"
 ];
 
-Core.prototype.createSquad = function(): Squad {
+let permSquadNames: string[] = [
+    "Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf", "Hotel"
+];
+
+Core.prototype.createGuessSquad = function(): Squad {
     const squad: Squad = new Squad();
     squad.name = squadNames[(squadNameIndex++) % 26];
+    squad.guess = true;
 
-    this.squad.guessSquads.push(squad);
+    debug(`Created new guess squad ${squad.name}`);
+
+    this.squad.guesses.push(squad);
 
     return squad;
+}
+
+Core.prototype.createPermSquad = function(): Squad {
+    const squad: Squad = new Squad();
+    squad.name = `${this.squad.perm.length + 1}`;
+    squad.guess = false;
+    squad.display = permSquadNames[(this.squad.perm.length % permSquadNames.length)];
+
+    debug(`Created new perm squad ${squad.name}/${squad.display}`);
+
+    this.squad.perm.push(squad);
+
+    return squad;
+}
+
+Core.prototype.removePermSquad = function(squadName: string): void {
+    for (const squad of this.squad.perm) {
+        if (squad.name == squadName && squad.members.length > 0) {
+            const newSquad: Squad = this.createGuessSquad();
+            for (const member of squad.members) {
+                newSquad.members.push(member);
+            }
+
+            squad.members = [];
+        }
+    }
+
+    this.squad.perm = this.squad.perm.filter(iter => iter.name != squadName);
 }
 
 Core.prototype.removeMember = function(charID: string): void {
@@ -470,7 +501,7 @@ Core.prototype.removeMember = function(charID: string): void {
 
         squad.members = squad.members.filter(iter => iter.charID != charID);
         if (squad.members.length == 0 && squad.guess == true) {
-            this.squad.guessSquads = this.squad.guessSquads.filter(iter => iter.name != squad.name);
+            this.squad.guesses = this.squad.guesses.filter(iter => iter.ID != squad.ID);
         }
     }
 

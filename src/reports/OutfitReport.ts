@@ -77,11 +77,8 @@ export class OutfitReportParameters {
      * Squad stats
      */
     public squads = {
-        squad1: new Squad() as Squad,
-        squad2: new Squad() as Squad,
-        squad3: new Squad() as Squad,
-        squad4: new Squad() as Squad,
-        others: [] as Squad[]
+        perm: [] as Squad[],
+        guesses: [] as Squad[]
     };
 
     /**
@@ -551,23 +548,20 @@ export class OutfitReportGenerator {
             }
         }
 
-        report.squadStats.data.push(getSquadStats(parameters.squads.squad1, "Alpha"));
-        report.squadStats.data.push(getSquadStats(parameters.squads.squad2, "Bravo"));
-        report.squadStats.data.push(getSquadStats(parameters.squads.squad3, "Charlie"));
-        report.squadStats.data.push(getSquadStats(parameters.squads.squad4, "Delta"));
-
-        const otherSquad: Squad = new Squad();
-        otherSquad.name = "Other";
-        for (const squad of parameters.squads.others) {
-            otherSquad.members.push(...squad.members);
+        for (const squad of parameters.squads.perm) {
+            report.squadStats.data.push(getSquadStats(squad, squad.display || "Other"));
         }
-        report.squadStats.data.push(getSquadStats(otherSquad, "Other"));
+        
+        for (const squad of parameters.squads.guesses) {
+            report.squadStats.data.push(getSquadStats(squad, squad.display || "Other"));
+        }
 
         const allSquad: Squad = new Squad();
-        for (const squad of [parameters.squads.squad1, parameters.squads.squad2, parameters.squads.squad3, parameters.squads.squad4, ...parameters.squads.others]) {
+        for (const squad of [...parameters.squads.perm, ...parameters.squads.guesses]) {
             allSquad.members.push(...squad.members);
         }
         report.squadStats.all = getSquadStats(allSquad, "All");
+        report.squadStats.data.push(report.squadStats.all);
 
         let otherIDs: string[] = [];
         const breakdown: Map<string, ExpBreakdown> = new Map<string, ExpBreakdown>();

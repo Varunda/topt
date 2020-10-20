@@ -67,11 +67,8 @@ export class Core {
     public squad = {
         debug: false as boolean,
 
-        squad1: new Squad() as Squad,
-        squad2: new Squad() as Squad,
-        squad3: new Squad() as Squad,
-        squad4: new Squad() as Squad,
-        guessSquads: [] as Squad[],
+        perm: [] as Squad[],
+        guesses: [] as Squad[],
 
         members: new Map() as Map<string, SquadMember>,
     };
