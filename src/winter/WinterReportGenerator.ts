@@ -73,6 +73,9 @@ export class WinterReportGenerator {
         report.fun.push(this.mostC4Kills(parameters));
         report.fun.push(this.mostPercentRevive(parameters));
         report.fun.push(this.mostDrawfireAssists(parameters));
+        report.fun.push(this.mostRouterKills(parameters));
+        report.fun.push(this.mostBeaconKills(parameters));
+        report.fun.push(this.mostMAXKills(parameters));
 
         let opsLeft: number = 
             + 1     // Knife kills
@@ -196,7 +199,7 @@ export class WinterReportGenerator {
     private static mostDrawfireAssists(parameters: WinterReportParameters): WinterMetric {
         return this.metric(parameters, [PsEvent.drawfire], {
             name: "Drawfire Assists",
-            funName: "Decoy placer",
+            funName: "Professional Distraction",
             description: "Most drawfire assists",
             entries: []
         });
@@ -247,12 +250,42 @@ export class WinterReportGenerator {
         });
     }
 
+    private static mostRouterKills(parameters: WinterReportParameters): WinterMetric {
+        return this.metric(parameters, [PsEvent.routerKill], {
+            name: "Router kills",
+            funName: "Connectivity Issues",
+            description: "Players with the most router kills",
+            entries: []
+        });
+    }
+
+    public static mostBeaconKills(parameters: WinterReportParameters): WinterMetric {
+        return this.metric(parameters, [PsEvent.beaconKill], {
+            name: "Beacon kills",
+            funName: "Bacon Fryer",
+            description: "Players with the most beacon kills",
+            entries: []
+        });
+    }
+
     private static mostUniqueRevives(parameters: WinterReportParameters): WinterMetric {
         return this.value(parameters, ((player: TrackedPlayer) => {
             const ev: TExpEvent[] = player.events.filter(iter => iter.type == "exp"
                 && (iter.expID == PsEvent.revive || iter.expID == PsEvent.squadRevive)) as TExpEvent[];
 
             return ev.map(iter => iter.targetID).filter((value, index, array) => array.indexOf(value) == index).length;
+        }), {
+            name: "Most unique revives",
+            funName: "Spread the love",
+            description: "Most unique revives",
+            entries: []
+        });
+    }
+
+    private static mostMAXKills(parameters: WinterReportParameters): WinterMetric {
+        return this.value(parameters, ((player: TrackedPlayer) => {
+            return player.events.filter(iter => iter.type == "kill"
+                && (iter.targetLoadoutID == "7" || iter.targetLoadoutID == "14" || iter.targetLoadoutID == "21")).length;
         }), {
             name: "Most unique revives",
             funName: "Spread the love",
@@ -380,7 +413,7 @@ export class WinterReportGenerator {
     private static mostLightningKills(parameters: WinterReportParameters): WinterMetric {
         return this.vehicle(parameters, [Vehicles.lightning], {
             name: "Lightnings destroyed",
-            funName: "Thunder stealer",
+            funName: "Thunder Struct",
             description: "Most lightnings destroyed",
             entries: []
         });

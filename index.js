@@ -61192,6 +61192,8 @@ PsEvent.flashAssist = "554";
 PsEvent.squadFlashAssist = "555";
 PsEvent.savior = "335";
 PsEvent.ribbon = "291";
+PsEvent.routerKill = "1409";
+PsEvent.beaconKill = "270";
 const remap = (expID, toID) => {
     return [expID, { name: "", types: [], track: true, alsoIncrement: toID }];
 };
@@ -66857,6 +66859,9 @@ class WinterReportGenerator {
         report.fun.push(this.mostC4Kills(parameters));
         report.fun.push(this.mostPercentRevive(parameters));
         report.fun.push(this.mostDrawfireAssists(parameters));
+        report.fun.push(this.mostRouterKills(parameters));
+        report.fun.push(this.mostBeaconKills(parameters));
+        report.fun.push(this.mostMAXKills(parameters));
         let opsLeft = +1 // Knife kills
             + 1 // Pistol kills
             + 1 // Grenade kills
@@ -66954,7 +66959,7 @@ class WinterReportGenerator {
     static mostDrawfireAssists(parameters) {
         return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].drawfire], {
             name: "Drawfire Assists",
-            funName: "Decoy placer",
+            funName: "Professional Distraction",
             description: "Most drawfire assists",
             entries: []
         });
@@ -66999,11 +67004,38 @@ class WinterReportGenerator {
             entries: []
         });
     }
+    static mostRouterKills(parameters) {
+        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].routerKill], {
+            name: "Router kills",
+            funName: "Connectivity Issues",
+            description: "Players with the most router kills",
+            entries: []
+        });
+    }
+    static mostBeaconKills(parameters) {
+        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].beaconKill], {
+            name: "Beacon kills",
+            funName: "Bacon Fryer",
+            description: "Players with the most beacon kills",
+            entries: []
+        });
+    }
     static mostUniqueRevives(parameters) {
         return this.value(parameters, ((player) => {
             const ev = player.events.filter(iter => iter.type == "exp"
                 && (iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].revive || iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadRevive));
             return ev.map(iter => iter.targetID).filter((value, index, array) => array.indexOf(value) == index).length;
+        }), {
+            name: "Most unique revives",
+            funName: "Spread the love",
+            description: "Most unique revives",
+            entries: []
+        });
+    }
+    static mostMAXKills(parameters) {
+        return this.value(parameters, ((player) => {
+            return player.events.filter(iter => iter.type == "kill"
+                && (iter.targetLoadoutID == "7" || iter.targetLoadoutID == "14" || iter.targetLoadoutID == "21")).length;
         }), {
             name: "Most unique revives",
             funName: "Spread the love",
@@ -67105,7 +67137,7 @@ class WinterReportGenerator {
     static mostLightningKills(parameters) {
         return this.vehicle(parameters, [census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].lightning], {
             name: "Lightnings destroyed",
-            funName: "Thunder stealer",
+            funName: "Thunder Struct",
             description: "Most lightnings destroyed",
             entries: []
         });
