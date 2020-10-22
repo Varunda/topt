@@ -110,10 +110,6 @@ Vue.component("killfeed-squad", {
                 {{squad.name}}
                 &nbsp;
 
-                <button v-if="squad.display != null" class="btn btn-sm btn-danger my-n1 mr-n2 float-right">
-                    Delete
-                </button>
-
                 <button class="btn btn-sm btn-warning my-n1 float-right" @click="resetMembers">
                     Reset
                 </button>

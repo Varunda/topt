@@ -287,9 +287,9 @@ export class WinterReportGenerator {
             return player.events.filter(iter => iter.type == "kill"
                 && (iter.targetLoadoutID == "7" || iter.targetLoadoutID == "14" || iter.targetLoadoutID == "21")).length;
         }), {
-            name: "Most unique revives",
-            funName: "Spread the love",
-            description: "Most unique revives",
+            name: "Most MAX kills",
+            funName: "Wheelchair flipper",
+            description: "Players with most MAX kills",
             entries: []
         });
     }

@@ -159,7 +159,7 @@ Core.prototype.squadInit = function(): void {
     }, 1000);
 }
 
-Core.prototype.addMember = function (char: { ID: string, name: string }): void {
+Core.prototype.addMember = function(char: { ID: string, name: string }): void {
     if (this.squad.members.has(char.ID)) {
         warn(`Not adding duplicate member ${char.name}`);
         return;
