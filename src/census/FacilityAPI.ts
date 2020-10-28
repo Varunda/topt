@@ -73,7 +73,12 @@ export class FacilityAPI {
         const response: ApiResponse<Facility> = new ApiResponse();
 
         if (FacilityAPI._cache.has(facilityID)) {
-            response.resolveOk(FacilityAPI._cache.get(facilityID)!);
+            const facility: Facility | null = FacilityAPI._cache.get(facilityID)!;
+            if (facility == null) {
+                response.resolve({ code: 204, data: null });
+            } else {
+                response.resolveOk(facility);
+            }
         } else {
             const request: ApiResponse<any> = CensusAPI.get(`/map_region?facility_id=${facilityID}`);
 

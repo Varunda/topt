@@ -62452,7 +62452,13 @@ class FacilityAPI {
         }
         const response = new _ApiWrapper__WEBPACK_IMPORTED_MODULE_1__["ApiResponse"]();
         if (FacilityAPI._cache.has(facilityID)) {
-            response.resolveOk(FacilityAPI._cache.get(facilityID));
+            const facility = FacilityAPI._cache.get(facilityID);
+            if (facility == null) {
+                response.resolve({ code: 204, data: null });
+            }
+            else {
+                response.resolveOk(facility);
+            }
         }
         else {
             const request = _CensusAPI__WEBPACK_IMPORTED_MODULE_0__["default"].get(`/map_region?facility_id=${facilityID}`);
@@ -63470,22 +63476,28 @@ class Core {
             }
             this.stats.set(character.ID, player);
         });
-        const subscribeExp = {
-            "action": "subscribe",
-            "characters": [
-                ...(chars.map((char) => char.ID))
-            ],
-            "eventNames": [
-                "GainExperience",
-                "AchievementEarned",
-                "Death",
-                "FacilityControl",
-                "ItemAdded",
-                "VehicleDestroy"
-            ],
-            "service": "event"
-        };
-        this.sockets.tracked.send(JSON.stringify(subscribeExp));
+        // Large outfits like SKL really stress the websockets out if you try to subscribe to 12k members
+        //      at once, instead breaking them into chunks works nicely
+        const subscribeSetSize = 200;
+        for (let i = 0; i < chars.length; i += subscribeSetSize) {
+            //console.log(`Slice: ${chars.slice(i, i + subscribeSetSize).map(iter => iter.ID).join(", ")}`);
+            const subscribeExp = {
+                "action": "subscribe",
+                "characters": [
+                    ...(chars.slice(i, i + subscribeSetSize).map(iter => iter.ID))
+                ],
+                "eventNames": [
+                    "GainExperience",
+                    "AchievementEarned",
+                    "Death",
+                    "FacilityControl",
+                    "ItemAdded",
+                    "VehicleDestroy"
+                ],
+                "service": "event"
+            };
+            this.sockets.tracked.send(JSON.stringify(subscribeExp));
+        }
     }
     onmessage(ev) {
         for (const message of this.socketMessageQueue) {
@@ -63661,7 +63673,6 @@ function setupFacilitySocket(core) {
         if (core.sockets.facility == null) {
             throw `sockets.facility is null`;
         }
-        console.log(`facility socket connected`);
         const msg = {
             service: "event",
             action: "subscribe",
@@ -63671,7 +63682,8 @@ function setupFacilitySocket(core) {
             ],
             eventNames: [
                 "PlayerFacilityCapture",
-                "PlayerFacilityDefend"
+                "PlayerFacilityDefend",
+                "FacilityControl"
             ],
             logicalAndCharactersWithWorlds: true
         };

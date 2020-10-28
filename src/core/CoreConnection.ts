@@ -177,8 +177,6 @@ function setupFacilitySocket(core: Core): ApiResponse {
             throw `sockets.facility is null`;
         }
 
-        console.log(`facility socket connected`);
-
         const msg: object = {
             service: "event",
             action: "subscribe",
@@ -188,7 +186,8 @@ function setupFacilitySocket(core: Core): ApiResponse {
             ],
             eventNames: [
                 "PlayerFacilityCapture",
-                "PlayerFacilityDefend"
+                "PlayerFacilityDefend",
+                "FacilityControl"
             ],
             logicalAndCharactersWithWorlds: true
         };

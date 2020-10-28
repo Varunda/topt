@@ -314,23 +314,29 @@ export class Core {
             this.stats.set(character.ID, player);
         });
 
-        const subscribeExp: object = {
-            "action": "subscribe",
-            "characters": [
-                ...(chars.map((char) => char.ID))
-            ],
-            "eventNames": [
-                "GainExperience",
-                "AchievementEarned",
-                "Death",
-                "FacilityControl",
-                "ItemAdded",
-                "VehicleDestroy"
-            ],
-            "service": "event"
-        };
+        // Large outfits like SKL really stress the websockets out if you try to subscribe to 12k members
+        //      at once, instead breaking them into chunks works nicely
+        const subscribeSetSize: number = 200;
+        for (let i = 0; i < chars.length; i += subscribeSetSize) {
+            //console.log(`Slice: ${chars.slice(i, i + subscribeSetSize).map(iter => iter.ID).join(", ")}`);
+            const subscribeExp: object = {
+                "action": "subscribe",
+                "characters": [
+                    ...(chars.slice(i, i + subscribeSetSize).map(iter => iter.ID))
+                ],
+                "eventNames": [
+                    "GainExperience",
+                    "AchievementEarned",
+                    "Death",
+                    "FacilityControl",
+                    "ItemAdded",
+                    "VehicleDestroy"
+                ],
+                "service": "event"
+            };
 
-        this.sockets.tracked.send(JSON.stringify(subscribeExp));
+            this.sockets.tracked.send(JSON.stringify(subscribeExp));
+        }
     }
 
     public onmessage(ev: MessageEvent): void {
