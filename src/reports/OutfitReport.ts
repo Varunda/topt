@@ -323,7 +323,7 @@ export class OutfitReportGenerator {
         EventReporter.facilityCaptures({
             captures: report.facilityCaptures,
             players: parameters.playerCaptures
-        }).ok(data => report.baseCaptures = data).always(callback("Facility captuers"));
+        }).ok(data => report.baseCaptures = data).always(callback("Facility captures"));
 
         const chars: TrackedPlayer[] = Array.from(parameters.players.values());
 

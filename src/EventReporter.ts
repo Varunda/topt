@@ -172,6 +172,8 @@ export default class EventReporter {
             .map(iter => iter.outfitID)
             .filter((value, index, arr) => arr.indexOf(value) == index);
 
+        console.log(`Have ${data.captures.length} captures`);
+
         OutfitAPI.getByIDs(outfitIDs).ok((data: Outfit[]) => {
             for (const capture of captures) {
                 // Same faction caps are boring

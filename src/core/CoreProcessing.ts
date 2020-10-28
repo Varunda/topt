@@ -346,6 +346,8 @@ declare module "Core" {
             const facilityID: string = msg.payload.facility_id;
 
             FacilityAPI.getByID(facilityID).ok((data: Facility) => {
+                console.log(`New facility capture: ${data.name}`);
+
                 const capture: FacilityCapture = {
                     facilityID: data.ID,
                     zoneID: zoneID,

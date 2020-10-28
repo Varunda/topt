@@ -57966,6 +57966,7 @@ class EventReporter {
         const outfitIDs = players
             .map(iter => iter.outfitID)
             .filter((value, index, arr) => arr.indexOf(value) == index);
+        console.log(`Have ${data.captures.length} captures`);
         census_OutfitAPI__WEBPACK_IMPORTED_MODULE_8__["default"].getByIDs(outfitIDs).ok((data) => {
             var _a, _b, _c, _d;
             for (const capture of captures) {
@@ -64058,6 +64059,7 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processMessage = functi
             const outfitID = msg.payload.outfit_id;
             const facilityID = msg.payload.facility_id;
             census_FacilityAPI__WEBPACK_IMPORTED_MODULE_4__["FacilityAPI"].getByID(facilityID).ok((data) => {
+                console.log(`New facility capture: ${data.name}`);
                 const capture = {
                     facilityID: data.ID,
                     zoneID: zoneID,
@@ -65938,7 +65940,7 @@ class OutfitReportGenerator {
         EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].facilityCaptures({
             captures: report.facilityCaptures,
             players: parameters.playerCaptures
-        }).ok(data => report.baseCaptures = data).always(callback("Facility captuers"));
+        }).ok(data => report.baseCaptures = data).always(callback("Facility captures"));
         const chars = Array.from(parameters.players.values());
         report.kpmBoxPlot = {
             total: EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kpmBoxplot(chars, parameters.tracking),
