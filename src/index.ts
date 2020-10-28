@@ -12,17 +12,10 @@ import * as $ from "jquery";
 import * as JSZip from "jszip";
 (window as any).moment = moment;
 
-import CensusAPI from "census/CensusAPI";
-import OutfitAPI, { Outfit } from "census/OutfitAPI";
-import { CharacterAPI, Character } from "census/CharacterAPI";
 import { Weapon, WeaponAPI } from "census/WeaponAPI";
-import { EventAPI } from "census/EventAPI";
-import { Achievement, AchievementAPI } from "census/AchievementAPI";
 import { FacilityAPI, Facility } from "census/FacilityAPI";
 
-import { PsLoadout, PsLoadouts } from "census/PsLoadout";
 import { PsEventType, PsEvent, PsEvents } from "PsEvent";
-import StatMap from "StatMap";
 
 import {
     TEvent, TEventType,
@@ -32,13 +25,7 @@ import {
     TEventHandler
 } from "events/index";
 
-import {
-    ExpBreakdown, FacilityCapture, ClassBreakdown, IndividualReporter,
-    CountedRibbon, Report, TimeTracking, BreakdownCollection, BreakdownSection, BreakdownMeta,
-    TrackedRouter,
-    ReportParameters
-} from "InvididualGenerator";
-
+import { IndividualReporter, Report, ReportParameters } from "InvididualGenerator";
 import { PersonalReportGenerator } from "PersonalReportGenerator";
 import { OutfitReport, OutfitReportGenerator, OutfitReportSettings } from "reports/OutfitReport";
 
@@ -63,12 +50,10 @@ import "MomentFilter";
 import "KillfeedSquad";
 
 import { StorageHelper } from "Storage";
-import { KillfeedGeneration, KillfeedEntry, KillfeedOptions, Killfeed } from "Killfeed";
 
 import { WinterReportGenerator } from "winter/WinterReportGenerator";
 import { WinterReport } from "winter/WinterReport";
 import { WinterReportParameters, WinterReportSettings } from "winter/WinterReportParameters";
-import { timers } from "jquery";
 
 import Core from "core/index";
 import { TrackedPlayer } from "core/TrackedPlayer";
@@ -76,7 +61,6 @@ import { CoreSettings } from "core/CoreSettings";
 import { SquadAddon } from "addons/SquadAddon";
 import { Squad } from "core/squad/Squad";
 import { Playback } from "addons/Playback";
-import { isThisTypeNode } from "../node_modules/typescript/lib/typescript.js";
 
 class OpReportSettings {
     public zoneID: string | null = null;
@@ -137,11 +121,6 @@ export const vm = new Vue({
             guesses: [] as Squad[],
         },
 
-        killfeed: {
-            entry: new Killfeed() as Killfeed,
-            options: new KillfeedOptions() as KillfeedOptions
-        },
-
         // Used to make iteration thru classes easier
         classIterator: [
             { title: "Infiltrator", name: "infil" },
@@ -155,6 +134,8 @@ export const vm = new Vue({
         winter: {
             report: Loadable.idle() as Loading<WinterReport>,
             settings: new WinterReportSettings() as WinterReportSettings,
+
+            ignoredPlayers: "" as string
         },
 
         outfitReport: new OutfitReport() as OutfitReport,
@@ -412,7 +393,7 @@ export const vm = new Vue({
                 return;
             }
 
-            const whatHovered = SquadAddon.getHovered()
+            const whatHovered = SquadAddon.getHovered();
 
             if (whatHovered == "squad" && SquadAddon.selectedSquadName != null) {
                 const squad: Squad | null = this.core.getSquad(ev.key);
@@ -480,13 +461,22 @@ export const vm = new Vue({
         },
 
         generateWinterReport: function(): void {
+            const playerNames: string[] = this.winter.ignoredPlayers.split(" ")
+                .map(iter => iter.toLowerCase());
+
+            const players: TrackedPlayer[] = Array.from(this.core.stats.values())
+                .filter(iter => playerNames.indexOf(iter.name.toLowerCase()) == -1);
+
+            console.log(`Making a winter report with: ${players.map(iter => iter.name).join(", ")}`);
+
             const params: WinterReportParameters = new WinterReportParameters();
-            params.players = Array.from(this.core.stats.values());
+            params.players = players;
             params.timeTracking = this.core.tracking;
             params.settings = this.winter.settings;
 
             this.core.stats.forEach((player: TrackedPlayer, charID: string) => {
                 if (player.events.length == 0) { return; }
+                if (playerNames.indexOf(player.name.toLowerCase()) != -1) { return; }
 
                 params.events.push(...player.events);
             });

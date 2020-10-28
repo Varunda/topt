@@ -288,7 +288,7 @@ Core.prototype.processExperienceEvent = function(event: TExpEvent): void {
                 member.state = "alive";
                 member.whenDied = null;
                 member.timeDead = 0;
-                debug(`${member.name} was revived from ${event}`);
+                //debug(`${member.name} was revived from ${event}`);
             } 
         }
 

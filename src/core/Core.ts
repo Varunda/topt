@@ -9,8 +9,6 @@ import StatMap from "StatMap";
 
 import { TrackedPlayer } from "core/TrackedPlayer";
 
-import { KillfeedGeneration } from "Killfeed";
-
 import { FacilityCapture, TimeTracking, TrackedRouter } from "InvididualGenerator";
 
 import {
@@ -247,8 +245,6 @@ export class Core {
                     this.addMember({ ID: char.ID, name: char.name });
                 }
             }
-
-            KillfeedGeneration.addCharacters(data);
         });
 
         return loading;

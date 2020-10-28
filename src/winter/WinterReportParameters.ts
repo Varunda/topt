@@ -10,7 +10,24 @@ export class WinterReportParameters {
 }
 
 export class WinterReportSettings {
+    /**
+     * If the fun names will be used instead of descriptive names
+     */
     public useFunNames: boolean = false;
+
+    /**
+     * How many players to show for each card
+     */
     public topNPlayers: number = 5;
+
+    /**
+     * How many fun metrics to show. Fun being like unique revives, -1 to show all
+     */
     public funMetricCount: number = -1;
+
+    /**
+     * Char IDs of players to ignore and skip if they are in the top
+     */
+    public ignoredPlayers: string[] = [];
+
 }

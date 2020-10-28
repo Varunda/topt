@@ -1,8 +1,9 @@
 
 import Vue, { PropType } from "vue";
 
-import { KillfeedGeneration, KillfeedSquad, KillfeedMember } from "Killfeed";
 import { SquadAddon } from "addons/SquadAddon";
+import { SquadMember } from "core/squad/SquadMember";
+import { Squad } from "core/squad/Squad";
 
 type GroupInfo = {
     total: number;
@@ -12,7 +13,7 @@ type GroupInfo = {
     aliveColor: string;
 };
 
-function getGroupInfo(members: KillfeedMember[]): GroupInfo {
+function getGroupInfo(members: SquadMember[]): GroupInfo {
     if (members.length == 0) {
         return defaultGroupInfo();
     }
@@ -56,7 +57,7 @@ function defaultGroupInfo(): GroupInfo {
 
 Vue.component("killfeed-squad", {
     props: {
-        squad: { type: Object as PropType<KillfeedSquad>, required: true },
+        squad: { type: Object as PropType<Squad>, required: true },
         ShowState: { type: Boolean, required: false, default: false },
         debug: { type: Boolean, required: false, default: false }
     },

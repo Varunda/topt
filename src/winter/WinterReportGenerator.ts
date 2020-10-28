@@ -413,7 +413,7 @@ export class WinterReportGenerator {
     private static mostLightningKills(parameters: WinterReportParameters): WinterMetric {
         return this.vehicle(parameters, [Vehicles.lightning], {
             name: "Lightnings destroyed",
-            funName: "Thunder Struct",
+            funName: "Thunder Struck",
             description: "Most lightnings destroyed",
             entries: []
         });

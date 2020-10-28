@@ -23,7 +23,6 @@ import {
 } from "events/index";
 import { TLogoutEvent } from "events/TLogoutEvent";
 import { TLoginEvent } from "events/TLoginEvent";
-import { KillfeedGeneration } from "Killfeed";
 
 declare module "Core" {
 

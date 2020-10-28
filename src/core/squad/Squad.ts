@@ -19,6 +19,11 @@ export class Squad {
     public members: SquadMember[] = [];
 
     /**
+     * Members went offline during stats
+     */
+    public offline: SquadMember[] = [];
+
+    /**
      * If this squad is a guess squad or not, affects how automatic merging is done
      */
     public guess: boolean = true;

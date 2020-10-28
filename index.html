@@ -171,7 +171,7 @@
                     height: 100%
                 ">
 
-                    <div class="form-group">
+                    <div class="form-group"> <!-- Add outfit -->
                         <label>Outfit tag</label>
                         <div class="input-group">
                             <input v-model="parameters.outfitTag"
@@ -191,7 +191,7 @@
                         </div>
                     </div>
 
-                    <div class="form-group mb-0">
+                    <div class="form-group mb-0"> <!-- Add person -->
                         <label>Player name</label>
                         <div class="input-group">
                             <input v-model="parameters.playerName"
@@ -215,11 +215,11 @@
                     <div> <!-- View selection -->
                         <label class="d-block">View</label>
 
-                        <button class="btn w-100 mb-1" :class="[ view == 'realtime' ? 'btn-success' : 'btn-outline-light' ]" @click="view = 'realtime'">
+                        <button class="btn w-100 mb-1" :class="[ view == 'realtime' ? 'btn-success' : 'btn-secondary' ]" @click="view = 'realtime'">
                             Metrics
                         </button>
 
-                        <button class="btn w-100" :class="[ view == 'killfeed' ? 'btn-success' : 'btn-outline-light' ]" @click="view = 'killfeed'">
+                        <button class="btn w-100" :class="[ view == 'killfeed' ? 'btn-success' : 'btn-secondary' ]" @click="view = 'killfeed'">
                             Squad tracker
                         </button>
                     </div>
@@ -1487,7 +1487,7 @@
             <template v-else>
                 <div class="col-12"> <!-- Header -->
                     <div class="d-flex align-items-center mb-2">
-                        <img :src="showFrog == false ? '/logo.png' : '/frog.png'" class="mr-1" style="max-width: 128px; max-height: 128px; border-radius: 30%;" title="Tide logo">
+                        <img :src="showFrog == false ? '/data/logo.png' : '/data/frog.png'" class="mr-1" style="max-width: 128px; max-height: 128px; border-radius: 30%;" title="Tide logo">
                         <div class="d-flex flex-row flex-grow-1">
                             <div class="flex-grow-1">
                                 <h2>Tide OP Tracker (TOPT)</h2>
@@ -1658,6 +1658,10 @@
                                 <option :value="8">8</option>
                                 <option :value="10">10</option>
                             </select>
+
+                            <label class="col-form-label">Players to ignore (separate with a space)</label>
+                            <textarea v-model="winter.ignoredPlayers" class="form-control">
+                            </textarea>
                         </div>
 
                         <hr>
