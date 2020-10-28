@@ -425,6 +425,7 @@ export const vm = new Vue({
                 this.generateWinterReport();
             }
 
+            $("#report-modal").modal("hide");
             this.parameters.report = "";
         },
 

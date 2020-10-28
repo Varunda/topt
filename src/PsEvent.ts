@@ -36,6 +36,7 @@ export class PsEvent {
     public static revived: string = "-6";
     public static baseCapture: string = "-3";
     public static baseDefense: string = "-4";
+    public static spotkill: string = "37";
     public static squadSpawn: string = "56";
     public static capturePoint: string = "272";
 

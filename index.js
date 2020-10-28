@@ -60623,6 +60623,7 @@ PsEvent.death = "-1";
 PsEvent.revived = "-6";
 PsEvent.baseCapture = "-3";
 PsEvent.baseDefense = "-4";
+PsEvent.spotkill = "37";
 PsEvent.squadSpawn = "56";
 PsEvent.capturePoint = "272";
 // Medic events
@@ -65405,6 +65406,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             else if (this.parameters.report == "winter") {
                 this.generateWinterReport();
             }
+            jquery__WEBPACK_IMPORTED_MODULE_7__("#report-modal").modal("hide");
             this.parameters.report = "";
         },
         generateOutfitReport: function () {
