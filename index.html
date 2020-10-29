@@ -60,6 +60,25 @@
         .strike::after {
             margin-left: 0.25rem;
         }
+
+        @-moz-keyframes spin {
+            from { -moz-transform: rotate(0deg); }
+            to { -moz-transform: rotate(360deg); }
+        }
+        @-webkit-keyframes spin {
+            from { -webkit-transform: rotate(0deg); }
+            to { -webkit-transform: rotate(360deg); }
+        }
+        @keyframes spin {
+            from {transform:rotate(0deg);}
+            to {transform:rotate(360deg);}
+        }
+
+        .loading {
+            animation-name: spin;
+            animation-duration: 1000ms;
+            animation-iteration-count: infinite;
+        }
     </style>
 </head>
 
@@ -186,8 +205,7 @@
                                     class="btn btn-primary"
                                     type="button">
 
-                                    <span v-if="loadingOutfit == true" class="spinner-border spinner-border-sm">
-                                    </span>
+                                    <img v-if="loadingOutfit == true" class="loading" src="/data/loading.png" style="max-height: 1.25rem;">
 
                                     Add
                                 </button>
