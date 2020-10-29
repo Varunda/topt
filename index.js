@@ -63178,12 +63178,14 @@ window.WeaponAPI = WeaponAPI;
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "SquadStats", function() { return SquadStats; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Core", function() { return Core; });
-/* harmony import */ var Loadable__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! Loadable */ "./src/Loadable.ts");
-/* harmony import */ var census_CensusAPI__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! census/CensusAPI */ "./src/census/CensusAPI.ts");
-/* harmony import */ var census_OutfitAPI__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! census/OutfitAPI */ "./src/census/OutfitAPI.ts");
-/* harmony import */ var census_CharacterAPI__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! census/CharacterAPI */ "./src/census/CharacterAPI.ts");
-/* harmony import */ var core_TrackedPlayer__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! core/TrackedPlayer */ "./src/core/TrackedPlayer.ts");
-/* harmony import */ var InvididualGenerator__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! InvididualGenerator */ "./src/InvididualGenerator.ts");
+/* harmony import */ var census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! census/ApiWrapper */ "./src/census/ApiWrapper.ts");
+/* harmony import */ var Loadable__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! Loadable */ "./src/Loadable.ts");
+/* harmony import */ var census_CensusAPI__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! census/CensusAPI */ "./src/census/CensusAPI.ts");
+/* harmony import */ var census_OutfitAPI__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! census/OutfitAPI */ "./src/census/OutfitAPI.ts");
+/* harmony import */ var census_CharacterAPI__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! census/CharacterAPI */ "./src/census/CharacterAPI.ts");
+/* harmony import */ var core_TrackedPlayer__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! core/TrackedPlayer */ "./src/core/TrackedPlayer.ts");
+/* harmony import */ var InvididualGenerator__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! InvididualGenerator */ "./src/InvididualGenerator.ts");
+
 
 
 
@@ -63233,7 +63235,7 @@ class Core {
         this.playerCaptures = [];
         this.facilityCaptures = [];
         this.rawData = [];
-        this.tracking = new InvididualGenerator__WEBPACK_IMPORTED_MODULE_5__["TimeTracking"]();
+        this.tracking = new InvididualGenerator__WEBPACK_IMPORTED_MODULE_6__["TimeTracking"]();
         this.connected = false;
         this.handlers = {
             exp: [],
@@ -63249,7 +63251,7 @@ class Core {
         this.serviceID = serviceID;
         this.serverID = serverID;
         this.socketMessageQueue.length = 5;
-        census_CensusAPI__WEBPACK_IMPORTED_MODULE_1__["default"].init(this.serviceID);
+        census_CensusAPI__WEBPACK_IMPORTED_MODULE_2__["default"].init(this.serviceID);
         this.squadInit();
     }
     /**
@@ -63372,19 +63374,19 @@ class Core {
         if (this.connected == false) {
             throw `Cannot track outfit ${tag}: Core is not connected`;
         }
-        const loading = Loadable__WEBPACK_IMPORTED_MODULE_0__["Loadable"].loading();
+        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
         if (tag.trim().length == 0) {
-            loading.state = "loaded";
-            return loading;
+            response.resolveOk();
+            return response;
         }
-        census_OutfitAPI__WEBPACK_IMPORTED_MODULE_2__["default"].getByTag(tag).ok((data) => {
+        census_OutfitAPI__WEBPACK_IMPORTED_MODULE_3__["default"].getByTag(tag).ok((data) => {
             this.outfits.push(data);
         });
-        census_OutfitAPI__WEBPACK_IMPORTED_MODULE_2__["default"].getCharactersByTag(tag).ok((data) => {
+        census_OutfitAPI__WEBPACK_IMPORTED_MODULE_3__["default"].getCharactersByTag(tag).ok((data) => {
             this.subscribeToEvents(data);
-            loading.state = "loaded";
+            response.resolveOk();
         });
-        return loading;
+        return response;
     }
     /**
      * Begin tracking a new player
@@ -63397,14 +63399,13 @@ class Core {
         if (this.connected == false) {
             throw `Cannot track character ${name}: Core is not connected`;
         }
-        const loading = Loadable__WEBPACK_IMPORTED_MODULE_0__["Loadable"].loading();
+        const loading = Loadable__WEBPACK_IMPORTED_MODULE_1__["Loadable"].loading();
         if (name.trim().length == 0) {
             loading.state = "loaded";
             return loading;
         }
-        census_CharacterAPI__WEBPACK_IMPORTED_MODULE_3__["CharacterAPI"].getByName(name).ok((data) => {
+        census_CharacterAPI__WEBPACK_IMPORTED_MODULE_4__["CharacterAPI"].getByName(name).ok((data) => {
             this.subscribeToEvents([data]);
-            this.addMember({ ID: data.ID, name: data.name });
         });
         return loading;
     }
@@ -63429,7 +63430,7 @@ class Core {
             return a.name.localeCompare(b.name);
         });
         chars.forEach((character) => {
-            const player = new core_TrackedPlayer__WEBPACK_IMPORTED_MODULE_4__["TrackedPlayer"]();
+            const player = new core_TrackedPlayer__WEBPACK_IMPORTED_MODULE_5__["TrackedPlayer"]();
             player.characterID = character.ID;
             player.faction = character.faction;
             player.outfitTag = character.outfitTag;
@@ -65107,7 +65108,6 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             startTimeLeft: 0,
             report: "",
             importing: false,
-            outfitRequest: Loadable__WEBPACK_IMPORTED_MODULE_5__["Loadable"].loaded(""),
         },
         storage: {
             enabled: false,
@@ -65137,6 +65137,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
         outfitReport: new reports_OutfitReport__WEBPACK_IMPORTED_MODULE_14__["OutfitReport"](),
         opsReportSettings: new reports_OutfitReport__WEBPACK_IMPORTED_MODULE_14__["OutfitReportSettings"](),
         refreshIntervalID: -1,
+        loadingOutfit: false,
         showFrog: false,
         display: [] // The currently displayed stats
     },
@@ -65575,7 +65576,11 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             if (["fooi", "fiji", "g0bs"].indexOf(this.parameters.outfitTag.toLowerCase()) > -1) {
                 this.showFrog = true;
             }
-            this.core.addOutfit(this.parameters.outfitTag);
+            this.loadingOutfit = true;
+            this.core.addOutfit(this.parameters.outfitTag).ok(() => {
+                this.loadingOutfit = false;
+                this.parameters.outfitTag = "";
+            });
         },
         addPlayer: function () {
             if (this.parameters.playerName.trim().length == 0) {

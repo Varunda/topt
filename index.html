@@ -178,12 +178,16 @@
                                 @keyup.enter="addOutfit"
                                 class="form-control"
                                 type="text"
+                                :disabled="loadingOutfit == true"
                             >
                             <div class="input-group-append">
                                 <button @click="addOutfit"
-                                    :disabled="parameters.outfitTag.trim().length == 0"
+                                    :disabled="parameters.outfitTag.trim().length == 0 || loadingOutfit == true"
                                     class="btn btn-primary"
                                     type="button">
+
+                                    <span v-if="loadingOutfit == true" class="spinner-border spinner-border-sm">
+                                    </span>
 
                                     Add
                                 </button>
@@ -1632,13 +1636,6 @@
 
                         <div v-if="parameters.report == 'ops'">
                             <h6 class="strike">OPs report settings</h6>
-
-                            <select v-model="opsReportSettings.zoneID" class="form-control">
-                                <option :value="null">All zones</option>
-                                <option v-for="zone in zoneIDs" :value="zone">
-                                    {{zone}}
-                                </option>
-                            </select>
                         </div>
 
                         <div v-else-if="parameters.report == 'winter'">

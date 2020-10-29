@@ -220,16 +220,16 @@ export class Core {
      * 
      * @returns A Loading that will contain the state of 
      */
-    public addOutfit(tag: string): Loading<string> {
+    public addOutfit(tag: string): ApiResponse {
         if (this.connected == false) {
             throw `Cannot track outfit ${tag}: Core is not connected`;
         }
 
-        const loading: Loading<string> = Loadable.loading();
+        const response: ApiResponse = new ApiResponse();
 
         if (tag.trim().length == 0) {
-            loading.state = "loaded";
-            return loading;
+            response.resolveOk();
+            return response;
         }
 
         OutfitAPI.getByTag(tag).ok((data: Outfit) => {
@@ -238,10 +238,10 @@ export class Core {
 
         OutfitAPI.getCharactersByTag(tag).ok((data: Character[]) => {
             this.subscribeToEvents(data);
-            loading.state = "loaded";
+            response.resolveOk();
         });
 
-        return loading;
+        return response;
     }
 
     /**
@@ -265,7 +265,6 @@ export class Core {
 
         CharacterAPI.getByName(name).ok((data: Character) => {
             this.subscribeToEvents([data]);
-            this.addMember({ ID: data.ID, name: data.name });
         });
 
         return loading;

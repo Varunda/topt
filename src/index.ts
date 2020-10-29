@@ -84,9 +84,7 @@ export const vm = new Vue({
             sortColumn: "name" as string,
 
             fromStorage: false as boolean,
-
             serverID: "1" as string,
-
             darkMode: false as boolean
         },
 
@@ -103,8 +101,6 @@ export const vm = new Vue({
             report: "" as string,
 
             importing: false as boolean,
-
-            outfitRequest: Loadable.loaded("") as Loading<string>,
         },
 
         storage: {
@@ -143,6 +139,8 @@ export const vm = new Vue({
 
         refreshIntervalID: -1 as number, // ID of the timed interval to refresh the realtime view
 
+        loadingOutfit: false as boolean,
+
         showFrog: false as boolean,
 
         display: [] as TrackedPlayer[] // The currently displayed stats
@@ -171,7 +169,6 @@ export const vm = new Vue({
                 this.connect();
             }
         }
-
     },
 
     mounted: function(): void {
@@ -677,7 +674,11 @@ export const vm = new Vue({
                 this.showFrog = true;
             }
 
-            this.core.addOutfit(this.parameters.outfitTag);
+            this.loadingOutfit = true;
+            this.core.addOutfit(this.parameters.outfitTag).ok(() => {
+                this.loadingOutfit = false;
+                this.parameters.outfitTag = "";
+            });
         },
 
         addPlayer: function(): void {
