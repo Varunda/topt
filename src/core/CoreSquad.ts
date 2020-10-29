@@ -374,8 +374,6 @@ Core.prototype.processExperienceEvent = function(event: TExpEvent): void {
 }
 
 Core.prototype.getSquad = function(squadName: string): Squad | null {
-    const self: Core = this as Core;
-
     let squad: Squad | null = this.squad.perm.find(iter => iter.name == squadName) || null;
     if (squad != null) {
         return squad;

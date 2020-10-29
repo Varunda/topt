@@ -78,7 +78,7 @@ export class Core {
     public serverID: string;
 
     public stats: Map<string, TrackedPlayer> = new Map<string, TrackedPlayer>();
-    public outfits: string[] = [];
+    public outfits: Outfit[] = [];
     public characters: Character[] = [];
     public miscEvents: TEvent[] = [];
     public playerCaptures: (TCaptureEvent | TDefendEvent)[] = [];
@@ -233,18 +233,12 @@ export class Core {
         }
 
         OutfitAPI.getByTag(tag).ok((data: Outfit) => {
-            this.outfits.push(data.ID);
+            this.outfits.push(data);
         });
 
         OutfitAPI.getCharactersByTag(tag).ok((data: Character[]) => {
             this.subscribeToEvents(data);
             loading.state = "loaded";
-
-            for (const char of data) {
-                if (char.online == true) {
-                    this.addMember({ ID: char.ID, name: char.name });
-                }
-            }
         });
 
         return loading;

@@ -290,6 +290,11 @@
 
                     <div> <!-- Misc info -->
                         <div class="d-block">
+                            <b>Outfits: </b>
+                            {{core.outfits.map(iter => iter.tag).join(", ")}}
+                        </div>
+
+                        <div class="d-block">
                             <b>Players: </b>
                             Tracking {{core.characters.length}} players
                         </div>

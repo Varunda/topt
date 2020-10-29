@@ -62635,39 +62635,6 @@ class OutfitAPI {
         }
         return response;
     }
-    /*
-    
-        const outfits: Outfit[] = [];
-
-        const sliceSize: number = 20;
-        let slicesLeft: number = Math.ceil(IDs.length / sliceSize);
-        console.log(`Have ${slicesLeft} slices to do. size of ${sliceSize}, data of ${IDs.length}`);
-
-        for (let i = 0; i < IDs.length; i += sliceSize) {
-            const slice: string[] = IDs.slice(i, i + sliceSize);
-
-            const request: ApiResponse<any> = CensusAPI.get(`/outfit/?outfit_id=${slice.join(",")}&c:resolve=leader`);
-
-            request.ok((data: any) => {
-                if (data.returned == 0) {
-                } else {
-                    for (const datum of data.character_list) {
-                        const char: Outfit = OutfitAPI.parse(datum);
-                        outfits.push(char);
-                    }
-                }
-
-                --slicesLeft;
-                if (slicesLeft == 0) {
-                    console.log(`No more slices left, resolving`);
-                    response.resolveOk(outfits);
-                } else {
-                    console.log(`${slicesLeft} slices left`);
-                }
-            });
-        }
-
-    */
     static getByTag(outfitTag) {
         const response = new _ApiWrapper__WEBPACK_IMPORTED_MODULE_1__["ApiResponse"]();
         const request = _CensusAPI__WEBPACK_IMPORTED_MODULE_0__["default"].get(`/outfit/?alias_lower=${outfitTag.toLocaleLowerCase()}&c:resolve=leader`);
@@ -63411,16 +63378,11 @@ class Core {
             return loading;
         }
         census_OutfitAPI__WEBPACK_IMPORTED_MODULE_2__["default"].getByTag(tag).ok((data) => {
-            this.outfits.push(data.ID);
+            this.outfits.push(data);
         });
         census_OutfitAPI__WEBPACK_IMPORTED_MODULE_2__["default"].getCharactersByTag(tag).ok((data) => {
             this.subscribeToEvents(data);
             loading.state = "loaded";
-            for (const char of data) {
-                if (char.online == true) {
-                    this.addMember({ ID: char.ID, name: char.name });
-                }
-            }
         });
         return loading;
     }
@@ -64520,7 +64482,6 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processExperienceEvent 
     }
 };
 core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.getSquad = function (squadName) {
-    const self = this;
     let squad = this.squad.perm.find(iter => iter.name == squadName) || null;
     if (squad != null) {
         return squad;
@@ -65424,7 +65385,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 captures: this.core.facilityCaptures,
                 playerCaptures: this.core.playerCaptures,
                 players: this.core.stats,
-                outfits: this.core.outfits,
+                outfits: this.core.outfits.map(iter => iter.ID),
                 events: events,
                 tracking: this.core.tracking,
                 squads: {

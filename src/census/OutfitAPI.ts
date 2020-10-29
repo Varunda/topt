@@ -80,40 +80,6 @@ export default class OutfitAPI {
         return response;
     }
 
-    /*
-    
-        const outfits: Outfit[] = [];
-
-        const sliceSize: number = 20;
-        let slicesLeft: number = Math.ceil(IDs.length / sliceSize);
-        console.log(`Have ${slicesLeft} slices to do. size of ${sliceSize}, data of ${IDs.length}`);
-
-        for (let i = 0; i < IDs.length; i += sliceSize) {
-            const slice: string[] = IDs.slice(i, i + sliceSize);
-
-            const request: ApiResponse<any> = CensusAPI.get(`/outfit/?outfit_id=${slice.join(",")}&c:resolve=leader`);
-
-            request.ok((data: any) => {
-                if (data.returned == 0) {
-                } else {
-                    for (const datum of data.character_list) {
-                        const char: Outfit = OutfitAPI.parse(datum);
-                        outfits.push(char);
-                    }
-                }
-
-                --slicesLeft;
-                if (slicesLeft == 0) {
-                    console.log(`No more slices left, resolving`);
-                    response.resolveOk(outfits);
-                } else {
-                    console.log(`${slicesLeft} slices left`);
-                }
-            });
-        }
-
-    */
-
     public static getByTag(outfitTag: string): ApiResponse<Outfit | null> {
         const response: ApiResponse<Outfit | null> = new ApiResponse();
 

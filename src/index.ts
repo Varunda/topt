@@ -448,7 +448,7 @@ export const vm = new Vue({
                 captures: this.core.facilityCaptures,
                 playerCaptures: this.core.playerCaptures,
                 players: this.core.stats,
-                outfits: this.core.outfits,
+                outfits: this.core.outfits.map(iter => iter.ID),
                 events: events,
                 tracking: this.core.tracking,
                 squads: {
