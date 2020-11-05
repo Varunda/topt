@@ -143,12 +143,20 @@ Vue.component("killfeed-squad", {
                         </td>
 
                         <td>
-                            {{member.state == "alive" ? "A" : member.state == "dying" ? "R" : "D"}}
-                            <span v-if="member.state == 'dying'">
-                                / 0:{{(30 - member.timeDead).toFixed(0).padStart(2, "0")}}
+                            <span v-if="member.online == true">
+                                <span v-if="member.state == 'alive'">
+                                    A &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+                                </span>
+                                <span v-if="member.state == 'dying'">
+                                    R / 0:{{(30 - member.timeDead).toFixed(0).padStart(2, "0")}}
+                                </span>
+                                <span v-else>
+                                    D &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+                                </span>
                             </span>
+
                             <span v-else>
-                                &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+                                Offline
                             </span>
                         </td>
 

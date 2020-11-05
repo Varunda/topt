@@ -437,6 +437,7 @@ export const vm = new Vue({
 
             events = events.sort((a, b) => a.timestamp - b.timestamp);
 
+            this.opsReportSettings.showSquadStats = this.core.squad.perm.length > 0;
             OutfitReportGenerator.generate({
                 settings: {
                     zoneID: null,

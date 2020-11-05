@@ -159,6 +159,18 @@ Core.prototype.squadInit = function(): void {
     }, 1000);
 }
 
+function sortSquad(squad: Squad): void {
+    squad.members.sort((a, b) => {
+        if (b.online == false && a.online == false) {
+            return a.name.localeCompare(b.name);
+        }
+        if (b.online == false || a.online == false) {
+            return 1;
+        }
+        return a.name.localeCompare(b.name);
+    });
+}
+
 Core.prototype.addMember = function(char: { ID: string, name: string }): void {
     if (this.squad.members.has(char.ID)) {
         warn(`Not adding duplicate member ${char.name}`);
@@ -173,7 +185,8 @@ Core.prototype.addMember = function(char: { ID: string, name: string }): void {
         timeDead: 0,
         whenDied: null,
         whenBeacon: null,
-        beaconCooldown: 0
+        beaconCooldown: 0,
+        online: true
     });
 
     const member: SquadMember = this.squad.members.get(char.ID)!;
@@ -182,6 +195,7 @@ Core.prototype.addMember = function(char: { ID: string, name: string }): void {
 
     const squad: Squad = this.createGuessSquad();
     squad.members.push(member);
+    sortSquad(squad);
 }
 
 Core.prototype.processKillDeathEvent = function(event: TKillEvent | TDeathEvent): void {
@@ -356,6 +370,8 @@ Core.prototype.processExperienceEvent = function(event: TExpEvent): void {
                 targetSquad.members = targetSquad.members.filter(iter => iter.charID != targetMember.charID);
             }
 
+            sortSquad(sourceSquad);
+            sortSquad(targetSquad);
         }
     }
 
@@ -369,6 +385,10 @@ Core.prototype.processExperienceEvent = function(event: TExpEvent): void {
 
             const squad: Squad = this.createGuessSquad();
             squad.members.push(sourceMember);
+
+            sortSquad(squad);
+            sortSquad(targetSquad);
+            sortSquad(sourceSquad);
         }
     }
 }
@@ -408,6 +428,7 @@ Core.prototype.addMemberToSquad = function(charID: string, squadName: string): v
     }
 
     squad.members.push(member);
+    sortSquad(squad);
 }
 
 Core.prototype.getSquadOfMember = function(charID: string): Squad | null {
@@ -482,6 +503,7 @@ Core.prototype.removePermSquad = function(squadName: string): void {
             for (const member of squad.members) {
                 newSquad.members.push(member);
             }
+            sortSquad(newSquad);
 
             squad.members = [];
         }
@@ -491,8 +513,14 @@ Core.prototype.removePermSquad = function(squadName: string): void {
 }
 
 Core.prototype.removeMember = function(charID: string): void {
-    log(`Removing ${charID} from squads`);
+    log(`${charID} is offline`);
 
+    if (this.squad.members.has(charID)) {
+        const char: SquadMember = this.squad.members.get(charID)!
+        char.online = false;
+    }
+
+    /*
     const squad: Squad | null = this.getSquadOfMember(charID);
     if (squad != null) {
         debug(`${charID} was in squad ${squad.name}, removing`);
@@ -502,8 +530,5 @@ Core.prototype.removeMember = function(charID: string): void {
             this.squad.guesses = this.squad.guesses.filter(iter => iter.ID != squad.ID);
         }
     }
-
-    if (this.squad.members.has(charID)) {
-        this.squad.members.delete(charID);
-    }
+    */
 }

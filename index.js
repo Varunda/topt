@@ -60180,12 +60180,20 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("killfeed-squad", {
                         </td>
 
                         <td>
-                            {{member.state == "alive" ? "A" : member.state == "dying" ? "R" : "D"}}
-                            <span v-if="member.state == 'dying'">
-                                / 0:{{(30 - member.timeDead).toFixed(0).padStart(2, "0")}}
+                            <span v-if="member.online == true">
+                                <span v-if="member.state == 'alive'">
+                                    A &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+                                </span>
+                                <span v-if="member.state == 'dying'">
+                                    R / 0:{{(30 - member.timeDead).toFixed(0).padStart(2, "0")}}
+                                </span>
+                                <span v-else>
+                                    D &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+                                </span>
                             </span>
+
                             <span v-else>
-                                &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+                                Offline
                             </span>
                         </td>
 
@@ -64255,6 +64263,17 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.squadInit = function ()
         });
     }, 1000);
 };
+function sortSquad(squad) {
+    squad.members.sort((a, b) => {
+        if (b.online == false && a.online == false) {
+            return a.name.localeCompare(b.name);
+        }
+        if (b.online == false || a.online == false) {
+            return 1;
+        }
+        return a.name.localeCompare(b.name);
+    });
+}
 core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.addMember = function (char) {
     if (this.squad.members.has(char.ID)) {
         warn(`Not adding duplicate member ${char.name}`);
@@ -64268,12 +64287,14 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.addMember = function (c
         timeDead: 0,
         whenDied: null,
         whenBeacon: null,
-        beaconCooldown: 0
+        beaconCooldown: 0,
+        online: true
     });
     const member = this.squad.members.get(char.ID);
     debug(`Started squad tracking ${char.name}/${char.ID}`);
     const squad = this.createGuessSquad();
     squad.members.push(member);
+    sortSquad(squad);
 };
 core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processKillDeathEvent = function (event) {
     var _a, _b;
@@ -64469,6 +64490,8 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processExperienceEvent 
                 sourceSquad.members.push(targetMember);
                 targetSquad.members = targetSquad.members.filter(iter => iter.charID != targetMember.charID);
             }
+            sortSquad(sourceSquad);
+            sortSquad(targetSquad);
         }
     }
     // Check if the squad is no longer valid and needs to be removed, i.e. moved squads
@@ -64479,6 +64502,9 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processExperienceEvent 
             targetSquad.members = targetSquad.members.filter(iter => iter.charID != sourceMember.charID);
             const squad = this.createGuessSquad();
             squad.members.push(sourceMember);
+            sortSquad(squad);
+            sortSquad(targetSquad);
+            sortSquad(sourceSquad);
         }
     }
 };
@@ -64510,6 +64536,7 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.addMemberToSquad = func
         }
     }
     squad.members.push(member);
+    sortSquad(squad);
 };
 core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.getSquadOfMember = function (charID) {
     const check = (squad) => {
@@ -64567,24 +64594,29 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.removePermSquad = funct
             for (const member of squad.members) {
                 newSquad.members.push(member);
             }
+            sortSquad(newSquad);
             squad.members = [];
         }
     }
     this.squad.perm = this.squad.perm.filter(iter => iter.name != squadName);
 };
 core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.removeMember = function (charID) {
-    log(`Removing ${charID} from squads`);
-    const squad = this.getSquadOfMember(charID);
+    log(`${charID} is offline`);
+    if (this.squad.members.has(charID)) {
+        const char = this.squad.members.get(charID);
+        char.online = false;
+    }
+    /*
+    const squad: Squad | null = this.getSquadOfMember(charID);
     if (squad != null) {
         debug(`${charID} was in squad ${squad.name}, removing`);
+
         squad.members = squad.members.filter(iter => iter.charID != charID);
         if (squad.members.length == 0 && squad.guess == true) {
             this.squad.guesses = this.squad.guesses.filter(iter => iter.ID != squad.ID);
         }
     }
-    if (this.squad.members.has(charID)) {
-        this.squad.members.delete(charID);
-    }
+    */
 };
 
 
@@ -64789,6 +64821,10 @@ class SquadMember {
          * Timestamp (in MS) of when this character last put a beacon down
          */
         this.whenBeacon = null;
+        /**
+         * Is this squad member online or not
+         */
+        this.online = true;
     }
 }
 
@@ -65378,6 +65414,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             });
             events.push(...this.core.miscEvents);
             events = events.sort((a, b) => a.timestamp - b.timestamp);
+            this.opsReportSettings.showSquadStats = this.core.squad.perm.length > 0;
             reports_OutfitReport__WEBPACK_IMPORTED_MODULE_14__["OutfitReportGenerator"].generate({
                 settings: {
                     zoneID: null,

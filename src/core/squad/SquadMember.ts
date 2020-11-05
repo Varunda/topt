@@ -41,4 +41,9 @@ export class SquadMember {
      */
     public whenBeacon: number | null = null;
 
+    /**
+     * Is this squad member online or not
+     */
+    public online: boolean = true;
+
 }
