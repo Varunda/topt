@@ -60184,7 +60184,7 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("killfeed-squad", {
                                 <span v-if="member.state == 'alive'">
                                     A &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
                                 </span>
-                                <span v-if="member.state == 'dying'">
+                                <span v-else-if="member.state == 'dying'">
                                     R / 0:{{(30 - member.timeDead).toFixed(0).padStart(2, "0")}}
                                 </span>
                                 <span v-else>
@@ -61249,7 +61249,9 @@ window.StorageHelper = StorageHelper;
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "PlaybackOptions", function() { return PlaybackOptions; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Playback", function() { return Playback; });
-/* harmony import */ var census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! census/ApiWrapper */ "./src/census/ApiWrapper.ts");
+/* harmony import */ var census_OutfitAPI__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! census/OutfitAPI */ "./src/census/OutfitAPI.ts");
+/* harmony import */ var census_ApiWrapper__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! census/ApiWrapper */ "./src/census/ApiWrapper.ts");
+
 
 const log = (msg) => {
     console.log(`[Playback] ${msg}`);
@@ -61277,7 +61279,7 @@ class Playback {
             throw `Cannot load file: Core has not been set. Did you forget to use Playback.setCore()?`;
         }
         Playback._file = file;
-        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_1__["ApiResponse"]();
         const reader = new FileReader();
         reader.onload = ((ev) => {
             const data = JSON.parse(reader.result);
@@ -61292,7 +61294,9 @@ class Playback {
                 const events = data.events;
                 // Force online for squad tracking
                 this._core.subscribeToEvents(chars.map(iter => { iter.online = iter.secondsPlayed > 0; return iter; }));
-                this._core.outfits = outfits;
+                census_OutfitAPI__WEBPACK_IMPORTED_MODULE_0__["default"].getByIDs(outfits).ok((data) => {
+                    this._core.outfits = data;
+                });
                 if (events != undefined && events.length != 0) {
                     Playback._events = events;
                     const parsedData = events.map(iter => JSON.parse(iter));
@@ -64269,14 +64273,15 @@ function sortSquad(squad) {
             return a.name.localeCompare(b.name);
         }
         if (b.online == false || a.online == false) {
-            return 1;
+            return -1;
         }
         return a.name.localeCompare(b.name);
     });
 }
 core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.addMember = function (char) {
     if (this.squad.members.has(char.ID)) {
-        warn(`Not adding duplicate member ${char.name}`);
+        this.squad.members.get(char.ID).online = true;
+        debug(`${char.name}/${char.ID} was online before, setting online again`);
         return;
     }
     this.squad.members.set(char.ID, {
@@ -64291,6 +64296,7 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.addMember = function (c
         online: true
     });
     const member = this.squad.members.get(char.ID);
+    member.online = true;
     debug(`Started squad tracking ${char.name}/${char.ID}`);
     const squad = this.createGuessSquad();
     squad.members.push(member);
@@ -64605,18 +64611,10 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.removeMember = function
     if (this.squad.members.has(charID)) {
         const char = this.squad.members.get(charID);
         char.online = false;
+        char.state = "alive";
+        char.whenDied = null;
+        char.timeDead = 0;
     }
-    /*
-    const squad: Squad | null = this.getSquadOfMember(charID);
-    if (squad != null) {
-        debug(`${charID} was in squad ${squad.name}, removing`);
-
-        squad.members = squad.members.filter(iter => iter.charID != charID);
-        if (squad.members.length == 0 && squad.guess == true) {
-            this.squad.guesses = this.squad.guesses.filter(iter => iter.ID != squad.ID);
-        }
-    }
-    */
 };
 
 

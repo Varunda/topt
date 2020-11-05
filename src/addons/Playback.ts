@@ -92,7 +92,9 @@ export class Playback {
                 // Force online for squad tracking
                 this._core!.subscribeToEvents(chars.map(iter => { iter.online = iter.secondsPlayed > 0; return iter; }));
 
-                this._core!.outfits = outfits;
+                OutfitAPI.getByIDs(outfits).ok((data: Outfit[]) => {
+                    this._core!.outfits = data;
+                });
 
                 if (events != undefined && events.length != 0) {
                     Playback._events = events;

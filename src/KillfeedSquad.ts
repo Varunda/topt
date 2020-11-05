@@ -147,7 +147,7 @@ Vue.component("killfeed-squad", {
                                 <span v-if="member.state == 'alive'">
                                     A &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
                                 </span>
-                                <span v-if="member.state == 'dying'">
+                                <span v-else-if="member.state == 'dying'">
                                     R / 0:{{(30 - member.timeDead).toFixed(0).padStart(2, "0")}}
                                 </span>
                                 <span v-else>

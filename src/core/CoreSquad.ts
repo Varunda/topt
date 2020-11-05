@@ -165,7 +165,7 @@ function sortSquad(squad: Squad): void {
             return a.name.localeCompare(b.name);
         }
         if (b.online == false || a.online == false) {
-            return 1;
+            return -1;
         }
         return a.name.localeCompare(b.name);
     });
@@ -173,7 +173,8 @@ function sortSquad(squad: Squad): void {
 
 Core.prototype.addMember = function(char: { ID: string, name: string }): void {
     if (this.squad.members.has(char.ID)) {
-        warn(`Not adding duplicate member ${char.name}`);
+        this.squad.members.get(char.ID)!.online = true;
+        debug(`${char.name}/${char.ID} was online before, setting online again`);
         return;
     }
 
@@ -190,6 +191,7 @@ Core.prototype.addMember = function(char: { ID: string, name: string }): void {
     });
 
     const member: SquadMember = this.squad.members.get(char.ID)!;
+    member.online = true;
 
     debug(`Started squad tracking ${char.name}/${char.ID}`);
 
@@ -518,17 +520,8 @@ Core.prototype.removeMember = function(charID: string): void {
     if (this.squad.members.has(charID)) {
         const char: SquadMember = this.squad.members.get(charID)!
         char.online = false;
+        char.state = "alive";
+        char.whenDied = null;
+        char.timeDead = 0;
     }
-
-    /*
-    const squad: Squad | null = this.getSquadOfMember(charID);
-    if (squad != null) {
-        debug(`${charID} was in squad ${squad.name}, removing`);
-
-        squad.members = squad.members.filter(iter => iter.charID != charID);
-        if (squad.members.length == 0 && squad.guess == true) {
-            this.squad.guesses = this.squad.guesses.filter(iter => iter.ID != squad.ID);
-        }
-    }
-    */
 }
