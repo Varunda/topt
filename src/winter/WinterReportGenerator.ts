@@ -533,6 +533,57 @@ export class WinterReportGenerator {
         return metric;
     }
 
+    private static shortestLife(parameters: WinterReportParameters): WinterMetric {
+        const metric: WinterMetric = new WinterMetric();
+        metric.name = "Shortest life expectance";
+        metric.funName = "Not elders";
+        metric.description = "Shortest average life expectance";
+
+        const amounts: StatMap = new StatMap();
+
+        for (const player of parameters.players) {
+            if (player.events.length == 0) {
+                continue;
+            }
+
+            const expectances: number[] = [];
+
+            let start: number = player.events[0].timestamp;
+
+            for (const ev of player.events) {
+                if (ev.type == "death" && ev.revived == false) {
+                    expectances.push((ev.timestamp - start) / 1000);
+                    start = ev.timestamp;
+                }
+            }
+
+            if (expectances.length == 0) {
+                continue;
+            }
+
+            const total: number = expectances.reduce((acc, val) => { return acc += val; }, 0);
+            const avg: number = total / expectances.length;
+
+            amounts.set(player.name, avg);
+        }
+
+        metric.entries = this.statMapToEntires(parameters, amounts, (value: number) => {
+            let mins: number = 0;
+            let seconds: number = value;
+
+            if (value > 60) {
+                mins = Math.floor(seconds / 60);
+                seconds = seconds % 60;
+
+                return `${mins.toFixed(0)} mins ${seconds.toFixed(0)} seconds`;
+            }
+
+            return `${value.toFixed(1)} seconds`;
+        });
+
+        return metric;
+    }
+
     private static mostKnifeKills(parameters: WinterReportParameters): ApiResponse<WinterMetric> {
         return this.weaponType(parameters, "Knife", {
             name: "Knife kills",
@@ -698,8 +749,10 @@ export class WinterReportGenerator {
         display: ((_: number) => string) | null = null): WinterMetricEntry[] {
 
         return Array.from(map.getMap().entries()).map((iter: [string, number]) => {
+            const tag = parameters.players.find(i => i.name.toLowerCase() == iter[0].toLowerCase())?.outfitTag ?? "";
             return {
                 name: iter[0],
+                outfitTag: tag,
                 value: iter[1],
                 display: display != null ? display(iter[1]) : null
             };

@@ -302,7 +302,7 @@ export class Core {
             player.name = character.name;
             if (character.online == true) {
                 player.joinTime = new Date().getTime();
-                this.addMember({ ID: player.characterID, name: player.name });
+                this.addMember({ ID: player.characterID, name: player.name, outfitTag: character.outfitTag });
             }
             this.stats.set(character.ID, player);
         });

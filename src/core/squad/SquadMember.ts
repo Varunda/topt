@@ -7,6 +7,11 @@ export class SquadMember {
     public name: string = "";
 
     /**
+     * Tag of the outfit. Empty string for no outfit
+     */
+    public outfitTag: string = "";
+
+    /**
      * Character ID of the squad member
      */
     public charID: string = "";

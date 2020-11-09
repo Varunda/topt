@@ -55,7 +55,7 @@ declare module "Core" {
          * 
          * @param char Character to begin tracking
          */
-        addMember(char: { ID: string, name: string }): void;
+        addMember(char: { ID: string, name: string, outfitTag: string }): void;
 
         /**
          * Create a new guess squad
@@ -171,7 +171,7 @@ function sortSquad(squad: Squad): void {
     });
 }
 
-Core.prototype.addMember = function(char: { ID: string, name: string }): void {
+Core.prototype.addMember = function(char: { ID: string, name: string, outfitTag: string }): void {
     if (this.squad.members.has(char.ID)) {
         this.squad.members.get(char.ID)!.online = true;
         debug(`${char.name}/${char.ID} was online before, setting online again`);
@@ -181,6 +181,7 @@ Core.prototype.addMember = function(char: { ID: string, name: string }): void {
     this.squad.members.set(char.ID, {
         name: char.name,
         charID: char.ID,
+        outfitTag: char.outfitTag,
         class: "",
         state: "alive",
         timeDead: 0,

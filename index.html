@@ -289,11 +289,20 @@
                             </button>
                         </div>
 
-                        <button @click="exportData"
-                            class="btn btn-info w-100 mb-2"
-                            type="button">
-                            Export data
-                        </button>
+                        <div class="btn-group mb-2 w-100">
+                            <button @click="exportData"
+                                class="btn btn-info"
+                                type="button">
+                                Export data
+                            </button>
+
+                            <button @click="exportOpsReport"
+                                class="btn btn-primary"
+                                type="button">
+                                Export report
+                            </button>
+                        </div>
+
                     </div>
 
                     <div> <!-- Report generation -->
@@ -1555,6 +1564,7 @@
                             </span>
                             <div class="list-group list-group-flush flex-grow-1">
                                 <div v-for="entry in metric.entries" class="list-group-item border-top">
+                                    [{{winter.settings.displayOutfitTag == true ? entry.outfitTag : ""}}]
                                     {{entry.name}} - {{entry.display != null ? entry.display : entry.value}}
                                 </div>
                             </div>
@@ -1575,6 +1585,7 @@
                             </span>
                             <div class="list-group list-group-flush flex-grow-1">
                                 <div v-for="entry in metric.entries" class="list-group-item border-top">
+                                    {{winter.settings.displayOutfitTag == true ? entry.outfitTag : ""}}
                                     {{entry.name}} - {{entry.display != null ? entry.display : entry.value}}
                                 </div>
                             </div>
@@ -1677,6 +1688,12 @@
                                 <option :value="5">5</option>
                                 <option :value="8">8</option>
                                 <option :value="10">10</option>
+                            </select>
+
+                            <label class="col-form-label">Display outfit tag?</label>
+                            <select v-model="winter.settings.displayOutfitTag" class="form-control">
+                                <option :value="false">No</option>
+                                <option :value="true">Yes</option>
                             </select>
 
                             <label class="col-form-label">Players to ignore (separate with a space)</label>

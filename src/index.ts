@@ -278,6 +278,15 @@ export const vm = new Vue({
             FileSaver.saveAs(file);
         },
 
+        exportOpsReport: function(): void {
+            this.generateOutfitReport().ok(() => {
+                const json: string = JSON.stringify(this.outfitReport, null, 2);
+                const file = new File([json], "report.json", { type: "text/json" });
+
+                FileSaver.saveAs(file);
+            });
+        },
+
         saveSettings: function(): void {
             if (this.storage.enabled == false) {
                 return;
@@ -426,7 +435,9 @@ export const vm = new Vue({
             this.parameters.report = "";
         },
 
-        generateOutfitReport: function(): void {
+        generateOutfitReport: function(): ApiResponse {
+            const response: ApiResponse = new ApiResponse();
+
             let events: TEvent[] = [];
 
             this.core.stats.forEach((player: TrackedPlayer, charID: string) => {
@@ -456,7 +467,10 @@ export const vm = new Vue({
             }).ok((data: OutfitReport) => { 
                 this.outfitReport = data;
                 this.view = "ops";
+                response.resolveOk();
             });
+
+            return response;
         },
 
         generateWinterReport: function(): void {

@@ -63449,7 +63449,7 @@ class Core {
             player.name = character.name;
             if (character.online == true) {
                 player.joinTime = new Date().getTime();
-                this.addMember({ ID: player.characterID, name: player.name });
+                this.addMember({ ID: player.characterID, name: player.name, outfitTag: character.outfitTag });
             }
             this.stats.set(character.ID, player);
         });
@@ -64117,7 +64117,11 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processMessage = functi
                 };
                 char.events.push(ev);
                 self.emit(ev);
-                self.addMember({ ID: char.characterID, name: char.name });
+                self.addMember({
+                    ID: char.characterID,
+                    name: char.name,
+                    outfitTag: char.outfitTag
+                });
             }
         }
         else if (event == "PlayerLogout") {
@@ -64287,6 +64291,7 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.addMember = function (c
     this.squad.members.set(char.ID, {
         name: char.name,
         charID: char.ID,
+        outfitTag: char.outfitTag,
         class: "",
         state: "alive",
         timeDead: 0,
@@ -64749,10 +64754,6 @@ class Squad {
          */
         this.members = [];
         /**
-         * Members went offline during stats
-         */
-        this.offline = [];
-        /**
          * If this squad is a guess squad or not, affects how automatic merging is done
          */
         this.guess = true;
@@ -64791,6 +64792,10 @@ class SquadMember {
          * Display name of the squad member
          */
         this.name = "";
+        /**
+         * Tag of the outfit. Empty string for no outfit
+         */
+        this.outfitTag = "";
         /**
          * Character ID of the squad member
          */
@@ -65277,6 +65282,13 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             const file = new File([JSON.stringify(json)], "data.json", { type: "text/json" });
             _node_modules_file_saver_dist_FileSaver_js__WEBPACK_IMPORTED_MODULE_15__["saveAs"](file);
         },
+        exportOpsReport: function () {
+            this.generateOutfitReport().ok(() => {
+                const json = JSON.stringify(this.outfitReport, null, 2);
+                const file = new File([json], "report.json", { type: "text/json" });
+                _node_modules_file_saver_dist_FileSaver_js__WEBPACK_IMPORTED_MODULE_15__["saveAs"](file);
+            });
+        },
         saveSettings: function () {
             if (this.storage.enabled == false) {
                 return;
@@ -65406,6 +65418,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             this.parameters.report = "";
         },
         generateOutfitReport: function () {
+            const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_4__["ApiResponse"]();
             let events = [];
             this.core.stats.forEach((player, charID) => {
                 events.push(...player.events);
@@ -65431,7 +65444,9 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             }).ok((data) => {
                 this.outfitReport = data;
                 this.view = "ops";
+                response.resolveOk();
             });
+            return response;
         },
         generateWinterReport: function () {
             const playerNames = this.winter.ignoredPlayers.split(" ")
@@ -66240,6 +66255,7 @@ class WinterMetric {
 class WinterMetricEntry {
     constructor() {
         this.name = "";
+        this.outfitTag = "";
         this.value = 0;
         this.display = null;
     }
@@ -66713,6 +66729,43 @@ class WinterReportGenerator {
         });
         return metric;
     }
+    static shortestLife(parameters) {
+        const metric = new _WinterMetric__WEBPACK_IMPORTED_MODULE_2__["WinterMetric"]();
+        metric.name = "Shortest life expectance";
+        metric.funName = "Not elders";
+        metric.description = "Shortest average life expectance";
+        const amounts = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        for (const player of parameters.players) {
+            if (player.events.length == 0) {
+                continue;
+            }
+            const expectances = [];
+            let start = player.events[0].timestamp;
+            for (const ev of player.events) {
+                if (ev.type == "death" && ev.revived == false) {
+                    expectances.push((ev.timestamp - start) / 1000);
+                    start = ev.timestamp;
+                }
+            }
+            if (expectances.length == 0) {
+                continue;
+            }
+            const total = expectances.reduce((acc, val) => { return acc += val; }, 0);
+            const avg = total / expectances.length;
+            amounts.set(player.name, avg);
+        }
+        metric.entries = this.statMapToEntires(parameters, amounts, (value) => {
+            let mins = 0;
+            let seconds = value;
+            if (value > 60) {
+                mins = Math.floor(seconds / 60);
+                seconds = seconds % 60;
+                return `${mins.toFixed(0)} mins ${seconds.toFixed(0)} seconds`;
+            }
+            return `${value.toFixed(1)} seconds`;
+        });
+        return metric;
+    }
     static mostKnifeKills(parameters) {
         return this.weaponType(parameters, "Knife", {
             name: "Knife kills",
@@ -66836,8 +66889,11 @@ class WinterReportGenerator {
     }
     static statMapToEntires(parameters, map, display = null) {
         return Array.from(map.getMap().entries()).map((iter) => {
+            var _a, _b;
+            const tag = (_b = (_a = parameters.players.find(i => i.name.toLowerCase() == iter[0].toLowerCase())) === null || _a === void 0 ? void 0 : _a.outfitTag, (_b !== null && _b !== void 0 ? _b : ""));
             return {
                 name: iter[0],
+                outfitTag: tag,
                 value: iter[1],
                 display: display != null ? display(iter[1]) : null
             };
@@ -66883,6 +66939,10 @@ class WinterReportSettings {
          * How many fun metrics to show. Fun being like unique revives, -1 to show all
          */
         this.funMetricCount = -1;
+        /**
+         * Will the outfit tag be shown?
+         */
+        this.displayOutfitTag = false;
         /**
          * Char IDs of players to ignore and skip if they are in the top
          */

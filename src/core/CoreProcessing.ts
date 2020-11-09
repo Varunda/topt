@@ -439,7 +439,11 @@ declare module "Core" {
 
                 self.emit(ev);
 
-                self.addMember({ ID: char.characterID, name: char.name });
+                self.addMember({
+                    ID: char.characterID,
+                    name: char.name,
+                    outfitTag: char.outfitTag 
+                });
             }
         } else if (event == "PlayerLogout") {
             const charID: string = msg.payload.character_id;
