@@ -1,16 +1,13 @@
 import { Core } from "core/Core";
 
-import { PsLoadout, PsLoadouts } from "census/PsLoadout";
-import { PsEventType, PsEvent, PsEvents } from "PsEvent";
-import StatMap from "StatMap";
+import { PsLoadout, PsLoadouts } from "core/census/PsLoadout";
+import { PsEventType, PsEvent, PsEvents } from "core/PsEvent";
 
-import { Weapon, WeaponAPI } from "census/WeaponAPI";
-import { EventAPI } from "census/EventAPI";
-import { Achievement, AchievementAPI } from "census/AchievementAPI";
-import { FacilityAPI, Facility } from "census/FacilityAPI";
-import { CharacterAPI, Character } from "census/CharacterAPI";
+import { Weapon, WeaponAPI } from "core/census/WeaponAPI";
+import { FacilityAPI, Facility } from "core/census/FacilityAPI";
+import { CharacterAPI, Character } from "core/census/CharacterAPI";
 
-import { FacilityCapture, TrackedRouter } from "InvididualGenerator";
+import { FacilityCapture, TrackedRouter } from "core/InvididualGenerator";
 
 import { TrackedPlayer } from "core/TrackedPlayer";
 
@@ -18,11 +15,9 @@ import {
     TEvent, TEventType,
     TExpEvent, TKillEvent, TDeathEvent, TTeamkillEvent,
     TCaptureEvent, TDefendEvent,
-    TVehicleKillEvent,
+    TVehicleKillEvent, TLoginEvent, TLogoutEvent,
     TEventHandler
-} from "events/index";
-import { TLogoutEvent } from "events/TLogoutEvent";
-import { TLoginEvent } from "events/TLoginEvent";
+} from "core/events/index";
 
 declare module "Core" {
 

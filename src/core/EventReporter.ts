@@ -1,12 +1,11 @@
-import { ApiResponse } from "census/ApiWrapper";
-import { Character, CharacterAPI } from "census/CharacterAPI";
-import { Weapon, WeaponAPI } from "census/WeaponAPI";
-import StatMap from "StatMap";
-import { PsLoadout, PsLoadouts, PsLoadoutType } from "census/PsLoadout";
-import { Vehicle, VehicleAPI, VehicleTypes } from "census/VehicleAPI";
+import { ApiResponse } from "core/census/ApiWrapper";
+import { Character, CharacterAPI } from "core/census/CharacterAPI";
+import { Weapon, WeaponAPI } from "core/census/WeaponAPI";
+import StatMap from "core/StatMap";
+import { PsLoadout, PsLoadouts, PsLoadoutType } from "core/census/PsLoadout";
+import { Vehicle, VehicleAPI, VehicleTypes } from "core/census/VehicleAPI";
 
-import * as moment from "moment";
-import { PsEvent } from "PsEvent";
+import { PsEvent } from "core/PsEvent";
 
 import {
     TEvent, TEventType,
@@ -14,10 +13,10 @@ import {
     TCaptureEvent, TDefendEvent,
     TVehicleKillEvent,
     TEventHandler
-} from "events/index";
+} from "core/events/index";
 
-import { TrackedPlayer, IndividualReporter, TimeTracking, Playtime, FacilityCapture } from "InvididualGenerator";
-import OutfitAPI, { Outfit } from "census/OutfitAPI";
+import { TrackedPlayer, IndividualReporter, TimeTracking, Playtime, FacilityCapture } from "core/InvididualGenerator";
+import OutfitAPI, { Outfit } from "core/census/OutfitAPI";
 
 export class BreakdownArray {
     data: Breakdown[] = [];

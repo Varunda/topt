@@ -1,5 +1,5 @@
-import { Report } from "InvididualGenerator";
-import { ApiResponse } from "census/ApiWrapper";
+import { Report } from "core/InvididualGenerator";
+import { ApiResponse } from "core/census/ApiWrapper";
 
 export class PersonalReportGenerator {
 

@@ -1,25 +1,17 @@
-import { ApiResponse } from "census/ApiWrapper";
-import { Loading, Loadable } from "Loadable";
+import { ApiResponse } from "core/census/ApiWrapper";
 
-import * as moment from "moment";
+import { CharacterAPI, Character } from "core/census/CharacterAPI";
+import { Weapon, WeaponAPI } from "core/census/WeaponAPI";
+import { Achievement, AchievementAPI } from "core/census/AchievementAPI";
 
-import CensusAPI from "census/CensusAPI";
-import OutfitAPI, { Outfit } from "census/OutfitAPI";
-import { CharacterAPI, Character } from "census/CharacterAPI";
-import { Weapon, WeaponAPI } from "census/WeaponAPI";
-import { EventAPI } from "census/EventAPI";
-import { Achievement, AchievementAPI } from "census/AchievementAPI";
-import { FacilityAPI, Facility } from "census/FacilityAPI";
-
-import { PsLoadout, PsLoadouts, PsLoadoutType } from "census/PsLoadout";
-import { PsEventType, PsEvent, PsEvents } from "PsEvent";
-import StatMap from "StatMap";
+import { PsLoadout, PsLoadouts, PsLoadoutType } from "core/census/PsLoadout";
+import { PsEventType, PsEvent, PsEvents } from "core/PsEvent";
+import StatMap from "core/StatMap";
 import EventReporter, { 
     statMapToBreakdown, BreakdownWeaponType,
     Breakdown, BreakdownArray, defaultCharacterMapper, defaultCharacterSortField,
     OutfitVersusBreakdown, ClassCollection, classCollectionNumber, BreakdownTimeslot, BreakdownTrend, BaseCapture
-} from "EventReporter";
-import { classCollectionTrend } from "OutfitTrends";
+} from "core/EventReporter";
 
 import {
     TEvent, TEventType,
@@ -27,7 +19,7 @@ import {
     TCaptureEvent, TDefendEvent,
     TVehicleKillEvent,
     TEventHandler
-} from "events/index";
+} from "core/events/index";
 
 export class ClassBreakdown {
     secondsAs: number = 0;
@@ -914,6 +906,7 @@ export class IndividualReporter {
             meta.title = "Transport assists";
             meta.data = new BreakdownArray();
 
+            /*
             EventAPI.getMultiDeaths(killedIDs, firstEv, lastEv).ok((data: TDeathEvent[]) => {
                 const killers: string[] = [];
 
@@ -956,6 +949,7 @@ export class IndividualReporter {
                     response.resolveOk(meta);
                 });
             });
+            */
         } else {
             response.resolve({ code: 204, data: null });
         }

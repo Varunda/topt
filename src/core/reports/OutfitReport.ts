@@ -1,8 +1,7 @@
-import { ApiResponse } from "census/ApiWrapper";
-import { Loading, Loadable } from "Loadable";
+import { ApiResponse } from "core/census/ApiWrapper";
 
-import { PsLoadout, PsLoadouts } from "census/PsLoadout";
-import { PsEventType, PsEvent, PsEvents } from "PsEvent";
+import { PsLoadout, PsLoadouts } from "core/census/PsLoadout";
+import { PsEventType, PsEvent, PsEvents } from "core/PsEvent";
 
 import {
     TEvent, TEventType,
@@ -10,24 +9,23 @@ import {
     TCaptureEvent, TDefendEvent,
     TVehicleKillEvent,
     TEventHandler
-} from "events/index";
+} from "core/events/index";
 
 import EventReporter, { statMapToBreakdown,
     Breakdown, BreakdownArray,
     OutfitVersusBreakdown, ClassCollection, classCollectionNumber,
     BreakdownTimeslot, BreakdownTrend, BreakdownWeaponType, BaseCapture, BaseCaptureOutfit
-} from "EventReporter";
+} from "core/EventReporter";
 import {
     ExpBreakdown, FacilityCapture, IndividualReporter,
      TimeTracking, 
     ClassKdCollection, classKdCollection,
     Playtime, PlayerVersusEntry
-} from "InvididualGenerator";
+} from "core/InvididualGenerator";
 
 import { SquadStats }  from "core/Core";
 import { TrackedPlayer } from "core/TrackedPlayer";
 import { Squad } from "core/squad/Squad";
-import { param } from "jquery";
 
 export class OutfitReportSettings {
 

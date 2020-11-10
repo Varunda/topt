@@ -1,9 +1,8 @@
 import { Core } from "core/Core";
 
-import { TKillEvent, TDeathEvent, TExpEvent } from "events/index";
-import { PsLoadout, PsLoadouts } from "census/PsLoadout";
-import { PsEvent, PsEvents } from "PsEvent";
-import { CharacterAPI, Character } from "census/CharacterAPI";
+import { TKillEvent, TDeathEvent, TExpEvent } from "core/events/index";
+import { PsLoadout, PsLoadouts } from "core/census/PsLoadout";
+import { PsEvent, PsEvents } from "core/PsEvent";
 
 import { Squad } from "./squad/Squad";
 import { SquadMember } from "./squad/SquadMember";

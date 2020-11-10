@@ -1,5 +1,5 @@
 import Vue from "vue";
-import { BreakdownTimeslot } from "EventReporter";
+import { BreakdownTimeslot } from "core/EventReporter";
 
 import { Chart } from "chart.js";
 

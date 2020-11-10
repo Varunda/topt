@@ -1,15 +1,13 @@
-import { ApiResponse } from "census/ApiWrapper";
+import { ApiResponse } from "core/census/ApiWrapper";
 import { Loading, Loadable } from "Loadable";
 
-import CensusAPI from "census/CensusAPI";
-import OutfitAPI, { Outfit } from "census/OutfitAPI";
-import { CharacterAPI, Character } from "census/CharacterAPI";
-
-import StatMap from "StatMap";
+import CensusAPI from "core/census/CensusAPI";
+import OutfitAPI, { Outfit } from "core/census/OutfitAPI";
+import { CharacterAPI, Character } from "core/census/CharacterAPI";
 
 import { TrackedPlayer } from "core/TrackedPlayer";
 
-import { FacilityCapture, TimeTracking, TrackedRouter } from "InvididualGenerator";
+import { FacilityCapture, TimeTracking, TrackedRouter } from "core/InvididualGenerator";
 
 import {
     TEvent, TEventType, 
@@ -17,7 +15,7 @@ import {
     TCaptureEvent, TDefendEvent,
     TVehicleKillEvent,
     TEventHandler
-} from "events/index";
+} from "core/events/index";
 
 import { Squad } from "./squad/Squad";
 import { SquadMember } from "./squad/SquadMember"

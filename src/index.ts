@@ -4,7 +4,7 @@ import "bootstrap/dist/css/bootstrap.min.css";
 
 import Vue, { PropType } from "vue";
 
-import { ApiResponse } from "census/ApiWrapper";
+import { ApiResponse } from "core/census/ApiWrapper";
 import { Loading, Loadable } from "Loadable";
 
 import * as moment from "moment";
@@ -12,10 +12,10 @@ import * as $ from "jquery";
 import * as JSZip from "jszip";
 (window as any).moment = moment;
 
-import { Weapon, WeaponAPI } from "census/WeaponAPI";
-import { FacilityAPI, Facility } from "census/FacilityAPI";
+import { Weapon, WeaponAPI } from "core/census/WeaponAPI";
+import { FacilityAPI, Facility } from "core/census/FacilityAPI";
 
-import { PsEventType, PsEvent, PsEvents } from "PsEvent";
+import { PsEventType, PsEvent, PsEvents } from "core/PsEvent";
 
 import {
     TEvent, TEventType,
@@ -23,11 +23,11 @@ import {
     TCaptureEvent, TDefendEvent,
     TVehicleKillEvent,
     TEventHandler
-} from "events/index";
+} from "core/events/index";
 
-import { IndividualReporter, Report, ReportParameters } from "InvididualGenerator";
+import { IndividualReporter, Report, ReportParameters } from "core/InvididualGenerator";
 import { PersonalReportGenerator } from "PersonalReportGenerator";
-import { OutfitReport, OutfitReportGenerator, OutfitReportSettings } from "reports/OutfitReport";
+import { OutfitReport, OutfitReportGenerator, OutfitReportSettings } from "core/reports/OutfitReport";
 
 // @ts-ignore
 import * as FileSaver from "../node_modules/file-saver/dist/FileSaver.js";

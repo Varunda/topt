@@ -1,4 +1,4 @@
-import { TrackedPlayer, TimeTracking } from "InvididualGenerator";
+import { TrackedPlayer, TimeTracking } from "core/InvididualGenerator";
 
 import { TEvent } from "events/index";
 

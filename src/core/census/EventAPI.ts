@@ -1,6 +1,6 @@
 import CensusAPI from "./CensusAPI";
 import { ApiResponse } from "./ApiWrapper";
-import { Event, EventKill, EventDeath } from "../Event";
+//import { Event, EventKill, EventDeath } from "core/events/index";
 
 export class EventAPI {
 
@@ -8,6 +8,7 @@ export class EventAPI {
         throw ``;
     }
 
+    /*
     public static parseEventKill(elem: any): EventKill {
         return {
             type: "kill",
@@ -104,6 +105,7 @@ export class EventAPI {
 
         return response;
     }
+    */
 
 }
 (window as any).EventAPI = EventAPI;

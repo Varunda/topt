@@ -1,5 +1,5 @@
 import Vue, { PropType } from "vue";
-import { BreakdownArray, Breakdown, BreakdownTrend } from "EventReporter";
+import { BreakdownArray, Breakdown, BreakdownTrend } from "core/EventReporter";
 
 import { Chart } from "chart.js";
 

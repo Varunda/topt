@@ -1,5 +1,5 @@
 import Vue, { PropType } from "vue";
-import { BreakdownArray } from "EventReporter";
+import { BreakdownArray } from "core/EventReporter";
 
 Vue.component("breakdown", {
     props: {

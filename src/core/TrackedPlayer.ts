@@ -1,5 +1,5 @@
-import StatMap from "StatMap";
-import { TEvent, TDeathEvent } from "events/index";
+import StatMap from "core/StatMap";
+import { TEvent, TDeathEvent } from "core/events/index";
 
 /**
  * Represents a character that is being tracked

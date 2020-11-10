@@ -1,35 +1,7 @@
-
 import Core from "core/index";
-import { TrackedPlayer } from "core/TrackedPlayer";
-import { CoreSettings } from "core/CoreSettings";
-import { SquadAddon } from "addons/SquadAddon";
-import { Squad } from "core/squad/Squad";
-import CensusAPI from "census/CensusAPI";
-import OutfitAPI, { Outfit } from "census/OutfitAPI";
-import { CharacterAPI, Character } from "census/CharacterAPI";
-import { Weapon, WeaponAPI } from "census/WeaponAPI";
-import { EventAPI } from "census/EventAPI";
-import { Achievement, AchievementAPI } from "census/AchievementAPI";
-import { FacilityAPI, Facility } from "census/FacilityAPI";
 
-import { PsLoadout, PsLoadouts } from "census/PsLoadout";
-import { PsEventType, PsEvent, PsEvents } from "PsEvent";
-import { Event, EventExp, EventKill, EventDeath, EventVehicleKill, EventCapture, EventTeamkill, EventDefend } from "Event";
-import StatMap from "StatMap";
-
-import {
-    TEvent, TEventType,
-    TExpEvent, TKillEvent, TDeathEvent, TTeamkillEvent,
-    TCaptureEvent, TDefendEvent,
-    TVehicleKillEvent,
-    TEventHandler
-} from "events/index";
-
-import EventReporter, { statMapToBreakdown,
-    Breakdown, BreakdownArray,
-    OutfitVersusBreakdown, ClassCollection, classCollectionNumber
-} from "EventReporter";
-import { ApiResponse } from "census/ApiWrapper";
+import OutfitAPI, { Outfit } from "core/census/OutfitAPI";
+import { ApiResponse } from "core/census/ApiWrapper";
 
 const log = (msg: any): void => {
     console.log(`[Playback] ${msg}`);

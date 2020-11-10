@@ -57789,2264 +57789,6 @@ window.ColorHelper = ColorHelper;
 
 /***/ }),
 
-/***/ "./src/EventReporter.ts":
-/*!******************************!*\
-  !*** ./src/EventReporter.ts ***!
-  \******************************/
-/*! exports provided: BreakdownArray, Breakdown, BreakdownTimeslot, BreakdownTrend, OutfitVersusBreakdown, BreakdownWeaponType, classCollectionNumber, BaseCaptureOutfit, BaseCapture, statMapToBreakdown, defaultCharacterMapper, defaultCharacterSortField, defaultWeaponMapper, defaultVehicleMapper, default */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "BreakdownArray", function() { return BreakdownArray; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Breakdown", function() { return Breakdown; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "BreakdownTimeslot", function() { return BreakdownTimeslot; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "BreakdownTrend", function() { return BreakdownTrend; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "OutfitVersusBreakdown", function() { return OutfitVersusBreakdown; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "BreakdownWeaponType", function() { return BreakdownWeaponType; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "classCollectionNumber", function() { return classCollectionNumber; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "BaseCaptureOutfit", function() { return BaseCaptureOutfit; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "BaseCapture", function() { return BaseCapture; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "statMapToBreakdown", function() { return statMapToBreakdown; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "defaultCharacterMapper", function() { return defaultCharacterMapper; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "defaultCharacterSortField", function() { return defaultCharacterSortField; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "defaultWeaponMapper", function() { return defaultWeaponMapper; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "defaultVehicleMapper", function() { return defaultVehicleMapper; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "default", function() { return EventReporter; });
-/* harmony import */ var census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! census/ApiWrapper */ "./src/census/ApiWrapper.ts");
-/* harmony import */ var census_CharacterAPI__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! census/CharacterAPI */ "./src/census/CharacterAPI.ts");
-/* harmony import */ var census_WeaponAPI__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! census/WeaponAPI */ "./src/census/WeaponAPI.ts");
-/* harmony import */ var StatMap__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! StatMap */ "./src/StatMap.ts");
-/* harmony import */ var census_PsLoadout__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! census/PsLoadout */ "./src/census/PsLoadout.ts");
-/* harmony import */ var census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! census/VehicleAPI */ "./src/census/VehicleAPI.ts");
-/* harmony import */ var PsEvent__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! PsEvent */ "./src/PsEvent.ts");
-/* harmony import */ var InvididualGenerator__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! InvididualGenerator */ "./src/InvididualGenerator.ts");
-/* harmony import */ var census_OutfitAPI__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! census/OutfitAPI */ "./src/census/OutfitAPI.ts");
-
-
-
-
-
-
-
-
-
-class BreakdownArray {
-    constructor() {
-        this.data = [];
-        this.total = 0;
-        this.display = null;
-    }
-}
-class Breakdown {
-    constructor() {
-        this.display = "";
-        this.sortField = "";
-        this.amount = 0;
-        this.color = undefined;
-    }
-}
-class BreakdownTimeslot {
-    constructor() {
-        this.startTime = 0;
-        this.endTime = 0;
-        this.value = 0;
-    }
-}
-class BreakdownTrend {
-    constructor() {
-        this.timestamp = new Date();
-        this.values = [];
-    }
-}
-;
-class OutfitVersusBreakdown {
-    constructor() {
-        this.tag = "";
-        this.name = "";
-        this.faction = "";
-        this.kills = 0;
-        this.deaths = 0;
-        this.revived = 0;
-        this.players = 0;
-        this.classKills = classCollectionNumber();
-        this.classDeaths = classCollectionNumber();
-        this.classRevived = classCollectionNumber();
-    }
-}
-class BreakdownWeaponType {
-    constructor() {
-        this.type = "";
-        this.deaths = 0;
-        this.revived = 0;
-        this.unrevived = 0;
-        this.headshots = 0;
-        this.mostUsed = "";
-        this.mostUsedDeaths = 0;
-    }
-}
-function classCollectionNumber() {
-    return {
-        total: 0,
-        infil: 0,
-        lightAssault: 0,
-        medic: 0,
-        engineer: 0,
-        heavy: 0,
-        max: 0
-    };
-}
-class BaseCaptureOutfit {
-    constructor() {
-        this.ID = "";
-        this.name = "";
-        this.tag = "";
-        this.amount = 0;
-    }
-}
-class BaseCapture {
-    constructor() {
-        this.name = "";
-        this.faction = "";
-        this.timestamp = 0;
-        this.outfits = new BreakdownArray();
-    }
-}
-function statMapToBreakdown(map, source, matcher, mapper, sortField = undefined) {
-    const breakdown = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
-    const arr = new BreakdownArray();
-    if (map.size() > 0) {
-        const IDs = Array.from(map.getMap().keys());
-        source(IDs).ok((data) => {
-            map.getMap().forEach((amount, ID) => {
-                const datum = data.find(elem => matcher(elem, ID));
-                const breakdown = {
-                    display: mapper(datum, ID),
-                    sortField: (sortField != undefined) ? sortField(datum, ID) : mapper(datum, ID),
-                    amount: amount,
-                    color: undefined
-                };
-                arr.total += amount;
-                arr.data.push(breakdown);
-            });
-            arr.data.sort((a, b) => {
-                const diff = b.amount - a.amount;
-                return diff || b.sortField.localeCompare(a.sortField);
-            });
-            breakdown.resolveOk(arr);
-        });
-    }
-    else {
-        breakdown.resolveOk(arr);
-    }
-    return breakdown;
-}
-function defaultCharacterMapper(elem, ID) {
-    var _a;
-    return `${((_a = elem) === null || _a === void 0 ? void 0 : _a.outfitTag) ? `[${elem.outfitTag}] ` : ``}${(elem) ? elem.name : `Unknown ${ID}`}`;
-}
-function defaultCharacterSortField(elem, ID) {
-    var _a, _b;
-    return _b = (_a = elem) === null || _a === void 0 ? void 0 : _a.name, (_b !== null && _b !== void 0 ? _b : `Unknown ${ID}}`);
-}
-function defaultWeaponMapper(elem, ID) {
-    var _a, _b;
-    return _b = (_a = elem) === null || _a === void 0 ? void 0 : _a.name, (_b !== null && _b !== void 0 ? _b : `Unknown ${ID}`);
-}
-function defaultVehicleMapper(elem, ID) {
-    var _a, _b;
-    return _b = (_a = elem) === null || _a === void 0 ? void 0 : _a.name, (_b !== null && _b !== void 0 ? _b : `Unknown ${ID}`);
-}
-class EventReporter {
-    static facilityCaptures(data) {
-        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
-        const baseCaptures = [];
-        const captures = data.captures;
-        const players = data.players;
-        const outfitIDs = players
-            .map(iter => iter.outfitID)
-            .filter((value, index, arr) => arr.indexOf(value) == index);
-        console.log(`Have ${data.captures.length} captures`);
-        census_OutfitAPI__WEBPACK_IMPORTED_MODULE_8__["default"].getByIDs(outfitIDs).ok((data) => {
-            var _a, _b, _c, _d;
-            for (const capture of captures) {
-                // Same faction caps are boring
-                if (capture.factionID == capture.previousFaction) {
-                    continue;
-                }
-                const entry = new BaseCapture();
-                entry.timestamp = capture.timestamp.getTime();
-                entry.name = capture.name;
-                entry.faction = capture.previousFaction;
-                const facilityID = capture.facilityID;
-                const name = capture.name;
-                const outfitID = capture.outfitID;
-                const outfit = data.find(iter => iter.ID == outfitID);
-                if (outfit == undefined) {
-                    console.warn(`Missing outfit ${outfitID}`);
-                    continue;
-                }
-                const helpers = players.filter(iter => iter.timestamp == capture.timestamp.getTime());
-                const outfits = [{ name: "No outfit", ID: "-1", amount: 0, tag: "" }];
-                for (const helper of helpers) {
-                    let outfitEntry = undefined;
-                    if (helper.outfitID == "0" || helper.outfitID.length == 0) {
-                        outfitEntry = outfits[0];
-                    }
-                    else {
-                        outfitEntry = outfits.find(iter => iter.ID == helper.outfitID);
-                        if (outfitEntry == undefined) {
-                            const outfitDatum = data.find(iter => iter.ID == helper.outfitID);
-                            outfitEntry = {
-                                ID: helper.outfitID,
-                                name: (_b = (_a = outfitDatum) === null || _a === void 0 ? void 0 : _a.name, (_b !== null && _b !== void 0 ? _b : `Unknown ${helper.outfitID}`)),
-                                amount: 0,
-                                tag: (_d = (_c = outfitDatum) === null || _c === void 0 ? void 0 : _c.tag, (_d !== null && _d !== void 0 ? _d : ``)),
-                            };
-                            outfits.push(outfitEntry);
-                        }
-                    }
-                    ++outfitEntry.amount;
-                }
-                const breakdown = {
-                    data: outfits.sort((a, b) => b.amount - a.amount).map(iter => {
-                        return {
-                            display: iter.name,
-                            amount: iter.amount,
-                            color: undefined,
-                            sortField: `${iter.amount}`
-                        };
-                    }),
-                    total: outfits.reduce(((acc, iter) => acc += iter.amount), 0),
-                    display: null
-                };
-                entry.outfits = breakdown;
-                baseCaptures.push(entry);
-            }
-            response.resolveOk(baseCaptures);
-        });
-        return response;
-    }
-    static experience(expID, events) {
-        const exp = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
-        for (const event of events) {
-            if (event.type == "exp" && (event.expID == expID || event.trueExpID == expID)) {
-                exp.increment(event.targetID);
-            }
-        }
-        return statMapToBreakdown(exp, census_CharacterAPI__WEBPACK_IMPORTED_MODULE_1__["CharacterAPI"].getByIDs, (elem, charID) => elem.ID == charID, defaultCharacterMapper, defaultCharacterSortField);
-    }
-    static experienceSource(ids, targetID, events) {
-        const exp = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
-        for (const event of events) {
-            if (event.type == "exp" && event.targetID == targetID && ids.indexOf(event.expID) > -1) {
-                exp.increment(event.sourceID);
-            }
-        }
-        if (exp.size() == 0) {
-            return census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"].resolve({ code: 204, data: null });
-        }
-        console.log(`charIDs: [${Array.from(exp.getMap().keys()).join(", ")}]`);
-        return statMapToBreakdown(exp, census_CharacterAPI__WEBPACK_IMPORTED_MODULE_1__["CharacterAPI"].getByIDs, (elem, charID) => elem.ID == charID, defaultCharacterMapper, defaultCharacterSortField);
-    }
-    static outfitVersusBreakdown(events) {
-        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
-        const outfitBreakdowns = new Map();
-        const outfitPlayers = new Map();
-        const killCount = events.filter(iter => iter.type == "kill").length;
-        const deathCount = events.filter(iter => iter.type == "death" && iter.revived == false).length;
-        const charIDs = events.filter((iter) => iter.type == "kill" || (iter.type == "death" && iter.revived == false))
-            .map((iter) => {
-            if (iter.type == "kill") {
-                return iter.targetID;
-            }
-            else if (iter.type == "death" && iter.revived == false) {
-                return iter.targetID;
-            }
-            throw `Invalid event type '${iter.type}'`;
-        });
-        census_CharacterAPI__WEBPACK_IMPORTED_MODULE_1__["CharacterAPI"].getByIDs(charIDs).ok((data) => {
-            for (const ev of events) {
-                if (ev.type == "kill" || ev.type == "death") {
-                    const killedChar = data.find(iter => iter.ID == ev.targetID);
-                    if (killedChar == undefined) {
-                        console.warn(`Missing ${ev.type} targetID ${ev.targetID}`);
-                    }
-                    else {
-                        const outfitID = killedChar.outfitID;
-                        if (outfitBreakdowns.has(outfitID) == false) {
-                            const breakdown = new OutfitVersusBreakdown();
-                            breakdown.tag = killedChar.outfitTag;
-                            breakdown.name = killedChar.outfitName || "<No outfit>";
-                            breakdown.faction = killedChar.faction;
-                            outfitBreakdowns.set(outfitID, breakdown);
-                            outfitPlayers.set(outfitID, []);
-                        }
-                        const breakdown = outfitBreakdowns.get(outfitID);
-                        if (ev.type == "kill") {
-                            ++breakdown.kills;
-                        }
-                        else if (ev.type == "death") {
-                            if (ev.revived == true) {
-                                ++breakdown.revived;
-                            }
-                            else {
-                                ++breakdown.deaths;
-                            }
-                        }
-                        const loadout = census_PsLoadout__WEBPACK_IMPORTED_MODULE_4__["PsLoadouts"].get(ev.loadoutID);
-                        const coll = ev.type == "kill" ? breakdown.classKills
-                            : ev.type == "death" && ev.revived == false ? breakdown.classDeaths
-                                : breakdown.classRevived;
-                        if (loadout != undefined) {
-                            if (loadout.type == "infil") {
-                                ++coll.infil;
-                            }
-                            else if (loadout.type == "lightAssault") {
-                                ++coll.lightAssault;
-                            }
-                            else if (loadout.type == "medic") {
-                                ++coll.medic;
-                            }
-                            else if (loadout.type == "engineer") {
-                                ++coll.engineer;
-                            }
-                            else if (loadout.type == "heavy") {
-                                ++coll.heavy;
-                            }
-                            else if (loadout.type == "max") {
-                                ++coll.max;
-                            }
-                        }
-                        const players = outfitPlayers.get(outfitID);
-                        if (players.indexOf(ev.targetID) == -1) {
-                            ++breakdown.players;
-                            players.push(ev.targetID);
-                        }
-                    }
-                }
-            }
-            // Only include the outfit if they were > 1% of the kills or deaths
-            const breakdowns = Array.from(outfitBreakdowns.values())
-                .filter(iter => iter.kills > (killCount / 100) || iter.deaths > (deathCount / 100));
-            breakdowns.sort((a, b) => {
-                return b.deaths - a.deaths
-                    || b.kills - a.kills
-                    || b.revived - a.revived
-                    || b.tag.localeCompare(a.tag);
-            });
-            response.resolveOk(breakdowns);
-        });
-        return response;
-    }
-    static kpmBoxplot(players, tracking, loadout) {
-        let kpms = [];
-        for (const player of players) {
-            if (player.secondsOnline <= 0) {
-                continue;
-            }
-            let secondsOnline = player.secondsOnline;
-            if (loadout != undefined) {
-                const playtime = InvididualGenerator__WEBPACK_IMPORTED_MODULE_7__["IndividualReporter"].classUsage({ player: player, tracking: tracking, routers: [], events: [] });
-                if (loadout == "infil") {
-                    secondsOnline = playtime.infil.secondsAs;
-                }
-                else if (loadout == "lightAssault") {
-                    secondsOnline = playtime.lightAssault.secondsAs;
-                }
-                else if (loadout == "medic") {
-                    secondsOnline = playtime.medic.secondsAs;
-                }
-                else if (loadout == "engineer") {
-                    secondsOnline = playtime.engineer.secondsAs;
-                }
-                else if (loadout == "heavy") {
-                    secondsOnline = playtime.heavy.secondsAs;
-                }
-                else if (loadout == "max") {
-                    secondsOnline = playtime.max.secondsAs;
-                }
-                if (secondsOnline == 0) {
-                    continue;
-                }
-            }
-            let count = 0;
-            const kills = player.events.filter(iter => iter.type == "kill");
-            for (const kill of kills) {
-                const psloadout = census_PsLoadout__WEBPACK_IMPORTED_MODULE_4__["PsLoadouts"].get(kill.loadoutID);
-                if (loadout == undefined || (psloadout != undefined && psloadout.type == loadout)) {
-                    ++count;
-                }
-            }
-            if (count == 0) {
-                continue;
-            }
-            const minutesOnline = secondsOnline / 60;
-            const kpm = Number.parseFloat((count / minutesOnline).toFixed(2));
-            console.log(`${player.name} got ${count} kills on ${loadout} in ${minutesOnline} minutes (${kpm})`);
-            kpms.push(kpm);
-        }
-        kpms.sort((a, b) => b - a);
-        return kpms;
-    }
-    static kdBoxplot(players, tracking, loadout) {
-        let kds = [];
-        for (const player of players) {
-            if (player.secondsOnline <= 0) {
-                continue;
-            }
-            let killCount = 0;
-            const kills = player.events.filter(iter => iter.type == "kill");
-            for (const kill of kills) {
-                const psloadout = census_PsLoadout__WEBPACK_IMPORTED_MODULE_4__["PsLoadouts"].get(kill.loadoutID);
-                if (loadout == undefined || (psloadout != undefined && psloadout.type == loadout)) {
-                    ++killCount;
-                }
-            }
-            let deathCount = 0;
-            const deaths = player.events.filter(iter => iter.type == "death" && iter.revived == false);
-            for (const death of deaths) {
-                const psloadout = census_PsLoadout__WEBPACK_IMPORTED_MODULE_4__["PsLoadouts"].get(death.loadoutID);
-                if (loadout == undefined || (psloadout != undefined && psloadout.type == loadout)) {
-                    ++deathCount;
-                }
-            }
-            if (killCount == 0 || deathCount == 0) {
-                continue;
-            }
-            //console.log(`${player.name} went ${killCount} / ${deathCount} on ${loadout}`);
-            const kd = Number.parseFloat((killCount / deathCount).toFixed(2));
-            kds.push(kd);
-        }
-        kds.sort((a, b) => b - a);
-        return kds;
-    }
-    static weaponDeathBreakdown(events) {
-        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
-        const weapons = events.filter((ev) => ev.type == "death")
-            .map((ev) => ev.weaponID)
-            .filter((ID, index, arr) => arr.indexOf(ID) == index);
-        let types = [];
-        // <weapon type, <weapon, count>>
-        const used = new Map();
-        const missingWeapons = new Set();
-        census_WeaponAPI__WEBPACK_IMPORTED_MODULE_2__["WeaponAPI"].getByIDs(weapons).ok((data) => {
-            var _a, _b, _c;
-            const deaths = events.filter(ev => ev.type == "death");
-            for (const death of deaths) {
-                const weapon = data.find(iter => iter.ID == death.weaponID);
-                if (weapon == undefined) {
-                    missingWeapons.add(death.weaponID);
-                }
-                const typeName = (_b = (_a = weapon) === null || _a === void 0 ? void 0 : _a.type, (_b !== null && _b !== void 0 ? _b : "Other"));
-                let type = types.find(iter => iter.type == typeName);
-                if (type == undefined) {
-                    type = {
-                        type: typeName,
-                        deaths: 0,
-                        headshots: 0,
-                        revived: 0,
-                        unrevived: 0,
-                        mostUsed: "",
-                        mostUsedDeaths: 0
-                    };
-                    types.push(type);
-                }
-                if (weapon != undefined) {
-                    if (!used.has(weapon.type)) {
-                        used.set(weapon.type, new Map());
-                    }
-                    const set = used.get(weapon.type);
-                    set.set(weapon.name, (_c = set.get(weapon.name), (_c !== null && _c !== void 0 ? _c : 0)) + 1);
-                    used.set(weapon.type, set);
-                }
-                ++type.deaths;
-                if (death.revived == false) {
-                    ++type.unrevived;
-                }
-                else {
-                    ++type.revived;
-                }
-                if (death.isHeadshot == true) {
-                    ++type.headshots;
-                }
-            }
-            used.forEach((weapons, type) => {
-                const breakdown = types.find(iter => iter.type == type);
-                weapons.forEach((deaths, weapon) => {
-                    if (deaths > breakdown.mostUsedDeaths) {
-                        breakdown.mostUsedDeaths = deaths;
-                        breakdown.mostUsed = weapon;
-                    }
-                });
-            });
-            types = types.filter((iter) => {
-                return iter.deaths / deaths.length > 0.0025;
-            });
-            types.sort((a, b) => {
-                return b.deaths - a.deaths
-                    || b.headshots - a.headshots
-                    || b.type.localeCompare(a.type);
-            });
-            console.log(`Missing weapons:`, missingWeapons);
-            response.resolveOk(types);
-        });
-        return response;
-    }
-    static vehicleKills(events) {
-        const vehKills = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
-        for (const event of events) {
-            if (event.type == "vehicle" && census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["VehicleTypes"].tracked.indexOf(event.vehicleID) > -1) {
-                vehKills.increment(event.vehicleID);
-            }
-        }
-        return statMapToBreakdown(vehKills, census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["VehicleAPI"].getAll, (elem, ID) => elem.ID == ID, defaultVehicleMapper);
-    }
-    static vehicleWeaponKills(events) {
-        const vehKills = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
-        for (const event of events) {
-            if (event.type == "vehicle" && event.weaponID != "0") {
-                vehKills.increment(event.weaponID);
-            }
-        }
-        return statMapToBreakdown(vehKills, census_WeaponAPI__WEBPACK_IMPORTED_MODULE_2__["WeaponAPI"].getByIDs, (elem, ID) => elem.ID == ID, defaultWeaponMapper);
-    }
-    static weaponKills(events) {
-        const wepKills = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
-        for (const event of events) {
-            if (event.type == "kill") {
-                wepKills.increment(event.weaponID);
-            }
-        }
-        return statMapToBreakdown(wepKills, census_WeaponAPI__WEBPACK_IMPORTED_MODULE_2__["WeaponAPI"].getByIDs, (elem, ID) => elem.ID == ID, defaultWeaponMapper);
-    }
-    static weaponTeamkills(events) {
-        const wepKills = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
-        for (const ev of events) {
-            if (ev.type == "teamkill") {
-                wepKills.increment(ev.weaponID);
-            }
-        }
-        return statMapToBreakdown(wepKills, census_WeaponAPI__WEBPACK_IMPORTED_MODULE_2__["WeaponAPI"].getByIDs, (elem, ID) => elem.ID == ID, defaultWeaponMapper);
-    }
-    static weaponDeaths(events, revived = undefined) {
-        const amounts = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
-        for (const event of events) {
-            if (event.type == "death" && (revived == undefined || revived == event.revived)) {
-                amounts.increment(event.weaponID);
-            }
-        }
-        return statMapToBreakdown(amounts, census_WeaponAPI__WEBPACK_IMPORTED_MODULE_2__["WeaponAPI"].getByIDs, (elem, ID) => elem.ID == ID, defaultWeaponMapper);
-    }
-    static weaponTypeKills(events) {
-        const amounts = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
-        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
-        const weaponIDs = [];
-        for (const event of events) {
-            if (event.type == "kill") {
-                weaponIDs.push(event.weaponID);
-            }
-        }
-        const arr = new BreakdownArray();
-        census_WeaponAPI__WEBPACK_IMPORTED_MODULE_2__["WeaponAPI"].getByIDs(weaponIDs).ok((data) => {
-            for (const event of events) {
-                if (event.type == "kill") {
-                    const weapon = data.find(iter => iter.ID == event.weaponID);
-                    if (weapon == undefined) {
-                        amounts.increment("Unknown");
-                    }
-                    else {
-                        amounts.increment(weapon.type);
-                    }
-                    ++arr.total;
-                }
-            }
-            amounts.getMap().forEach((count, wepType) => {
-                arr.data.push({
-                    display: wepType,
-                    amount: count,
-                    sortField: wepType,
-                    color: undefined
-                });
-            });
-            arr.data.sort((a, b) => {
-                const diff = b.amount - a.amount;
-                if (diff == 0) {
-                    return b.display.localeCompare(a.display);
-                }
-                return diff;
-            });
-            response.resolveOk(arr);
-        });
-        return response;
-    }
-    static weaponTypeDeaths(events, revived = undefined) {
-        const amounts = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
-        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
-        const weaponIDs = [];
-        for (const event of events) {
-            if (event.type == "death" && (revived == undefined || event.revived == revived)) {
-                weaponIDs.push(event.weaponID);
-            }
-        }
-        const arr = new BreakdownArray();
-        census_WeaponAPI__WEBPACK_IMPORTED_MODULE_2__["WeaponAPI"].getByIDs(weaponIDs).ok((data) => {
-            for (const event of events) {
-                if (event.type == "death" && (revived == undefined || event.revived == revived)) {
-                    const weapon = data.find(iter => iter.ID == event.weaponID);
-                    if (weapon == undefined) {
-                        amounts.increment("Unknown");
-                    }
-                    else {
-                        amounts.increment(weapon.type);
-                    }
-                    ++arr.total;
-                }
-            }
-            amounts.getMap().forEach((count, wepType) => {
-                arr.data.push({
-                    display: wepType,
-                    amount: count,
-                    sortField: wepType,
-                    color: undefined
-                });
-            });
-            arr.data.sort((a, b) => {
-                const diff = b.amount - a.amount;
-                if (diff == 0) {
-                    return b.display.localeCompare(a.display);
-                }
-                return diff;
-            });
-            response.resolveOk(arr);
-        });
-        return response;
-    }
-    static classPlaytimes(times) {
-        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
-        const arr = new BreakdownArray();
-        times[0].infil.secondsAs;
-        const infil = {
-            amount: 0,
-            color: undefined,
-            display: "Infiltrator",
-            sortField: "infil"
-        };
-        const la = {
-            amount: 0,
-            color: undefined,
-            display: "Light Assault",
-            sortField: "LA"
-        };
-        const medic = {
-            amount: 0,
-            color: undefined,
-            display: "Medic playtime",
-            sortField: "medic"
-        };
-        const eng = {
-            amount: 0,
-            color: undefined,
-            display: "Engineer",
-            sortField: "engineer"
-        };
-        const heavy = {
-            amount: 0,
-            color: undefined,
-            display: "Heavy Assault",
-            sortField: "heavy"
-        };
-        const max = {
-            amount: 0,
-            color: undefined,
-            display: "MAX",
-            sortField: "max"
-        };
-        for (const time of times) {
-            infil.amount += time.infil.secondsAs;
-            la.amount += time.lightAssault.secondsAs;
-            medic.amount += time.medic.secondsAs;
-            eng.amount += time.engineer.secondsAs;
-            heavy.amount += time.heavy.secondsAs;
-            max.amount += time.max.secondsAs;
-        }
-        arr.data.push(infil, la, medic, eng, heavy, max);
-        arr.total = infil.amount + la.amount + medic.amount + eng.amount + heavy.amount + max.amount;
-        arr.display = (seconds) => {
-            const hours = Math.floor(seconds / 3600);
-            const mins = Math.floor((seconds - (3600 * hours)) / 60);
-            return `${hours.toFixed(0).padStart(2, "0")}:${mins.toFixed(0).padStart(2, "0")}:${(seconds % 60).toFixed(0).padStart(2, "0")}`;
-        };
-        response.resolveOk(arr);
-        return response;
-    }
-    static factionKills(events) {
-        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
-        const arr = new BreakdownArray();
-        const countKills = function (ev, faction) {
-            if (ev.type != "kill") {
-                return false;
-            }
-            const loadout = census_PsLoadout__WEBPACK_IMPORTED_MODULE_4__["PsLoadouts"].get(ev.targetLoadoutID);
-            return loadout != undefined && loadout.faction == faction;
-        };
-        arr.data.push({
-            amount: events.filter(iter => countKills(iter, "VS")).length,
-            color: "#AE06B3",
-            display: "VS",
-            sortField: "VS"
-        });
-        arr.data.push({
-            amount: events.filter(iter => countKills(iter, "NC")).length,
-            color: "#1A39F9",
-            display: "NC",
-            sortField: "NC"
-        });
-        arr.data.push({
-            amount: events.filter(iter => countKills(iter, "TR")).length,
-            color: "#CE2304",
-            display: "TR",
-            sortField: "TR"
-        });
-        arr.data.push({
-            amount: events.filter(iter => countKills(iter, "NS")).length,
-            color: "#6A6A6A",
-            display: "NS",
-            sortField: "NS"
-        });
-        arr.total = events.filter(iter => iter.type == "kill").length;
-        response.resolveOk(arr);
-        return response;
-    }
-    static factionDeaths(events) {
-        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
-        const countDeaths = function (ev, faction) {
-            if (ev.type != "death" || ev.revived == true) {
-                return false;
-            }
-            const loadout = census_PsLoadout__WEBPACK_IMPORTED_MODULE_4__["PsLoadouts"].get(ev.targetLoadoutID);
-            return loadout != undefined && loadout.faction == faction;
-        };
-        const arr = new BreakdownArray();
-        arr.data.push({
-            amount: events.filter(iter => countDeaths(iter, "VS")).length,
-            color: "#AE06B3",
-            display: "VS",
-            sortField: "VS"
-        });
-        arr.data.push({
-            amount: events.filter(iter => countDeaths(iter, "NC")).length,
-            color: "#1A39F9",
-            display: "NC",
-            sortField: "NC"
-        });
-        arr.data.push({
-            amount: events.filter(iter => countDeaths(iter, "TR")).length,
-            color: "#CE2304",
-            display: "TR",
-            sortField: "TR"
-        });
-        arr.data.push({
-            amount: events.filter(iter => countDeaths(iter, "NS")).length,
-            color: "#6A6A6A",
-            display: "NS",
-            sortField: "NS"
-        });
-        arr.total = events.filter(iter => iter.type == "death" && iter.revived == false).length;
-        response.resolveOk(arr);
-        return response;
-    }
-    static continentKills(events) {
-        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
-        const countKills = function (ev, zoneID) {
-            return ev.type == "kill" && ev.zoneID == zoneID;
-        };
-        const arr = new BreakdownArray();
-        arr.data.push({
-            amount: events.filter(iter => countKills(iter, "2")).length,
-            color: "#F4E11D",
-            display: "Indar",
-            sortField: "Indar"
-        });
-        arr.data.push({
-            amount: events.filter(iter => countKills(iter, "4")).length,
-            color: "#09B118",
-            display: "Hossin",
-            sortField: "Hossin"
-        });
-        arr.data.push({
-            amount: events.filter(iter => countKills(iter, "6")).length,
-            color: "#2DE53E",
-            display: "Amerish",
-            sortField: "Amerish"
-        });
-        arr.data.push({
-            amount: events.filter(iter => countKills(iter, "8")).length,
-            color: "#D8E9EC",
-            display: "Esamir",
-            sortField: "Esamir"
-        });
-        arr.total = events.filter(iter => iter.type == "kill").length;
-        response.resolveOk(arr);
-        return response;
-    }
-    static continentDeaths(events) {
-        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
-        const countDeaths = function (ev, zoneID) {
-            return ev.type == "death" && ev.revived == false && ev.zoneID == zoneID;
-        };
-        const arr = new BreakdownArray();
-        arr.data.push({
-            amount: events.filter(iter => countDeaths(iter, "2")).length,
-            color: "#F4E11D",
-            display: "Indar",
-            sortField: "Indar"
-        });
-        arr.data.push({
-            amount: events.filter(iter => countDeaths(iter, "4")).length,
-            color: "#09B118",
-            display: "Hossin",
-            sortField: "Hossin"
-        });
-        arr.data.push({
-            amount: events.filter(iter => countDeaths(iter, "6")).length,
-            color: "#2DE53E",
-            display: "Amerish",
-            sortField: "Amerish"
-        });
-        arr.data.push({
-            amount: events.filter(iter => countDeaths(iter, "8")).length,
-            color: "#D8E9EC",
-            display: "Esamir",
-            sortField: "Esamir"
-        });
-        arr.total = events.filter(iter => iter.type == "death" && iter.revived == false).length;
-        response.resolveOk(arr);
-        return response;
-    }
-    static characterKills(events) {
-        const amounts = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
-        for (const event of events) {
-            if (event.type == "kill") {
-                amounts.increment(event.targetID);
-            }
-        }
-        return statMapToBreakdown(amounts, census_CharacterAPI__WEBPACK_IMPORTED_MODULE_1__["CharacterAPI"].getByIDs, (elem, ID) => elem.ID == ID, defaultCharacterMapper);
-    }
-    static characterDeaths(events) {
-        const amounts = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
-        for (const event of events) {
-            if (event.type == "death" && event.revived == false) {
-                amounts.increment(event.targetID);
-            }
-        }
-        return statMapToBreakdown(amounts, census_CharacterAPI__WEBPACK_IMPORTED_MODULE_1__["CharacterAPI"].getByIDs, (elem, ID) => elem.ID == ID, defaultCharacterMapper);
-    }
-    static kpmOverTime(events, timeWidth = 300000) {
-        const kills = events.filter(iter => iter.type == "kill")
-            .sort((a, b) => a.timestamp - b.timestamp);
-        const players = new Set();
-        if (kills.length == 0) {
-            return [];
-        }
-        const slots = [];
-        const minutes = timeWidth / 60000;
-        const stop = kills[kills.length - 1].timestamp;
-        let start = events[0].timestamp;
-        let count = 0;
-        while (true) {
-            const end = start + timeWidth;
-            const section = kills.filter(iter => iter.timestamp >= start && iter.timestamp < end);
-            for (const ev of section) {
-                players.add(ev.sourceID);
-                ++count;
-            }
-            slots.push({
-                startTime: start,
-                endTime: end,
-                value: Number.parseFloat((count / (players.size || 1) / minutes).toFixed(2))
-            });
-            count = 0;
-            players.clear();
-            start += timeWidth;
-            if (start > stop) {
-                break;
-            }
-        }
-        return slots;
-    }
-    static kdOverTime(events, timeWidth = 300000) {
-        const evs = events.filter(iter => iter.type == "kill" || (iter.type == "death" && iter.revived == false));
-        if (evs.length == 0) {
-            return [];
-        }
-        const slots = [];
-        const stop = evs[evs.length - 1].timestamp;
-        let start = events[0].timestamp;
-        while (true) {
-            const end = start + timeWidth;
-            const section = evs.filter(iter => iter.timestamp >= start && iter.timestamp < end);
-            const kills = section.filter(iter => iter.type == "kill");
-            const deaths = section.filter(iter => iter.type == "death" && iter.revived == false);
-            slots.push({
-                startTime: start,
-                endTime: end,
-                value: Number.parseFloat((kills.length / (deaths.length || 1)).toFixed(2))
-            });
-            start += timeWidth;
-            if (start > stop) {
-                break;
-            }
-        }
-        return slots;
-    }
-    static kdPerUpdate(allEvents) {
-        const events = allEvents.filter(iter => iter.type == "kill" || (iter.type == "death" && iter.revived == false));
-        if (events.length == 0) {
-            return [];
-        }
-        let kills = 0;
-        let deaths = 0;
-        const slots = [];
-        for (let i = events[0].timestamp; i < events[events.length - 1].timestamp; i += 1000) {
-            const evs = events.filter(iter => iter.timestamp == i);
-            if (evs.length == 0) {
-                continue;
-            }
-            for (const ev of evs) {
-                if (ev.type == "kill") {
-                    ++kills;
-                }
-                else if (ev.type == "death") {
-                    ++deaths;
-                }
-            }
-            slots.push({
-                value: Number.parseFloat((kills / (deaths || 1)).toFixed(2)),
-                startTime: i,
-                endTime: i
-            });
-        }
-        return slots;
-    }
-    static revivesOverTime(events, timeWidth = 300000) {
-        const revives = events.filter(iter => iter.type == "exp" && (iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].revive || iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].squadRevive));
-        if (revives.length == 0) {
-            return [];
-        }
-        const slots = [];
-        const stop = revives[revives.length - 1].timestamp;
-        let start = events[0].timestamp;
-        while (true) {
-            const end = start + timeWidth;
-            const section = revives.filter(iter => iter.timestamp >= start && iter.timestamp < end);
-            const players = section.map(iter => iter.sourceID)
-                .filter((value, index, arr) => arr.indexOf(value) == index).length;
-            slots.push({
-                startTime: start,
-                endTime: end,
-                value: Number.parseFloat((section.length / (players || 1) / 5).toFixed(2))
-            });
-            start += timeWidth;
-            if (start > stop) {
-                break;
-            }
-        }
-        return slots;
-    }
-}
-window.EventReporter = EventReporter;
-
-
-/***/ }),
-
-/***/ "./src/InvididualGenerator.ts":
-/*!************************************!*\
-  !*** ./src/InvididualGenerator.ts ***!
-  \************************************/
-/*! exports provided: ClassBreakdown, FacilityCapture, ExpBreakdown, TimeTracking, classKdCollection, classCollectionBreakdownTrend, OutfitReport, TrackedRouter, Playtime, ClassUsage, Report, PlayerVersusEntry, PlayerVersus, BreakdownSpawn, TrackedPlayer, BreakdownCollection, BreakdownSection, BreakdownMeta, BreakdownSingle, EventFeedEntry, ReportParameters, IndividualReporter */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "ClassBreakdown", function() { return ClassBreakdown; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "FacilityCapture", function() { return FacilityCapture; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "ExpBreakdown", function() { return ExpBreakdown; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "TimeTracking", function() { return TimeTracking; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "classKdCollection", function() { return classKdCollection; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "classCollectionBreakdownTrend", function() { return classCollectionBreakdownTrend; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "OutfitReport", function() { return OutfitReport; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "TrackedRouter", function() { return TrackedRouter; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Playtime", function() { return Playtime; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "ClassUsage", function() { return ClassUsage; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Report", function() { return Report; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "PlayerVersusEntry", function() { return PlayerVersusEntry; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "PlayerVersus", function() { return PlayerVersus; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "BreakdownSpawn", function() { return BreakdownSpawn; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "TrackedPlayer", function() { return TrackedPlayer; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "BreakdownCollection", function() { return BreakdownCollection; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "BreakdownSection", function() { return BreakdownSection; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "BreakdownMeta", function() { return BreakdownMeta; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "BreakdownSingle", function() { return BreakdownSingle; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "EventFeedEntry", function() { return EventFeedEntry; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "ReportParameters", function() { return ReportParameters; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "IndividualReporter", function() { return IndividualReporter; });
-/* harmony import */ var census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! census/ApiWrapper */ "./src/census/ApiWrapper.ts");
-/* harmony import */ var census_CharacterAPI__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! census/CharacterAPI */ "./src/census/CharacterAPI.ts");
-/* harmony import */ var census_WeaponAPI__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! census/WeaponAPI */ "./src/census/WeaponAPI.ts");
-/* harmony import */ var census_EventAPI__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! census/EventAPI */ "./src/census/EventAPI.ts");
-/* harmony import */ var census_AchievementAPI__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! census/AchievementAPI */ "./src/census/AchievementAPI.ts");
-/* harmony import */ var census_PsLoadout__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! census/PsLoadout */ "./src/census/PsLoadout.ts");
-/* harmony import */ var PsEvent__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! PsEvent */ "./src/PsEvent.ts");
-/* harmony import */ var StatMap__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! StatMap */ "./src/StatMap.ts");
-/* harmony import */ var EventReporter__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! EventReporter */ "./src/EventReporter.ts");
-
-
-
-
-
-
-
-
-
-class ClassBreakdown {
-    constructor() {
-        this.secondsAs = 0;
-        this.score = 0;
-        this.kills = 0;
-        this.deaths = 0;
-    }
-}
-class FacilityCapture {
-    constructor() {
-        this.facilityID = "";
-        this.name = "";
-        this.type = "";
-        this.typeID = "";
-        this.zoneID = "";
-        this.timestamp = new Date();
-        this.timeHeld = 0;
-        this.factionID = "";
-        this.outfitID = "";
-        this.previousFaction = "";
-    }
-}
-class ExpBreakdown {
-    constructor() {
-        this.name = "";
-        this.score = 0;
-        this.amount = 0;
-    }
-}
-class TimeTracking {
-    constructor() {
-        this.running = false;
-        this.startTime = 0;
-        this.endTime = 0;
-    }
-}
-function classKdCollection() {
-    return {
-        infil: new ClassBreakdown(),
-        lightAssault: new ClassBreakdown(),
-        medic: new ClassBreakdown(),
-        engineer: new ClassBreakdown(),
-        heavy: new ClassBreakdown(),
-        max: new ClassBreakdown(),
-        total: new ClassBreakdown()
-    };
-}
-;
-function classCollectionBreakdownTrend() {
-    return {
-        total: [],
-        infil: [],
-        lightAssault: [],
-        medic: [],
-        engineer: [],
-        heavy: [],
-        max: []
-    };
-}
-class OutfitReport {
-    constructor() {
-        this.stats = new Map();
-        this.score = 0;
-        this.players = [];
-        this.events = [];
-        this.facilityCaptures = [];
-        this.continent = "Unknown";
-        this.classStats = new Map();
-        this.scoreBreakdown = [];
-        this.overtimePer5 = {
-            kpm: [],
-            kd: [],
-            rpm: [],
-        };
-        this.overtimePer1 = {
-            kpm: [],
-            kd: [],
-            rpm: [],
-        };
-        this.perUpdate = {
-            kpm: [],
-            kd: [],
-            rpm: []
-        };
-        this.trends = {
-            kpm: classCollectionBreakdownTrend(),
-            kd: classCollectionBreakdownTrend()
-        };
-        this.weaponKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
-        this.weaponTypeKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
-        this.teamkillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
-        this.deathAllBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
-        this.deathAllTypeBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
-        this.deathRevivedBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
-        this.deathRevivedTypeBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
-        this.deathKilledBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
-        this.deathKilledTypeBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
-        this.outfitVersusBreakdown = [];
-        this.weaponTypeDeathBreakdown = [];
-        this.vehicleKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
-        this.vehicleKillWeaponBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
-        this.timeUnrevived = [];
-        this.revivedLifeExpectance = [];
-        this.kmLifeExpectance = [];
-        this.kmTimeDead = [];
-        this.factionKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
-        this.factionDeathBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
-        this.continentKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
-        this.continentDeathBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
-        this.baseCaptures = [];
-        this.classKds = {
-            infil: classKdCollection(),
-            lightAssault: classKdCollection(),
-            medic: classKdCollection(),
-            engineer: classKdCollection(),
-            heavy: classKdCollection(),
-            max: classKdCollection(),
-            total: classKdCollection()
-        };
-        this.classTypeKills = {
-            infil: new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"](),
-            lightAssault: new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"](),
-            medic: new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"](),
-            engineer: new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"](),
-            heavy: new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"](),
-            max: new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"](),
-        };
-        this.classTypeDeaths = {
-            infil: new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"](),
-            lightAssault: new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"](),
-            medic: new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"](),
-            engineer: new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"](),
-            heavy: new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"](),
-            max: new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"](),
-        };
-    }
-}
-class TrackedRouter {
-    constructor() {
-        this.ID = "";
-        this.type = "router";
-        this.owner = "";
-        this.pulledAt = 0;
-        this.firstSpawn = undefined;
-        this.destroyed = undefined;
-        this.count = 0;
-    }
-}
-class Playtime {
-    constructor() {
-        this.characterID = "";
-        this.secondsOnline = 0;
-        this.infil = new ClassBreakdown();
-        this.lightAssault = new ClassBreakdown();
-        this.medic = new ClassBreakdown();
-        this.engineer = new ClassBreakdown();
-        this.heavy = new ClassBreakdown();
-        this.max = new ClassBreakdown();
-        this.mostPlayed = {
-            name: "",
-            secondsAs: 0,
-        };
-    }
-}
-class ClassUsage {
-    constructor() {
-        this.mostPlayed = {
-            name: "",
-            secondsAs: 0
-        };
-        this.infil = new ClassBreakdown();
-        this.lightAssault = new ClassBreakdown();
-        this.medic = new ClassBreakdown();
-        this.engineer = new ClassBreakdown();
-        this.heavy = new ClassBreakdown();
-        this.max = new ClassBreakdown();
-    }
-}
-class Report {
-    constructor() {
-        this.opened = false;
-        this.player = null;
-        this.stats = new Map();
-        this.classBreakdown = new ClassUsage();
-        this.classKd = classKdCollection();
-        this.logistics = {
-            show: false,
-            routers: [],
-            metas: []
-        };
-        this.overtime = {
-            kpm: [],
-            kd: [],
-            rpm: []
-        };
-        this.perUpdate = {
-            kpm: [],
-            kd: [],
-            rpm: []
-        };
-        this.collections = [];
-        this.vehicleBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
-        this.scoreBreakdown = [];
-        this.ribbons = [];
-        this.ribbonCount = 0;
-        this.breakdowns = [];
-        this.weaponKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
-        this.weaponKillTypeBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
-        this.weaponDeathBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
-        this.weaponDeathTypeBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
-        this.playerVersus = [];
-    }
-}
-class PlayerVersusEntry {
-    constructor() {
-        this.timestamp = 0;
-        this.type = "unknown";
-        this.weaponName = "";
-        this.headshot = false;
-    }
-}
-class PlayerVersus {
-    constructor() {
-        this.charID = "";
-        this.name = "";
-        this.kills = 0;
-        this.deaths = 0;
-        this.revives = 0;
-        this.weaponKills = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
-        this.weaponDeaths = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
-        this.encounters = [];
-    }
-}
-class BreakdownSpawn {
-    constructor() {
-        this.npcID = "";
-        this.count = 0;
-        this.firstSeen = new Date();
-    }
-}
-class TrackedPlayer {
-    constructor() {
-        this.characterID = "";
-        this.outfitTag = "";
-        this.name = "";
-        this.faction = "";
-        this.score = 0;
-        this.online = true;
-        this.joinTime = 0;
-        this.secondsOnline = 0;
-        this.stats = new StatMap__WEBPACK_IMPORTED_MODULE_7__["default"]();
-        this.ribbons = new StatMap__WEBPACK_IMPORTED_MODULE_7__["default"]();
-        this.recentDeath = null;
-        this.events = [];
-    }
-}
-class BreakdownCollection {
-    constructor() {
-        this.title = "";
-        this.sections = [];
-    }
-}
-class BreakdownSection {
-    constructor() {
-        this.title = "";
-        this.left = null;
-        this.right = null;
-        this.showPercent = true;
-        this.showTotal = true;
-    }
-}
-class BreakdownMeta {
-    constructor() {
-        this.title = "";
-        this.altTitle = "Count";
-        this.data = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
-    }
-}
-class BreakdownSingle {
-    constructor() {
-        this.title = "";
-        this.altTitle = "";
-        this.data = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
-        this.showPercent = true;
-        this.showTotal = true;
-    }
-}
-class EventFeedEntry {
-    constructor() {
-        this.type = "unknown";
-        this.text = "";
-        this.timestamp = new Date();
-        this.effects = [];
-    }
-}
-class ReportParameters {
-    constructor() {
-        /**
-         * Player the report is being generated for
-         */
-        this.player = new TrackedPlayer();
-        /**
-         * Contains all events collected during tracking. If you need just the player's events, use player
-         */
-        this.events = [];
-        /**
-         * Tracking information about the current state the tracker
-         */
-        this.tracking = { running: false, startTime: 0, endTime: 0 };
-        /**
-         * All routers tracked
-         */
-        this.routers = [];
-    }
-}
-class IndividualReporter {
-    static generatePersonalReport(parameters) {
-        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
-        if (parameters.player.events.length == 0) {
-            response.resolve({ code: 400, data: "No events for player, cannot generate" });
-            return response;
-        }
-        const report = new Report();
-        let opsLeft = 
-        //1       // Transport assists
-        +1 // Supported by
-            + 1 // Misc collection
-            + 1 // Weapon kills
-            + 1 // Weapon type kills
-            + 1 // Weapon deaths
-            + 1 // Weapon death types
-            + 1 // Ribbons
-            + 1 // Medic breakdown
-            + 1 // Engineer breakdown
-            + 1 // Player versus
-        ;
-        const totalOps = opsLeft;
-        const firstPlayerEvent = parameters.player.events[0];
-        const lastPlayerEvent = parameters.player.events[parameters.player.events.length - 1];
-        report.player = Object.assign({}, parameters.player);
-        report.player.events = [];
-        report.player.secondsOnline = (lastPlayerEvent.timestamp - firstPlayerEvent.timestamp) / 1000;
-        report.classBreakdown = IndividualReporter.classUsage(parameters);
-        report.classKd = IndividualReporter.classVersusKd(parameters.player.events);
-        report.scoreBreakdown = IndividualReporter.scoreBreakdown(parameters);
-        report.player.stats.getMap().forEach((value, eventID) => {
-            var _a;
-            const event = PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvents"].get(eventID);
-            if (event == undefined) {
-                return;
-            }
-            report.stats.set(event.name, `${value}`);
-            (_a = report.player) === null || _a === void 0 ? void 0 : _a.stats.set(event.name, value);
-        });
-        const calculatedStats = IndividualReporter.calculatedStats(parameters, report.classBreakdown);
-        calculatedStats.forEach((value, key) => {
-            report.stats.set(key, value);
-        });
-        report.logistics.routers = IndividualReporter.routerBreakdown(parameters);
-        const callback = (step) => {
-            return () => {
-                console.log(`Finished ${step}: Have ${opsLeft - 1} ops left outta ${totalOps}`);
-                if (--opsLeft == 0) {
-                    response.resolveOk(report);
-                }
-            };
-        };
-        IndividualReporter.supportedBy(parameters)
-            .ok(data => report.collections.push(data)).always(callback("Supported by"));
-        IndividualReporter.miscCollection(parameters)
-            .ok(data => report.collections.push(data)).always(callback("Misc coll"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_8__["default"].weaponKills(parameters.player.events)
-            .ok(data => report.weaponKillBreakdown = data).always(callback("Weapon kills"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_8__["default"].weaponTypeKills(parameters.player.events)
-            .ok(data => report.weaponKillTypeBreakdown = data).always(callback("Weapon type kills"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_8__["default"].weaponDeaths(parameters.player.events)
-            .ok(data => report.weaponDeathBreakdown = data).always(callback("Weapon deaths"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_8__["default"].weaponTypeDeaths(parameters.player.events)
-            .ok(data => report.weaponDeathTypeBreakdown = data).always(callback("Weapon type deaths"));
-        IndividualReporter.playerVersus(parameters).ok(data => report.playerVersus = data).always(callback("Player versus"));
-        report.overtime.kd = EventReporter__WEBPACK_IMPORTED_MODULE_8__["default"].kdOverTime(parameters.player.events);
-        report.overtime.kpm = EventReporter__WEBPACK_IMPORTED_MODULE_8__["default"].kpmOverTime(parameters.player.events);
-        if (parameters.player.events.find(iter => iter.type == "exp" && (iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].revive || iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].squadRevive)) != undefined) {
-            report.overtime.rpm = EventReporter__WEBPACK_IMPORTED_MODULE_8__["default"].revivesOverTime(parameters.player.events);
-        }
-        report.perUpdate.kd = EventReporter__WEBPACK_IMPORTED_MODULE_8__["default"].kdPerUpdate(parameters.player.events);
-        const ribbonIDs = Array.from(parameters.player.ribbons.getMap().keys());
-        if (ribbonIDs.length > 0) {
-            census_AchievementAPI__WEBPACK_IMPORTED_MODULE_4__["AchievementAPI"].getByIDs(ribbonIDs).ok((data) => {
-                var _a;
-                (_a = report.player) === null || _a === void 0 ? void 0 : _a.ribbons.getMap().forEach((amount, achivID) => {
-                    const achiv = data.find((iter) => iter.ID == achivID) || census_AchievementAPI__WEBPACK_IMPORTED_MODULE_4__["AchievementAPI"].unknown;
-                    const entry = Object.assign(Object.assign({}, achiv), { amount: amount });
-                    report.ribbonCount += amount;
-                    report.ribbons.push(entry);
-                });
-                report.ribbons.sort((a, b) => {
-                    return (b.amount - a.amount) || b.name.localeCompare(a.name);
-                });
-            }).always(() => {
-                callback("Ribbons")();
-            });
-        }
-        else {
-            callback("Ribbons")();
-        }
-        if (report.classBreakdown.medic.secondsAs > 10) {
-            IndividualReporter.medicBreakdown(parameters)
-                .ok(data => report.breakdowns.push(data)).always(callback("Medic breakdown"));
-        }
-        else {
-            callback("Medic breakdown")();
-        }
-        if (report.classBreakdown.engineer.secondsAs > 10) {
-            IndividualReporter.engineerBreakdown(parameters)
-                .ok(data => report.breakdowns.push(data)).always(callback("Eng breakdown"));
-        }
-        else {
-            callback("Eng breakdown")();
-        }
-        return response;
-    }
-    static playerVersus(parameters) {
-        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
-        const versus = [];
-        const charIDs = [];
-        const wepIDs = [];
-        for (const ev of parameters.player.events) {
-            if (ev.sourceID != parameters.player.characterID) {
-                continue;
-            }
-            if (ev.type != "kill" && ev.type != "death") {
-                continue;
-            }
-            charIDs.push(ev.targetID);
-            wepIDs.push(ev.weaponID);
-        }
-        let characters = [];
-        let weapons = [];
-        let opsLeft = 2;
-        const killsMap = new Map();
-        const deathsMap = new Map();
-        const done = () => {
-            var _a, _b, _c, _d, _e, _f;
-            for (const ev of parameters.player.events) {
-                if (ev.sourceID != parameters.player.characterID) {
-                    continue;
-                }
-                if (ev.type != "kill" && ev.type != "death") {
-                    continue;
-                }
-                let entry = versus.find(iter => iter.charID == ev.targetID);
-                if (entry == undefined) {
-                    entry = new PlayerVersus();
-                    entry.charID = ev.targetID;
-                    entry.name = (_b = (_a = characters.find(iter => iter.ID == ev.targetID)) === null || _a === void 0 ? void 0 : _a.name, (_b !== null && _b !== void 0 ? _b : `Unknown ${ev.targetID}`));
-                    killsMap.set(ev.targetID, new StatMap__WEBPACK_IMPORTED_MODULE_7__["default"]());
-                    deathsMap.set(ev.targetID, new StatMap__WEBPACK_IMPORTED_MODULE_7__["default"]());
-                    versus.push(entry);
-                }
-                const weaponName = (_d = (_c = weapons.find(iter => iter.ID == ev.weaponID)) === null || _c === void 0 ? void 0 : _c.name, (_d !== null && _d !== void 0 ? _d : `Unknown ${ev.weaponID}`));
-                let type = "unknown";
-                if (ev.type == "kill") {
-                    ++entry.kills;
-                    type = "kill";
-                    killsMap.get(ev.targetID).increment(weaponName);
-                }
-                else if (ev.type == "death") {
-                    if (ev.revived == true) {
-                        ++entry.revives;
-                        type = "revived";
-                    }
-                    else {
-                        ++entry.deaths;
-                        type = "death";
-                        deathsMap.get(ev.targetID).increment(weaponName);
-                    }
-                }
-                else {
-                    console.error(`Unchecked event type: '${ev}'`);
-                }
-                const encounter = {
-                    timestamp: ev.timestamp,
-                    headshot: ev.isHeadshot,
-                    type: type,
-                    weaponName: (_f = (_e = weapons.find(iter => iter.ID == ev.weaponID)) === null || _e === void 0 ? void 0 : _e.name, (_f !== null && _f !== void 0 ? _f : `Unknown ${ev.weaponID}`))
-                };
-                entry.encounters.push(encounter);
-            }
-            for (const entry of versus) {
-                if (killsMap.has(entry.charID) == false) {
-                    console.error(`Missing killsMap entry for ${entry.name}`);
-                    continue;
-                }
-                if (deathsMap.has(entry.charID) == false) {
-                    console.error(`Missing deathsMap entry for ${entry.name}`);
-                    continue;
-                }
-                const killMap = killsMap.get(entry.charID);
-                const deathMap = deathsMap.get(entry.charID);
-                const killBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
-                killMap.getMap().forEach((amount, weapon) => {
-                    killBreakdown.data.push({
-                        display: weapon,
-                        amount: amount,
-                        sortField: weapon,
-                        color: undefined
-                    });
-                    killBreakdown.total += amount;
-                });
-                entry.weaponKills = killBreakdown;
-                const deathBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
-                deathMap.getMap().forEach((amount, weapon) => {
-                    deathBreakdown.data.push({
-                        display: weapon,
-                        amount: amount,
-                        sortField: weapon,
-                        color: undefined
-                    });
-                    deathBreakdown.total += amount;
-                });
-                entry.weaponDeaths = deathBreakdown;
-            }
-            response.resolveOk(versus);
-        };
-        census_CharacterAPI__WEBPACK_IMPORTED_MODULE_1__["CharacterAPI"].getByIDs(charIDs).ok((data) => {
-            characters = data;
-            if (--opsLeft == 0) {
-                done();
-            }
-        });
-        census_WeaponAPI__WEBPACK_IMPORTED_MODULE_2__["WeaponAPI"].getByIDs(wepIDs).ok((data) => {
-            weapons = data;
-            if (--opsLeft == 0) {
-                done();
-            }
-        });
-        return response;
-    }
-    static medicBreakdown(parameters) {
-        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
-        const medicCollection = new BreakdownCollection();
-        medicCollection.title = "Medic";
-        let opsLeft = 1 // Heals
-            + 1 // Revives
-            + 1; // Shield repair
-        const add = (data) => {
-            medicCollection.sections.push(data);
-        };
-        const callback = () => {
-            if (--opsLeft == 0) {
-                response.resolveOk(medicCollection);
-            }
-        };
-        IndividualReporter.breakdownSection(parameters, "Heal ticks", PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].heal, PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].squadHeal).ok(add).always(callback);
-        IndividualReporter.breakdownSection(parameters, "Revives", PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].revive, PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].squadRevive).ok(add).always(callback);
-        IndividualReporter.breakdownSection(parameters, "Shield repair ticks", PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].shieldRepair, PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].squadShieldRepair).ok(add).always(callback);
-        return response;
-    }
-    static engineerBreakdown(parameters) {
-        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
-        const engCollection = new BreakdownCollection();
-        engCollection.title = "Engineer";
-        let opsLeft = 1 // Resupply
-            + 1; // Repair MAX
-        const add = (data) => {
-            engCollection.sections.push(data);
-        };
-        const callback = () => {
-            if (--opsLeft == 0) {
-                response.resolveOk(engCollection);
-            }
-        };
-        IndividualReporter.breakdownSection(parameters, "Resupply ticks", PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].resupply, PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].squadResupply).ok(add).always(callback);
-        IndividualReporter.breakdownSection(parameters, "MAX repair ticks", PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].maxRepair, PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].squadMaxRepair).ok(add).always(callback);
-        return response;
-    }
-    static breakdownSection(parameters, name, expID, squadExpID) {
-        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
-        const ticks = parameters.player.events.filter(iter => iter.type == "exp" && iter.expID == expID);
-        if (ticks.length > 0) {
-            const section = new BreakdownSection();
-            section.title = name;
-            let opsLeft = 2;
-            const callback = () => {
-                if (--opsLeft == 0) {
-                    response.resolveOk(section);
-                }
-            };
-            section.left = new BreakdownMeta();
-            section.left.title = "All";
-            EventReporter__WEBPACK_IMPORTED_MODULE_8__["default"].experience(expID, ticks).ok((data) => {
-                section.left.data = data;
-            }).always(callback);
-            section.right = new BreakdownMeta();
-            section.right.title = "Squad only";
-            EventReporter__WEBPACK_IMPORTED_MODULE_8__["default"].experience(squadExpID, ticks).ok((data) => {
-                section.right.data = data;
-            }).always(callback);
-        }
-        else {
-            response.resolve({ code: 204, data: null });
-        }
-        return response;
-    }
-    static miscCollection(parameters) {
-        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
-        const coll = {
-            header: "Misc",
-            metas: []
-        };
-        let opsLeft = 1; // Deployabled destroyed
-        const dep = IndividualReporter.deployableDestroyedBreakdown(parameters);
-        if (dep != null) {
-            coll.metas.push(dep);
-        }
-        if (coll.metas.length > 0) {
-            response.resolveOk(coll);
-        }
-        else {
-            response.resolve({ code: 204, data: null });
-        }
-        return response;
-    }
-    static supportedBy(parameters) {
-        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
-        const coll = {
-            header: "Supported by",
-            metas: []
-        };
-        let opsLeft = 1 // Healed by
-            + 1 // Revived by
-            + 1 // Shield repaired by
-            + 1 // Resupplied by
-            + 1; // Repaired by
-        const add = (data) => {
-            coll.metas.push(data);
-        };
-        const callback = () => {
-            if (--opsLeft == 0) {
-                response.resolveOk(coll);
-            }
-        };
-        IndividualReporter.singleSupportedBy(parameters, "Healed by", [PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].heal, PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].squadHeal]).ok(add).always(callback);
-        IndividualReporter.singleSupportedBy(parameters, "Revived by", [PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].revive, PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].squadRevive]).ok(add).always(callback);
-        IndividualReporter.singleSupportedBy(parameters, "Shield repaired by", [PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].shieldRepair, PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].squadShieldRepair]).ok(add).always(callback);
-        IndividualReporter.singleSupportedBy(parameters, "Resupplied by", [PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].resupply, PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].squadResupply]).ok(add).always(callback);
-        IndividualReporter.singleSupportedBy(parameters, "Repaired by", [PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].maxRepair, PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].squadMaxRepair]).ok(add).always(callback);
-        return response;
-    }
-    static singleSupportedBy(parameters, name, ids) {
-        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
-        let found = false;
-        for (const ev of parameters.events) {
-            if (ev.type == "exp" && ids.indexOf(ev.expID) > -1 && ev.targetID == parameters.player.characterID) {
-                found = true;
-                break;
-            }
-        }
-        if (found == false) {
-            response.resolve({ code: 204, data: null });
-        }
-        else {
-            const meta = new BreakdownSingle();
-            meta.title = name;
-            meta.altTitle = "Player";
-            meta.data = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
-            EventReporter__WEBPACK_IMPORTED_MODULE_8__["default"].experienceSource(ids, parameters.player.characterID, parameters.events).ok((data) => {
-                meta.data = data;
-                console.log(`Found [${data.data.map(iter => `${iter.display}:${iter.amount}`).join(", ")}] for [${ids.join(", ")}]`);
-                response.resolveOk(meta);
-            });
-        }
-        return response;
-    }
-    static deployableDestroyedBreakdown(parameters) {
-        const expIDs = [
-            "57",
-            "270",
-            "327",
-            "370",
-            "437",
-            "579",
-            "1373",
-            "1409",
-        ];
-        const ticks = parameters.player.events.filter((iter) => {
-            if (iter.type != "exp") {
-                return false;
-            }
-            return expIDs.indexOf(iter.expID) > -1;
-        });
-        if (ticks.length > 0) {
-            const meta = new BreakdownSingle();
-            meta.title = "Deployable kills";
-            meta.altTitle = "Deployable";
-            meta.data = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
-            const map = new StatMap__WEBPACK_IMPORTED_MODULE_7__["default"]();
-            for (const tick of ticks) {
-                let name = "unknown";
-                if (tick.expID == "57") {
-                    name = "Engineer turret";
-                }
-                else if (tick.expID == "270") {
-                    name = "Spawn beacon";
-                }
-                else if (tick.expID == "327") {
-                    name = "Tank mine";
-                }
-                else if (tick.expID == "370") {
-                    name = "Motion sensor";
-                }
-                else if (tick.expID == "437") {
-                    name = "Shield bubble";
-                }
-                else if (tick.expID == "579") {
-                    name = "Spitfire";
-                }
-                else if (tick.expID == "1373") {
-                    name = "Hardlight";
-                }
-                else if (tick.expID == "1409") {
-                    name = "Router";
-                }
-                else {
-                    name = `Unknown ${tick.expID}`;
-                }
-                map.increment(name);
-            }
-            map.getMap().forEach((amount, expName) => {
-                meta.data.total += amount;
-                meta.data.data.push({
-                    display: expName,
-                    sortField: expName,
-                    amount: amount,
-                    color: undefined
-                });
-            });
-            meta.data.data.sort((a, b) => {
-                return b.amount - a.amount || a.sortField.localeCompare(b.sortField);
-            });
-            return meta;
-        }
-        return null;
-    }
-    static routerBreakdown(parameters) {
-        const rts = parameters.routers.filter(iter => iter.owner == parameters.player.characterID);
-        return rts;
-    }
-    static transportAssists(parameters) {
-        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
-        const transAssists = parameters.player.events.filter(iter => iter.type == "exp" && iter.expID == "30");
-        if (transAssists.length > 0) {
-            const killedIDs = transAssists.map(iter => iter.targetID).filter((iter, index, arr) => arr.indexOf(iter) == index);
-            const firstEv = Math.min(...transAssists.map(iter => iter.timestamp));
-            const lastEv = Math.max(...transAssists.map(iter => iter.timestamp));
-            const map = new StatMap__WEBPACK_IMPORTED_MODULE_7__["default"]();
-            const meta = new BreakdownMeta();
-            meta.title = "Transport assists";
-            meta.data = new EventReporter__WEBPACK_IMPORTED_MODULE_8__["BreakdownArray"]();
-            census_EventAPI__WEBPACK_IMPORTED_MODULE_3__["EventAPI"].getMultiDeaths(killedIDs, firstEv, lastEv).ok((data) => {
-                const killers = [];
-                for (const assist of transAssists) {
-                    const death = data.find(iter => iter.sourceID == assist.targetID && iter.timestamp == assist.timestamp);
-                    if (death == undefined) {
-                        console.warn(`Missing event death for transport assist for ${assist.targetID} at ${assist.timestamp}`);
-                        continue;
-                    }
-                    killers.push(death.targetID);
-                }
-                census_CharacterAPI__WEBPACK_IMPORTED_MODULE_1__["CharacterAPI"].getByIDs(killers.filter((v, i, a) => a.indexOf(v) == i)).ok((data) => {
-                    for (const killer of killers) {
-                        const killerChar = data.find(iter => iter.ID == killer);
-                        if (killerChar == undefined) {
-                            console.warn(`Missing character ${killer} when generating transport assists`);
-                            continue;
-                        }
-                        map.increment(killerChar.name);
-                    }
-                    map.getMap().forEach((amount, char) => {
-                        const breakdown = {
-                            display: char,
-                            sortField: char,
-                            amount: amount,
-                            color: undefined
-                        };
-                        meta.data.data.push(breakdown);
-                        meta.data.total += amount;
-                    });
-                    meta.data.data.sort((a, b) => {
-                        return (b.amount - a.amount) || a.sortField.localeCompare(b.sortField);
-                    });
-                    response.resolveOk(meta);
-                });
-            });
-        }
-        else {
-            response.resolve({ code: 204, data: null });
-        }
-        return response;
-    }
-    static calculatedStats(parameters, classKd) {
-        const map = new Map();
-        const stats = parameters.player.stats;
-        map.set("KPM", (stats.get("Kill") / (parameters.player.secondsOnline / 60)).toFixed(2));
-        // K/D = Kills / Deaths
-        map.set("K/D", (stats.get("Kill") / stats.get("Death", 1)).toFixed(2));
-        // KA/D = Kills + Assits / Deaths
-        map.set("KA/D", ((stats.get("Kill") + stats.get("Kill assist")) / stats.get("Death", 1)).toFixed(2));
-        // HSR = Headshots / Kills
-        map.set("HSR", `${(stats.get("Headshot") / stats.get("Kill") * 100).toFixed(2)}%`);
-        // KR/D  = Kills + Revives / Deaths
-        map.set("KR/D", ((classKd.medic.kills + stats.get("Revive"))
-            / (classKd.medic.deaths || 1)).toFixed(2));
-        // R/D = Revives / Death
-        map.set("R/D", (stats.get("Revive") / (classKd.medic.deaths || 1)).toFixed(2));
-        // RPM = Revives / minutes online
-        map.set("RPM", (stats.get("Revive") / (classKd.medic.secondsAs / 60)).toFixed(2));
-        return map;
-    }
-    static scoreBreakdown(parameters) {
-        const breakdown = new Map();
-        for (const event of parameters.player.events) {
-            if (event.type == "exp") {
-                const exp = PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvents"].get(event.expID) || PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].other;
-                if (!breakdown.has(exp.name)) {
-                    breakdown.set(exp.name, new ExpBreakdown());
-                }
-                const score = breakdown.get(exp.name);
-                score.name = exp.name;
-                score.score += event.amount;
-                score.amount += 1;
-                if (exp == PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].other) {
-                    //console.log(`Other: ${JSON.stringify(event)}`);
-                }
-            }
-        }
-        // Sort all the entries by score, followed by amount, then lastly name
-        return [...breakdown.entries()].sort((a, b) => {
-            return b[1].score - a[1].score
-                || b[1].amount - a[1].amount
-                || a[0].localeCompare(b[0]);
-        }).map((a) => a[1]); // Transform the tuple into the ExpBreakdown
-    }
-    static classVersusKd(events, classLimit) {
-        const kds = classKdCollection();
-        events.forEach((event) => {
-            if (event.type == "kill" || event.type == "death") {
-                const sourceLoadoutID = event.loadoutID;
-                const sourceLoadout = census_PsLoadout__WEBPACK_IMPORTED_MODULE_5__["PsLoadouts"].get(sourceLoadoutID);
-                if (sourceLoadout == undefined) {
-                    return;
-                }
-                const targetLoadoutID = event.targetLoadoutID;
-                const targetLoadout = census_PsLoadout__WEBPACK_IMPORTED_MODULE_5__["PsLoadouts"].get(targetLoadoutID);
-                if (targetLoadout == undefined) {
-                    return;
-                }
-                if (classLimit != undefined) {
-                    if (sourceLoadout.type != classLimit) {
-                        return; // Continue to next iteration
-                    }
-                }
-                if (event.type == "kill") {
-                    switch (targetLoadout.type) {
-                        case "infil":
-                            kds.infil.kills += 1;
-                            break;
-                        case "lightAssault":
-                            kds.lightAssault.kills += 1;
-                            break;
-                        case "medic":
-                            kds.medic.kills += 1;
-                            break;
-                        case "engineer":
-                            kds.engineer.kills += 1;
-                            break;
-                        case "heavy":
-                            kds.heavy.kills += 1;
-                            break;
-                        case "max":
-                            kds.max.kills += 1;
-                            break;
-                        default: console.warn(`Unknown type`);
-                    }
-                }
-                if (event.type == "death" && event.revived == false) {
-                    switch (targetLoadout.type) {
-                        case "infil":
-                            kds.infil.deaths += 1;
-                            break;
-                        case "lightAssault":
-                            kds.lightAssault.deaths += 1;
-                            break;
-                        case "medic":
-                            kds.medic.deaths += 1;
-                            break;
-                        case "engineer":
-                            kds.engineer.deaths += 1;
-                            break;
-                        case "heavy":
-                            kds.heavy.deaths += 1;
-                            break;
-                        case "max":
-                            kds.max.deaths += 1;
-                            break;
-                        default: console.warn(`Unknown type`);
-                    }
-                }
-                if (event.type == "death" && event.revived == true) {
-                    switch (targetLoadout.type) {
-                        case "infil":
-                            kds.infil.score += 1;
-                            break;
-                        case "lightAssault":
-                            kds.lightAssault.score += 1;
-                            break;
-                        case "medic":
-                            kds.medic.score += 1;
-                            break;
-                        case "engineer":
-                            kds.engineer.score += 1;
-                            break;
-                        case "heavy":
-                            kds.heavy.score += 1;
-                            break;
-                        case "max":
-                            kds.max.score += 1;
-                            break;
-                        default: console.warn(`Unknown type`);
-                    }
-                }
-            }
-        });
-        return kds;
-    }
-    static classUsage(parameters) {
-        const usage = new Playtime();
-        if (parameters.player.events.length == 0) {
-            return usage;
-        }
-        let lastLoadout = undefined;
-        let lastTimestamp = parameters.player.events[0].timestamp;
-        const finalTimestamp = parameters.player.events[parameters.player.events.length - 1].timestamp;
-        usage.characterID = parameters.player.characterID;
-        usage.secondsOnline = (finalTimestamp - lastTimestamp) / 1000;
-        parameters.player.events.forEach((event) => {
-            if (event.type == "capture" || event.type == "defend" || event.type == "login" || event.type == "logout") {
-                return;
-            }
-            lastLoadout = census_PsLoadout__WEBPACK_IMPORTED_MODULE_5__["PsLoadouts"].get(event.loadoutID);
-            if (lastLoadout == undefined) {
-                return console.warn(`Unknown loadout ID: ${event.loadoutID}`);
-            }
-            if (event.type == "exp") {
-                const diff = (event.timestamp - lastTimestamp) / 1000;
-                lastTimestamp = event.timestamp;
-                switch (lastLoadout.type) {
-                    case "infil":
-                        usage.infil.secondsAs += diff;
-                        break;
-                    case "lightAssault":
-                        usage.lightAssault.secondsAs += diff;
-                        break;
-                    case "medic":
-                        usage.medic.secondsAs += diff;
-                        break;
-                    case "engineer":
-                        usage.engineer.secondsAs += diff;
-                        break;
-                    case "heavy":
-                        usage.heavy.secondsAs += diff;
-                        break;
-                    case "max":
-                        usage.max.secondsAs += diff;
-                        break;
-                    default: console.warn(`Unknown type`);
-                }
-            }
-            if (event.type == "exp") {
-                switch (lastLoadout.type) {
-                    case "infil":
-                        usage.infil.score += event.amount;
-                        break;
-                    case "lightAssault":
-                        usage.lightAssault.score += event.amount;
-                        break;
-                    case "medic":
-                        usage.medic.score += event.amount;
-                        break;
-                    case "engineer":
-                        usage.engineer.score += event.amount;
-                        break;
-                    case "heavy":
-                        usage.heavy.score += event.amount;
-                        break;
-                    case "max":
-                        usage.max.score += event.amount;
-                        break;
-                    default: console.warn(`Unknown type`);
-                }
-            }
-            else if (event.type == "kill") {
-                switch (lastLoadout.type) {
-                    case "infil":
-                        usage.infil.kills += 1;
-                        break;
-                    case "lightAssault":
-                        usage.lightAssault.kills += 1;
-                        break;
-                    case "medic":
-                        usage.medic.kills += 1;
-                        break;
-                    case "engineer":
-                        usage.engineer.kills += 1;
-                        break;
-                    case "heavy":
-                        usage.heavy.kills += 1;
-                        break;
-                    case "max":
-                        usage.max.kills += 1;
-                        break;
-                    default: console.warn(`Unknown type`);
-                }
-            }
-            else if (event.type == "death" && event.revived == false) {
-                switch (lastLoadout.type) {
-                    case "infil":
-                        usage.infil.deaths += 1;
-                        break;
-                    case "lightAssault":
-                        usage.lightAssault.deaths += 1;
-                        break;
-                    case "medic":
-                        usage.medic.deaths += 1;
-                        break;
-                    case "engineer":
-                        usage.engineer.deaths += 1;
-                        break;
-                    case "heavy":
-                        usage.heavy.deaths += 1;
-                        break;
-                    case "max":
-                        usage.max.deaths += 1;
-                        break;
-                    default: console.warn(`Unknown type`);
-                }
-            }
-        });
-        let maxTime = 0;
-        if (usage.infil.secondsAs > maxTime) {
-            maxTime = usage.infil.secondsAs;
-            usage.mostPlayed.name = "Infiltrator";
-        }
-        if (usage.lightAssault.secondsAs > maxTime) {
-            maxTime = usage.lightAssault.secondsAs;
-            usage.mostPlayed.name = "Light Assault";
-        }
-        if (usage.medic.secondsAs > maxTime) {
-            maxTime = usage.medic.secondsAs;
-            usage.mostPlayed.name = "Medic";
-        }
-        if (usage.engineer.secondsAs > maxTime) {
-            maxTime = usage.engineer.secondsAs;
-            usage.mostPlayed.name = "Engineer";
-        }
-        if (usage.heavy.secondsAs > maxTime) {
-            maxTime = usage.heavy.secondsAs;
-            usage.mostPlayed.name = "Heavy";
-        }
-        if (usage.max.secondsAs > maxTime) {
-            maxTime = usage.max.secondsAs;
-            usage.mostPlayed.name = "MAX";
-        }
-        usage.mostPlayed.secondsAs = maxTime;
-        return usage;
-    }
-    static unrevivedTime(events) {
-        const array = [];
-        for (const ev of events) {
-            if (ev.type != "death") {
-                continue;
-            }
-            if (ev.revivedEvent != null) {
-                const diff = (ev.revivedEvent.timestamp - ev.timestamp) / 1000;
-                if (diff > 40) {
-                    continue; // Somehow death events are missed and a revive event is linked to the wrong death
-                }
-                array.push(diff);
-            }
-        }
-        return array.sort((a, b) => b - a);
-    }
-    static reviveLifeExpectance(events) {
-        const array = [];
-        for (const ev of events) {
-            if (ev.type != "death" || ev.revivedEvent == null) {
-                continue;
-            }
-            const charEvents = events.filter(iter => iter.sourceID == ev.sourceID);
-            const index = charEvents.findIndex(iter => {
-                return iter.type == "death" && iter.timestamp == ev.timestamp && iter.targetID == ev.targetID;
-            });
-            if (index == -1) {
-                console.error(`Failed to find a death for ${ev.sourceID} at ${ev.timestamp} but wasn't found in charEvents`);
-                continue;
-            }
-            let nextDeath = null;
-            for (let i = index + 1; i < charEvents.length; ++i) {
-                if (charEvents[i].type == "death") {
-                    nextDeath = charEvents[i];
-                    break;
-                }
-            }
-            if (nextDeath == null) {
-                console.error(`Failed to find the next death for ${ev.sourceID} at ${ev.timestamp}`);
-                continue;
-            }
-            const diff = (nextDeath.timestamp - ev.revivedEvent.timestamp) / 1000;
-            if (diff <= 20) {
-                array.push(diff);
-            }
-        }
-        return array.sort((a, b) => b - a);
-    }
-    static lifeExpectanceRate(events) {
-        const array = [];
-        for (const ev of events) {
-            if (ev.type != "death" || ev.revivedEvent == null) {
-                continue;
-            }
-            const charEvents = events.filter(iter => iter.sourceID == ev.sourceID);
-            const index = charEvents.findIndex(iter => {
-                return iter.type == "death" && iter.timestamp == ev.timestamp && iter.targetID == ev.targetID;
-            });
-            if (index == -1) {
-                console.error(`Failed to find a death for ${ev.sourceID} at ${ev.timestamp} but wasn't found in charEvents`);
-                continue;
-            }
-            let nextDeath = null;
-            for (let i = index + 1; i < charEvents.length; ++i) {
-                if (charEvents[i].type == "death") {
-                    nextDeath = charEvents[i];
-                    break;
-                }
-            }
-            if (nextDeath == null) {
-                console.error(`Failed to find the next death for ${ev.sourceID} at ${ev.timestamp}`);
-                continue;
-            }
-            const diff = (nextDeath.timestamp - ev.revivedEvent.timestamp) / 1000;
-            array.push(diff);
-        }
-        const probs = this.kaplanMeier(array, 20);
-        return probs;
-    }
-    static timeUntilReviveRate(events) {
-        const array = [];
-        for (const ev of events) {
-            if (ev.type != "death") {
-                continue;
-            }
-            if (ev.revivedEvent != null) {
-                const diff = (ev.revivedEvent.timestamp - ev.timestamp) / 1000;
-                if (diff > 40) {
-                    continue; // Somehow death events are missed and a revive event is linked to the wrong death
-                }
-                array.push(diff);
-            }
-        }
-        const probs = this.kaplanMeier(array);
-        return probs;
-    }
-    static kaplanMeier(data, max) {
-        const ticks = [...Array((max !== null && max !== void 0 ? max : Math.max(...data))).keys()];
-        const probs = [];
-        let cur_pop = [...Array(data.length).keys()];
-        for (const tick of ticks) {
-            const survived = data.filter(iter => iter > tick).length;
-            probs.push(survived / cur_pop.length);
-            cur_pop = data.filter(iter => iter > tick);
-        }
-        let cumul = 1;
-        for (let i = 0; i < probs.length; ++i) {
-            probs[i] = cumul * probs[i];
-            cumul = probs[i];
-        }
-        return probs;
-    }
-    static generateContinentPlayedOn(events) {
-        let indar = 0;
-        let esamir = 0;
-        let amerish = 0;
-        let hossin = 0;
-        for (const ev of events) {
-            if (ev.type == "kill" || ev.type == "death") {
-                switch (ev.zoneID) {
-                    case "2":
-                        ++indar;
-                        break;
-                    case "4":
-                        ++hossin;
-                        break;
-                    case "6":
-                        ++amerish;
-                        break;
-                    case "8":
-                        ++esamir;
-                        break;
-                }
-            }
-        }
-        let count = 0;
-        let cont = "Default";
-        if (indar > count) {
-            cont = "Indar";
-            count = indar;
-        }
-        if (esamir > count) {
-            cont = "Esamir";
-            count = esamir;
-        }
-        if (amerish > count) {
-            cont = "Amerish";
-            count = amerish;
-        }
-        if (hossin > count) {
-            cont = "Hossin";
-            count = hossin;
-        }
-        return cont;
-    }
-}
-window.IndividualReporter = IndividualReporter;
-
-
-/***/ }),
-
 /***/ "./src/KillfeedSquad.ts":
 /*!******************************!*\
   !*** ./src/KillfeedSquad.ts ***!
@@ -60571,7 +58313,7 @@ class SessionV1 {
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "PersonalReportGenerator", function() { return PersonalReportGenerator; });
-/* harmony import */ var census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! census/ApiWrapper */ "./src/census/ApiWrapper.ts");
+/* harmony import */ var core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! core/census/ApiWrapper */ "./src/core/census/ApiWrapper.ts");
 
 class PersonalReportGenerator {
     static generate(html, report) {
@@ -60581,7 +58323,7 @@ class PersonalReportGenerator {
         return personalReport;
     }
     static getTemplate() {
-        const page = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]($.get(`./personal/index.html?q=${new Date().getTime()}`), (iter) => iter);
+        const page = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]($.get(`./personal/index.html?q=${new Date().getTime()}`), (iter) => iter);
         return page;
     }
 }
@@ -60589,10 +58331,4095 @@ class PersonalReportGenerator {
 
 /***/ }),
 
-/***/ "./src/PsEvent.ts":
+/***/ "./src/Quartile.ts":
+/*!*************************!*\
+  !*** ./src/Quartile.ts ***!
+  \*************************/
+/*! exports provided: Quartile */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Quartile", function() { return Quartile; });
+class Quartile {
+    constructor() {
+        this.min = 0;
+        this.q1 = 0;
+        this.median = 0;
+        this.q3 = 0;
+        this.max = 0;
+    }
+    static get(data) {
+        const quart = new Quartile();
+        if (data.length == 0) {
+            return quart;
+        }
+        if (data.length == 1) {
+            quart.min = data[0];
+            quart.q1 = data[0];
+            quart.median = data[0];
+            quart.q3 = data[0];
+            quart.max = data[0];
+            return quart;
+        }
+        quart.q1 = this.quartile(data, 0.25);
+        quart.median = this.quartile(data, 0.5);
+        quart.q3 = this.quartile(data, 0.75);
+        const stdDev = this.standardDeviation(data);
+        for (let i = data.length - 1; i >= 0; --i) {
+            if (data[i] <= quart.q3 + stdDev) {
+                quart.max = data[i];
+                break;
+            }
+        }
+        for (let i = 0; i < data.length; ++i) {
+            if (data[i] >= quart.q1 - stdDev) {
+                quart.min = data[i];
+                break;
+            }
+        }
+        quart.max = quart.max == 0 ? data[data.length - 1] : quart.max;
+        quart.min = quart.min == 0 ? data[0] : quart.min;
+        return quart;
+    }
+    static sum(data) {
+        return data.reduce((a, b) => a + b, 0);
+    }
+    static standardDeviation(data) {
+        const mean = this.sum(data) / data.length;
+        const diff = data.map(a => Math.pow((a - mean), 2));
+        return Math.sqrt(this.sum(diff) / (data.length - 1));
+    }
+    static quartile(data, q) {
+        const sorted = data.sort((a, b) => a - b);
+        const pos = (sorted.length - 1) * q;
+        const base = Math.floor(pos);
+        const rest = pos - base;
+        if (sorted[base + 1] !== undefined) {
+            return sorted[base] + rest * (sorted[base + 1] - sorted[base]);
+        }
+        else {
+            return sorted[base];
+        }
+    }
+}
+window.Quartile = Quartile;
+
+
+/***/ }),
+
+/***/ "./src/Storage.ts":
 /*!************************!*\
-  !*** ./src/PsEvent.ts ***!
+  !*** ./src/Storage.ts ***!
   \************************/
+/*! exports provided: StorageMetadata, StorageHelper */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "StorageMetadata", function() { return StorageMetadata; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "StorageHelper", function() { return StorageHelper; });
+/* harmony import */ var core_CoreSettings__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! core/CoreSettings */ "./src/core/CoreSettings.ts");
+
+class StorageMetadata {
+    constructor(data) {
+        this.tag = "";
+        this.data = data;
+    }
+}
+class StorageHelper {
+    static isEnabled() {
+        if (this._enabled == undefined) {
+            try {
+                const key = "$__topt_test_key__";
+                localStorage.setItem(key, key);
+                localStorage.getItem(key);
+                localStorage.removeItem(key);
+                this._enabled = true;
+            }
+            catch (_a) {
+                this._enabled = false;
+            }
+        }
+        return this._enabled;
+    }
+    static getSettings() {
+        if (this._settings == undefined) {
+            if (this.isEnabled() == false) {
+                return null;
+            }
+            let item = {
+                tag: "settings",
+                data: new core_CoreSettings__WEBPACK_IMPORTED_MODULE_0__["CoreSettings"]()
+            };
+            const itemStr = localStorage.getItem(this.KEY_SETTINGS);
+            if (itemStr == null) {
+                return null;
+            }
+            else {
+                item = JSON.parse(itemStr);
+            }
+            if (item.tag == undefined || item.tag != "settings") {
+                console.warn(`Cannot get settings: localStorage item ${this.KEY_SETTINGS} contained the wrong tag: ${item.tag}`);
+                return null;
+            }
+            this._settings = item.data;
+        }
+        return this._settings;
+    }
+    static setSettings(settings) {
+        if (this.isEnabled() == false) {
+            return console.warn(`Cannot save settings: localStorage is not enabled`);
+        }
+        if (settings == null) {
+            localStorage.removeItem(this.KEY_SETTINGS);
+        }
+        else {
+            let item = {
+                tag: "settings",
+                data: settings
+            };
+            localStorage.setItem(this.KEY_SETTINGS, JSON.stringify(item));
+        }
+    }
+}
+StorageHelper._enabled = undefined;
+StorageHelper._settings = undefined;
+StorageHelper.KEY_TREND = "topt.trends";
+StorageHelper.KEY_SESSION = "topt.session";
+StorageHelper.KEY_SETTINGS = "topt.settings";
+window.StorageHelper = StorageHelper;
+
+
+/***/ }),
+
+/***/ "./src/addons/Playback.ts":
+/*!********************************!*\
+  !*** ./src/addons/Playback.ts ***!
+  \********************************/
+/*! exports provided: PlaybackOptions, Playback */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "PlaybackOptions", function() { return PlaybackOptions; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Playback", function() { return Playback; });
+/* harmony import */ var core_census_OutfitAPI__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! core/census/OutfitAPI */ "./src/core/census/OutfitAPI.ts");
+/* harmony import */ var core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! core/census/ApiWrapper */ "./src/core/census/ApiWrapper.ts");
+
+
+const log = (msg) => {
+    console.log(`[Playback] ${msg}`);
+};
+const warn = (msg) => {
+    console.warn(`[Playback] ${msg}`);
+};
+const error = (msg) => {
+    console.error(`[Playback] ${msg}`);
+};
+const debug = (msg) => {
+    console.log(`[Playback] ${msg}`);
+};
+class PlaybackOptions {
+    constructor() {
+        this.speed = 0;
+    }
+}
+class Playback {
+    static setCore(core) {
+        Playback._core = core;
+    }
+    static loadFile(file) {
+        if (Playback._core == null) {
+            throw `Cannot load file: Core has not been set. Did you forget to use Playback.setCore()?`;
+        }
+        Playback._file = file;
+        const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_1__["ApiResponse"]();
+        const reader = new FileReader();
+        reader.onload = ((ev) => {
+            const data = JSON.parse(reader.result);
+            if (!data.version) {
+                error(`Missing version from import`);
+            }
+            else if (data.version == "1") {
+                const nowMs = new Date().getTime();
+                debug(`Exported data uses version 1`);
+                const chars = data.players;
+                const outfits = data.outfits;
+                const events = data.events;
+                // Force online for squad tracking
+                this._core.subscribeToEvents(chars.map(iter => { iter.online = iter.secondsPlayed > 0; return iter; }));
+                core_census_OutfitAPI__WEBPACK_IMPORTED_MODULE_0__["default"].getByIDs(outfits).ok((data) => {
+                    this._core.outfits = data;
+                });
+                if (events != undefined && events.length != 0) {
+                    Playback._events = events;
+                    const parsedData = events.map(iter => JSON.parse(iter));
+                    Playback._parsed = parsedData;
+                }
+                debug(`Took ${new Date().getTime() - nowMs}ms to import data`);
+                response.resolveOk();
+            }
+            else {
+                error(`Unchecked version: ${data.version}`);
+                response.resolve({ code: 400, data: `` });
+            }
+        });
+        reader.readAsText(file);
+        return response;
+    }
+    static start(parameters) {
+        if (this._core == null) {
+            throw `Cannot start playback, core is null. Did you forget to call Playback.setCore()?`;
+        }
+        // Instant playback
+        if (parameters.speed <= 0) {
+            debug(`Doing instant playback`);
+            this._core.tracking.startTime = Math.min(...Playback._parsed.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
+            this._core.tracking.endTime = Math.max(...Playback._parsed.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
+            for (const ev of Playback._events) {
+                this._core.processMessage(ev, true);
+            }
+            this._core.stop();
+        }
+        else {
+            const start = Math.min(...Playback._parsed.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
+            const end = Math.max(...Playback._parsed.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
+            this._core.tracking.startTime = start;
+            const slots = new Map();
+            for (const ev of Playback._parsed) {
+                const time = Number.parseInt(ev.payload.timestamp) * 1000;
+                if (Number.isNaN(time)) {
+                    warn(`Failed to get a timestamp from ${ev}`);
+                }
+                const diff = time - start;
+                if (!slots.has(diff)) {
+                    slots.set(diff, []);
+                }
+                slots.get(diff).push(ev);
+            }
+            let index = 0;
+            const intervalID = setInterval(() => {
+                if (!slots.has(index)) {
+                    debug(`Index ${index} has no events, skipping`);
+                }
+                else {
+                    const events = slots.get(index);
+                    for (const ev of events) {
+                        this._core.processMessage(JSON.stringify(ev), true);
+                    }
+                }
+                index += 1000;
+                if (index > end) {
+                    debug(`Ended on index ${index}`);
+                    clearInterval(intervalID);
+                }
+            }, 1000 * parameters.speed);
+        }
+    }
+}
+Playback._core = null;
+Playback._file = null;
+Playback._events = [];
+Playback._parsed = [];
+window.Playback = Playback;
+
+
+/***/ }),
+
+/***/ "./src/addons/SquadAddon.ts":
+/*!**********************************!*\
+  !*** ./src/addons/SquadAddon.ts ***!
+  \**********************************/
+/*! exports provided: SquadAddon */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "SquadAddon", function() { return SquadAddon; });
+class SquadAddon {
+    static getHovered() {
+        if (SquadAddon.selectedSquadName != null) {
+            return "squad";
+        }
+        if (SquadAddon.selectedMemberID != null) {
+            return "member";
+        }
+        return null;
+    }
+}
+SquadAddon.selectedSquadName = null;
+SquadAddon.selectedMemberID = null;
+Window.SquadAddon = SquadAddon;
+
+
+/***/ }),
+
+/***/ "./src/app/App.ts":
+/*!************************!*\
+  !*** ./src/app/App.ts ***!
+  \************************/
+/*! exports provided: default */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "default", function() { return App; });
+class App {
+    constructor(name) {
+        this.name = name;
+    }
+}
+
+
+/***/ }),
+
+/***/ "./src/app/AppRealtime.ts":
+/*!********************************!*\
+  !*** ./src/app/AppRealtime.ts ***!
+  \********************************/
+/*! exports provided: default */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "default", function() { return AppRealtime; });
+/* harmony import */ var app_App__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! app/App */ "./src/app/App.ts");
+
+class AppRealtime extends app_App__WEBPACK_IMPORTED_MODULE_0__["default"] {
+    constructor() {
+        super("realtime");
+    }
+    onStart() {
+    }
+    onResume() {
+    }
+    updateDisplay() {
+    }
+    onSuspend() {
+    }
+    onStop() {
+    }
+}
+
+
+/***/ }),
+
+/***/ "./src/core/Core.ts":
+/*!**************************!*\
+  !*** ./src/core/Core.ts ***!
+  \**************************/
+/*! exports provided: SquadStats, Core */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "SquadStats", function() { return SquadStats; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Core", function() { return Core; });
+/* harmony import */ var core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! core/census/ApiWrapper */ "./src/core/census/ApiWrapper.ts");
+/* harmony import */ var Loadable__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! Loadable */ "./src/Loadable.ts");
+/* harmony import */ var core_census_CensusAPI__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! core/census/CensusAPI */ "./src/core/census/CensusAPI.ts");
+/* harmony import */ var core_census_OutfitAPI__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! core/census/OutfitAPI */ "./src/core/census/OutfitAPI.ts");
+/* harmony import */ var core_census_CharacterAPI__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! core/census/CharacterAPI */ "./src/core/census/CharacterAPI.ts");
+/* harmony import */ var core_TrackedPlayer__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! core/TrackedPlayer */ "./src/core/TrackedPlayer.ts");
+/* harmony import */ var core_InvididualGenerator__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! core/InvididualGenerator */ "./src/core/InvididualGenerator.ts");
+
+
+
+
+
+
+
+class SquadStats {
+    constructor() {
+        this.name = "";
+        this.members = [];
+        this.kills = 0;
+        this.deaths = 0;
+        this.revives = 0;
+        this.heals = 0;
+        this.resupplies = 0;
+        this.repairs = 0;
+        this.vKills = 0;
+    }
+}
+class Core {
+    constructor(serviceID, serverID) {
+        this.sockets = {
+            tracked: null,
+            logistics: null,
+            logins: null,
+            facility: null,
+            debug: null
+        };
+        this.routerTracking = {
+            // key - Who placed the router
+            // value - Lastest npc ID that gave them a router spawn tick
+            routerNpcs: new Map(),
+            routers: [] // All routers that have been placed
+        };
+        this.squad = {
+            debug: false,
+            perm: [],
+            guesses: [],
+            members: new Map(),
+        };
+        this.socketMessageQueue = [];
+        this.debugSocketMessages = [];
+        this.stats = new Map();
+        this.outfits = [];
+        this.characters = [];
+        this.miscEvents = [];
+        this.playerCaptures = [];
+        this.facilityCaptures = [];
+        this.rawData = [];
+        this.tracking = new core_InvididualGenerator__WEBPACK_IMPORTED_MODULE_6__["TimeTracking"]();
+        this.connected = false;
+        this.handlers = {
+            exp: [],
+            kill: [],
+            death: [],
+            teamkill: [],
+            capture: [],
+            defend: [],
+            vehicle: [],
+            login: [],
+            logout: []
+        };
+        this.serviceID = serviceID;
+        this.serverID = serverID;
+        this.socketMessageQueue.length = 5;
+        core_census_CensusAPI__WEBPACK_IMPORTED_MODULE_2__["default"].init(this.serviceID);
+        this.squadInit();
+    }
+    /**
+     * Emit an event and execute all handlers on it
+     *
+     * @param event Event being emitted to all handlers
+     */
+    emit(event) {
+        this.handlers[event.type].forEach((callback) => { callback(event); });
+    }
+    /**
+     * Add an event handler that will occur when a specific event is created from the core
+     *
+     * @param type      Event to attach the handler to
+     * @param handler   Handler that will be executed when that event is emitted
+     */
+    on(type, handler) {
+        switch (type) {
+            case "exp":
+                this.handlers.exp.push(handler);
+                break;
+            case "kill":
+                this.handlers.kill.push(handler);
+                break;
+            case "death":
+                this.handlers.death.push(handler);
+                break;
+            case "teamkill":
+                this.handlers.death.push(handler);
+                break;
+            case "capture":
+                this.handlers.capture.push(handler);
+                break;
+            case "defend":
+                this.handlers.defend.push(handler);
+                break;
+            case "vehicle":
+                this.handlers.vehicle.push(handler);
+                break;
+            case "login":
+                this.handlers.login.push(handler);
+                break;
+            case "logout":
+                this.handlers.logout.push(handler);
+                break;
+            default: throw `Unchecked event type ${type}`;
+        }
+    }
+    /**
+     * Remove handlers and no longer emit events to them
+     *
+     * @param type Optional type of handler to clear. If not given, all handlers are cleared
+     */
+    clearHandlers(type) {
+        if (type == undefined) {
+            this.handlers.exp.length = 0;
+            this.handlers.kill.length = 0;
+            this.handlers.death.length = 0;
+            this.handlers.teamkill.length = 0;
+            this.handlers.capture.length = 0;
+            this.handlers.defend.length = 0;
+            this.handlers.vehicle.length = 0;
+            this.handlers.login.length = 0;
+            this.handlers.logout.length = 0;
+        }
+        else {
+            this.handlers[type].length = 0;
+        }
+    }
+    /**
+     * Start the tracking and begin saving events
+     */
+    start() {
+        if (this.connected == false) {
+            throw `Cannot start TOPT: core is not connected`;
+        }
+        this.tracking.running = true;
+        const nowMs = new Date().getTime();
+        this.tracking.startTime = nowMs;
+        this.stats.forEach((char, charID) => {
+            char.joinTime = nowMs;
+        });
+    }
+    /**
+     * Stop running the tracker
+     */
+    stop() {
+        if (this.tracking.running == true) {
+            const nowMs = new Date().getTime();
+            this.tracking.endTime = nowMs;
+        }
+        this.tracking.running = false;
+        this.stats.forEach((char, charID) => {
+            if (char.events.length > 0) {
+                const first = char.events[0];
+                const last = char.events[char.events.length - 1];
+                char.joinTime = first.timestamp;
+                char.secondsOnline = (last.timestamp - first.timestamp) / 1000;
+                const character = this.characters.find(iter => iter.ID == char.characterID);
+                if (character != undefined) {
+                    character.secondsPlayed = char.secondsOnline;
+                    if (character.secondsPlayed > 0) {
+                        character.online = true;
+                    }
+                }
+            }
+            else {
+                char.secondsOnline = 0;
+            }
+        });
+    }
+    /**
+     * Begin tracking all members of an outfit
+     *
+     * @param tag Tag of the outfit to track. Case-insensitive
+     *
+     * @returns A Loading that will contain the state of
+     */
+    addOutfit(tag) {
+        if (this.connected == false) {
+            throw `Cannot track outfit ${tag}: Core is not connected`;
+        }
+        const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        if (tag.trim().length == 0) {
+            response.resolveOk();
+            return response;
+        }
+        core_census_OutfitAPI__WEBPACK_IMPORTED_MODULE_3__["default"].getByTag(tag).ok((data) => {
+            this.outfits.push(data);
+        });
+        core_census_OutfitAPI__WEBPACK_IMPORTED_MODULE_3__["default"].getCharactersByTag(tag).ok((data) => {
+            this.subscribeToEvents(data);
+            response.resolveOk();
+        });
+        return response;
+    }
+    /**
+     * Begin tracking a new player
+     *
+     * @param name Name of the player to track. Case-insensitive
+     *
+     * @returns A loading that will contain the state of
+     */
+    addPlayer(name) {
+        if (this.connected == false) {
+            throw `Cannot track character ${name}: Core is not connected`;
+        }
+        const loading = Loadable__WEBPACK_IMPORTED_MODULE_1__["Loadable"].loading();
+        if (name.trim().length == 0) {
+            loading.state = "loaded";
+            return loading;
+        }
+        core_census_CharacterAPI__WEBPACK_IMPORTED_MODULE_4__["CharacterAPI"].getByName(name).ok((data) => {
+            this.subscribeToEvents([data]);
+        });
+        return loading;
+    }
+    /**
+     * Subscribe to the events in the event stream
+     *
+     * @param chars Characters to subscribe to
+     */
+    subscribeToEvents(chars) {
+        if (this.sockets.tracked == null) {
+            console.warn(`Cannot subscribe to events, tracked socket is null`);
+            return;
+        }
+        // No duplicates
+        chars = chars.filter((char) => {
+            return this.characters.map((c) => c.ID).indexOf(char.ID) == -1;
+        });
+        if (chars.length == 0) {
+            return;
+        }
+        this.characters = this.characters.concat(chars).sort((a, b) => {
+            return a.name.localeCompare(b.name);
+        });
+        chars.forEach((character) => {
+            const player = new core_TrackedPlayer__WEBPACK_IMPORTED_MODULE_5__["TrackedPlayer"]();
+            player.characterID = character.ID;
+            player.faction = character.faction;
+            player.outfitTag = character.outfitTag;
+            player.name = character.name;
+            if (character.online == true) {
+                player.joinTime = new Date().getTime();
+                this.addMember({ ID: player.characterID, name: player.name, outfitTag: character.outfitTag });
+            }
+            this.stats.set(character.ID, player);
+        });
+        // Large outfits like SKL really stress the websockets out if you try to subscribe to 12k members
+        //      at once, instead breaking them into chunks works nicely
+        const subscribeSetSize = 200;
+        for (let i = 0; i < chars.length; i += subscribeSetSize) {
+            //console.log(`Slice: ${chars.slice(i, i + subscribeSetSize).map(iter => iter.ID).join(", ")}`);
+            const subscribeExp = {
+                "action": "subscribe",
+                "characters": [
+                    ...(chars.slice(i, i + subscribeSetSize).map(iter => iter.ID))
+                ],
+                "eventNames": [
+                    "GainExperience",
+                    "AchievementEarned",
+                    "Death",
+                    "FacilityControl",
+                    "ItemAdded",
+                    "VehicleDestroy"
+                ],
+                "service": "event"
+            };
+            this.sockets.tracked.send(JSON.stringify(subscribeExp));
+        }
+    }
+    onmessage(ev) {
+        for (const message of this.socketMessageQueue) {
+            if (ev.data == message) {
+                //console.log(`Duplicate message found: ${ev.data}`);
+                return;
+            }
+        }
+        this.socketMessageQueue.push(ev.data);
+        this.socketMessageQueue.shift();
+        this.processMessage(ev.data, false);
+    }
+}
+window.Core = Core;
+
+
+/***/ }),
+
+/***/ "./src/core/CoreConnection.ts":
+/*!************************************!*\
+  !*** ./src/core/CoreConnection.ts ***!
+  \************************************/
+/*! no exports provided */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var core_Core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! core/Core */ "./src/core/Core.ts");
+/* harmony import */ var core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! core/census/ApiWrapper */ "./src/core/census/ApiWrapper.ts");
+
+
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.connect = function () {
+    const self = this;
+    const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_1__["ApiResponse"]();
+    self.disconnect();
+    let opsLeft = +1 // Tracker
+        + 1 // Logins
+        + 1 // Logistics
+        + 1 // Facilities
+        + 1; // Debug
+    setupTrackerSocket(self).always(() => { if (--opsLeft == 0) {
+        response.resolveOk();
+    } });
+    setupLoginSocket(self).always(() => { if (--opsLeft == 0) {
+        response.resolveOk();
+    } });
+    setupLogisticsSocket(self).always(() => { if (--opsLeft == 0) {
+        response.resolveOk();
+    } });
+    setupFacilitySocket(self).always(() => { if (--opsLeft == 0) {
+        response.resolveOk();
+    } });
+    setupDebugSocket(self).always(() => { if (--opsLeft == 0) {
+        response.resolveOk();
+    } });
+    self.connected = true;
+    return response;
+};
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.disconnect = function () {
+    const self = this;
+    if (self.sockets.tracked != null) {
+        self.sockets.tracked.close();
+        self.sockets.tracked = null;
+    }
+    if (self.sockets.logins != null) {
+        self.sockets.logins.close();
+        self.sockets.logins = null;
+    }
+    if (self.sockets.logistics != null) {
+        self.sockets.logistics.close();
+        self.sockets.logistics = null;
+    }
+    if (self.sockets.facility != null) {
+        self.sockets.facility.close();
+        self.sockets.facility = null;
+    }
+    if (self.sockets.debug != null) {
+        self.sockets.debug.close();
+        self.sockets.debug = null;
+    }
+    self.connected = false;
+};
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.onSocketError = function (socketName, ev) {
+    console.error(`Error on socket: ${socketName}> ${ev}`);
+};
+function setupTrackerSocket(core) {
+    const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_1__["ApiResponse"]();
+    core.sockets.tracked = new WebSocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${core.serviceID}`);
+    core.sockets.tracked.onopen = () => {
+    };
+    core.sockets.tracked.onerror = () => {
+        response.resolve({ code: 500, data: `` });
+    };
+    core.sockets.tracked.onmessage = () => {
+        response.resolveOk();
+        core.sockets.tracked.onmessage = core.onmessage.bind(core);
+    };
+    return response;
+}
+function setupDebugSocket(core) {
+    const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_1__["ApiResponse"]();
+    core.sockets.debug = new WebSocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${core.serviceID}`);
+    core.sockets.debug.onopen = () => {
+    };
+    core.sockets.debug.onerror = () => {
+        response.resolve({ code: 500, data: `` });
+    };
+    core.sockets.debug.onmessage = () => {
+        response.resolveOk();
+        core.sockets.debug.onmessage = (ev) => {
+            core.debugSocketMessages.push(JSON.parse(ev.data));
+        };
+    };
+    return response;
+}
+function setupLogisticsSocket(core) {
+    const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_1__["ApiResponse"]();
+    core.sockets.logistics = new WebSocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${core.serviceID}`);
+    core.sockets.logistics.onopen = (ev) => {
+        if (core.sockets.logistics == null) {
+            throw `Expected sockets.logistics to not be null`;
+        }
+        const msg = {
+            service: "event",
+            action: "subscribe",
+            characters: ["all"],
+            worlds: [
+                core.serverID
+            ],
+            eventNames: [
+                "GainExperience_experience_id_1409",
+            ],
+            logicalAndCharactersWithWorlds: true
+        };
+        core.sockets.logistics.send(JSON.stringify(msg));
+        response.resolveOk();
+    };
+    core.sockets.logistics.onerror = (ev) => core.onSocketError("logistics", ev);
+    core.sockets.logistics.onmessage = core.onmessage.bind(core);
+    return response;
+}
+function setupLoginSocket(core) {
+    const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_1__["ApiResponse"]();
+    core.sockets.logins = new WebSocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${core.serviceID}`);
+    core.sockets.logins.onopen = (ev) => {
+        if (core.sockets.logins == null) {
+            throw `Expected sockets.login to not be null`;
+        }
+        const msg = {
+            service: "event",
+            action: "subscribe",
+            characters: ["all"],
+            worlds: [
+                core.serverID
+            ],
+            eventNames: [
+                "PlayerLogin",
+                "PlayerLogout"
+            ],
+            logicalAndCharactersWithWorlds: true
+        };
+        core.sockets.logins.send(JSON.stringify(msg));
+        response.resolveOk();
+    };
+    core.sockets.logins.onerror = (ev) => core.onSocketError("login", ev);
+    core.sockets.logins.onmessage = core.onmessage.bind(core);
+    return response;
+}
+function setupFacilitySocket(core) {
+    const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_1__["ApiResponse"]();
+    core.sockets.facility = new WebSocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${core.serviceID}`);
+    core.sockets.facility.onopen = (ev) => {
+        if (core.sockets.facility == null) {
+            throw `sockets.facility is null`;
+        }
+        const msg = {
+            service: "event",
+            action: "subscribe",
+            characters: ["all"],
+            worlds: [
+                core.serverID
+            ],
+            eventNames: [
+                "PlayerFacilityCapture",
+                "PlayerFacilityDefend",
+                "FacilityControl"
+            ],
+            logicalAndCharactersWithWorlds: true
+        };
+        core.sockets.facility.send(JSON.stringify(msg));
+        response.resolveOk();
+    };
+    core.sockets.facility.onmessage = core.onmessage.bind(core);
+    core.sockets.facility.onerror = (ev) => core.onSocketError("facility", ev);
+    return response;
+}
+
+
+/***/ }),
+
+/***/ "./src/core/CoreDebugHelper.ts":
+/*!*************************************!*\
+  !*** ./src/core/CoreDebugHelper.ts ***!
+  \*************************************/
+/*! no exports provided */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var core_Core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! core/Core */ "./src/core/Core.ts");
+
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.printExpEvent = function (expID) {
+    const self = this;
+    const events = Array.from(self.stats.values())
+        .map(iter => iter.events)
+        .reduce((acc, cur) => { acc.push(...cur); return acc; }, [])
+        .filter(iter => iter.type == "exp" && iter.expID == expID);
+    console.log(events);
+};
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.subscribeToEvent = function (...expID) {
+    if (this.sockets.debug == null) {
+        return console.error(`Cannot globally subscribe to ${expID}: debug socket is null`);
+    }
+    const msg = {
+        service: "event",
+        action: "subscribe",
+        characters: ["all"],
+        worlds: [
+            this.serverID
+        ],
+        eventNames: [
+            ...expID.map(iter => `GainExperience_experience_id_${iter}`)
+        ],
+        logicalAndCharactersWithWorlds: true
+    };
+    this.sockets.debug.send(JSON.stringify(msg));
+};
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.subscribeToAllEvent = function (...expID) {
+    if (this.sockets.debug == null) {
+        return console.error(`Cannot globally subscribe to ${expID}: debug socket is null`);
+    }
+    const msg = {
+        service: "event",
+        action: "subscribe",
+        characters: ["all"],
+        worlds: ["all"],
+        eventNames: [
+            ...expID.map(iter => `GainExperience_experience_id_${iter}`)
+        ]
+    };
+    this.sockets.debug.send(JSON.stringify(msg));
+};
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.subscribeToItemAdded = function () {
+    if (this.sockets.debug == null) {
+        return console.error(`Cannot subscribe to ItemAdded events: debug socket is null`);
+    }
+    const msg = {
+        service: "event",
+        action: "subscribe",
+        characters: ["all"],
+        worlds: [
+            this.serverID
+        ],
+        eventNames: [
+            "ItemAdded"
+        ],
+        logicalAndCharactersWithWorlds: true
+    };
+    this.sockets.debug.send(JSON.stringify(msg));
+};
+
+
+/***/ }),
+
+/***/ "./src/core/CoreProcessing.ts":
+/*!************************************!*\
+  !*** ./src/core/CoreProcessing.ts ***!
+  \************************************/
+/*! no exports provided */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var core_Core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! core/Core */ "./src/core/Core.ts");
+/* harmony import */ var core_census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! core/census/PsLoadout */ "./src/core/census/PsLoadout.ts");
+/* harmony import */ var core_PsEvent__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! core/PsEvent */ "./src/core/PsEvent.ts");
+/* harmony import */ var core_census_WeaponAPI__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! core/census/WeaponAPI */ "./src/core/census/WeaponAPI.ts");
+/* harmony import */ var core_census_FacilityAPI__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! core/census/FacilityAPI */ "./src/core/census/FacilityAPI.ts");
+/* harmony import */ var core_census_CharacterAPI__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! core/census/CharacterAPI */ "./src/core/census/CharacterAPI.ts");
+
+
+
+
+
+
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processMessage = function (input, override = false) {
+    var _a;
+    const self = this;
+    if (self.tracking.running == false && override == false) {
+        return;
+    }
+    let save = false;
+    const msg = JSON.parse(input);
+    if (msg.type == "serviceMessage") {
+        const event = msg.payload.event_name;
+        const timestamp = Number.parseInt(msg.payload.timestamp) * 1000;
+        const zoneID = msg.payload.zone_id;
+        if (event == "GainExperience") {
+            const eventID = msg.payload.experience_id;
+            const charID = msg.payload.character_id;
+            const targetID = msg.payload.other_id;
+            const amount = Number.parseInt(msg.payload.amount);
+            const event = core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvents"].get(eventID);
+            if (eventID == "1410") {
+                if (self.stats.get(charID) != undefined) {
+                    if (self.routerTracking.routerNpcs.has(charID)) {
+                        //console.log(`${charID} router npc check for ${targetID}`);
+                        const router = self.routerTracking.routerNpcs.get(charID);
+                        if (router.ID != targetID) {
+                            //console.warn(`New router placed by ${charID}, missed ItemAdded event: removing old one and replacing with ${targetID}`);
+                            router.destroyed = timestamp;
+                            self.routerTracking.routers.push(Object.assign({}, router));
+                            self.routerTracking.routerNpcs.set(charID, {
+                                ID: targetID,
+                                owner: charID,
+                                pulledAt: timestamp,
+                                firstSpawn: timestamp,
+                                destroyed: undefined,
+                                count: 1,
+                                type: "router"
+                            });
+                        }
+                        else {
+                            //console.log(`Same router, incrementing count`);
+                            if (router.ID == "") {
+                                router.ID = targetID;
+                            }
+                            if (router.firstSpawn == undefined) {
+                                router.firstSpawn = timestamp;
+                            }
+                            ++router.count;
+                        }
+                    }
+                    else {
+                        //console.log(`${charID} has new router ${targetID} placed/used`);
+                        self.routerTracking.routerNpcs.set(charID, {
+                            ID: targetID,
+                            owner: charID,
+                            pulledAt: timestamp,
+                            firstSpawn: timestamp,
+                            destroyed: undefined,
+                            count: 1,
+                            type: "router"
+                        });
+                    }
+                    save = true;
+                }
+            }
+            else if (eventID == "1409") {
+                const trackedNpcs = Array.from(self.routerTracking.routerNpcs.values());
+                const ids = trackedNpcs.map(iter => iter.ID);
+                if (ids.indexOf(targetID) > -1) {
+                    const router = trackedNpcs.find(iter => iter.ID == targetID);
+                    //console.log(`Router ${router.ID} placed by ${router.owner} destroyed, saving`);
+                    router.destroyed = timestamp;
+                    self.routerTracking.routers.push(Object.assign({}, router));
+                    self.routerTracking.routerNpcs.delete(router.owner);
+                    save = true;
+                }
+            }
+            const ev = {
+                type: "exp",
+                amount: amount,
+                expID: eventID,
+                zoneID: zoneID,
+                trueExpID: eventID,
+                loadoutID: msg.payload.loadout_id,
+                sourceID: charID,
+                targetID: targetID,
+                timestamp: timestamp
+            };
+            // Undefined means was the target of the event, not the source
+            const player = self.stats.get(charID);
+            if (player != undefined) {
+                if (Number.isNaN(amount)) {
+                    console.warn(`NaN amount from event: ${JSON.stringify(msg)}`);
+                }
+                else {
+                    player.score += amount;
+                }
+                if (event != undefined) {
+                    if (event.track == true) {
+                        player.stats.increment(eventID);
+                        if (event.alsoIncrement != undefined) {
+                            const alsoEvent = core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvents"].get(event.alsoIncrement);
+                            if (alsoEvent.track == true) {
+                                player.stats.increment(event.alsoIncrement);
+                            }
+                            ev.expID = event.alsoIncrement;
+                        }
+                    }
+                }
+                player.events.push(ev);
+            }
+            else {
+                self.miscEvents.push(ev);
+            }
+            self.processExperienceEvent(ev);
+            self.emit(ev);
+            if (eventID == core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].revive || eventID == core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadRevive) {
+                const target = self.stats.get(targetID);
+                if (target != undefined) {
+                    if (target.recentDeath != null) {
+                        target.recentDeath.revived = true;
+                        target.recentDeath.revivedEvent = ev;
+                        //console.log(`${targetID} died but was revived by ${charID}`);
+                    }
+                    target.stats.decrement(core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].death);
+                    target.stats.increment(core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].revived);
+                }
+            }
+            save = true;
+        }
+        else if (event == "Death") {
+            const targetID = msg.payload.character_id;
+            const sourceID = msg.payload.attacker_character_id;
+            const isHeadshot = msg.payload.is_headshot == "1";
+            const targetLoadoutID = msg.payload.character_loadout_id;
+            const sourceLoadoutID = msg.payload.attacker_loadout_id;
+            if (self.tracking.running == true) {
+                core_census_CharacterAPI__WEBPACK_IMPORTED_MODULE_5__["CharacterAPI"].cache(targetID);
+                core_census_CharacterAPI__WEBPACK_IMPORTED_MODULE_5__["CharacterAPI"].cache(sourceID);
+            }
+            const targetLoadout = core_census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadouts"].get(targetLoadoutID);
+            if (targetLoadout == undefined) {
+                return console.warn(`Unknown target loadout ID: ${targetLoadoutID}`);
+            }
+            const sourceLoadout = core_census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadouts"].get(sourceLoadoutID);
+            if (sourceLoadout == undefined) {
+                return console.warn(`Unknown source loadout ID: ${sourceLoadoutID}`);
+            }
+            let targetTicks = self.stats.get(targetID);
+            if (targetTicks != undefined && targetLoadout.faction != sourceLoadout.faction) {
+                targetTicks.stats.increment(core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].death);
+                const ev = {
+                    type: "death",
+                    isHeadshot: isHeadshot,
+                    sourceID: targetID,
+                    targetID: sourceID,
+                    loadoutID: targetLoadoutID,
+                    targetLoadoutID: sourceLoadoutID,
+                    weaponID: msg.payload.attacker_weapon_id,
+                    revived: false,
+                    revivedEvent: null,
+                    timestamp: timestamp,
+                    zoneID: zoneID
+                };
+                targetTicks.events.push(ev);
+                targetTicks.recentDeath = ev;
+                core_census_WeaponAPI__WEBPACK_IMPORTED_MODULE_3__["WeaponAPI"].precache(ev.weaponID);
+                self.emit(ev);
+                self.processKillDeathEvent(ev);
+                save = true;
+            }
+            let sourceTicks = self.stats.get(sourceID);
+            if (sourceTicks != undefined) {
+                if (targetLoadout.faction == sourceLoadout.faction) {
+                    sourceTicks.stats.increment(core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].teamkill);
+                    (_a = targetTicks) === null || _a === void 0 ? void 0 : _a.stats.increment(core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].teamkilled);
+                    const ev = {
+                        type: "teamkill",
+                        sourceID: sourceID,
+                        loadoutID: sourceLoadoutID,
+                        targetID: targetID,
+                        targetLoadoutID: targetLoadoutID,
+                        weaponID: msg.payload.attacker_weapon_id,
+                        zoneID: zoneID,
+                        timestamp: timestamp
+                    };
+                    sourceTicks.events.push(ev);
+                    self.emit(ev);
+                }
+                else {
+                    sourceTicks.stats.increment(core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].kill);
+                    if (isHeadshot == true) {
+                        sourceTicks.stats.increment(core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].headshot);
+                    }
+                    const ev = {
+                        type: "kill",
+                        isHeadshot: isHeadshot,
+                        sourceID: sourceID,
+                        targetID: targetID,
+                        loadoutID: sourceLoadoutID,
+                        targetLoadoutID: targetLoadoutID,
+                        weaponID: msg.payload.attacker_weapon_id,
+                        timestamp: timestamp,
+                        zoneID: zoneID
+                    };
+                    sourceTicks.events.push(ev);
+                    core_census_WeaponAPI__WEBPACK_IMPORTED_MODULE_3__["WeaponAPI"].precache(ev.weaponID);
+                    self.emit(ev);
+                    self.processKillDeathEvent(ev);
+                }
+                save = true;
+            }
+        }
+        else if (event == "PlayerFacilityCapture") {
+            const playerID = msg.payload.character_id;
+            const outfitID = msg.payload.outfit_id;
+            const facilityID = msg.payload.facility_id;
+            const ev = {
+                type: "capture",
+                sourceID: playerID,
+                outfitID: outfitID,
+                facilityID: facilityID,
+                timestamp: timestamp,
+                zoneID: zoneID
+            };
+            self.playerCaptures.push(ev);
+            let player = self.stats.get(playerID);
+            if (player != undefined) {
+                player.stats.increment(core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].baseCapture);
+                player.events.push(ev);
+            }
+            self.emit(ev);
+            save = true;
+        }
+        else if (event == "PlayerFacilityDefend") {
+            const playerID = msg.payload.character_id;
+            const outfitID = msg.payload.outfit_id;
+            const facilityID = msg.payload.facility_id;
+            const ev = {
+                type: "defend",
+                sourceID: playerID,
+                outfitID: outfitID,
+                facilityID: facilityID,
+                timestamp: timestamp,
+                zoneID: zoneID,
+            };
+            self.playerCaptures.push(ev);
+            self.emit(ev);
+            let player = self.stats.get(playerID);
+            if (player != undefined) {
+                player.stats.increment(core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].baseDefense);
+            }
+            save = true;
+        }
+        else if (event == "AchievementEarned") {
+            const charID = msg.payload.character_id;
+            const achivID = msg.payload.achievement_id;
+            const char = self.stats.get(charID);
+            if (char != undefined) {
+                char.ribbons.increment(achivID);
+                save = true;
+            }
+        }
+        else if (event == "FacilityControl") {
+            const outfitID = msg.payload.outfit_id;
+            const facilityID = msg.payload.facility_id;
+            core_census_FacilityAPI__WEBPACK_IMPORTED_MODULE_4__["FacilityAPI"].getByID(facilityID).ok((data) => {
+                console.log(`New facility capture: ${data.name}`);
+                const capture = {
+                    facilityID: data.ID,
+                    zoneID: zoneID,
+                    name: data.name,
+                    typeID: data.typeID,
+                    type: data.type,
+                    timestamp: new Date(timestamp),
+                    timeHeld: Number.parseInt(msg.payload.duration_held),
+                    factionID: msg.payload.new_faction_id,
+                    outfitID: outfitID,
+                    previousFaction: msg.payload.old_faction_id,
+                };
+                self.facilityCaptures.push(capture);
+            }).noContent(() => {
+                console.error(`Failed to find facility ID ${facilityID}`);
+            });
+            save = true;
+        }
+        else if (event == "ItemAdded") {
+            const itemID = msg.payload.item_id;
+            const charID = msg.payload.character_id;
+            if (itemID == "6003551") {
+                if (self.stats.get(charID) != undefined) {
+                    //console.log(`${charID} pulled a new router`);
+                    if (self.routerTracking.routerNpcs.has(charID)) {
+                        const router = self.routerTracking.routerNpcs.get(charID);
+                        //console.log(`${charID} pulled a new router, saving old one`);
+                        router.destroyed = timestamp;
+                        self.routerTracking.routers.push(Object.assign({}, router));
+                    }
+                    const router = {
+                        ID: "",
+                        owner: charID,
+                        count: 0,
+                        destroyed: undefined,
+                        firstSpawn: undefined,
+                        pulledAt: timestamp,
+                        type: "router"
+                    };
+                    self.routerTracking.routerNpcs.set(charID, router);
+                    save = true;
+                }
+            }
+        }
+        else if (event == "VehicleDestroy") {
+            const killerID = msg.payload.attacker_character_id;
+            const killerLoadoutID = msg.payload.attacker_loadout_id;
+            const killerWeaponID = msg.payload.attacker_weapon_id;
+            const vehicleID = msg.payload.vehicle_id;
+            const player = self.stats.get(killerID);
+            if (player != undefined) {
+                const ev = {
+                    type: "vehicle",
+                    sourceID: killerID,
+                    loadoutID: killerLoadoutID,
+                    weaponID: killerWeaponID,
+                    targetID: msg.payload.character_id,
+                    vehicleID: vehicleID,
+                    timestamp: timestamp,
+                    zoneID: zoneID
+                };
+                player.events.push(ev);
+                save = true;
+                self.emit(ev);
+            }
+        }
+        else if (event == "PlayerLogin") {
+            const charID = msg.payload.character_id;
+            if (this.stats.has(charID)) {
+                const char = this.stats.get(charID);
+                char.online = true;
+                if (this.tracking.running == true) {
+                    char.joinTime = new Date().getTime();
+                }
+                const ev = {
+                    type: "login",
+                    sourceID: charID,
+                    timestamp: timestamp
+                };
+                char.events.push(ev);
+                self.emit(ev);
+                self.addMember({
+                    ID: char.characterID,
+                    name: char.name,
+                    outfitTag: char.outfitTag
+                });
+            }
+        }
+        else if (event == "PlayerLogout") {
+            const charID = msg.payload.character_id;
+            if (this.stats.has(charID)) {
+                const char = this.stats.get(charID);
+                char.online = false;
+                if (this.tracking.running == true) {
+                    const diff = new Date().getTime() - char.joinTime;
+                    char.secondsOnline += (diff / 1000);
+                }
+                const ev = {
+                    type: "logout",
+                    sourceID: charID,
+                    timestamp: timestamp
+                };
+                char.events.push(ev);
+                self.emit(ev);
+                self.removeMember(charID);
+            }
+        }
+        else {
+            console.warn(`Unknown event type: ${event}\n${JSON.stringify(msg)}`);
+        }
+    }
+    else if (msg.type == "heartbeat") {
+        //console.log(`Heartbeat ${new Date().toISOString()}`);
+    }
+    else if (msg.type == "serviceStateChanged") {
+        console.log(`serviceStateChanged event`);
+    }
+    else if (msg.type == "connectionStateChanged") {
+        console.log(`connectionStateChanged event`);
+    }
+    else if (msg.type == undefined) {
+        // Occurs in response to subscribing to new events
+    }
+    else {
+        console.warn(`Unchecked message type: '${msg.type}'`);
+    }
+    if (save == true) {
+        self.rawData.push(JSON.stringify(msg));
+    }
+};
+
+
+/***/ }),
+
+/***/ "./src/core/CoreSettings.ts":
+/*!**********************************!*\
+  !*** ./src/core/CoreSettings.ts ***!
+  \**********************************/
+/*! exports provided: CoreSettings */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "CoreSettings", function() { return CoreSettings; });
+class CoreSettings {
+    constructor() {
+        /**
+         * Service ID used to connect to the event stream
+         */
+        this.serviceID = "";
+        /**
+         * If the dark mode CSS will be added
+         */
+        this.darkMode = false;
+        /**
+         * ID of the server to listen to login/logout and facility events
+         */
+        this.serverID = "1";
+    }
+}
+
+
+/***/ }),
+
+/***/ "./src/core/CoreSquad.ts":
+/*!*******************************!*\
+  !*** ./src/core/CoreSquad.ts ***!
+  \*******************************/
+/*! no exports provided */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var core_Core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! core/Core */ "./src/core/Core.ts");
+/* harmony import */ var core_census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! core/census/PsLoadout */ "./src/core/census/PsLoadout.ts");
+/* harmony import */ var core_PsEvent__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! core/PsEvent */ "./src/core/PsEvent.ts");
+/* harmony import */ var _squad_Squad__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./squad/Squad */ "./src/core/squad/Squad.ts");
+
+
+
+
+const squadEvents = [
+    core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadResupply,
+    core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadHeal,
+    core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadMaxRepair,
+    core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadMotionDetect,
+    core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadRadarDetect,
+    core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadRevive,
+    core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadShieldRepair,
+    //PsEvent.squadSpawn, // Other ID isn't a char ID
+    core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadSpotKill
+];
+const nonSquadEvents = [
+    core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].heal,
+    core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].revive,
+    core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].resupply,
+    core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].shieldRepair,
+    core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].motionDetect,
+    core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].radarDetect,
+    core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].spotKill,
+];
+const log = (msg) => {
+    console.log(`[CoreSquad] ${msg}`);
+};
+const warn = (msg) => {
+    console.warn(`[CoreSquad] ${msg}`);
+};
+const debug = (msg) => {
+    console.log(`[CoreSquad] ${msg}`);
+};
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.squadInit = function () {
+    // Make the four default squads
+    this.createPermSquad();
+    this.createPermSquad();
+    this.createPermSquad();
+    this.createPermSquad();
+    setInterval(() => {
+        const time = new Date().getTime();
+        this.squad.members.forEach((member, charID) => {
+            if (member.state == "dying" && member.whenDied != null) {
+                member.timeDead = (time - member.whenDied) / 1000;
+                if (member.timeDead > 29) {
+                    member.state = "dead";
+                }
+            }
+            if (member.whenBeacon) {
+                member.beaconCooldown = (time - member.whenBeacon) / 1000;
+                if (member.beaconCooldown > 299) {
+                    member.whenBeacon = null;
+                    member.beaconCooldown = 0;
+                }
+            }
+        });
+    }, 1000);
+};
+function sortSquad(squad) {
+    squad.members.sort((a, b) => {
+        if (b.online == false && a.online == false) {
+            return a.name.localeCompare(b.name);
+        }
+        if (b.online == false || a.online == false) {
+            return -1;
+        }
+        return a.name.localeCompare(b.name);
+    });
+}
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.addMember = function (char) {
+    if (this.squad.members.has(char.ID)) {
+        this.squad.members.get(char.ID).online = true;
+        debug(`${char.name}/${char.ID} was online before, setting online again`);
+        return;
+    }
+    this.squad.members.set(char.ID, {
+        name: char.name,
+        charID: char.ID,
+        outfitTag: char.outfitTag,
+        class: "",
+        state: "alive",
+        timeDead: 0,
+        whenDied: null,
+        whenBeacon: null,
+        beaconCooldown: 0,
+        online: true
+    });
+    const member = this.squad.members.get(char.ID);
+    member.online = true;
+    debug(`Started squad tracking ${char.name}/${char.ID}`);
+    const squad = this.createGuessSquad();
+    squad.members.push(member);
+    sortSquad(squad);
+};
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processKillDeathEvent = function (event) {
+    var _a, _b;
+    if (event.type == "kill") {
+        if (this.squad.members.has(event.sourceID)) {
+            const member = this.squad.members.get(event.sourceID);
+            member.state = "alive";
+            member.timeDead = 0;
+            member.whenDied = null;
+            const loadout = (_a = core_census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadouts"].get(event.loadoutID), (_a !== null && _a !== void 0 ? _a : core_census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadout"].default));
+            switch (loadout.type) {
+                case "infil":
+                    member.class = "I";
+                    break;
+                case "lightAssault":
+                    member.class = "L";
+                    break;
+                case "medic":
+                    member.class = "M";
+                    break;
+                case "engineer":
+                    member.class = "E";
+                    break;
+                case "heavy":
+                    member.class = "H";
+                    break;
+                case "max":
+                    member.class = "W";
+                    break;
+                case "unknown":
+                    member.class = "";
+                    break;
+            }
+        }
+    }
+    else if (event.type == "death") {
+        if (this.squad.members.has(event.sourceID)) {
+            const member = this.squad.members.get(event.sourceID);
+            member.state = "dying";
+            member.whenDied = new Date().getTime();
+            member.timeDead = 0;
+            const loadout = (_b = core_census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadouts"].get(event.loadoutID), (_b !== null && _b !== void 0 ? _b : core_census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadout"].default));
+            switch (loadout.type) {
+                case "infil":
+                    member.class = "I";
+                    break;
+                case "lightAssault":
+                    member.class = "L";
+                    break;
+                case "medic":
+                    member.class = "M";
+                    break;
+                case "engineer":
+                    member.class = "E";
+                    break;
+                case "heavy":
+                    member.class = "H";
+                    break;
+                case "max":
+                    member.class = "W";
+                    break;
+                case "unknown":
+                    member.class = "";
+                    break;
+            }
+        }
+    }
+};
+const validRespawnEvent = (ev, whenDied) => {
+    // These events can happen whenever and aren't useful for knowing if someone is alive or not
+    if (ev.expID == core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].resupply || ev.expID == core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadResupply
+        || ev.expID == core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].shieldRepair || ev.expID == core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadShieldRepair
+        || ev.expID == core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].killAssist
+        || ev.expID == core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].ribbon
+        || ev.expID == core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].motionDetect || ev.expID == core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadMotionDetect
+        || ev.expID == core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadSpawn
+        || ev.expID == core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].drawfire
+    //|| ev.expID == PsEvent.heal || ev.expID == PsEvent.squadHeal // People rarely run mending field to make this an issue
+    ) {
+        return false;
+    }
+    // These events might be useful, depending on how long ago the player died, for example if they get a revive
+    //      within 1 second of death it might be a revive nade, but if it's after 8 seconds we know they had to respawn
+    //      in some other way as a revive nade takes 2.5 seconds to prime
+    /*
+    if (whenDied != null) {
+        console.log(`It's been ${ev.timestamp - whenDied} ms since death`);
+        if (((ev.expID == PsEvent.revive || ev.expID == PsEvent.squadRevive) && (ev.timestamp - whenDied <= 5)) // Revive nades take 2.5 seconds to prime
+            || ((ev.expID == PsEvent.heal || ev.expID == PsEvent.squadHeal) && (ev.timestamp - whenDied <= 15)) // Heal nades last for 10? seconds
+        ) {
+            return false;
+        }
+    }
+    */
+    return true;
+};
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processExperienceEvent = function (event) {
+    var _a, _b, _c, _d, _e;
+    if (event.expID == core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].revive || event.expID == core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadRevive) {
+        if (this.squad.members.has(event.targetID)) {
+            const member = this.squad.members.get(event.targetID);
+            member.state = "alive";
+            member.timeDead = 0;
+            member.whenDied = null;
+        }
+    }
+    if (event.expID == core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadSpawn) {
+        if (this.squad.members.has(event.sourceID)) {
+            const member = this.squad.members.get(event.sourceID);
+            if (member.whenBeacon == null) {
+                console.log(`${member.name} placed a beacon`);
+                member.beaconCooldown = 300;
+                member.whenBeacon = new Date().getTime();
+            }
+        }
+    }
+    if (this.squad.members.has(event.sourceID)) {
+        const member = this.squad.members.get(event.sourceID);
+        if (member.state != "alive") {
+            if (validRespawnEvent(event, member.whenDied) == true) {
+                member.state = "alive";
+                member.whenDied = null;
+                member.timeDead = 0;
+                //debug(`${member.name} was revived from ${event}`);
+            }
+        }
+        const loadout = (_a = core_census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadouts"].get(event.loadoutID), (_a !== null && _a !== void 0 ? _a : core_census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadout"].default));
+        switch (loadout.type) {
+            case "infil":
+                member.class = "I";
+                break;
+            case "lightAssault":
+                member.class = "L";
+                break;
+            case "medic":
+                member.class = "M";
+                break;
+            case "engineer":
+                member.class = "E";
+                break;
+            case "heavy":
+                member.class = "H";
+                break;
+            case "max":
+                member.class = "W";
+                break;
+            case "unknown":
+                warn(`Unknown class from event: ${event}`);
+                member.class = "";
+                break;
+        }
+    }
+    const sourceMember = this.squad.members.get(event.sourceID);
+    const targetMember = this.squad.members.get(event.targetID);
+    if (sourceMember == undefined || targetMember == undefined) {
+        return;
+    }
+    let sourceSquad = this.getSquadOfMember(event.sourceID);
+    let targetSquad = this.getSquadOfMember(event.targetID);
+    if (sourceSquad == null) {
+        sourceSquad = this.createGuessSquad();
+        sourceSquad.members.push(sourceMember);
+    }
+    if (targetSquad == null) {
+        targetSquad = this.createGuessSquad();
+        targetSquad.members.push(targetMember);
+    }
+    // Check if the squads need to be merged into one another if this was a squad exp source
+    if (squadEvents.indexOf(event.trueExpID) > -1) {
+        if (sourceSquad.ID == targetSquad.ID) {
+            //console.log(`${sourceMember.name} // ${targetMember.name} are already in a squad`);
+        }
+        else {
+            const ev = core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvents"].get(event.expID);
+            // 3 cases:
+            //      1. Both squads are guesses => Merge squads
+            //      2. One squad isn't a guess => Move guess squad into non-guess squad
+            //      3. Neither squad is a guess => Move member who performed action into other squad
+            if (targetSquad.guess == true && sourceSquad.guess == true) {
+                debug(`Both guesses, merging ${sourceMember.name} (${sourceSquad}) into ${targetMember.name} (${targetSquad}) from ${(_b = ev) === null || _b === void 0 ? void 0 : _b.name}`);
+                this.mergeSquads(sourceSquad, targetSquad);
+            }
+            else if (targetSquad.guess == false && sourceSquad.guess == true) {
+                debug(`Target is not a guess, merging ${sourceMember.name} (${sourceSquad}) into ${targetMember.name} (${targetSquad}) from ${(_c = ev) === null || _c === void 0 ? void 0 : _c.name}`);
+                this.mergeSquads(targetSquad, sourceSquad);
+            }
+            else if (targetSquad.guess == true && sourceSquad.guess == false) {
+                debug(`Source is not a guess, merging ${targetMember.name} (${targetSquad}) into ${sourceMember.name} (${sourceSquad}) from ${(_d = ev) === null || _d === void 0 ? void 0 : _d.name}`);
+                this.mergeSquads(sourceSquad, targetSquad);
+            }
+            else if (targetSquad.guess == false && sourceSquad.guess == false) {
+                debug(`Neither squad is a guess, moving ${targetMember.name} into ${sourceMember} (${sourceSquad}) from ${(_e = ev) === null || _e === void 0 ? void 0 : _e.name}`);
+                sourceSquad.members.push(targetMember);
+                targetSquad.members = targetSquad.members.filter(iter => iter.charID != targetMember.charID);
+            }
+            sortSquad(sourceSquad);
+            sortSquad(targetSquad);
+        }
+    }
+    // Check if the squad is no longer valid and needs to be removed, i.e. moved squads
+    if (nonSquadEvents.indexOf(event.trueExpID) > -1) {
+        //console.log(`Non squad event: ${event.trueExpID}`);
+        if (sourceSquad.ID == targetSquad.ID) {
+            debug(`${sourceMember.name} was in squad with ${targetMember.name}, but didn't get an expect squad exp event`);
+            targetSquad.members = targetSquad.members.filter(iter => iter.charID != sourceMember.charID);
+            const squad = this.createGuessSquad();
+            squad.members.push(sourceMember);
+            sortSquad(squad);
+            sortSquad(targetSquad);
+            sortSquad(sourceSquad);
+        }
+    }
+};
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.getSquad = function (squadName) {
+    let squad = this.squad.perm.find(iter => iter.name == squadName) || null;
+    if (squad != null) {
+        return squad;
+    }
+    return this.squad.guesses.find(iter => iter.name == squadName) || null;
+};
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.addMemberToSquad = function (charID, squadName) {
+    const member = this.squad.members.get(charID);
+    if (member == undefined) {
+        return warn(`Cannot move ${charID} to ${squadName}: ${charID} is not a squad member`);
+    }
+    const squad = this.getSquad(squadName);
+    if (squad == null) {
+        return warn(`Cannot move ${charID} to ${squadName}: squad ${squadName} does not exist`);
+    }
+    if (squad.members.find(iter => iter.charID == charID) != null) {
+        return debug(`${charID} is already part of squad ${squadName}, no need to move`);
+    }
+    const oldSquad = this.getSquadOfMember(charID);
+    if (oldSquad != null) {
+        debug(`${charID} is currently in ${oldSquad.name}, moving out of it`);
+        oldSquad.members = oldSquad.members.filter(iter => iter.charID != charID);
+        if (oldSquad.members.length == 0 && oldSquad.guess == true) {
+            this.squad.guesses = this.squad.guesses.filter(iter => iter.ID != oldSquad.ID);
+        }
+    }
+    squad.members.push(member);
+    sortSquad(squad);
+};
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.getSquadOfMember = function (charID) {
+    const check = (squad) => {
+        return squad.members.find(iter => iter.charID == charID) != null;
+    };
+    for (const squad of this.squad.perm) {
+        if (check(squad) == true) {
+            return squad;
+        }
+    }
+    for (const squad of this.squad.guesses) {
+        if (check(squad) == true) {
+            return squad;
+        }
+    }
+    return null;
+};
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.mergeSquads = function (into, from) {
+    into.members.push(...from.members);
+    from.members = [];
+    if (from.guess == true) {
+        debug(`${from.name} is a guess, removing from list`);
+        this.squad.guesses = this.squad.guesses.filter(iter => iter.ID != from.ID);
+    }
+};
+let squadNameIndex = 0;
+let squadNames = [
+    "q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "a", "s", "d",
+    "f", "g", "h", "j", "k", "l", "z", "x", "c", "v", "b", "n", "m"
+];
+let permSquadNames = [
+    "Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf", "Hotel"
+];
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.createGuessSquad = function () {
+    const squad = new _squad_Squad__WEBPACK_IMPORTED_MODULE_3__["Squad"]();
+    squad.name = squadNames[(squadNameIndex++) % 26];
+    squad.guess = true;
+    debug(`Created new guess squad ${squad.name}`);
+    this.squad.guesses.push(squad);
+    return squad;
+};
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.createPermSquad = function () {
+    const squad = new _squad_Squad__WEBPACK_IMPORTED_MODULE_3__["Squad"]();
+    squad.name = `${this.squad.perm.length + 1}`;
+    squad.guess = false;
+    squad.display = permSquadNames[(this.squad.perm.length % permSquadNames.length)];
+    debug(`Created new perm squad ${squad.name}/${squad.display}`);
+    this.squad.perm.push(squad);
+    return squad;
+};
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.removePermSquad = function (squadName) {
+    for (const squad of this.squad.perm) {
+        if (squad.name == squadName && squad.members.length > 0) {
+            const newSquad = this.createGuessSquad();
+            for (const member of squad.members) {
+                newSquad.members.push(member);
+            }
+            sortSquad(newSquad);
+            squad.members = [];
+        }
+    }
+    this.squad.perm = this.squad.perm.filter(iter => iter.name != squadName);
+};
+core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.removeMember = function (charID) {
+    log(`${charID} is offline`);
+    if (this.squad.members.has(charID)) {
+        const char = this.squad.members.get(charID);
+        char.online = false;
+        char.state = "alive";
+        char.whenDied = null;
+        char.timeDead = 0;
+    }
+};
+
+
+/***/ }),
+
+/***/ "./src/core/EventReporter.ts":
+/*!***********************************!*\
+  !*** ./src/core/EventReporter.ts ***!
+  \***********************************/
+/*! exports provided: BreakdownArray, Breakdown, BreakdownTimeslot, BreakdownTrend, OutfitVersusBreakdown, BreakdownWeaponType, classCollectionNumber, BaseCaptureOutfit, BaseCapture, statMapToBreakdown, defaultCharacterMapper, defaultCharacterSortField, defaultWeaponMapper, defaultVehicleMapper, default */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "BreakdownArray", function() { return BreakdownArray; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Breakdown", function() { return Breakdown; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "BreakdownTimeslot", function() { return BreakdownTimeslot; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "BreakdownTrend", function() { return BreakdownTrend; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "OutfitVersusBreakdown", function() { return OutfitVersusBreakdown; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "BreakdownWeaponType", function() { return BreakdownWeaponType; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "classCollectionNumber", function() { return classCollectionNumber; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "BaseCaptureOutfit", function() { return BaseCaptureOutfit; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "BaseCapture", function() { return BaseCapture; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "statMapToBreakdown", function() { return statMapToBreakdown; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "defaultCharacterMapper", function() { return defaultCharacterMapper; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "defaultCharacterSortField", function() { return defaultCharacterSortField; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "defaultWeaponMapper", function() { return defaultWeaponMapper; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "defaultVehicleMapper", function() { return defaultVehicleMapper; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "default", function() { return EventReporter; });
+/* harmony import */ var core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! core/census/ApiWrapper */ "./src/core/census/ApiWrapper.ts");
+/* harmony import */ var core_census_CharacterAPI__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! core/census/CharacterAPI */ "./src/core/census/CharacterAPI.ts");
+/* harmony import */ var core_census_WeaponAPI__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! core/census/WeaponAPI */ "./src/core/census/WeaponAPI.ts");
+/* harmony import */ var core_StatMap__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! core/StatMap */ "./src/core/StatMap.ts");
+/* harmony import */ var core_census_PsLoadout__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! core/census/PsLoadout */ "./src/core/census/PsLoadout.ts");
+/* harmony import */ var core_census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! core/census/VehicleAPI */ "./src/core/census/VehicleAPI.ts");
+/* harmony import */ var core_PsEvent__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! core/PsEvent */ "./src/core/PsEvent.ts");
+/* harmony import */ var core_InvididualGenerator__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! core/InvididualGenerator */ "./src/core/InvididualGenerator.ts");
+/* harmony import */ var core_census_OutfitAPI__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! core/census/OutfitAPI */ "./src/core/census/OutfitAPI.ts");
+
+
+
+
+
+
+
+
+
+class BreakdownArray {
+    constructor() {
+        this.data = [];
+        this.total = 0;
+        this.display = null;
+    }
+}
+class Breakdown {
+    constructor() {
+        this.display = "";
+        this.sortField = "";
+        this.amount = 0;
+        this.color = undefined;
+    }
+}
+class BreakdownTimeslot {
+    constructor() {
+        this.startTime = 0;
+        this.endTime = 0;
+        this.value = 0;
+    }
+}
+class BreakdownTrend {
+    constructor() {
+        this.timestamp = new Date();
+        this.values = [];
+    }
+}
+;
+class OutfitVersusBreakdown {
+    constructor() {
+        this.tag = "";
+        this.name = "";
+        this.faction = "";
+        this.kills = 0;
+        this.deaths = 0;
+        this.revived = 0;
+        this.players = 0;
+        this.classKills = classCollectionNumber();
+        this.classDeaths = classCollectionNumber();
+        this.classRevived = classCollectionNumber();
+    }
+}
+class BreakdownWeaponType {
+    constructor() {
+        this.type = "";
+        this.deaths = 0;
+        this.revived = 0;
+        this.unrevived = 0;
+        this.headshots = 0;
+        this.mostUsed = "";
+        this.mostUsedDeaths = 0;
+    }
+}
+function classCollectionNumber() {
+    return {
+        total: 0,
+        infil: 0,
+        lightAssault: 0,
+        medic: 0,
+        engineer: 0,
+        heavy: 0,
+        max: 0
+    };
+}
+class BaseCaptureOutfit {
+    constructor() {
+        this.ID = "";
+        this.name = "";
+        this.tag = "";
+        this.amount = 0;
+    }
+}
+class BaseCapture {
+    constructor() {
+        this.name = "";
+        this.faction = "";
+        this.timestamp = 0;
+        this.outfits = new BreakdownArray();
+    }
+}
+function statMapToBreakdown(map, source, matcher, mapper, sortField = undefined) {
+    const breakdown = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+    const arr = new BreakdownArray();
+    if (map.size() > 0) {
+        const IDs = Array.from(map.getMap().keys());
+        source(IDs).ok((data) => {
+            map.getMap().forEach((amount, ID) => {
+                const datum = data.find(elem => matcher(elem, ID));
+                const breakdown = {
+                    display: mapper(datum, ID),
+                    sortField: (sortField != undefined) ? sortField(datum, ID) : mapper(datum, ID),
+                    amount: amount,
+                    color: undefined
+                };
+                arr.total += amount;
+                arr.data.push(breakdown);
+            });
+            arr.data.sort((a, b) => {
+                const diff = b.amount - a.amount;
+                return diff || b.sortField.localeCompare(a.sortField);
+            });
+            breakdown.resolveOk(arr);
+        });
+    }
+    else {
+        breakdown.resolveOk(arr);
+    }
+    return breakdown;
+}
+function defaultCharacterMapper(elem, ID) {
+    var _a;
+    return `${((_a = elem) === null || _a === void 0 ? void 0 : _a.outfitTag) ? `[${elem.outfitTag}] ` : ``}${(elem) ? elem.name : `Unknown ${ID}`}`;
+}
+function defaultCharacterSortField(elem, ID) {
+    var _a, _b;
+    return _b = (_a = elem) === null || _a === void 0 ? void 0 : _a.name, (_b !== null && _b !== void 0 ? _b : `Unknown ${ID}}`);
+}
+function defaultWeaponMapper(elem, ID) {
+    var _a, _b;
+    return _b = (_a = elem) === null || _a === void 0 ? void 0 : _a.name, (_b !== null && _b !== void 0 ? _b : `Unknown ${ID}`);
+}
+function defaultVehicleMapper(elem, ID) {
+    var _a, _b;
+    return _b = (_a = elem) === null || _a === void 0 ? void 0 : _a.name, (_b !== null && _b !== void 0 ? _b : `Unknown ${ID}`);
+}
+class EventReporter {
+    static facilityCaptures(data) {
+        const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        const baseCaptures = [];
+        const captures = data.captures;
+        const players = data.players;
+        const outfitIDs = players
+            .map(iter => iter.outfitID)
+            .filter((value, index, arr) => arr.indexOf(value) == index);
+        console.log(`Have ${data.captures.length} captures`);
+        core_census_OutfitAPI__WEBPACK_IMPORTED_MODULE_8__["default"].getByIDs(outfitIDs).ok((data) => {
+            var _a, _b, _c, _d;
+            for (const capture of captures) {
+                // Same faction caps are boring
+                if (capture.factionID == capture.previousFaction) {
+                    continue;
+                }
+                const entry = new BaseCapture();
+                entry.timestamp = capture.timestamp.getTime();
+                entry.name = capture.name;
+                entry.faction = capture.previousFaction;
+                const facilityID = capture.facilityID;
+                const name = capture.name;
+                const outfitID = capture.outfitID;
+                const outfit = data.find(iter => iter.ID == outfitID);
+                if (outfit == undefined) {
+                    console.warn(`Missing outfit ${outfitID}`);
+                    continue;
+                }
+                const helpers = players.filter(iter => iter.timestamp == capture.timestamp.getTime());
+                const outfits = [{ name: "No outfit", ID: "-1", amount: 0, tag: "" }];
+                for (const helper of helpers) {
+                    let outfitEntry = undefined;
+                    if (helper.outfitID == "0" || helper.outfitID.length == 0) {
+                        outfitEntry = outfits[0];
+                    }
+                    else {
+                        outfitEntry = outfits.find(iter => iter.ID == helper.outfitID);
+                        if (outfitEntry == undefined) {
+                            const outfitDatum = data.find(iter => iter.ID == helper.outfitID);
+                            outfitEntry = {
+                                ID: helper.outfitID,
+                                name: (_b = (_a = outfitDatum) === null || _a === void 0 ? void 0 : _a.name, (_b !== null && _b !== void 0 ? _b : `Unknown ${helper.outfitID}`)),
+                                amount: 0,
+                                tag: (_d = (_c = outfitDatum) === null || _c === void 0 ? void 0 : _c.tag, (_d !== null && _d !== void 0 ? _d : ``)),
+                            };
+                            outfits.push(outfitEntry);
+                        }
+                    }
+                    ++outfitEntry.amount;
+                }
+                const breakdown = {
+                    data: outfits.sort((a, b) => b.amount - a.amount).map(iter => {
+                        return {
+                            display: iter.name,
+                            amount: iter.amount,
+                            color: undefined,
+                            sortField: `${iter.amount}`
+                        };
+                    }),
+                    total: outfits.reduce(((acc, iter) => acc += iter.amount), 0),
+                    display: null
+                };
+                entry.outfits = breakdown;
+                baseCaptures.push(entry);
+            }
+            response.resolveOk(baseCaptures);
+        });
+        return response;
+    }
+    static experience(expID, events) {
+        const exp = new core_StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        for (const event of events) {
+            if (event.type == "exp" && (event.expID == expID || event.trueExpID == expID)) {
+                exp.increment(event.targetID);
+            }
+        }
+        return statMapToBreakdown(exp, core_census_CharacterAPI__WEBPACK_IMPORTED_MODULE_1__["CharacterAPI"].getByIDs, (elem, charID) => elem.ID == charID, defaultCharacterMapper, defaultCharacterSortField);
+    }
+    static experienceSource(ids, targetID, events) {
+        const exp = new core_StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        for (const event of events) {
+            if (event.type == "exp" && event.targetID == targetID && ids.indexOf(event.expID) > -1) {
+                exp.increment(event.sourceID);
+            }
+        }
+        if (exp.size() == 0) {
+            return core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"].resolve({ code: 204, data: null });
+        }
+        console.log(`charIDs: [${Array.from(exp.getMap().keys()).join(", ")}]`);
+        return statMapToBreakdown(exp, core_census_CharacterAPI__WEBPACK_IMPORTED_MODULE_1__["CharacterAPI"].getByIDs, (elem, charID) => elem.ID == charID, defaultCharacterMapper, defaultCharacterSortField);
+    }
+    static outfitVersusBreakdown(events) {
+        const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        const outfitBreakdowns = new Map();
+        const outfitPlayers = new Map();
+        const killCount = events.filter(iter => iter.type == "kill").length;
+        const deathCount = events.filter(iter => iter.type == "death" && iter.revived == false).length;
+        const charIDs = events.filter((iter) => iter.type == "kill" || (iter.type == "death" && iter.revived == false))
+            .map((iter) => {
+            if (iter.type == "kill") {
+                return iter.targetID;
+            }
+            else if (iter.type == "death" && iter.revived == false) {
+                return iter.targetID;
+            }
+            throw `Invalid event type '${iter.type}'`;
+        });
+        core_census_CharacterAPI__WEBPACK_IMPORTED_MODULE_1__["CharacterAPI"].getByIDs(charIDs).ok((data) => {
+            for (const ev of events) {
+                if (ev.type == "kill" || ev.type == "death") {
+                    const killedChar = data.find(iter => iter.ID == ev.targetID);
+                    if (killedChar == undefined) {
+                        console.warn(`Missing ${ev.type} targetID ${ev.targetID}`);
+                    }
+                    else {
+                        const outfitID = killedChar.outfitID;
+                        if (outfitBreakdowns.has(outfitID) == false) {
+                            const breakdown = new OutfitVersusBreakdown();
+                            breakdown.tag = killedChar.outfitTag;
+                            breakdown.name = killedChar.outfitName || "<No outfit>";
+                            breakdown.faction = killedChar.faction;
+                            outfitBreakdowns.set(outfitID, breakdown);
+                            outfitPlayers.set(outfitID, []);
+                        }
+                        const breakdown = outfitBreakdowns.get(outfitID);
+                        if (ev.type == "kill") {
+                            ++breakdown.kills;
+                        }
+                        else if (ev.type == "death") {
+                            if (ev.revived == true) {
+                                ++breakdown.revived;
+                            }
+                            else {
+                                ++breakdown.deaths;
+                            }
+                        }
+                        const loadout = core_census_PsLoadout__WEBPACK_IMPORTED_MODULE_4__["PsLoadouts"].get(ev.loadoutID);
+                        const coll = ev.type == "kill" ? breakdown.classKills
+                            : ev.type == "death" && ev.revived == false ? breakdown.classDeaths
+                                : breakdown.classRevived;
+                        if (loadout != undefined) {
+                            if (loadout.type == "infil") {
+                                ++coll.infil;
+                            }
+                            else if (loadout.type == "lightAssault") {
+                                ++coll.lightAssault;
+                            }
+                            else if (loadout.type == "medic") {
+                                ++coll.medic;
+                            }
+                            else if (loadout.type == "engineer") {
+                                ++coll.engineer;
+                            }
+                            else if (loadout.type == "heavy") {
+                                ++coll.heavy;
+                            }
+                            else if (loadout.type == "max") {
+                                ++coll.max;
+                            }
+                        }
+                        const players = outfitPlayers.get(outfitID);
+                        if (players.indexOf(ev.targetID) == -1) {
+                            ++breakdown.players;
+                            players.push(ev.targetID);
+                        }
+                    }
+                }
+            }
+            // Only include the outfit if they were > 1% of the kills or deaths
+            const breakdowns = Array.from(outfitBreakdowns.values())
+                .filter(iter => iter.kills > (killCount / 100) || iter.deaths > (deathCount / 100));
+            breakdowns.sort((a, b) => {
+                return b.deaths - a.deaths
+                    || b.kills - a.kills
+                    || b.revived - a.revived
+                    || b.tag.localeCompare(a.tag);
+            });
+            response.resolveOk(breakdowns);
+        });
+        return response;
+    }
+    static kpmBoxplot(players, tracking, loadout) {
+        let kpms = [];
+        for (const player of players) {
+            if (player.secondsOnline <= 0) {
+                continue;
+            }
+            let secondsOnline = player.secondsOnline;
+            if (loadout != undefined) {
+                const playtime = core_InvididualGenerator__WEBPACK_IMPORTED_MODULE_7__["IndividualReporter"].classUsage({ player: player, tracking: tracking, routers: [], events: [] });
+                if (loadout == "infil") {
+                    secondsOnline = playtime.infil.secondsAs;
+                }
+                else if (loadout == "lightAssault") {
+                    secondsOnline = playtime.lightAssault.secondsAs;
+                }
+                else if (loadout == "medic") {
+                    secondsOnline = playtime.medic.secondsAs;
+                }
+                else if (loadout == "engineer") {
+                    secondsOnline = playtime.engineer.secondsAs;
+                }
+                else if (loadout == "heavy") {
+                    secondsOnline = playtime.heavy.secondsAs;
+                }
+                else if (loadout == "max") {
+                    secondsOnline = playtime.max.secondsAs;
+                }
+                if (secondsOnline == 0) {
+                    continue;
+                }
+            }
+            let count = 0;
+            const kills = player.events.filter(iter => iter.type == "kill");
+            for (const kill of kills) {
+                const psloadout = core_census_PsLoadout__WEBPACK_IMPORTED_MODULE_4__["PsLoadouts"].get(kill.loadoutID);
+                if (loadout == undefined || (psloadout != undefined && psloadout.type == loadout)) {
+                    ++count;
+                }
+            }
+            if (count == 0) {
+                continue;
+            }
+            const minutesOnline = secondsOnline / 60;
+            const kpm = Number.parseFloat((count / minutesOnline).toFixed(2));
+            console.log(`${player.name} got ${count} kills on ${loadout} in ${minutesOnline} minutes (${kpm})`);
+            kpms.push(kpm);
+        }
+        kpms.sort((a, b) => b - a);
+        return kpms;
+    }
+    static kdBoxplot(players, tracking, loadout) {
+        let kds = [];
+        for (const player of players) {
+            if (player.secondsOnline <= 0) {
+                continue;
+            }
+            let killCount = 0;
+            const kills = player.events.filter(iter => iter.type == "kill");
+            for (const kill of kills) {
+                const psloadout = core_census_PsLoadout__WEBPACK_IMPORTED_MODULE_4__["PsLoadouts"].get(kill.loadoutID);
+                if (loadout == undefined || (psloadout != undefined && psloadout.type == loadout)) {
+                    ++killCount;
+                }
+            }
+            let deathCount = 0;
+            const deaths = player.events.filter(iter => iter.type == "death" && iter.revived == false);
+            for (const death of deaths) {
+                const psloadout = core_census_PsLoadout__WEBPACK_IMPORTED_MODULE_4__["PsLoadouts"].get(death.loadoutID);
+                if (loadout == undefined || (psloadout != undefined && psloadout.type == loadout)) {
+                    ++deathCount;
+                }
+            }
+            if (killCount == 0 || deathCount == 0) {
+                continue;
+            }
+            //console.log(`${player.name} went ${killCount} / ${deathCount} on ${loadout}`);
+            const kd = Number.parseFloat((killCount / deathCount).toFixed(2));
+            kds.push(kd);
+        }
+        kds.sort((a, b) => b - a);
+        return kds;
+    }
+    static weaponDeathBreakdown(events) {
+        const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        const weapons = events.filter((ev) => ev.type == "death")
+            .map((ev) => ev.weaponID)
+            .filter((ID, index, arr) => arr.indexOf(ID) == index);
+        let types = [];
+        // <weapon type, <weapon, count>>
+        const used = new Map();
+        const missingWeapons = new Set();
+        core_census_WeaponAPI__WEBPACK_IMPORTED_MODULE_2__["WeaponAPI"].getByIDs(weapons).ok((data) => {
+            var _a, _b, _c;
+            const deaths = events.filter(ev => ev.type == "death");
+            for (const death of deaths) {
+                const weapon = data.find(iter => iter.ID == death.weaponID);
+                if (weapon == undefined) {
+                    missingWeapons.add(death.weaponID);
+                }
+                const typeName = (_b = (_a = weapon) === null || _a === void 0 ? void 0 : _a.type, (_b !== null && _b !== void 0 ? _b : "Other"));
+                let type = types.find(iter => iter.type == typeName);
+                if (type == undefined) {
+                    type = {
+                        type: typeName,
+                        deaths: 0,
+                        headshots: 0,
+                        revived: 0,
+                        unrevived: 0,
+                        mostUsed: "",
+                        mostUsedDeaths: 0
+                    };
+                    types.push(type);
+                }
+                if (weapon != undefined) {
+                    if (!used.has(weapon.type)) {
+                        used.set(weapon.type, new Map());
+                    }
+                    const set = used.get(weapon.type);
+                    set.set(weapon.name, (_c = set.get(weapon.name), (_c !== null && _c !== void 0 ? _c : 0)) + 1);
+                    used.set(weapon.type, set);
+                }
+                ++type.deaths;
+                if (death.revived == false) {
+                    ++type.unrevived;
+                }
+                else {
+                    ++type.revived;
+                }
+                if (death.isHeadshot == true) {
+                    ++type.headshots;
+                }
+            }
+            used.forEach((weapons, type) => {
+                const breakdown = types.find(iter => iter.type == type);
+                weapons.forEach((deaths, weapon) => {
+                    if (deaths > breakdown.mostUsedDeaths) {
+                        breakdown.mostUsedDeaths = deaths;
+                        breakdown.mostUsed = weapon;
+                    }
+                });
+            });
+            types = types.filter((iter) => {
+                return iter.deaths / deaths.length > 0.0025;
+            });
+            types.sort((a, b) => {
+                return b.deaths - a.deaths
+                    || b.headshots - a.headshots
+                    || b.type.localeCompare(a.type);
+            });
+            console.log(`Missing weapons:`, missingWeapons);
+            response.resolveOk(types);
+        });
+        return response;
+    }
+    static vehicleKills(events) {
+        const vehKills = new core_StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        for (const event of events) {
+            if (event.type == "vehicle" && core_census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["VehicleTypes"].tracked.indexOf(event.vehicleID) > -1) {
+                vehKills.increment(event.vehicleID);
+            }
+        }
+        return statMapToBreakdown(vehKills, core_census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["VehicleAPI"].getAll, (elem, ID) => elem.ID == ID, defaultVehicleMapper);
+    }
+    static vehicleWeaponKills(events) {
+        const vehKills = new core_StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        for (const event of events) {
+            if (event.type == "vehicle" && event.weaponID != "0") {
+                vehKills.increment(event.weaponID);
+            }
+        }
+        return statMapToBreakdown(vehKills, core_census_WeaponAPI__WEBPACK_IMPORTED_MODULE_2__["WeaponAPI"].getByIDs, (elem, ID) => elem.ID == ID, defaultWeaponMapper);
+    }
+    static weaponKills(events) {
+        const wepKills = new core_StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        for (const event of events) {
+            if (event.type == "kill") {
+                wepKills.increment(event.weaponID);
+            }
+        }
+        return statMapToBreakdown(wepKills, core_census_WeaponAPI__WEBPACK_IMPORTED_MODULE_2__["WeaponAPI"].getByIDs, (elem, ID) => elem.ID == ID, defaultWeaponMapper);
+    }
+    static weaponTeamkills(events) {
+        const wepKills = new core_StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        for (const ev of events) {
+            if (ev.type == "teamkill") {
+                wepKills.increment(ev.weaponID);
+            }
+        }
+        return statMapToBreakdown(wepKills, core_census_WeaponAPI__WEBPACK_IMPORTED_MODULE_2__["WeaponAPI"].getByIDs, (elem, ID) => elem.ID == ID, defaultWeaponMapper);
+    }
+    static weaponDeaths(events, revived = undefined) {
+        const amounts = new core_StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        for (const event of events) {
+            if (event.type == "death" && (revived == undefined || revived == event.revived)) {
+                amounts.increment(event.weaponID);
+            }
+        }
+        return statMapToBreakdown(amounts, core_census_WeaponAPI__WEBPACK_IMPORTED_MODULE_2__["WeaponAPI"].getByIDs, (elem, ID) => elem.ID == ID, defaultWeaponMapper);
+    }
+    static weaponTypeKills(events) {
+        const amounts = new core_StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        const weaponIDs = [];
+        for (const event of events) {
+            if (event.type == "kill") {
+                weaponIDs.push(event.weaponID);
+            }
+        }
+        const arr = new BreakdownArray();
+        core_census_WeaponAPI__WEBPACK_IMPORTED_MODULE_2__["WeaponAPI"].getByIDs(weaponIDs).ok((data) => {
+            for (const event of events) {
+                if (event.type == "kill") {
+                    const weapon = data.find(iter => iter.ID == event.weaponID);
+                    if (weapon == undefined) {
+                        amounts.increment("Unknown");
+                    }
+                    else {
+                        amounts.increment(weapon.type);
+                    }
+                    ++arr.total;
+                }
+            }
+            amounts.getMap().forEach((count, wepType) => {
+                arr.data.push({
+                    display: wepType,
+                    amount: count,
+                    sortField: wepType,
+                    color: undefined
+                });
+            });
+            arr.data.sort((a, b) => {
+                const diff = b.amount - a.amount;
+                if (diff == 0) {
+                    return b.display.localeCompare(a.display);
+                }
+                return diff;
+            });
+            response.resolveOk(arr);
+        });
+        return response;
+    }
+    static weaponTypeDeaths(events, revived = undefined) {
+        const amounts = new core_StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        const weaponIDs = [];
+        for (const event of events) {
+            if (event.type == "death" && (revived == undefined || event.revived == revived)) {
+                weaponIDs.push(event.weaponID);
+            }
+        }
+        const arr = new BreakdownArray();
+        core_census_WeaponAPI__WEBPACK_IMPORTED_MODULE_2__["WeaponAPI"].getByIDs(weaponIDs).ok((data) => {
+            for (const event of events) {
+                if (event.type == "death" && (revived == undefined || event.revived == revived)) {
+                    const weapon = data.find(iter => iter.ID == event.weaponID);
+                    if (weapon == undefined) {
+                        amounts.increment("Unknown");
+                    }
+                    else {
+                        amounts.increment(weapon.type);
+                    }
+                    ++arr.total;
+                }
+            }
+            amounts.getMap().forEach((count, wepType) => {
+                arr.data.push({
+                    display: wepType,
+                    amount: count,
+                    sortField: wepType,
+                    color: undefined
+                });
+            });
+            arr.data.sort((a, b) => {
+                const diff = b.amount - a.amount;
+                if (diff == 0) {
+                    return b.display.localeCompare(a.display);
+                }
+                return diff;
+            });
+            response.resolveOk(arr);
+        });
+        return response;
+    }
+    static classPlaytimes(times) {
+        const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        const arr = new BreakdownArray();
+        times[0].infil.secondsAs;
+        const infil = {
+            amount: 0,
+            color: undefined,
+            display: "Infiltrator",
+            sortField: "infil"
+        };
+        const la = {
+            amount: 0,
+            color: undefined,
+            display: "Light Assault",
+            sortField: "LA"
+        };
+        const medic = {
+            amount: 0,
+            color: undefined,
+            display: "Medic playtime",
+            sortField: "medic"
+        };
+        const eng = {
+            amount: 0,
+            color: undefined,
+            display: "Engineer",
+            sortField: "engineer"
+        };
+        const heavy = {
+            amount: 0,
+            color: undefined,
+            display: "Heavy Assault",
+            sortField: "heavy"
+        };
+        const max = {
+            amount: 0,
+            color: undefined,
+            display: "MAX",
+            sortField: "max"
+        };
+        for (const time of times) {
+            infil.amount += time.infil.secondsAs;
+            la.amount += time.lightAssault.secondsAs;
+            medic.amount += time.medic.secondsAs;
+            eng.amount += time.engineer.secondsAs;
+            heavy.amount += time.heavy.secondsAs;
+            max.amount += time.max.secondsAs;
+        }
+        arr.data.push(infil, la, medic, eng, heavy, max);
+        arr.total = infil.amount + la.amount + medic.amount + eng.amount + heavy.amount + max.amount;
+        arr.display = (seconds) => {
+            const hours = Math.floor(seconds / 3600);
+            const mins = Math.floor((seconds - (3600 * hours)) / 60);
+            return `${hours.toFixed(0).padStart(2, "0")}:${mins.toFixed(0).padStart(2, "0")}:${(seconds % 60).toFixed(0).padStart(2, "0")}`;
+        };
+        response.resolveOk(arr);
+        return response;
+    }
+    static factionKills(events) {
+        const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        const arr = new BreakdownArray();
+        const countKills = function (ev, faction) {
+            if (ev.type != "kill") {
+                return false;
+            }
+            const loadout = core_census_PsLoadout__WEBPACK_IMPORTED_MODULE_4__["PsLoadouts"].get(ev.targetLoadoutID);
+            return loadout != undefined && loadout.faction == faction;
+        };
+        arr.data.push({
+            amount: events.filter(iter => countKills(iter, "VS")).length,
+            color: "#AE06B3",
+            display: "VS",
+            sortField: "VS"
+        });
+        arr.data.push({
+            amount: events.filter(iter => countKills(iter, "NC")).length,
+            color: "#1A39F9",
+            display: "NC",
+            sortField: "NC"
+        });
+        arr.data.push({
+            amount: events.filter(iter => countKills(iter, "TR")).length,
+            color: "#CE2304",
+            display: "TR",
+            sortField: "TR"
+        });
+        arr.data.push({
+            amount: events.filter(iter => countKills(iter, "NS")).length,
+            color: "#6A6A6A",
+            display: "NS",
+            sortField: "NS"
+        });
+        arr.total = events.filter(iter => iter.type == "kill").length;
+        response.resolveOk(arr);
+        return response;
+    }
+    static factionDeaths(events) {
+        const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        const countDeaths = function (ev, faction) {
+            if (ev.type != "death" || ev.revived == true) {
+                return false;
+            }
+            const loadout = core_census_PsLoadout__WEBPACK_IMPORTED_MODULE_4__["PsLoadouts"].get(ev.targetLoadoutID);
+            return loadout != undefined && loadout.faction == faction;
+        };
+        const arr = new BreakdownArray();
+        arr.data.push({
+            amount: events.filter(iter => countDeaths(iter, "VS")).length,
+            color: "#AE06B3",
+            display: "VS",
+            sortField: "VS"
+        });
+        arr.data.push({
+            amount: events.filter(iter => countDeaths(iter, "NC")).length,
+            color: "#1A39F9",
+            display: "NC",
+            sortField: "NC"
+        });
+        arr.data.push({
+            amount: events.filter(iter => countDeaths(iter, "TR")).length,
+            color: "#CE2304",
+            display: "TR",
+            sortField: "TR"
+        });
+        arr.data.push({
+            amount: events.filter(iter => countDeaths(iter, "NS")).length,
+            color: "#6A6A6A",
+            display: "NS",
+            sortField: "NS"
+        });
+        arr.total = events.filter(iter => iter.type == "death" && iter.revived == false).length;
+        response.resolveOk(arr);
+        return response;
+    }
+    static continentKills(events) {
+        const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        const countKills = function (ev, zoneID) {
+            return ev.type == "kill" && ev.zoneID == zoneID;
+        };
+        const arr = new BreakdownArray();
+        arr.data.push({
+            amount: events.filter(iter => countKills(iter, "2")).length,
+            color: "#F4E11D",
+            display: "Indar",
+            sortField: "Indar"
+        });
+        arr.data.push({
+            amount: events.filter(iter => countKills(iter, "4")).length,
+            color: "#09B118",
+            display: "Hossin",
+            sortField: "Hossin"
+        });
+        arr.data.push({
+            amount: events.filter(iter => countKills(iter, "6")).length,
+            color: "#2DE53E",
+            display: "Amerish",
+            sortField: "Amerish"
+        });
+        arr.data.push({
+            amount: events.filter(iter => countKills(iter, "8")).length,
+            color: "#D8E9EC",
+            display: "Esamir",
+            sortField: "Esamir"
+        });
+        arr.total = events.filter(iter => iter.type == "kill").length;
+        response.resolveOk(arr);
+        return response;
+    }
+    static continentDeaths(events) {
+        const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        const countDeaths = function (ev, zoneID) {
+            return ev.type == "death" && ev.revived == false && ev.zoneID == zoneID;
+        };
+        const arr = new BreakdownArray();
+        arr.data.push({
+            amount: events.filter(iter => countDeaths(iter, "2")).length,
+            color: "#F4E11D",
+            display: "Indar",
+            sortField: "Indar"
+        });
+        arr.data.push({
+            amount: events.filter(iter => countDeaths(iter, "4")).length,
+            color: "#09B118",
+            display: "Hossin",
+            sortField: "Hossin"
+        });
+        arr.data.push({
+            amount: events.filter(iter => countDeaths(iter, "6")).length,
+            color: "#2DE53E",
+            display: "Amerish",
+            sortField: "Amerish"
+        });
+        arr.data.push({
+            amount: events.filter(iter => countDeaths(iter, "8")).length,
+            color: "#D8E9EC",
+            display: "Esamir",
+            sortField: "Esamir"
+        });
+        arr.total = events.filter(iter => iter.type == "death" && iter.revived == false).length;
+        response.resolveOk(arr);
+        return response;
+    }
+    static characterKills(events) {
+        const amounts = new core_StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        for (const event of events) {
+            if (event.type == "kill") {
+                amounts.increment(event.targetID);
+            }
+        }
+        return statMapToBreakdown(amounts, core_census_CharacterAPI__WEBPACK_IMPORTED_MODULE_1__["CharacterAPI"].getByIDs, (elem, ID) => elem.ID == ID, defaultCharacterMapper);
+    }
+    static characterDeaths(events) {
+        const amounts = new core_StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        for (const event of events) {
+            if (event.type == "death" && event.revived == false) {
+                amounts.increment(event.targetID);
+            }
+        }
+        return statMapToBreakdown(amounts, core_census_CharacterAPI__WEBPACK_IMPORTED_MODULE_1__["CharacterAPI"].getByIDs, (elem, ID) => elem.ID == ID, defaultCharacterMapper);
+    }
+    static kpmOverTime(events, timeWidth = 300000) {
+        const kills = events.filter(iter => iter.type == "kill")
+            .sort((a, b) => a.timestamp - b.timestamp);
+        const players = new Set();
+        if (kills.length == 0) {
+            return [];
+        }
+        const slots = [];
+        const minutes = timeWidth / 60000;
+        const stop = kills[kills.length - 1].timestamp;
+        let start = events[0].timestamp;
+        let count = 0;
+        while (true) {
+            const end = start + timeWidth;
+            const section = kills.filter(iter => iter.timestamp >= start && iter.timestamp < end);
+            for (const ev of section) {
+                players.add(ev.sourceID);
+                ++count;
+            }
+            slots.push({
+                startTime: start,
+                endTime: end,
+                value: Number.parseFloat((count / (players.size || 1) / minutes).toFixed(2))
+            });
+            count = 0;
+            players.clear();
+            start += timeWidth;
+            if (start > stop) {
+                break;
+            }
+        }
+        return slots;
+    }
+    static kdOverTime(events, timeWidth = 300000) {
+        const evs = events.filter(iter => iter.type == "kill" || (iter.type == "death" && iter.revived == false));
+        if (evs.length == 0) {
+            return [];
+        }
+        const slots = [];
+        const stop = evs[evs.length - 1].timestamp;
+        let start = events[0].timestamp;
+        while (true) {
+            const end = start + timeWidth;
+            const section = evs.filter(iter => iter.timestamp >= start && iter.timestamp < end);
+            const kills = section.filter(iter => iter.type == "kill");
+            const deaths = section.filter(iter => iter.type == "death" && iter.revived == false);
+            slots.push({
+                startTime: start,
+                endTime: end,
+                value: Number.parseFloat((kills.length / (deaths.length || 1)).toFixed(2))
+            });
+            start += timeWidth;
+            if (start > stop) {
+                break;
+            }
+        }
+        return slots;
+    }
+    static kdPerUpdate(allEvents) {
+        const events = allEvents.filter(iter => iter.type == "kill" || (iter.type == "death" && iter.revived == false));
+        if (events.length == 0) {
+            return [];
+        }
+        let kills = 0;
+        let deaths = 0;
+        const slots = [];
+        for (let i = events[0].timestamp; i < events[events.length - 1].timestamp; i += 1000) {
+            const evs = events.filter(iter => iter.timestamp == i);
+            if (evs.length == 0) {
+                continue;
+            }
+            for (const ev of evs) {
+                if (ev.type == "kill") {
+                    ++kills;
+                }
+                else if (ev.type == "death") {
+                    ++deaths;
+                }
+            }
+            slots.push({
+                value: Number.parseFloat((kills / (deaths || 1)).toFixed(2)),
+                startTime: i,
+                endTime: i
+            });
+        }
+        return slots;
+    }
+    static revivesOverTime(events, timeWidth = 300000) {
+        const revives = events.filter(iter => iter.type == "exp" && (iter.expID == core_PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].revive || iter.expID == core_PsEvent__WEBPACK_IMPORTED_MODULE_6__["PsEvent"].squadRevive));
+        if (revives.length == 0) {
+            return [];
+        }
+        const slots = [];
+        const stop = revives[revives.length - 1].timestamp;
+        let start = events[0].timestamp;
+        while (true) {
+            const end = start + timeWidth;
+            const section = revives.filter(iter => iter.timestamp >= start && iter.timestamp < end);
+            const players = section.map(iter => iter.sourceID)
+                .filter((value, index, arr) => arr.indexOf(value) == index).length;
+            slots.push({
+                startTime: start,
+                endTime: end,
+                value: Number.parseFloat((section.length / (players || 1) / 5).toFixed(2))
+            });
+            start += timeWidth;
+            if (start > stop) {
+                break;
+            }
+        }
+        return slots;
+    }
+}
+window.EventReporter = EventReporter;
+
+
+/***/ }),
+
+/***/ "./src/core/InvididualGenerator.ts":
+/*!*****************************************!*\
+  !*** ./src/core/InvididualGenerator.ts ***!
+  \*****************************************/
+/*! exports provided: ClassBreakdown, FacilityCapture, ExpBreakdown, TimeTracking, classKdCollection, classCollectionBreakdownTrend, OutfitReport, TrackedRouter, Playtime, ClassUsage, Report, PlayerVersusEntry, PlayerVersus, BreakdownSpawn, TrackedPlayer, BreakdownCollection, BreakdownSection, BreakdownMeta, BreakdownSingle, EventFeedEntry, ReportParameters, IndividualReporter */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "ClassBreakdown", function() { return ClassBreakdown; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "FacilityCapture", function() { return FacilityCapture; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "ExpBreakdown", function() { return ExpBreakdown; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "TimeTracking", function() { return TimeTracking; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "classKdCollection", function() { return classKdCollection; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "classCollectionBreakdownTrend", function() { return classCollectionBreakdownTrend; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "OutfitReport", function() { return OutfitReport; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "TrackedRouter", function() { return TrackedRouter; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Playtime", function() { return Playtime; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "ClassUsage", function() { return ClassUsage; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Report", function() { return Report; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "PlayerVersusEntry", function() { return PlayerVersusEntry; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "PlayerVersus", function() { return PlayerVersus; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "BreakdownSpawn", function() { return BreakdownSpawn; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "TrackedPlayer", function() { return TrackedPlayer; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "BreakdownCollection", function() { return BreakdownCollection; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "BreakdownSection", function() { return BreakdownSection; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "BreakdownMeta", function() { return BreakdownMeta; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "BreakdownSingle", function() { return BreakdownSingle; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "EventFeedEntry", function() { return EventFeedEntry; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "ReportParameters", function() { return ReportParameters; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "IndividualReporter", function() { return IndividualReporter; });
+/* harmony import */ var core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! core/census/ApiWrapper */ "./src/core/census/ApiWrapper.ts");
+/* harmony import */ var core_census_CharacterAPI__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! core/census/CharacterAPI */ "./src/core/census/CharacterAPI.ts");
+/* harmony import */ var core_census_WeaponAPI__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! core/census/WeaponAPI */ "./src/core/census/WeaponAPI.ts");
+/* harmony import */ var core_census_AchievementAPI__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! core/census/AchievementAPI */ "./src/core/census/AchievementAPI.ts");
+/* harmony import */ var core_census_PsLoadout__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! core/census/PsLoadout */ "./src/core/census/PsLoadout.ts");
+/* harmony import */ var core_PsEvent__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! core/PsEvent */ "./src/core/PsEvent.ts");
+/* harmony import */ var core_StatMap__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! core/StatMap */ "./src/core/StatMap.ts");
+/* harmony import */ var core_EventReporter__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! core/EventReporter */ "./src/core/EventReporter.ts");
+
+
+
+
+
+
+
+
+class ClassBreakdown {
+    constructor() {
+        this.secondsAs = 0;
+        this.score = 0;
+        this.kills = 0;
+        this.deaths = 0;
+    }
+}
+class FacilityCapture {
+    constructor() {
+        this.facilityID = "";
+        this.name = "";
+        this.type = "";
+        this.typeID = "";
+        this.zoneID = "";
+        this.timestamp = new Date();
+        this.timeHeld = 0;
+        this.factionID = "";
+        this.outfitID = "";
+        this.previousFaction = "";
+    }
+}
+class ExpBreakdown {
+    constructor() {
+        this.name = "";
+        this.score = 0;
+        this.amount = 0;
+    }
+}
+class TimeTracking {
+    constructor() {
+        this.running = false;
+        this.startTime = 0;
+        this.endTime = 0;
+    }
+}
+function classKdCollection() {
+    return {
+        infil: new ClassBreakdown(),
+        lightAssault: new ClassBreakdown(),
+        medic: new ClassBreakdown(),
+        engineer: new ClassBreakdown(),
+        heavy: new ClassBreakdown(),
+        max: new ClassBreakdown(),
+        total: new ClassBreakdown()
+    };
+}
+;
+function classCollectionBreakdownTrend() {
+    return {
+        total: [],
+        infil: [],
+        lightAssault: [],
+        medic: [],
+        engineer: [],
+        heavy: [],
+        max: []
+    };
+}
+class OutfitReport {
+    constructor() {
+        this.stats = new Map();
+        this.score = 0;
+        this.players = [];
+        this.events = [];
+        this.facilityCaptures = [];
+        this.continent = "Unknown";
+        this.classStats = new Map();
+        this.scoreBreakdown = [];
+        this.overtimePer5 = {
+            kpm: [],
+            kd: [],
+            rpm: [],
+        };
+        this.overtimePer1 = {
+            kpm: [],
+            kd: [],
+            rpm: [],
+        };
+        this.perUpdate = {
+            kpm: [],
+            kd: [],
+            rpm: []
+        };
+        this.trends = {
+            kpm: classCollectionBreakdownTrend(),
+            kd: classCollectionBreakdownTrend()
+        };
+        this.weaponKillBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+        this.weaponTypeKillBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+        this.teamkillBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+        this.deathAllBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+        this.deathAllTypeBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+        this.deathRevivedBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+        this.deathRevivedTypeBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+        this.deathKilledBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+        this.deathKilledTypeBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+        this.outfitVersusBreakdown = [];
+        this.weaponTypeDeathBreakdown = [];
+        this.vehicleKillBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+        this.vehicleKillWeaponBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+        this.timeUnrevived = [];
+        this.revivedLifeExpectance = [];
+        this.kmLifeExpectance = [];
+        this.kmTimeDead = [];
+        this.factionKillBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+        this.factionDeathBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+        this.continentKillBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+        this.continentDeathBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+        this.baseCaptures = [];
+        this.classKds = {
+            infil: classKdCollection(),
+            lightAssault: classKdCollection(),
+            medic: classKdCollection(),
+            engineer: classKdCollection(),
+            heavy: classKdCollection(),
+            max: classKdCollection(),
+            total: classKdCollection()
+        };
+        this.classTypeKills = {
+            infil: new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"](),
+            lightAssault: new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"](),
+            medic: new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"](),
+            engineer: new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"](),
+            heavy: new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"](),
+            max: new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"](),
+        };
+        this.classTypeDeaths = {
+            infil: new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"](),
+            lightAssault: new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"](),
+            medic: new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"](),
+            engineer: new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"](),
+            heavy: new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"](),
+            max: new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"](),
+        };
+    }
+}
+class TrackedRouter {
+    constructor() {
+        this.ID = "";
+        this.type = "router";
+        this.owner = "";
+        this.pulledAt = 0;
+        this.firstSpawn = undefined;
+        this.destroyed = undefined;
+        this.count = 0;
+    }
+}
+class Playtime {
+    constructor() {
+        this.characterID = "";
+        this.secondsOnline = 0;
+        this.infil = new ClassBreakdown();
+        this.lightAssault = new ClassBreakdown();
+        this.medic = new ClassBreakdown();
+        this.engineer = new ClassBreakdown();
+        this.heavy = new ClassBreakdown();
+        this.max = new ClassBreakdown();
+        this.mostPlayed = {
+            name: "",
+            secondsAs: 0,
+        };
+    }
+}
+class ClassUsage {
+    constructor() {
+        this.mostPlayed = {
+            name: "",
+            secondsAs: 0
+        };
+        this.infil = new ClassBreakdown();
+        this.lightAssault = new ClassBreakdown();
+        this.medic = new ClassBreakdown();
+        this.engineer = new ClassBreakdown();
+        this.heavy = new ClassBreakdown();
+        this.max = new ClassBreakdown();
+    }
+}
+class Report {
+    constructor() {
+        this.opened = false;
+        this.player = null;
+        this.stats = new Map();
+        this.classBreakdown = new ClassUsage();
+        this.classKd = classKdCollection();
+        this.logistics = {
+            show: false,
+            routers: [],
+            metas: []
+        };
+        this.overtime = {
+            kpm: [],
+            kd: [],
+            rpm: []
+        };
+        this.perUpdate = {
+            kpm: [],
+            kd: [],
+            rpm: []
+        };
+        this.collections = [];
+        this.vehicleBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+        this.scoreBreakdown = [];
+        this.ribbons = [];
+        this.ribbonCount = 0;
+        this.breakdowns = [];
+        this.weaponKillBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+        this.weaponKillTypeBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+        this.weaponDeathBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+        this.weaponDeathTypeBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+        this.playerVersus = [];
+    }
+}
+class PlayerVersusEntry {
+    constructor() {
+        this.timestamp = 0;
+        this.type = "unknown";
+        this.weaponName = "";
+        this.headshot = false;
+    }
+}
+class PlayerVersus {
+    constructor() {
+        this.charID = "";
+        this.name = "";
+        this.kills = 0;
+        this.deaths = 0;
+        this.revives = 0;
+        this.weaponKills = new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+        this.weaponDeaths = new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+        this.encounters = [];
+    }
+}
+class BreakdownSpawn {
+    constructor() {
+        this.npcID = "";
+        this.count = 0;
+        this.firstSeen = new Date();
+    }
+}
+class TrackedPlayer {
+    constructor() {
+        this.characterID = "";
+        this.outfitTag = "";
+        this.name = "";
+        this.faction = "";
+        this.score = 0;
+        this.online = true;
+        this.joinTime = 0;
+        this.secondsOnline = 0;
+        this.stats = new core_StatMap__WEBPACK_IMPORTED_MODULE_6__["default"]();
+        this.ribbons = new core_StatMap__WEBPACK_IMPORTED_MODULE_6__["default"]();
+        this.recentDeath = null;
+        this.events = [];
+    }
+}
+class BreakdownCollection {
+    constructor() {
+        this.title = "";
+        this.sections = [];
+    }
+}
+class BreakdownSection {
+    constructor() {
+        this.title = "";
+        this.left = null;
+        this.right = null;
+        this.showPercent = true;
+        this.showTotal = true;
+    }
+}
+class BreakdownMeta {
+    constructor() {
+        this.title = "";
+        this.altTitle = "Count";
+        this.data = new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+    }
+}
+class BreakdownSingle {
+    constructor() {
+        this.title = "";
+        this.altTitle = "";
+        this.data = new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+        this.showPercent = true;
+        this.showTotal = true;
+    }
+}
+class EventFeedEntry {
+    constructor() {
+        this.type = "unknown";
+        this.text = "";
+        this.timestamp = new Date();
+        this.effects = [];
+    }
+}
+class ReportParameters {
+    constructor() {
+        /**
+         * Player the report is being generated for
+         */
+        this.player = new TrackedPlayer();
+        /**
+         * Contains all events collected during tracking. If you need just the player's events, use player
+         */
+        this.events = [];
+        /**
+         * Tracking information about the current state the tracker
+         */
+        this.tracking = { running: false, startTime: 0, endTime: 0 };
+        /**
+         * All routers tracked
+         */
+        this.routers = [];
+    }
+}
+class IndividualReporter {
+    static generatePersonalReport(parameters) {
+        const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        if (parameters.player.events.length == 0) {
+            response.resolve({ code: 400, data: "No events for player, cannot generate" });
+            return response;
+        }
+        const report = new Report();
+        let opsLeft = 
+        //1       // Transport assists
+        +1 // Supported by
+            + 1 // Misc collection
+            + 1 // Weapon kills
+            + 1 // Weapon type kills
+            + 1 // Weapon deaths
+            + 1 // Weapon death types
+            + 1 // Ribbons
+            + 1 // Medic breakdown
+            + 1 // Engineer breakdown
+            + 1 // Player versus
+        ;
+        const totalOps = opsLeft;
+        const firstPlayerEvent = parameters.player.events[0];
+        const lastPlayerEvent = parameters.player.events[parameters.player.events.length - 1];
+        report.player = Object.assign({}, parameters.player);
+        report.player.events = [];
+        report.player.secondsOnline = (lastPlayerEvent.timestamp - firstPlayerEvent.timestamp) / 1000;
+        report.classBreakdown = IndividualReporter.classUsage(parameters);
+        report.classKd = IndividualReporter.classVersusKd(parameters.player.events);
+        report.scoreBreakdown = IndividualReporter.scoreBreakdown(parameters);
+        report.player.stats.getMap().forEach((value, eventID) => {
+            var _a;
+            const event = core_PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvents"].get(eventID);
+            if (event == undefined) {
+                return;
+            }
+            report.stats.set(event.name, `${value}`);
+            (_a = report.player) === null || _a === void 0 ? void 0 : _a.stats.set(event.name, value);
+        });
+        const calculatedStats = IndividualReporter.calculatedStats(parameters, report.classBreakdown);
+        calculatedStats.forEach((value, key) => {
+            report.stats.set(key, value);
+        });
+        report.logistics.routers = IndividualReporter.routerBreakdown(parameters);
+        const callback = (step) => {
+            return () => {
+                console.log(`Finished ${step}: Have ${opsLeft - 1} ops left outta ${totalOps}`);
+                if (--opsLeft == 0) {
+                    response.resolveOk(report);
+                }
+            };
+        };
+        IndividualReporter.supportedBy(parameters)
+            .ok(data => report.collections.push(data)).always(callback("Supported by"));
+        IndividualReporter.miscCollection(parameters)
+            .ok(data => report.collections.push(data)).always(callback("Misc coll"));
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].weaponKills(parameters.player.events)
+            .ok(data => report.weaponKillBreakdown = data).always(callback("Weapon kills"));
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].weaponTypeKills(parameters.player.events)
+            .ok(data => report.weaponKillTypeBreakdown = data).always(callback("Weapon type kills"));
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].weaponDeaths(parameters.player.events)
+            .ok(data => report.weaponDeathBreakdown = data).always(callback("Weapon deaths"));
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].weaponTypeDeaths(parameters.player.events)
+            .ok(data => report.weaponDeathTypeBreakdown = data).always(callback("Weapon type deaths"));
+        IndividualReporter.playerVersus(parameters).ok(data => report.playerVersus = data).always(callback("Player versus"));
+        report.overtime.kd = core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].kdOverTime(parameters.player.events);
+        report.overtime.kpm = core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].kpmOverTime(parameters.player.events);
+        if (parameters.player.events.find(iter => iter.type == "exp" && (iter.expID == core_PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].revive || iter.expID == core_PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].squadRevive)) != undefined) {
+            report.overtime.rpm = core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].revivesOverTime(parameters.player.events);
+        }
+        report.perUpdate.kd = core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].kdPerUpdate(parameters.player.events);
+        const ribbonIDs = Array.from(parameters.player.ribbons.getMap().keys());
+        if (ribbonIDs.length > 0) {
+            core_census_AchievementAPI__WEBPACK_IMPORTED_MODULE_3__["AchievementAPI"].getByIDs(ribbonIDs).ok((data) => {
+                var _a;
+                (_a = report.player) === null || _a === void 0 ? void 0 : _a.ribbons.getMap().forEach((amount, achivID) => {
+                    const achiv = data.find((iter) => iter.ID == achivID) || core_census_AchievementAPI__WEBPACK_IMPORTED_MODULE_3__["AchievementAPI"].unknown;
+                    const entry = Object.assign(Object.assign({}, achiv), { amount: amount });
+                    report.ribbonCount += amount;
+                    report.ribbons.push(entry);
+                });
+                report.ribbons.sort((a, b) => {
+                    return (b.amount - a.amount) || b.name.localeCompare(a.name);
+                });
+            }).always(() => {
+                callback("Ribbons")();
+            });
+        }
+        else {
+            callback("Ribbons")();
+        }
+        if (report.classBreakdown.medic.secondsAs > 10) {
+            IndividualReporter.medicBreakdown(parameters)
+                .ok(data => report.breakdowns.push(data)).always(callback("Medic breakdown"));
+        }
+        else {
+            callback("Medic breakdown")();
+        }
+        if (report.classBreakdown.engineer.secondsAs > 10) {
+            IndividualReporter.engineerBreakdown(parameters)
+                .ok(data => report.breakdowns.push(data)).always(callback("Eng breakdown"));
+        }
+        else {
+            callback("Eng breakdown")();
+        }
+        return response;
+    }
+    static playerVersus(parameters) {
+        const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        const versus = [];
+        const charIDs = [];
+        const wepIDs = [];
+        for (const ev of parameters.player.events) {
+            if (ev.sourceID != parameters.player.characterID) {
+                continue;
+            }
+            if (ev.type != "kill" && ev.type != "death") {
+                continue;
+            }
+            charIDs.push(ev.targetID);
+            wepIDs.push(ev.weaponID);
+        }
+        let characters = [];
+        let weapons = [];
+        let opsLeft = 2;
+        const killsMap = new Map();
+        const deathsMap = new Map();
+        const done = () => {
+            var _a, _b, _c, _d, _e, _f;
+            for (const ev of parameters.player.events) {
+                if (ev.sourceID != parameters.player.characterID) {
+                    continue;
+                }
+                if (ev.type != "kill" && ev.type != "death") {
+                    continue;
+                }
+                let entry = versus.find(iter => iter.charID == ev.targetID);
+                if (entry == undefined) {
+                    entry = new PlayerVersus();
+                    entry.charID = ev.targetID;
+                    entry.name = (_b = (_a = characters.find(iter => iter.ID == ev.targetID)) === null || _a === void 0 ? void 0 : _a.name, (_b !== null && _b !== void 0 ? _b : `Unknown ${ev.targetID}`));
+                    killsMap.set(ev.targetID, new core_StatMap__WEBPACK_IMPORTED_MODULE_6__["default"]());
+                    deathsMap.set(ev.targetID, new core_StatMap__WEBPACK_IMPORTED_MODULE_6__["default"]());
+                    versus.push(entry);
+                }
+                const weaponName = (_d = (_c = weapons.find(iter => iter.ID == ev.weaponID)) === null || _c === void 0 ? void 0 : _c.name, (_d !== null && _d !== void 0 ? _d : `Unknown ${ev.weaponID}`));
+                let type = "unknown";
+                if (ev.type == "kill") {
+                    ++entry.kills;
+                    type = "kill";
+                    killsMap.get(ev.targetID).increment(weaponName);
+                }
+                else if (ev.type == "death") {
+                    if (ev.revived == true) {
+                        ++entry.revives;
+                        type = "revived";
+                    }
+                    else {
+                        ++entry.deaths;
+                        type = "death";
+                        deathsMap.get(ev.targetID).increment(weaponName);
+                    }
+                }
+                else {
+                    console.error(`Unchecked event type: '${ev}'`);
+                }
+                const encounter = {
+                    timestamp: ev.timestamp,
+                    headshot: ev.isHeadshot,
+                    type: type,
+                    weaponName: (_f = (_e = weapons.find(iter => iter.ID == ev.weaponID)) === null || _e === void 0 ? void 0 : _e.name, (_f !== null && _f !== void 0 ? _f : `Unknown ${ev.weaponID}`))
+                };
+                entry.encounters.push(encounter);
+            }
+            for (const entry of versus) {
+                if (killsMap.has(entry.charID) == false) {
+                    console.error(`Missing killsMap entry for ${entry.name}`);
+                    continue;
+                }
+                if (deathsMap.has(entry.charID) == false) {
+                    console.error(`Missing deathsMap entry for ${entry.name}`);
+                    continue;
+                }
+                const killMap = killsMap.get(entry.charID);
+                const deathMap = deathsMap.get(entry.charID);
+                const killBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+                killMap.getMap().forEach((amount, weapon) => {
+                    killBreakdown.data.push({
+                        display: weapon,
+                        amount: amount,
+                        sortField: weapon,
+                        color: undefined
+                    });
+                    killBreakdown.total += amount;
+                });
+                entry.weaponKills = killBreakdown;
+                const deathBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+                deathMap.getMap().forEach((amount, weapon) => {
+                    deathBreakdown.data.push({
+                        display: weapon,
+                        amount: amount,
+                        sortField: weapon,
+                        color: undefined
+                    });
+                    deathBreakdown.total += amount;
+                });
+                entry.weaponDeaths = deathBreakdown;
+            }
+            response.resolveOk(versus);
+        };
+        core_census_CharacterAPI__WEBPACK_IMPORTED_MODULE_1__["CharacterAPI"].getByIDs(charIDs).ok((data) => {
+            characters = data;
+            if (--opsLeft == 0) {
+                done();
+            }
+        });
+        core_census_WeaponAPI__WEBPACK_IMPORTED_MODULE_2__["WeaponAPI"].getByIDs(wepIDs).ok((data) => {
+            weapons = data;
+            if (--opsLeft == 0) {
+                done();
+            }
+        });
+        return response;
+    }
+    static medicBreakdown(parameters) {
+        const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        const medicCollection = new BreakdownCollection();
+        medicCollection.title = "Medic";
+        let opsLeft = 1 // Heals
+            + 1 // Revives
+            + 1; // Shield repair
+        const add = (data) => {
+            medicCollection.sections.push(data);
+        };
+        const callback = () => {
+            if (--opsLeft == 0) {
+                response.resolveOk(medicCollection);
+            }
+        };
+        IndividualReporter.breakdownSection(parameters, "Heal ticks", core_PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].heal, core_PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].squadHeal).ok(add).always(callback);
+        IndividualReporter.breakdownSection(parameters, "Revives", core_PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].revive, core_PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].squadRevive).ok(add).always(callback);
+        IndividualReporter.breakdownSection(parameters, "Shield repair ticks", core_PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].shieldRepair, core_PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].squadShieldRepair).ok(add).always(callback);
+        return response;
+    }
+    static engineerBreakdown(parameters) {
+        const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        const engCollection = new BreakdownCollection();
+        engCollection.title = "Engineer";
+        let opsLeft = 1 // Resupply
+            + 1; // Repair MAX
+        const add = (data) => {
+            engCollection.sections.push(data);
+        };
+        const callback = () => {
+            if (--opsLeft == 0) {
+                response.resolveOk(engCollection);
+            }
+        };
+        IndividualReporter.breakdownSection(parameters, "Resupply ticks", core_PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].resupply, core_PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].squadResupply).ok(add).always(callback);
+        IndividualReporter.breakdownSection(parameters, "MAX repair ticks", core_PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].maxRepair, core_PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].squadMaxRepair).ok(add).always(callback);
+        return response;
+    }
+    static breakdownSection(parameters, name, expID, squadExpID) {
+        const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        const ticks = parameters.player.events.filter(iter => iter.type == "exp" && iter.expID == expID);
+        if (ticks.length > 0) {
+            const section = new BreakdownSection();
+            section.title = name;
+            let opsLeft = 2;
+            const callback = () => {
+                if (--opsLeft == 0) {
+                    response.resolveOk(section);
+                }
+            };
+            section.left = new BreakdownMeta();
+            section.left.title = "All";
+            core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].experience(expID, ticks).ok((data) => {
+                section.left.data = data;
+            }).always(callback);
+            section.right = new BreakdownMeta();
+            section.right.title = "Squad only";
+            core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].experience(squadExpID, ticks).ok((data) => {
+                section.right.data = data;
+            }).always(callback);
+        }
+        else {
+            response.resolve({ code: 204, data: null });
+        }
+        return response;
+    }
+    static miscCollection(parameters) {
+        const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        const coll = {
+            header: "Misc",
+            metas: []
+        };
+        let opsLeft = 1; // Deployabled destroyed
+        const dep = IndividualReporter.deployableDestroyedBreakdown(parameters);
+        if (dep != null) {
+            coll.metas.push(dep);
+        }
+        if (coll.metas.length > 0) {
+            response.resolveOk(coll);
+        }
+        else {
+            response.resolve({ code: 204, data: null });
+        }
+        return response;
+    }
+    static supportedBy(parameters) {
+        const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        const coll = {
+            header: "Supported by",
+            metas: []
+        };
+        let opsLeft = 1 // Healed by
+            + 1 // Revived by
+            + 1 // Shield repaired by
+            + 1 // Resupplied by
+            + 1; // Repaired by
+        const add = (data) => {
+            coll.metas.push(data);
+        };
+        const callback = () => {
+            if (--opsLeft == 0) {
+                response.resolveOk(coll);
+            }
+        };
+        IndividualReporter.singleSupportedBy(parameters, "Healed by", [core_PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].heal, core_PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].squadHeal]).ok(add).always(callback);
+        IndividualReporter.singleSupportedBy(parameters, "Revived by", [core_PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].revive, core_PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].squadRevive]).ok(add).always(callback);
+        IndividualReporter.singleSupportedBy(parameters, "Shield repaired by", [core_PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].shieldRepair, core_PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].squadShieldRepair]).ok(add).always(callback);
+        IndividualReporter.singleSupportedBy(parameters, "Resupplied by", [core_PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].resupply, core_PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].squadResupply]).ok(add).always(callback);
+        IndividualReporter.singleSupportedBy(parameters, "Repaired by", [core_PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].maxRepair, core_PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].squadMaxRepair]).ok(add).always(callback);
+        return response;
+    }
+    static singleSupportedBy(parameters, name, ids) {
+        const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        let found = false;
+        for (const ev of parameters.events) {
+            if (ev.type == "exp" && ids.indexOf(ev.expID) > -1 && ev.targetID == parameters.player.characterID) {
+                found = true;
+                break;
+            }
+        }
+        if (found == false) {
+            response.resolve({ code: 204, data: null });
+        }
+        else {
+            const meta = new BreakdownSingle();
+            meta.title = name;
+            meta.altTitle = "Player";
+            meta.data = new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+            core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["default"].experienceSource(ids, parameters.player.characterID, parameters.events).ok((data) => {
+                meta.data = data;
+                console.log(`Found [${data.data.map(iter => `${iter.display}:${iter.amount}`).join(", ")}] for [${ids.join(", ")}]`);
+                response.resolveOk(meta);
+            });
+        }
+        return response;
+    }
+    static deployableDestroyedBreakdown(parameters) {
+        const expIDs = [
+            "57",
+            "270",
+            "327",
+            "370",
+            "437",
+            "579",
+            "1373",
+            "1409",
+        ];
+        const ticks = parameters.player.events.filter((iter) => {
+            if (iter.type != "exp") {
+                return false;
+            }
+            return expIDs.indexOf(iter.expID) > -1;
+        });
+        if (ticks.length > 0) {
+            const meta = new BreakdownSingle();
+            meta.title = "Deployable kills";
+            meta.altTitle = "Deployable";
+            meta.data = new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+            const map = new core_StatMap__WEBPACK_IMPORTED_MODULE_6__["default"]();
+            for (const tick of ticks) {
+                let name = "unknown";
+                if (tick.expID == "57") {
+                    name = "Engineer turret";
+                }
+                else if (tick.expID == "270") {
+                    name = "Spawn beacon";
+                }
+                else if (tick.expID == "327") {
+                    name = "Tank mine";
+                }
+                else if (tick.expID == "370") {
+                    name = "Motion sensor";
+                }
+                else if (tick.expID == "437") {
+                    name = "Shield bubble";
+                }
+                else if (tick.expID == "579") {
+                    name = "Spitfire";
+                }
+                else if (tick.expID == "1373") {
+                    name = "Hardlight";
+                }
+                else if (tick.expID == "1409") {
+                    name = "Router";
+                }
+                else {
+                    name = `Unknown ${tick.expID}`;
+                }
+                map.increment(name);
+            }
+            map.getMap().forEach((amount, expName) => {
+                meta.data.total += amount;
+                meta.data.data.push({
+                    display: expName,
+                    sortField: expName,
+                    amount: amount,
+                    color: undefined
+                });
+            });
+            meta.data.data.sort((a, b) => {
+                return b.amount - a.amount || a.sortField.localeCompare(b.sortField);
+            });
+            return meta;
+        }
+        return null;
+    }
+    static routerBreakdown(parameters) {
+        const rts = parameters.routers.filter(iter => iter.owner == parameters.player.characterID);
+        return rts;
+    }
+    static transportAssists(parameters) {
+        const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        const transAssists = parameters.player.events.filter(iter => iter.type == "exp" && iter.expID == "30");
+        if (transAssists.length > 0) {
+            const killedIDs = transAssists.map(iter => iter.targetID).filter((iter, index, arr) => arr.indexOf(iter) == index);
+            const firstEv = Math.min(...transAssists.map(iter => iter.timestamp));
+            const lastEv = Math.max(...transAssists.map(iter => iter.timestamp));
+            const map = new core_StatMap__WEBPACK_IMPORTED_MODULE_6__["default"]();
+            const meta = new BreakdownMeta();
+            meta.title = "Transport assists";
+            meta.data = new core_EventReporter__WEBPACK_IMPORTED_MODULE_7__["BreakdownArray"]();
+            /*
+            EventAPI.getMultiDeaths(killedIDs, firstEv, lastEv).ok((data: TDeathEvent[]) => {
+                const killers: string[] = [];
+
+                for (const assist of transAssists) {
+                    const death = data.find(iter => iter.sourceID == assist.targetID && iter.timestamp == assist.timestamp);
+                    if (death == undefined) {
+                        console.warn(`Missing event death for transport assist for ${assist.targetID} at ${assist.timestamp}`);
+                        continue;
+                    }
+                    killers.push(death.targetID);
+                }
+
+                CharacterAPI.getByIDs(killers.filter((v, i, a) => a.indexOf(v) == i)).ok((data: Character[]) => {
+                    for (const killer of killers) {
+                        const killerChar = data.find(iter => iter.ID == killer);
+                        if (killerChar == undefined) {
+                            console.warn(`Missing character ${killer} when generating transport assists`);
+                            continue;
+                        }
+
+                        map.increment(killerChar.name);
+                    }
+
+                    map.getMap().forEach((amount: number, char: string) => {
+                        const breakdown: Breakdown = {
+                            display: char,
+                            sortField: char,
+                            amount: amount,
+                            color: undefined
+                        };
+
+                        meta.data.data.push(breakdown);
+                        meta.data.total += amount;
+                    });
+
+                    meta.data.data.sort((a, b) => {
+                        return (b.amount - a.amount) || a.sortField.localeCompare(b.sortField);
+                    });
+
+                    response.resolveOk(meta);
+                });
+            });
+            */
+        }
+        else {
+            response.resolve({ code: 204, data: null });
+        }
+        return response;
+    }
+    static calculatedStats(parameters, classKd) {
+        const map = new Map();
+        const stats = parameters.player.stats;
+        map.set("KPM", (stats.get("Kill") / (parameters.player.secondsOnline / 60)).toFixed(2));
+        // K/D = Kills / Deaths
+        map.set("K/D", (stats.get("Kill") / stats.get("Death", 1)).toFixed(2));
+        // KA/D = Kills + Assits / Deaths
+        map.set("KA/D", ((stats.get("Kill") + stats.get("Kill assist")) / stats.get("Death", 1)).toFixed(2));
+        // HSR = Headshots / Kills
+        map.set("HSR", `${(stats.get("Headshot") / stats.get("Kill") * 100).toFixed(2)}%`);
+        // KR/D  = Kills + Revives / Deaths
+        map.set("KR/D", ((classKd.medic.kills + stats.get("Revive"))
+            / (classKd.medic.deaths || 1)).toFixed(2));
+        // R/D = Revives / Death
+        map.set("R/D", (stats.get("Revive") / (classKd.medic.deaths || 1)).toFixed(2));
+        // RPM = Revives / minutes online
+        map.set("RPM", (stats.get("Revive") / (classKd.medic.secondsAs / 60)).toFixed(2));
+        return map;
+    }
+    static scoreBreakdown(parameters) {
+        const breakdown = new Map();
+        for (const event of parameters.player.events) {
+            if (event.type == "exp") {
+                const exp = core_PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvents"].get(event.expID) || core_PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].other;
+                if (!breakdown.has(exp.name)) {
+                    breakdown.set(exp.name, new ExpBreakdown());
+                }
+                const score = breakdown.get(exp.name);
+                score.name = exp.name;
+                score.score += event.amount;
+                score.amount += 1;
+                if (exp == core_PsEvent__WEBPACK_IMPORTED_MODULE_5__["PsEvent"].other) {
+                    //console.log(`Other: ${JSON.stringify(event)}`);
+                }
+            }
+        }
+        // Sort all the entries by score, followed by amount, then lastly name
+        return [...breakdown.entries()].sort((a, b) => {
+            return b[1].score - a[1].score
+                || b[1].amount - a[1].amount
+                || a[0].localeCompare(b[0]);
+        }).map((a) => a[1]); // Transform the tuple into the ExpBreakdown
+    }
+    static classVersusKd(events, classLimit) {
+        const kds = classKdCollection();
+        events.forEach((event) => {
+            if (event.type == "kill" || event.type == "death") {
+                const sourceLoadoutID = event.loadoutID;
+                const sourceLoadout = core_census_PsLoadout__WEBPACK_IMPORTED_MODULE_4__["PsLoadouts"].get(sourceLoadoutID);
+                if (sourceLoadout == undefined) {
+                    return;
+                }
+                const targetLoadoutID = event.targetLoadoutID;
+                const targetLoadout = core_census_PsLoadout__WEBPACK_IMPORTED_MODULE_4__["PsLoadouts"].get(targetLoadoutID);
+                if (targetLoadout == undefined) {
+                    return;
+                }
+                if (classLimit != undefined) {
+                    if (sourceLoadout.type != classLimit) {
+                        return; // Continue to next iteration
+                    }
+                }
+                if (event.type == "kill") {
+                    switch (targetLoadout.type) {
+                        case "infil":
+                            kds.infil.kills += 1;
+                            break;
+                        case "lightAssault":
+                            kds.lightAssault.kills += 1;
+                            break;
+                        case "medic":
+                            kds.medic.kills += 1;
+                            break;
+                        case "engineer":
+                            kds.engineer.kills += 1;
+                            break;
+                        case "heavy":
+                            kds.heavy.kills += 1;
+                            break;
+                        case "max":
+                            kds.max.kills += 1;
+                            break;
+                        default: console.warn(`Unknown type`);
+                    }
+                }
+                if (event.type == "death" && event.revived == false) {
+                    switch (targetLoadout.type) {
+                        case "infil":
+                            kds.infil.deaths += 1;
+                            break;
+                        case "lightAssault":
+                            kds.lightAssault.deaths += 1;
+                            break;
+                        case "medic":
+                            kds.medic.deaths += 1;
+                            break;
+                        case "engineer":
+                            kds.engineer.deaths += 1;
+                            break;
+                        case "heavy":
+                            kds.heavy.deaths += 1;
+                            break;
+                        case "max":
+                            kds.max.deaths += 1;
+                            break;
+                        default: console.warn(`Unknown type`);
+                    }
+                }
+                if (event.type == "death" && event.revived == true) {
+                    switch (targetLoadout.type) {
+                        case "infil":
+                            kds.infil.score += 1;
+                            break;
+                        case "lightAssault":
+                            kds.lightAssault.score += 1;
+                            break;
+                        case "medic":
+                            kds.medic.score += 1;
+                            break;
+                        case "engineer":
+                            kds.engineer.score += 1;
+                            break;
+                        case "heavy":
+                            kds.heavy.score += 1;
+                            break;
+                        case "max":
+                            kds.max.score += 1;
+                            break;
+                        default: console.warn(`Unknown type`);
+                    }
+                }
+            }
+        });
+        return kds;
+    }
+    static classUsage(parameters) {
+        const usage = new Playtime();
+        if (parameters.player.events.length == 0) {
+            return usage;
+        }
+        let lastLoadout = undefined;
+        let lastTimestamp = parameters.player.events[0].timestamp;
+        const finalTimestamp = parameters.player.events[parameters.player.events.length - 1].timestamp;
+        usage.characterID = parameters.player.characterID;
+        usage.secondsOnline = (finalTimestamp - lastTimestamp) / 1000;
+        parameters.player.events.forEach((event) => {
+            if (event.type == "capture" || event.type == "defend" || event.type == "login" || event.type == "logout") {
+                return;
+            }
+            lastLoadout = core_census_PsLoadout__WEBPACK_IMPORTED_MODULE_4__["PsLoadouts"].get(event.loadoutID);
+            if (lastLoadout == undefined) {
+                return console.warn(`Unknown loadout ID: ${event.loadoutID}`);
+            }
+            if (event.type == "exp") {
+                const diff = (event.timestamp - lastTimestamp) / 1000;
+                lastTimestamp = event.timestamp;
+                switch (lastLoadout.type) {
+                    case "infil":
+                        usage.infil.secondsAs += diff;
+                        break;
+                    case "lightAssault":
+                        usage.lightAssault.secondsAs += diff;
+                        break;
+                    case "medic":
+                        usage.medic.secondsAs += diff;
+                        break;
+                    case "engineer":
+                        usage.engineer.secondsAs += diff;
+                        break;
+                    case "heavy":
+                        usage.heavy.secondsAs += diff;
+                        break;
+                    case "max":
+                        usage.max.secondsAs += diff;
+                        break;
+                    default: console.warn(`Unknown type`);
+                }
+            }
+            if (event.type == "exp") {
+                switch (lastLoadout.type) {
+                    case "infil":
+                        usage.infil.score += event.amount;
+                        break;
+                    case "lightAssault":
+                        usage.lightAssault.score += event.amount;
+                        break;
+                    case "medic":
+                        usage.medic.score += event.amount;
+                        break;
+                    case "engineer":
+                        usage.engineer.score += event.amount;
+                        break;
+                    case "heavy":
+                        usage.heavy.score += event.amount;
+                        break;
+                    case "max":
+                        usage.max.score += event.amount;
+                        break;
+                    default: console.warn(`Unknown type`);
+                }
+            }
+            else if (event.type == "kill") {
+                switch (lastLoadout.type) {
+                    case "infil":
+                        usage.infil.kills += 1;
+                        break;
+                    case "lightAssault":
+                        usage.lightAssault.kills += 1;
+                        break;
+                    case "medic":
+                        usage.medic.kills += 1;
+                        break;
+                    case "engineer":
+                        usage.engineer.kills += 1;
+                        break;
+                    case "heavy":
+                        usage.heavy.kills += 1;
+                        break;
+                    case "max":
+                        usage.max.kills += 1;
+                        break;
+                    default: console.warn(`Unknown type`);
+                }
+            }
+            else if (event.type == "death" && event.revived == false) {
+                switch (lastLoadout.type) {
+                    case "infil":
+                        usage.infil.deaths += 1;
+                        break;
+                    case "lightAssault":
+                        usage.lightAssault.deaths += 1;
+                        break;
+                    case "medic":
+                        usage.medic.deaths += 1;
+                        break;
+                    case "engineer":
+                        usage.engineer.deaths += 1;
+                        break;
+                    case "heavy":
+                        usage.heavy.deaths += 1;
+                        break;
+                    case "max":
+                        usage.max.deaths += 1;
+                        break;
+                    default: console.warn(`Unknown type`);
+                }
+            }
+        });
+        let maxTime = 0;
+        if (usage.infil.secondsAs > maxTime) {
+            maxTime = usage.infil.secondsAs;
+            usage.mostPlayed.name = "Infiltrator";
+        }
+        if (usage.lightAssault.secondsAs > maxTime) {
+            maxTime = usage.lightAssault.secondsAs;
+            usage.mostPlayed.name = "Light Assault";
+        }
+        if (usage.medic.secondsAs > maxTime) {
+            maxTime = usage.medic.secondsAs;
+            usage.mostPlayed.name = "Medic";
+        }
+        if (usage.engineer.secondsAs > maxTime) {
+            maxTime = usage.engineer.secondsAs;
+            usage.mostPlayed.name = "Engineer";
+        }
+        if (usage.heavy.secondsAs > maxTime) {
+            maxTime = usage.heavy.secondsAs;
+            usage.mostPlayed.name = "Heavy";
+        }
+        if (usage.max.secondsAs > maxTime) {
+            maxTime = usage.max.secondsAs;
+            usage.mostPlayed.name = "MAX";
+        }
+        usage.mostPlayed.secondsAs = maxTime;
+        return usage;
+    }
+    static unrevivedTime(events) {
+        const array = [];
+        for (const ev of events) {
+            if (ev.type != "death") {
+                continue;
+            }
+            if (ev.revivedEvent != null) {
+                const diff = (ev.revivedEvent.timestamp - ev.timestamp) / 1000;
+                if (diff > 40) {
+                    continue; // Somehow death events are missed and a revive event is linked to the wrong death
+                }
+                array.push(diff);
+            }
+        }
+        return array.sort((a, b) => b - a);
+    }
+    static reviveLifeExpectance(events) {
+        const array = [];
+        for (const ev of events) {
+            if (ev.type != "death" || ev.revivedEvent == null) {
+                continue;
+            }
+            const charEvents = events.filter(iter => iter.sourceID == ev.sourceID);
+            const index = charEvents.findIndex(iter => {
+                return iter.type == "death" && iter.timestamp == ev.timestamp && iter.targetID == ev.targetID;
+            });
+            if (index == -1) {
+                console.error(`Failed to find a death for ${ev.sourceID} at ${ev.timestamp} but wasn't found in charEvents`);
+                continue;
+            }
+            let nextDeath = null;
+            for (let i = index + 1; i < charEvents.length; ++i) {
+                if (charEvents[i].type == "death") {
+                    nextDeath = charEvents[i];
+                    break;
+                }
+            }
+            if (nextDeath == null) {
+                console.error(`Failed to find the next death for ${ev.sourceID} at ${ev.timestamp}`);
+                continue;
+            }
+            const diff = (nextDeath.timestamp - ev.revivedEvent.timestamp) / 1000;
+            if (diff <= 20) {
+                array.push(diff);
+            }
+        }
+        return array.sort((a, b) => b - a);
+    }
+    static lifeExpectanceRate(events) {
+        const array = [];
+        for (const ev of events) {
+            if (ev.type != "death" || ev.revivedEvent == null) {
+                continue;
+            }
+            const charEvents = events.filter(iter => iter.sourceID == ev.sourceID);
+            const index = charEvents.findIndex(iter => {
+                return iter.type == "death" && iter.timestamp == ev.timestamp && iter.targetID == ev.targetID;
+            });
+            if (index == -1) {
+                console.error(`Failed to find a death for ${ev.sourceID} at ${ev.timestamp} but wasn't found in charEvents`);
+                continue;
+            }
+            let nextDeath = null;
+            for (let i = index + 1; i < charEvents.length; ++i) {
+                if (charEvents[i].type == "death") {
+                    nextDeath = charEvents[i];
+                    break;
+                }
+            }
+            if (nextDeath == null) {
+                console.error(`Failed to find the next death for ${ev.sourceID} at ${ev.timestamp}`);
+                continue;
+            }
+            const diff = (nextDeath.timestamp - ev.revivedEvent.timestamp) / 1000;
+            array.push(diff);
+        }
+        const probs = this.kaplanMeier(array, 20);
+        return probs;
+    }
+    static timeUntilReviveRate(events) {
+        const array = [];
+        for (const ev of events) {
+            if (ev.type != "death") {
+                continue;
+            }
+            if (ev.revivedEvent != null) {
+                const diff = (ev.revivedEvent.timestamp - ev.timestamp) / 1000;
+                if (diff > 40) {
+                    continue; // Somehow death events are missed and a revive event is linked to the wrong death
+                }
+                array.push(diff);
+            }
+        }
+        const probs = this.kaplanMeier(array);
+        return probs;
+    }
+    static kaplanMeier(data, max) {
+        const ticks = [...Array((max !== null && max !== void 0 ? max : Math.max(...data))).keys()];
+        const probs = [];
+        let cur_pop = [...Array(data.length).keys()];
+        for (const tick of ticks) {
+            const survived = data.filter(iter => iter > tick).length;
+            probs.push(survived / cur_pop.length);
+            cur_pop = data.filter(iter => iter > tick);
+        }
+        let cumul = 1;
+        for (let i = 0; i < probs.length; ++i) {
+            probs[i] = cumul * probs[i];
+            cumul = probs[i];
+        }
+        return probs;
+    }
+    static generateContinentPlayedOn(events) {
+        let indar = 0;
+        let esamir = 0;
+        let amerish = 0;
+        let hossin = 0;
+        for (const ev of events) {
+            if (ev.type == "kill" || ev.type == "death") {
+                switch (ev.zoneID) {
+                    case "2":
+                        ++indar;
+                        break;
+                    case "4":
+                        ++hossin;
+                        break;
+                    case "6":
+                        ++amerish;
+                        break;
+                    case "8":
+                        ++esamir;
+                        break;
+                }
+            }
+        }
+        let count = 0;
+        let cont = "Default";
+        if (indar > count) {
+            cont = "Indar";
+            count = indar;
+        }
+        if (esamir > count) {
+            cont = "Esamir";
+            count = esamir;
+        }
+        if (amerish > count) {
+            cont = "Amerish";
+            count = amerish;
+        }
+        if (hossin > count) {
+            cont = "Hossin";
+            count = hossin;
+        }
+        return cont;
+    }
+}
+window.IndividualReporter = IndividualReporter;
+
+
+/***/ }),
+
+/***/ "./src/core/PsEvent.ts":
+/*!*****************************!*\
+  !*** ./src/core/PsEvent.ts ***!
+  \*****************************/
 /*! exports provided: PsEvent, PsEvents */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
@@ -61036,87 +62863,21 @@ const PsEvents = new Map([
 
 /***/ }),
 
-/***/ "./src/Quartile.ts":
-/*!*************************!*\
-  !*** ./src/Quartile.ts ***!
-  \*************************/
-/*! exports provided: Quartile */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
+/***/ "./src/core/Squad.ts":
+/*!***************************!*\
+  !*** ./src/core/Squad.ts ***!
+  \***************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
 
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Quartile", function() { return Quartile; });
-class Quartile {
-    constructor() {
-        this.min = 0;
-        this.q1 = 0;
-        this.median = 0;
-        this.q3 = 0;
-        this.max = 0;
-    }
-    static get(data) {
-        const quart = new Quartile();
-        if (data.length == 0) {
-            return quart;
-        }
-        if (data.length == 1) {
-            quart.min = data[0];
-            quart.q1 = data[0];
-            quart.median = data[0];
-            quart.q3 = data[0];
-            quart.max = data[0];
-            return quart;
-        }
-        quart.q1 = this.quartile(data, 0.25);
-        quart.median = this.quartile(data, 0.5);
-        quart.q3 = this.quartile(data, 0.75);
-        const stdDev = this.standardDeviation(data);
-        for (let i = data.length - 1; i >= 0; --i) {
-            if (data[i] <= quart.q3 + stdDev) {
-                quart.max = data[i];
-                break;
-            }
-        }
-        for (let i = 0; i < data.length; ++i) {
-            if (data[i] >= quart.q1 - stdDev) {
-                quart.min = data[i];
-                break;
-            }
-        }
-        quart.max = quart.max == 0 ? data[data.length - 1] : quart.max;
-        quart.min = quart.min == 0 ? data[0] : quart.min;
-        return quart;
-    }
-    static sum(data) {
-        return data.reduce((a, b) => a + b, 0);
-    }
-    static standardDeviation(data) {
-        const mean = this.sum(data) / data.length;
-        const diff = data.map(a => Math.pow((a - mean), 2));
-        return Math.sqrt(this.sum(diff) / (data.length - 1));
-    }
-    static quartile(data, q) {
-        const sorted = data.sort((a, b) => a - b);
-        const pos = (sorted.length - 1) * q;
-        const base = Math.floor(pos);
-        const rest = pos - base;
-        if (sorted[base + 1] !== undefined) {
-            return sorted[base] + rest * (sorted[base + 1] - sorted[base]);
-        }
-        else {
-            return sorted[base];
-        }
-    }
-}
-window.Quartile = Quartile;
 
 
 /***/ }),
 
-/***/ "./src/StatMap.ts":
-/*!************************!*\
-  !*** ./src/StatMap.ts ***!
-  \************************/
+/***/ "./src/core/StatMap.ts":
+/*!*****************************!*\
+  !*** ./src/core/StatMap.ts ***!
+  \*****************************/
 /*! exports provided: default */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
@@ -61153,307 +62914,81 @@ class StatMap {
 
 /***/ }),
 
-/***/ "./src/Storage.ts":
-/*!************************!*\
-  !*** ./src/Storage.ts ***!
-  \************************/
-/*! exports provided: StorageMetadata, StorageHelper */
+/***/ "./src/core/TrackedPlayer.ts":
+/*!***********************************!*\
+  !*** ./src/core/TrackedPlayer.ts ***!
+  \***********************************/
+/*! exports provided: TrackedPlayer */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "StorageMetadata", function() { return StorageMetadata; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "StorageHelper", function() { return StorageHelper; });
-/* harmony import */ var core_CoreSettings__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! core/CoreSettings */ "./src/core/CoreSettings.ts");
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "TrackedPlayer", function() { return TrackedPlayer; });
+/* harmony import */ var core_StatMap__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! core/StatMap */ "./src/core/StatMap.ts");
 
-class StorageMetadata {
-    constructor(data) {
-        this.tag = "";
-        this.data = data;
-    }
-}
-class StorageHelper {
-    static isEnabled() {
-        if (this._enabled == undefined) {
-            try {
-                const key = "$__topt_test_key__";
-                localStorage.setItem(key, key);
-                localStorage.getItem(key);
-                localStorage.removeItem(key);
-                this._enabled = true;
-            }
-            catch (_a) {
-                this._enabled = false;
-            }
-        }
-        return this._enabled;
-    }
-    static getSettings() {
-        if (this._settings == undefined) {
-            if (this.isEnabled() == false) {
-                return null;
-            }
-            let item = {
-                tag: "settings",
-                data: new core_CoreSettings__WEBPACK_IMPORTED_MODULE_0__["CoreSettings"]()
-            };
-            const itemStr = localStorage.getItem(this.KEY_SETTINGS);
-            if (itemStr == null) {
-                return null;
-            }
-            else {
-                item = JSON.parse(itemStr);
-            }
-            if (item.tag == undefined || item.tag != "settings") {
-                console.warn(`Cannot get settings: localStorage item ${this.KEY_SETTINGS} contained the wrong tag: ${item.tag}`);
-                return null;
-            }
-            this._settings = item.data;
-        }
-        return this._settings;
-    }
-    static setSettings(settings) {
-        if (this.isEnabled() == false) {
-            return console.warn(`Cannot save settings: localStorage is not enabled`);
-        }
-        if (settings == null) {
-            localStorage.removeItem(this.KEY_SETTINGS);
-        }
-        else {
-            let item = {
-                tag: "settings",
-                data: settings
-            };
-            localStorage.setItem(this.KEY_SETTINGS, JSON.stringify(item));
-        }
-    }
-}
-StorageHelper._enabled = undefined;
-StorageHelper._settings = undefined;
-StorageHelper.KEY_TREND = "topt.trends";
-StorageHelper.KEY_SESSION = "topt.session";
-StorageHelper.KEY_SETTINGS = "topt.settings";
-window.StorageHelper = StorageHelper;
-
-
-/***/ }),
-
-/***/ "./src/addons/Playback.ts":
-/*!********************************!*\
-  !*** ./src/addons/Playback.ts ***!
-  \********************************/
-/*! exports provided: PlaybackOptions, Playback */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "PlaybackOptions", function() { return PlaybackOptions; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Playback", function() { return Playback; });
-/* harmony import */ var census_OutfitAPI__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! census/OutfitAPI */ "./src/census/OutfitAPI.ts");
-/* harmony import */ var census_ApiWrapper__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! census/ApiWrapper */ "./src/census/ApiWrapper.ts");
-
-
-const log = (msg) => {
-    console.log(`[Playback] ${msg}`);
-};
-const warn = (msg) => {
-    console.warn(`[Playback] ${msg}`);
-};
-const error = (msg) => {
-    console.error(`[Playback] ${msg}`);
-};
-const debug = (msg) => {
-    console.log(`[Playback] ${msg}`);
-};
-class PlaybackOptions {
+/**
+ * Represents a character that is being tracked
+ */
+class TrackedPlayer {
     constructor() {
-        this.speed = 0;
-    }
-}
-class Playback {
-    static setCore(core) {
-        Playback._core = core;
-    }
-    static loadFile(file) {
-        if (Playback._core == null) {
-            throw `Cannot load file: Core has not been set. Did you forget to use Playback.setCore()?`;
-        }
-        Playback._file = file;
-        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_1__["ApiResponse"]();
-        const reader = new FileReader();
-        reader.onload = ((ev) => {
-            const data = JSON.parse(reader.result);
-            if (!data.version) {
-                error(`Missing version from import`);
-            }
-            else if (data.version == "1") {
-                const nowMs = new Date().getTime();
-                debug(`Exported data uses version 1`);
-                const chars = data.players;
-                const outfits = data.outfits;
-                const events = data.events;
-                // Force online for squad tracking
-                this._core.subscribeToEvents(chars.map(iter => { iter.online = iter.secondsPlayed > 0; return iter; }));
-                census_OutfitAPI__WEBPACK_IMPORTED_MODULE_0__["default"].getByIDs(outfits).ok((data) => {
-                    this._core.outfits = data;
-                });
-                if (events != undefined && events.length != 0) {
-                    Playback._events = events;
-                    const parsedData = events.map(iter => JSON.parse(iter));
-                    Playback._parsed = parsedData;
-                }
-                debug(`Took ${new Date().getTime() - nowMs}ms to import data`);
-                response.resolveOk();
-            }
-            else {
-                error(`Unchecked version: ${data.version}`);
-                response.resolve({ code: 400, data: `` });
-            }
-        });
-        reader.readAsText(file);
-        return response;
-    }
-    static start(parameters) {
-        if (this._core == null) {
-            throw `Cannot start playback, core is null. Did you forget to call Playback.setCore()?`;
-        }
-        // Instant playback
-        if (parameters.speed <= 0) {
-            debug(`Doing instant playback`);
-            this._core.tracking.startTime = Math.min(...Playback._parsed.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
-            this._core.tracking.endTime = Math.max(...Playback._parsed.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
-            for (const ev of Playback._events) {
-                this._core.processMessage(ev, true);
-            }
-            this._core.stop();
-        }
-        else {
-            const start = Math.min(...Playback._parsed.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
-            const end = Math.max(...Playback._parsed.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
-            this._core.tracking.startTime = start;
-            const slots = new Map();
-            for (const ev of Playback._parsed) {
-                const time = Number.parseInt(ev.payload.timestamp) * 1000;
-                if (Number.isNaN(time)) {
-                    warn(`Failed to get a timestamp from ${ev}`);
-                }
-                const diff = time - start;
-                if (!slots.has(diff)) {
-                    slots.set(diff, []);
-                }
-                slots.get(diff).push(ev);
-            }
-            let index = 0;
-            const intervalID = setInterval(() => {
-                if (!slots.has(index)) {
-                    debug(`Index ${index} has no events, skipping`);
-                }
-                else {
-                    const events = slots.get(index);
-                    for (const ev of events) {
-                        this._core.processMessage(JSON.stringify(ev), true);
-                    }
-                }
-                index += 1000;
-                if (index > end) {
-                    debug(`Ended on index ${index}`);
-                    clearInterval(intervalID);
-                }
-            }, 1000 * parameters.speed);
-        }
-    }
-}
-Playback._core = null;
-Playback._file = null;
-Playback._events = [];
-Playback._parsed = [];
-window.Playback = Playback;
-
-
-/***/ }),
-
-/***/ "./src/addons/SquadAddon.ts":
-/*!**********************************!*\
-  !*** ./src/addons/SquadAddon.ts ***!
-  \**********************************/
-/*! exports provided: SquadAddon */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "SquadAddon", function() { return SquadAddon; });
-class SquadAddon {
-    static getHovered() {
-        if (SquadAddon.selectedSquadName != null) {
-            return "squad";
-        }
-        if (SquadAddon.selectedMemberID != null) {
-            return "member";
-        }
-        return null;
-    }
-}
-SquadAddon.selectedSquadName = null;
-SquadAddon.selectedMemberID = null;
-Window.SquadAddon = SquadAddon;
-
-
-/***/ }),
-
-/***/ "./src/app/App.ts":
-/*!************************!*\
-  !*** ./src/app/App.ts ***!
-  \************************/
-/*! exports provided: default */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "default", function() { return App; });
-class App {
-    constructor(name) {
-        this.name = name;
+        /**
+         * Unique character ID of the tracked player
+         */
+        this.characterID = "";
+        /**
+         * Tag of the outfit, if the character is in one
+         */
+        this.outfitTag = "";
+        /**
+         * Name of the character
+         */
+        this.name = "";
+        /**
+         * What faction the character is a part of
+         */
+        this.faction = "";
+        /**
+         * How much accumulated score a character has gotten during tracking
+         */
+        this.score = 0;
+        /**
+         * If this character is currently online
+         */
+        this.online = true;
+        /**
+         * What time (in MS) the character more recently joined, to a minimum of when the tracker started
+         */
+        this.joinTime = 0;
+        /**
+         * How many seconds the character has been online for
+         */
+        this.secondsOnline = 0;
+        /**
+         * How many times a character has gotten each experience event
+         */
+        this.stats = new core_StatMap__WEBPACK_IMPORTED_MODULE_0__["default"]();
+        /**
+         * How many times a character has gotten each ribbon
+         */
+        this.ribbons = new core_StatMap__WEBPACK_IMPORTED_MODULE_0__["default"]();
+        /**
+         * Reference to the most recent death event, used for tracking revives
+         */
+        this.recentDeath = null;
+        /**
+         * The events that have occured because of a player
+         */
+        this.events = [];
     }
 }
 
 
 /***/ }),
 
-/***/ "./src/app/AppRealtime.ts":
-/*!********************************!*\
-  !*** ./src/app/AppRealtime.ts ***!
-  \********************************/
-/*! exports provided: default */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "default", function() { return AppRealtime; });
-/* harmony import */ var app_App__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! app/App */ "./src/app/App.ts");
-
-class AppRealtime extends app_App__WEBPACK_IMPORTED_MODULE_0__["default"] {
-    constructor() {
-        super("realtime");
-    }
-    onStart() {
-    }
-    onResume() {
-    }
-    updateDisplay() {
-    }
-    onSuspend() {
-    }
-    onStop() {
-    }
-}
-
-
-/***/ }),
-
-/***/ "./src/census/AchievementAPI.ts":
-/*!**************************************!*\
-  !*** ./src/census/AchievementAPI.ts ***!
-  \**************************************/
+/***/ "./src/core/census/AchievementAPI.ts":
+/*!*******************************************!*\
+  !*** ./src/core/census/AchievementAPI.ts ***!
+  \*******************************************/
 /*! exports provided: Achievement, AchievementAPI */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
@@ -61461,8 +62996,8 @@ class AppRealtime extends app_App__WEBPACK_IMPORTED_MODULE_0__["default"] {
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Achievement", function() { return Achievement; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "AchievementAPI", function() { return AchievementAPI; });
-/* harmony import */ var _CensusAPI__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./CensusAPI */ "./src/census/CensusAPI.ts");
-/* harmony import */ var _ApiWrapper__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./ApiWrapper */ "./src/census/ApiWrapper.ts");
+/* harmony import */ var _CensusAPI__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./CensusAPI */ "./src/core/census/CensusAPI.ts");
+/* harmony import */ var _ApiWrapper__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./ApiWrapper */ "./src/core/census/ApiWrapper.ts");
 
 
 class Achievement {
@@ -61563,10 +63098,10 @@ window.AchievementAPI = AchievementAPI;
 
 /***/ }),
 
-/***/ "./src/census/ApiWrapper.ts":
-/*!**********************************!*\
-  !*** ./src/census/ApiWrapper.ts ***!
-  \**********************************/
+/***/ "./src/core/census/ApiWrapper.ts":
+/*!***************************************!*\
+  !*** ./src/core/census/ApiWrapper.ts ***!
+  \***************************************/
 /*! exports provided: ApiResponse, APIWrapper, default */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
@@ -62087,17 +63622,17 @@ class APIWrapper {
 
 /***/ }),
 
-/***/ "./src/census/CensusAPI.ts":
-/*!*********************************!*\
-  !*** ./src/census/CensusAPI.ts ***!
-  \*********************************/
+/***/ "./src/core/census/CensusAPI.ts":
+/*!**************************************!*\
+  !*** ./src/core/census/CensusAPI.ts ***!
+  \**************************************/
 /*! exports provided: default */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "default", function() { return CensusAPI; });
-/* harmony import */ var _ApiWrapper__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./ApiWrapper */ "./src/census/ApiWrapper.ts");
+/* harmony import */ var _ApiWrapper__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./ApiWrapper */ "./src/core/census/ApiWrapper.ts");
 /* harmony import */ var jquery__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! jquery */ "./node_modules/jquery/dist/jquery.js");
 /* harmony import */ var jquery__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(jquery__WEBPACK_IMPORTED_MODULE_1__);
 
@@ -62135,10 +63670,10 @@ window.CensusAPI = CensusAPI;
 
 /***/ }),
 
-/***/ "./src/census/CharacterAPI.ts":
-/*!************************************!*\
-  !*** ./src/census/CharacterAPI.ts ***!
-  \************************************/
+/***/ "./src/core/census/CharacterAPI.ts":
+/*!*****************************************!*\
+  !*** ./src/core/census/CharacterAPI.ts ***!
+  \*****************************************/
 /*! exports provided: Character, CharacterAPI */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
@@ -62146,8 +63681,8 @@ window.CensusAPI = CensusAPI;
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Character", function() { return Character; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "CharacterAPI", function() { return CharacterAPI; });
-/* harmony import */ var _CensusAPI__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./CensusAPI */ "./src/census/CensusAPI.ts");
-/* harmony import */ var _ApiWrapper__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./ApiWrapper */ "./src/census/ApiWrapper.ts");
+/* harmony import */ var _CensusAPI__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./CensusAPI */ "./src/core/census/CensusAPI.ts");
+/* harmony import */ var _ApiWrapper__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./ApiWrapper */ "./src/core/census/ApiWrapper.ts");
 
 
 class Character {
@@ -62298,98 +63833,20 @@ window.CharacterAPI = CharacterAPI;
 
 /***/ }),
 
-/***/ "./src/census/EventAPI.ts":
-/*!********************************!*\
-  !*** ./src/census/EventAPI.ts ***!
-  \********************************/
+/***/ "./src/core/census/EventAPI.ts":
+/*!*************************************!*\
+  !*** ./src/core/census/EventAPI.ts ***!
+  \*************************************/
 /*! exports provided: EventAPI */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "EventAPI", function() { return EventAPI; });
-/* harmony import */ var _CensusAPI__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./CensusAPI */ "./src/census/CensusAPI.ts");
-/* harmony import */ var _ApiWrapper__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./ApiWrapper */ "./src/census/ApiWrapper.ts");
-
-
+//import { Event, EventKill, EventDeath } from "core/events/index";
 class EventAPI {
     static parseEvent(elem) {
         throw ``;
-    }
-    static parseEventKill(elem) {
-        return {
-            type: "kill",
-            isHeadshot: elem.is_headshot == "1",
-            loadoutID: elem.attacker_loadout_id,
-            sourceID: elem.attacker_character_id,
-            targetID: elem.character_id,
-            targetLoadoutID: elem.character_loadout_id,
-            timestamp: Number.parseInt(elem.timestamp) * 1000,
-            weaponID: elem.attacker_weapon_id,
-            zoneID: elem.zone_id
-        };
-    }
-    static parseEventDeath(elem) {
-        return {
-            type: "death",
-            isHeadshot: elem.is_headshot == "1",
-            loadoutID: elem.character_loadout_id,
-            sourceID: elem.character_id,
-            targetID: elem.attacker_character_id,
-            targetLoadoutID: elem.attacker_loadout_id,
-            timestamp: Number.parseInt(elem.timestamp) * 1000,
-            weaponID: elem.attacker_weapon_id,
-            revived: false,
-            revivedEvent: null,
-            zoneID: elem.zone_id
-        };
-    }
-    static getKills(charID, startMs, endMs) {
-        const response = new _ApiWrapper__WEBPACK_IMPORTED_MODULE_1__["ApiResponse"]();
-        startMs = Math.round((startMs / 1000)) - 1;
-        endMs = Math.round((endMs / 1000)) + 1;
-        if (startMs >= endMs) {
-            response.resolve({ code: 400, data: `Start must come before end` });
-        }
-        else {
-            const request = _CensusAPI__WEBPACK_IMPORTED_MODULE_0__["default"].get(`/characters_event/?character_id=${charID}&type=KILL&after=${startMs}&before=${endMs}`);
-            request.ok((data) => {
-                const events = [];
-                for (const datum of data.characters_event_list) {
-                    events.push(EventAPI.parseEventKill(datum));
-                }
-                response.resolveOk(events);
-            });
-        }
-        return response;
-    }
-    static getMultiDeaths(ids, startMs, endMs) {
-        const response = new _ApiWrapper__WEBPACK_IMPORTED_MODULE_1__["ApiResponse"]();
-        startMs = (startMs / 1000) - 1;
-        endMs = (endMs / 1000) + 1;
-        const request = _CensusAPI__WEBPACK_IMPORTED_MODULE_0__["default"].get(`/characters_event/?character_id=${ids.join(",")}&type=DEATH&after=${startMs}&before=${endMs}&c:limit=10000`);
-        request.ok((data) => {
-            const events = [];
-            for (const datum of data.characters_event_list) {
-                events.push(EventAPI.parseEventDeath(datum));
-            }
-            response.resolveOk(events);
-        });
-        return response;
-    }
-    static getDeaths(charID, startMs, endMs) {
-        const response = new _ApiWrapper__WEBPACK_IMPORTED_MODULE_1__["ApiResponse"]();
-        startMs = (startMs / 1000) - 1;
-        endMs = (endMs / 1000) + 1;
-        const request = _CensusAPI__WEBPACK_IMPORTED_MODULE_0__["default"].get(`/characters_event/?character_id=${charID}&type=DEATH&after=${startMs}&before=${endMs}`);
-        request.ok((data) => {
-            const events = [];
-            for (const datum of data.characters_event_list) {
-                events.push(EventAPI.parseEventDeath(datum));
-            }
-            response.resolveOk(events);
-        });
-        return response;
     }
 }
 window.EventAPI = EventAPI;
@@ -62397,10 +63854,10 @@ window.EventAPI = EventAPI;
 
 /***/ }),
 
-/***/ "./src/census/FacilityAPI.ts":
-/*!***********************************!*\
-  !*** ./src/census/FacilityAPI.ts ***!
-  \***********************************/
+/***/ "./src/core/census/FacilityAPI.ts":
+/*!****************************************!*\
+  !*** ./src/core/census/FacilityAPI.ts ***!
+  \****************************************/
 /*! exports provided: Facility, FacilityAPI */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
@@ -62408,8 +63865,8 @@ window.EventAPI = EventAPI;
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Facility", function() { return Facility; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "FacilityAPI", function() { return FacilityAPI; });
-/* harmony import */ var _CensusAPI__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./CensusAPI */ "./src/census/CensusAPI.ts");
-/* harmony import */ var _ApiWrapper__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./ApiWrapper */ "./src/census/ApiWrapper.ts");
+/* harmony import */ var _CensusAPI__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./CensusAPI */ "./src/core/census/CensusAPI.ts");
+/* harmony import */ var _ApiWrapper__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./ApiWrapper */ "./src/core/census/ApiWrapper.ts");
 /* harmony import */ var jquery__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! jquery */ "./node_modules/jquery/dist/jquery.js");
 /* harmony import */ var jquery__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(jquery__WEBPACK_IMPORTED_MODULE_2__);
 
@@ -62563,10 +64020,10 @@ window.FacilityAPI = FacilityAPI;
 
 /***/ }),
 
-/***/ "./src/census/OutfitAPI.ts":
-/*!*********************************!*\
-  !*** ./src/census/OutfitAPI.ts ***!
-  \*********************************/
+/***/ "./src/core/census/OutfitAPI.ts":
+/*!**************************************!*\
+  !*** ./src/core/census/OutfitAPI.ts ***!
+  \**************************************/
 /*! exports provided: Outfit, default */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
@@ -62574,9 +64031,9 @@ window.FacilityAPI = FacilityAPI;
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Outfit", function() { return Outfit; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "default", function() { return OutfitAPI; });
-/* harmony import */ var _CensusAPI__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./CensusAPI */ "./src/census/CensusAPI.ts");
-/* harmony import */ var _ApiWrapper__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./ApiWrapper */ "./src/census/ApiWrapper.ts");
-/* harmony import */ var _CharacterAPI__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./CharacterAPI */ "./src/census/CharacterAPI.ts");
+/* harmony import */ var _CensusAPI__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./CensusAPI */ "./src/core/census/CensusAPI.ts");
+/* harmony import */ var _ApiWrapper__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./ApiWrapper */ "./src/core/census/ApiWrapper.ts");
+/* harmony import */ var _CharacterAPI__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./CharacterAPI */ "./src/core/census/CharacterAPI.ts");
 
 
 
@@ -62689,10 +64146,10 @@ window.OutfitAPI = OutfitAPI;
 
 /***/ }),
 
-/***/ "./src/census/PsLoadout.ts":
-/*!*********************************!*\
-  !*** ./src/census/PsLoadout.ts ***!
-  \*********************************/
+/***/ "./src/core/census/PsLoadout.ts":
+/*!**************************************!*\
+  !*** ./src/core/census/PsLoadout.ts ***!
+  \**************************************/
 /*! exports provided: PsLoadout, PsLoadouts */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
@@ -62916,10 +64373,10 @@ const PsLoadouts = new Map([
 
 /***/ }),
 
-/***/ "./src/census/VehicleAPI.ts":
-/*!**********************************!*\
-  !*** ./src/census/VehicleAPI.ts ***!
-  \**********************************/
+/***/ "./src/core/census/VehicleAPI.ts":
+/*!***************************************!*\
+  !*** ./src/core/census/VehicleAPI.ts ***!
+  \***************************************/
 /*! exports provided: Vehicle, VehicleTypes, Vehicles, VehicleAPI */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
@@ -62929,8 +64386,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "VehicleTypes", function() { return VehicleTypes; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Vehicles", function() { return Vehicles; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "VehicleAPI", function() { return VehicleAPI; });
-/* harmony import */ var _CensusAPI__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./CensusAPI */ "./src/census/CensusAPI.ts");
-/* harmony import */ var _ApiWrapper__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./ApiWrapper */ "./src/census/ApiWrapper.ts");
+/* harmony import */ var _CensusAPI__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./CensusAPI */ "./src/core/census/CensusAPI.ts");
+/* harmony import */ var _ApiWrapper__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./ApiWrapper */ "./src/core/census/ApiWrapper.ts");
 
 
 class Vehicle {
@@ -63015,10 +64472,10 @@ window.VehicleAPI = VehicleAPI;
 
 /***/ }),
 
-/***/ "./src/census/WeaponAPI.ts":
-/*!*********************************!*\
-  !*** ./src/census/WeaponAPI.ts ***!
-  \*********************************/
+/***/ "./src/core/census/WeaponAPI.ts":
+/*!**************************************!*\
+  !*** ./src/core/census/WeaponAPI.ts ***!
+  \**************************************/
 /*! exports provided: Weapon, WeaponAPI */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
@@ -63026,8 +64483,8 @@ window.VehicleAPI = VehicleAPI;
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Weapon", function() { return Weapon; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "WeaponAPI", function() { return WeaponAPI; });
-/* harmony import */ var _CensusAPI__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./CensusAPI */ "./src/census/CensusAPI.ts");
-/* harmony import */ var _ApiWrapper__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./ApiWrapper */ "./src/census/ApiWrapper.ts");
+/* harmony import */ var _CensusAPI__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./CensusAPI */ "./src/core/census/CensusAPI.ts");
+/* harmony import */ var _ApiWrapper__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./ApiWrapper */ "./src/core/census/ApiWrapper.ts");
 /* harmony import */ var jquery__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! jquery */ "./node_modules/jquery/dist/jquery.js");
 /* harmony import */ var jquery__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(jquery__WEBPACK_IMPORTED_MODULE_2__);
 
@@ -63179,1456 +64636,10 @@ window.WeaponAPI = WeaponAPI;
 
 /***/ }),
 
-/***/ "./src/core/Core.ts":
-/*!**************************!*\
-  !*** ./src/core/Core.ts ***!
-  \**************************/
-/*! exports provided: SquadStats, Core */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "SquadStats", function() { return SquadStats; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Core", function() { return Core; });
-/* harmony import */ var census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! census/ApiWrapper */ "./src/census/ApiWrapper.ts");
-/* harmony import */ var Loadable__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! Loadable */ "./src/Loadable.ts");
-/* harmony import */ var census_CensusAPI__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! census/CensusAPI */ "./src/census/CensusAPI.ts");
-/* harmony import */ var census_OutfitAPI__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! census/OutfitAPI */ "./src/census/OutfitAPI.ts");
-/* harmony import */ var census_CharacterAPI__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! census/CharacterAPI */ "./src/census/CharacterAPI.ts");
-/* harmony import */ var core_TrackedPlayer__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! core/TrackedPlayer */ "./src/core/TrackedPlayer.ts");
-/* harmony import */ var InvididualGenerator__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! InvididualGenerator */ "./src/InvididualGenerator.ts");
-
-
-
-
-
-
-
-class SquadStats {
-    constructor() {
-        this.name = "";
-        this.members = [];
-        this.kills = 0;
-        this.deaths = 0;
-        this.revives = 0;
-        this.heals = 0;
-        this.resupplies = 0;
-        this.repairs = 0;
-        this.vKills = 0;
-    }
-}
-class Core {
-    constructor(serviceID, serverID) {
-        this.sockets = {
-            tracked: null,
-            logistics: null,
-            logins: null,
-            facility: null,
-            debug: null
-        };
-        this.routerTracking = {
-            // key - Who placed the router
-            // value - Lastest npc ID that gave them a router spawn tick
-            routerNpcs: new Map(),
-            routers: [] // All routers that have been placed
-        };
-        this.squad = {
-            debug: false,
-            perm: [],
-            guesses: [],
-            members: new Map(),
-        };
-        this.socketMessageQueue = [];
-        this.debugSocketMessages = [];
-        this.stats = new Map();
-        this.outfits = [];
-        this.characters = [];
-        this.miscEvents = [];
-        this.playerCaptures = [];
-        this.facilityCaptures = [];
-        this.rawData = [];
-        this.tracking = new InvididualGenerator__WEBPACK_IMPORTED_MODULE_6__["TimeTracking"]();
-        this.connected = false;
-        this.handlers = {
-            exp: [],
-            kill: [],
-            death: [],
-            teamkill: [],
-            capture: [],
-            defend: [],
-            vehicle: [],
-            login: [],
-            logout: []
-        };
-        this.serviceID = serviceID;
-        this.serverID = serverID;
-        this.socketMessageQueue.length = 5;
-        census_CensusAPI__WEBPACK_IMPORTED_MODULE_2__["default"].init(this.serviceID);
-        this.squadInit();
-    }
-    /**
-     * Emit an event and execute all handlers on it
-     *
-     * @param event Event being emitted to all handlers
-     */
-    emit(event) {
-        this.handlers[event.type].forEach((callback) => { callback(event); });
-    }
-    /**
-     * Add an event handler that will occur when a specific event is created from the core
-     *
-     * @param type      Event to attach the handler to
-     * @param handler   Handler that will be executed when that event is emitted
-     */
-    on(type, handler) {
-        switch (type) {
-            case "exp":
-                this.handlers.exp.push(handler);
-                break;
-            case "kill":
-                this.handlers.kill.push(handler);
-                break;
-            case "death":
-                this.handlers.death.push(handler);
-                break;
-            case "teamkill":
-                this.handlers.death.push(handler);
-                break;
-            case "capture":
-                this.handlers.capture.push(handler);
-                break;
-            case "defend":
-                this.handlers.defend.push(handler);
-                break;
-            case "vehicle":
-                this.handlers.vehicle.push(handler);
-                break;
-            case "login":
-                this.handlers.login.push(handler);
-                break;
-            case "logout":
-                this.handlers.logout.push(handler);
-                break;
-            default: throw `Unchecked event type ${type}`;
-        }
-    }
-    /**
-     * Remove handlers and no longer emit events to them
-     *
-     * @param type Optional type of handler to clear. If not given, all handlers are cleared
-     */
-    clearHandlers(type) {
-        if (type == undefined) {
-            this.handlers.exp.length = 0;
-            this.handlers.kill.length = 0;
-            this.handlers.death.length = 0;
-            this.handlers.teamkill.length = 0;
-            this.handlers.capture.length = 0;
-            this.handlers.defend.length = 0;
-            this.handlers.vehicle.length = 0;
-            this.handlers.login.length = 0;
-            this.handlers.logout.length = 0;
-        }
-        else {
-            this.handlers[type].length = 0;
-        }
-    }
-    /**
-     * Start the tracking and begin saving events
-     */
-    start() {
-        if (this.connected == false) {
-            throw `Cannot start TOPT: core is not connected`;
-        }
-        this.tracking.running = true;
-        const nowMs = new Date().getTime();
-        this.tracking.startTime = nowMs;
-        this.stats.forEach((char, charID) => {
-            char.joinTime = nowMs;
-        });
-    }
-    /**
-     * Stop running the tracker
-     */
-    stop() {
-        if (this.tracking.running == true) {
-            const nowMs = new Date().getTime();
-            this.tracking.endTime = nowMs;
-        }
-        this.tracking.running = false;
-        this.stats.forEach((char, charID) => {
-            if (char.events.length > 0) {
-                const first = char.events[0];
-                const last = char.events[char.events.length - 1];
-                char.joinTime = first.timestamp;
-                char.secondsOnline = (last.timestamp - first.timestamp) / 1000;
-                const character = this.characters.find(iter => iter.ID == char.characterID);
-                if (character != undefined) {
-                    character.secondsPlayed = char.secondsOnline;
-                    if (character.secondsPlayed > 0) {
-                        character.online = true;
-                    }
-                }
-            }
-            else {
-                char.secondsOnline = 0;
-            }
-        });
-    }
-    /**
-     * Begin tracking all members of an outfit
-     *
-     * @param tag Tag of the outfit to track. Case-insensitive
-     *
-     * @returns A Loading that will contain the state of
-     */
-    addOutfit(tag) {
-        if (this.connected == false) {
-            throw `Cannot track outfit ${tag}: Core is not connected`;
-        }
-        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
-        if (tag.trim().length == 0) {
-            response.resolveOk();
-            return response;
-        }
-        census_OutfitAPI__WEBPACK_IMPORTED_MODULE_3__["default"].getByTag(tag).ok((data) => {
-            this.outfits.push(data);
-        });
-        census_OutfitAPI__WEBPACK_IMPORTED_MODULE_3__["default"].getCharactersByTag(tag).ok((data) => {
-            this.subscribeToEvents(data);
-            response.resolveOk();
-        });
-        return response;
-    }
-    /**
-     * Begin tracking a new player
-     *
-     * @param name Name of the player to track. Case-insensitive
-     *
-     * @returns A loading that will contain the state of
-     */
-    addPlayer(name) {
-        if (this.connected == false) {
-            throw `Cannot track character ${name}: Core is not connected`;
-        }
-        const loading = Loadable__WEBPACK_IMPORTED_MODULE_1__["Loadable"].loading();
-        if (name.trim().length == 0) {
-            loading.state = "loaded";
-            return loading;
-        }
-        census_CharacterAPI__WEBPACK_IMPORTED_MODULE_4__["CharacterAPI"].getByName(name).ok((data) => {
-            this.subscribeToEvents([data]);
-        });
-        return loading;
-    }
-    /**
-     * Subscribe to the events in the event stream
-     *
-     * @param chars Characters to subscribe to
-     */
-    subscribeToEvents(chars) {
-        if (this.sockets.tracked == null) {
-            console.warn(`Cannot subscribe to events, tracked socket is null`);
-            return;
-        }
-        // No duplicates
-        chars = chars.filter((char) => {
-            return this.characters.map((c) => c.ID).indexOf(char.ID) == -1;
-        });
-        if (chars.length == 0) {
-            return;
-        }
-        this.characters = this.characters.concat(chars).sort((a, b) => {
-            return a.name.localeCompare(b.name);
-        });
-        chars.forEach((character) => {
-            const player = new core_TrackedPlayer__WEBPACK_IMPORTED_MODULE_5__["TrackedPlayer"]();
-            player.characterID = character.ID;
-            player.faction = character.faction;
-            player.outfitTag = character.outfitTag;
-            player.name = character.name;
-            if (character.online == true) {
-                player.joinTime = new Date().getTime();
-                this.addMember({ ID: player.characterID, name: player.name, outfitTag: character.outfitTag });
-            }
-            this.stats.set(character.ID, player);
-        });
-        // Large outfits like SKL really stress the websockets out if you try to subscribe to 12k members
-        //      at once, instead breaking them into chunks works nicely
-        const subscribeSetSize = 200;
-        for (let i = 0; i < chars.length; i += subscribeSetSize) {
-            //console.log(`Slice: ${chars.slice(i, i + subscribeSetSize).map(iter => iter.ID).join(", ")}`);
-            const subscribeExp = {
-                "action": "subscribe",
-                "characters": [
-                    ...(chars.slice(i, i + subscribeSetSize).map(iter => iter.ID))
-                ],
-                "eventNames": [
-                    "GainExperience",
-                    "AchievementEarned",
-                    "Death",
-                    "FacilityControl",
-                    "ItemAdded",
-                    "VehicleDestroy"
-                ],
-                "service": "event"
-            };
-            this.sockets.tracked.send(JSON.stringify(subscribeExp));
-        }
-    }
-    onmessage(ev) {
-        for (const message of this.socketMessageQueue) {
-            if (ev.data == message) {
-                //console.log(`Duplicate message found: ${ev.data}`);
-                return;
-            }
-        }
-        this.socketMessageQueue.push(ev.data);
-        this.socketMessageQueue.shift();
-        this.processMessage(ev.data, false);
-    }
-}
-window.Core = Core;
-
-
-/***/ }),
-
-/***/ "./src/core/CoreConnection.ts":
-/*!************************************!*\
-  !*** ./src/core/CoreConnection.ts ***!
-  \************************************/
-/*! no exports provided */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony import */ var core_Core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! core/Core */ "./src/core/Core.ts");
-/* harmony import */ var census_ApiWrapper__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! census/ApiWrapper */ "./src/census/ApiWrapper.ts");
-
-
-core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.connect = function () {
-    const self = this;
-    const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_1__["ApiResponse"]();
-    self.disconnect();
-    let opsLeft = +1 // Tracker
-        + 1 // Logins
-        + 1 // Logistics
-        + 1 // Facilities
-        + 1; // Debug
-    setupTrackerSocket(self).always(() => { if (--opsLeft == 0) {
-        response.resolveOk();
-    } });
-    setupLoginSocket(self).always(() => { if (--opsLeft == 0) {
-        response.resolveOk();
-    } });
-    setupLogisticsSocket(self).always(() => { if (--opsLeft == 0) {
-        response.resolveOk();
-    } });
-    setupFacilitySocket(self).always(() => { if (--opsLeft == 0) {
-        response.resolveOk();
-    } });
-    setupDebugSocket(self).always(() => { if (--opsLeft == 0) {
-        response.resolveOk();
-    } });
-    self.connected = true;
-    return response;
-};
-core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.disconnect = function () {
-    const self = this;
-    if (self.sockets.tracked != null) {
-        self.sockets.tracked.close();
-        self.sockets.tracked = null;
-    }
-    if (self.sockets.logins != null) {
-        self.sockets.logins.close();
-        self.sockets.logins = null;
-    }
-    if (self.sockets.logistics != null) {
-        self.sockets.logistics.close();
-        self.sockets.logistics = null;
-    }
-    if (self.sockets.facility != null) {
-        self.sockets.facility.close();
-        self.sockets.facility = null;
-    }
-    if (self.sockets.debug != null) {
-        self.sockets.debug.close();
-        self.sockets.debug = null;
-    }
-    self.connected = false;
-};
-core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.onSocketError = function (socketName, ev) {
-    console.error(`Error on socket: ${socketName}> ${ev}`);
-};
-function setupTrackerSocket(core) {
-    const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_1__["ApiResponse"]();
-    core.sockets.tracked = new WebSocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${core.serviceID}`);
-    core.sockets.tracked.onopen = () => {
-    };
-    core.sockets.tracked.onerror = () => {
-        response.resolve({ code: 500, data: `` });
-    };
-    core.sockets.tracked.onmessage = () => {
-        response.resolveOk();
-        core.sockets.tracked.onmessage = core.onmessage.bind(core);
-    };
-    return response;
-}
-function setupDebugSocket(core) {
-    const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_1__["ApiResponse"]();
-    core.sockets.debug = new WebSocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${core.serviceID}`);
-    core.sockets.debug.onopen = () => {
-    };
-    core.sockets.debug.onerror = () => {
-        response.resolve({ code: 500, data: `` });
-    };
-    core.sockets.debug.onmessage = () => {
-        response.resolveOk();
-        core.sockets.debug.onmessage = (ev) => {
-            core.debugSocketMessages.push(JSON.parse(ev.data));
-        };
-    };
-    return response;
-}
-function setupLogisticsSocket(core) {
-    const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_1__["ApiResponse"]();
-    core.sockets.logistics = new WebSocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${core.serviceID}`);
-    core.sockets.logistics.onopen = (ev) => {
-        if (core.sockets.logistics == null) {
-            throw `Expected sockets.logistics to not be null`;
-        }
-        const msg = {
-            service: "event",
-            action: "subscribe",
-            characters: ["all"],
-            worlds: [
-                core.serverID
-            ],
-            eventNames: [
-                "GainExperience_experience_id_1409",
-            ],
-            logicalAndCharactersWithWorlds: true
-        };
-        core.sockets.logistics.send(JSON.stringify(msg));
-        response.resolveOk();
-    };
-    core.sockets.logistics.onerror = (ev) => core.onSocketError("logistics", ev);
-    core.sockets.logistics.onmessage = core.onmessage.bind(core);
-    return response;
-}
-function setupLoginSocket(core) {
-    const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_1__["ApiResponse"]();
-    core.sockets.logins = new WebSocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${core.serviceID}`);
-    core.sockets.logins.onopen = (ev) => {
-        if (core.sockets.logins == null) {
-            throw `Expected sockets.login to not be null`;
-        }
-        const msg = {
-            service: "event",
-            action: "subscribe",
-            characters: ["all"],
-            worlds: [
-                core.serverID
-            ],
-            eventNames: [
-                "PlayerLogin",
-                "PlayerLogout"
-            ],
-            logicalAndCharactersWithWorlds: true
-        };
-        core.sockets.logins.send(JSON.stringify(msg));
-        response.resolveOk();
-    };
-    core.sockets.logins.onerror = (ev) => core.onSocketError("login", ev);
-    core.sockets.logins.onmessage = core.onmessage.bind(core);
-    return response;
-}
-function setupFacilitySocket(core) {
-    const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_1__["ApiResponse"]();
-    core.sockets.facility = new WebSocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${core.serviceID}`);
-    core.sockets.facility.onopen = (ev) => {
-        if (core.sockets.facility == null) {
-            throw `sockets.facility is null`;
-        }
-        const msg = {
-            service: "event",
-            action: "subscribe",
-            characters: ["all"],
-            worlds: [
-                core.serverID
-            ],
-            eventNames: [
-                "PlayerFacilityCapture",
-                "PlayerFacilityDefend",
-                "FacilityControl"
-            ],
-            logicalAndCharactersWithWorlds: true
-        };
-        core.sockets.facility.send(JSON.stringify(msg));
-        response.resolveOk();
-    };
-    core.sockets.facility.onmessage = core.onmessage.bind(core);
-    core.sockets.facility.onerror = (ev) => core.onSocketError("facility", ev);
-    return response;
-}
-
-
-/***/ }),
-
-/***/ "./src/core/CoreDebugHelper.ts":
-/*!*************************************!*\
-  !*** ./src/core/CoreDebugHelper.ts ***!
-  \*************************************/
-/*! no exports provided */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony import */ var core_Core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! core/Core */ "./src/core/Core.ts");
-
-core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.printExpEvent = function (expID) {
-    const self = this;
-    const events = Array.from(self.stats.values())
-        .map(iter => iter.events)
-        .reduce((acc, cur) => { acc.push(...cur); return acc; }, [])
-        .filter(iter => iter.type == "exp" && iter.expID == expID);
-    console.log(events);
-};
-core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.subscribeToEvent = function (...expID) {
-    if (this.sockets.debug == null) {
-        return console.error(`Cannot globally subscribe to ${expID}: debug socket is null`);
-    }
-    const msg = {
-        service: "event",
-        action: "subscribe",
-        characters: ["all"],
-        worlds: [
-            this.serverID
-        ],
-        eventNames: [
-            ...expID.map(iter => `GainExperience_experience_id_${iter}`)
-        ],
-        logicalAndCharactersWithWorlds: true
-    };
-    this.sockets.debug.send(JSON.stringify(msg));
-};
-core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.subscribeToAllEvent = function (...expID) {
-    if (this.sockets.debug == null) {
-        return console.error(`Cannot globally subscribe to ${expID}: debug socket is null`);
-    }
-    const msg = {
-        service: "event",
-        action: "subscribe",
-        characters: ["all"],
-        worlds: ["all"],
-        eventNames: [
-            ...expID.map(iter => `GainExperience_experience_id_${iter}`)
-        ]
-    };
-    this.sockets.debug.send(JSON.stringify(msg));
-};
-core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.subscribeToItemAdded = function () {
-    if (this.sockets.debug == null) {
-        return console.error(`Cannot subscribe to ItemAdded events: debug socket is null`);
-    }
-    const msg = {
-        service: "event",
-        action: "subscribe",
-        characters: ["all"],
-        worlds: [
-            this.serverID
-        ],
-        eventNames: [
-            "ItemAdded"
-        ],
-        logicalAndCharactersWithWorlds: true
-    };
-    this.sockets.debug.send(JSON.stringify(msg));
-};
-
-
-/***/ }),
-
-/***/ "./src/core/CoreProcessing.ts":
-/*!************************************!*\
-  !*** ./src/core/CoreProcessing.ts ***!
-  \************************************/
-/*! no exports provided */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony import */ var core_Core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! core/Core */ "./src/core/Core.ts");
-/* harmony import */ var census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! census/PsLoadout */ "./src/census/PsLoadout.ts");
-/* harmony import */ var PsEvent__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! PsEvent */ "./src/PsEvent.ts");
-/* harmony import */ var census_WeaponAPI__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! census/WeaponAPI */ "./src/census/WeaponAPI.ts");
-/* harmony import */ var census_FacilityAPI__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! census/FacilityAPI */ "./src/census/FacilityAPI.ts");
-/* harmony import */ var census_CharacterAPI__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! census/CharacterAPI */ "./src/census/CharacterAPI.ts");
-
-
-
-
-
-
-core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processMessage = function (input, override = false) {
-    var _a;
-    const self = this;
-    if (self.tracking.running == false && override == false) {
-        return;
-    }
-    let save = false;
-    const msg = JSON.parse(input);
-    if (msg.type == "serviceMessage") {
-        const event = msg.payload.event_name;
-        const timestamp = Number.parseInt(msg.payload.timestamp) * 1000;
-        const zoneID = msg.payload.zone_id;
-        if (event == "GainExperience") {
-            const eventID = msg.payload.experience_id;
-            const charID = msg.payload.character_id;
-            const targetID = msg.payload.other_id;
-            const amount = Number.parseInt(msg.payload.amount);
-            const event = PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvents"].get(eventID);
-            if (eventID == "1410") {
-                if (self.stats.get(charID) != undefined) {
-                    if (self.routerTracking.routerNpcs.has(charID)) {
-                        //console.log(`${charID} router npc check for ${targetID}`);
-                        const router = self.routerTracking.routerNpcs.get(charID);
-                        if (router.ID != targetID) {
-                            //console.warn(`New router placed by ${charID}, missed ItemAdded event: removing old one and replacing with ${targetID}`);
-                            router.destroyed = timestamp;
-                            self.routerTracking.routers.push(Object.assign({}, router));
-                            self.routerTracking.routerNpcs.set(charID, {
-                                ID: targetID,
-                                owner: charID,
-                                pulledAt: timestamp,
-                                firstSpawn: timestamp,
-                                destroyed: undefined,
-                                count: 1,
-                                type: "router"
-                            });
-                        }
-                        else {
-                            //console.log(`Same router, incrementing count`);
-                            if (router.ID == "") {
-                                router.ID = targetID;
-                            }
-                            if (router.firstSpawn == undefined) {
-                                router.firstSpawn = timestamp;
-                            }
-                            ++router.count;
-                        }
-                    }
-                    else {
-                        //console.log(`${charID} has new router ${targetID} placed/used`);
-                        self.routerTracking.routerNpcs.set(charID, {
-                            ID: targetID,
-                            owner: charID,
-                            pulledAt: timestamp,
-                            firstSpawn: timestamp,
-                            destroyed: undefined,
-                            count: 1,
-                            type: "router"
-                        });
-                    }
-                    save = true;
-                }
-            }
-            else if (eventID == "1409") {
-                const trackedNpcs = Array.from(self.routerTracking.routerNpcs.values());
-                const ids = trackedNpcs.map(iter => iter.ID);
-                if (ids.indexOf(targetID) > -1) {
-                    const router = trackedNpcs.find(iter => iter.ID == targetID);
-                    //console.log(`Router ${router.ID} placed by ${router.owner} destroyed, saving`);
-                    router.destroyed = timestamp;
-                    self.routerTracking.routers.push(Object.assign({}, router));
-                    self.routerTracking.routerNpcs.delete(router.owner);
-                    save = true;
-                }
-            }
-            const ev = {
-                type: "exp",
-                amount: amount,
-                expID: eventID,
-                zoneID: zoneID,
-                trueExpID: eventID,
-                loadoutID: msg.payload.loadout_id,
-                sourceID: charID,
-                targetID: targetID,
-                timestamp: timestamp
-            };
-            // Undefined means was the target of the event, not the source
-            const player = self.stats.get(charID);
-            if (player != undefined) {
-                if (Number.isNaN(amount)) {
-                    console.warn(`NaN amount from event: ${JSON.stringify(msg)}`);
-                }
-                else {
-                    player.score += amount;
-                }
-                if (event != undefined) {
-                    if (event.track == true) {
-                        player.stats.increment(eventID);
-                        if (event.alsoIncrement != undefined) {
-                            const alsoEvent = PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvents"].get(event.alsoIncrement);
-                            if (alsoEvent.track == true) {
-                                player.stats.increment(event.alsoIncrement);
-                            }
-                            ev.expID = event.alsoIncrement;
-                        }
-                    }
-                }
-                player.events.push(ev);
-            }
-            else {
-                self.miscEvents.push(ev);
-            }
-            self.processExperienceEvent(ev);
-            self.emit(ev);
-            if (eventID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].revive || eventID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadRevive) {
-                const target = self.stats.get(targetID);
-                if (target != undefined) {
-                    if (target.recentDeath != null) {
-                        target.recentDeath.revived = true;
-                        target.recentDeath.revivedEvent = ev;
-                        //console.log(`${targetID} died but was revived by ${charID}`);
-                    }
-                    target.stats.decrement(PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].death);
-                    target.stats.increment(PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].revived);
-                }
-            }
-            save = true;
-        }
-        else if (event == "Death") {
-            const targetID = msg.payload.character_id;
-            const sourceID = msg.payload.attacker_character_id;
-            const isHeadshot = msg.payload.is_headshot == "1";
-            const targetLoadoutID = msg.payload.character_loadout_id;
-            const sourceLoadoutID = msg.payload.attacker_loadout_id;
-            if (self.tracking.running == true) {
-                census_CharacterAPI__WEBPACK_IMPORTED_MODULE_5__["CharacterAPI"].cache(targetID);
-                census_CharacterAPI__WEBPACK_IMPORTED_MODULE_5__["CharacterAPI"].cache(sourceID);
-            }
-            const targetLoadout = census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadouts"].get(targetLoadoutID);
-            if (targetLoadout == undefined) {
-                return console.warn(`Unknown target loadout ID: ${targetLoadoutID}`);
-            }
-            const sourceLoadout = census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadouts"].get(sourceLoadoutID);
-            if (sourceLoadout == undefined) {
-                return console.warn(`Unknown source loadout ID: ${sourceLoadoutID}`);
-            }
-            let targetTicks = self.stats.get(targetID);
-            if (targetTicks != undefined && targetLoadout.faction != sourceLoadout.faction) {
-                targetTicks.stats.increment(PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].death);
-                const ev = {
-                    type: "death",
-                    isHeadshot: isHeadshot,
-                    sourceID: targetID,
-                    targetID: sourceID,
-                    loadoutID: targetLoadoutID,
-                    targetLoadoutID: sourceLoadoutID,
-                    weaponID: msg.payload.attacker_weapon_id,
-                    revived: false,
-                    revivedEvent: null,
-                    timestamp: timestamp,
-                    zoneID: zoneID
-                };
-                targetTicks.events.push(ev);
-                targetTicks.recentDeath = ev;
-                census_WeaponAPI__WEBPACK_IMPORTED_MODULE_3__["WeaponAPI"].precache(ev.weaponID);
-                self.emit(ev);
-                self.processKillDeathEvent(ev);
-                save = true;
-            }
-            let sourceTicks = self.stats.get(sourceID);
-            if (sourceTicks != undefined) {
-                if (targetLoadout.faction == sourceLoadout.faction) {
-                    sourceTicks.stats.increment(PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].teamkill);
-                    (_a = targetTicks) === null || _a === void 0 ? void 0 : _a.stats.increment(PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].teamkilled);
-                    const ev = {
-                        type: "teamkill",
-                        sourceID: sourceID,
-                        loadoutID: sourceLoadoutID,
-                        targetID: targetID,
-                        targetLoadoutID: targetLoadoutID,
-                        weaponID: msg.payload.attacker_weapon_id,
-                        zoneID: zoneID,
-                        timestamp: timestamp
-                    };
-                    sourceTicks.events.push(ev);
-                    self.emit(ev);
-                }
-                else {
-                    sourceTicks.stats.increment(PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].kill);
-                    if (isHeadshot == true) {
-                        sourceTicks.stats.increment(PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].headshot);
-                    }
-                    const ev = {
-                        type: "kill",
-                        isHeadshot: isHeadshot,
-                        sourceID: sourceID,
-                        targetID: targetID,
-                        loadoutID: sourceLoadoutID,
-                        targetLoadoutID: targetLoadoutID,
-                        weaponID: msg.payload.attacker_weapon_id,
-                        timestamp: timestamp,
-                        zoneID: zoneID
-                    };
-                    sourceTicks.events.push(ev);
-                    census_WeaponAPI__WEBPACK_IMPORTED_MODULE_3__["WeaponAPI"].precache(ev.weaponID);
-                    self.emit(ev);
-                    self.processKillDeathEvent(ev);
-                }
-                save = true;
-            }
-        }
-        else if (event == "PlayerFacilityCapture") {
-            const playerID = msg.payload.character_id;
-            const outfitID = msg.payload.outfit_id;
-            const facilityID = msg.payload.facility_id;
-            const ev = {
-                type: "capture",
-                sourceID: playerID,
-                outfitID: outfitID,
-                facilityID: facilityID,
-                timestamp: timestamp,
-                zoneID: zoneID
-            };
-            self.playerCaptures.push(ev);
-            let player = self.stats.get(playerID);
-            if (player != undefined) {
-                player.stats.increment(PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].baseCapture);
-                player.events.push(ev);
-            }
-            self.emit(ev);
-            save = true;
-        }
-        else if (event == "PlayerFacilityDefend") {
-            const playerID = msg.payload.character_id;
-            const outfitID = msg.payload.outfit_id;
-            const facilityID = msg.payload.facility_id;
-            const ev = {
-                type: "defend",
-                sourceID: playerID,
-                outfitID: outfitID,
-                facilityID: facilityID,
-                timestamp: timestamp,
-                zoneID: zoneID,
-            };
-            self.playerCaptures.push(ev);
-            self.emit(ev);
-            let player = self.stats.get(playerID);
-            if (player != undefined) {
-                player.stats.increment(PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].baseDefense);
-            }
-            save = true;
-        }
-        else if (event == "AchievementEarned") {
-            const charID = msg.payload.character_id;
-            const achivID = msg.payload.achievement_id;
-            const char = self.stats.get(charID);
-            if (char != undefined) {
-                char.ribbons.increment(achivID);
-                save = true;
-            }
-        }
-        else if (event == "FacilityControl") {
-            const outfitID = msg.payload.outfit_id;
-            const facilityID = msg.payload.facility_id;
-            census_FacilityAPI__WEBPACK_IMPORTED_MODULE_4__["FacilityAPI"].getByID(facilityID).ok((data) => {
-                console.log(`New facility capture: ${data.name}`);
-                const capture = {
-                    facilityID: data.ID,
-                    zoneID: zoneID,
-                    name: data.name,
-                    typeID: data.typeID,
-                    type: data.type,
-                    timestamp: new Date(timestamp),
-                    timeHeld: Number.parseInt(msg.payload.duration_held),
-                    factionID: msg.payload.new_faction_id,
-                    outfitID: outfitID,
-                    previousFaction: msg.payload.old_faction_id,
-                };
-                self.facilityCaptures.push(capture);
-            }).noContent(() => {
-                console.error(`Failed to find facility ID ${facilityID}`);
-            });
-            save = true;
-        }
-        else if (event == "ItemAdded") {
-            const itemID = msg.payload.item_id;
-            const charID = msg.payload.character_id;
-            if (itemID == "6003551") {
-                if (self.stats.get(charID) != undefined) {
-                    //console.log(`${charID} pulled a new router`);
-                    if (self.routerTracking.routerNpcs.has(charID)) {
-                        const router = self.routerTracking.routerNpcs.get(charID);
-                        //console.log(`${charID} pulled a new router, saving old one`);
-                        router.destroyed = timestamp;
-                        self.routerTracking.routers.push(Object.assign({}, router));
-                    }
-                    const router = {
-                        ID: "",
-                        owner: charID,
-                        count: 0,
-                        destroyed: undefined,
-                        firstSpawn: undefined,
-                        pulledAt: timestamp,
-                        type: "router"
-                    };
-                    self.routerTracking.routerNpcs.set(charID, router);
-                    save = true;
-                }
-            }
-        }
-        else if (event == "VehicleDestroy") {
-            const killerID = msg.payload.attacker_character_id;
-            const killerLoadoutID = msg.payload.attacker_loadout_id;
-            const killerWeaponID = msg.payload.attacker_weapon_id;
-            const vehicleID = msg.payload.vehicle_id;
-            const player = self.stats.get(killerID);
-            if (player != undefined) {
-                const ev = {
-                    type: "vehicle",
-                    sourceID: killerID,
-                    loadoutID: killerLoadoutID,
-                    weaponID: killerWeaponID,
-                    targetID: msg.payload.character_id,
-                    vehicleID: vehicleID,
-                    timestamp: timestamp,
-                    zoneID: zoneID
-                };
-                player.events.push(ev);
-                save = true;
-                self.emit(ev);
-            }
-        }
-        else if (event == "PlayerLogin") {
-            const charID = msg.payload.character_id;
-            if (this.stats.has(charID)) {
-                const char = this.stats.get(charID);
-                char.online = true;
-                if (this.tracking.running == true) {
-                    char.joinTime = new Date().getTime();
-                }
-                const ev = {
-                    type: "login",
-                    sourceID: charID,
-                    timestamp: timestamp
-                };
-                char.events.push(ev);
-                self.emit(ev);
-                self.addMember({
-                    ID: char.characterID,
-                    name: char.name,
-                    outfitTag: char.outfitTag
-                });
-            }
-        }
-        else if (event == "PlayerLogout") {
-            const charID = msg.payload.character_id;
-            if (this.stats.has(charID)) {
-                const char = this.stats.get(charID);
-                char.online = false;
-                if (this.tracking.running == true) {
-                    const diff = new Date().getTime() - char.joinTime;
-                    char.secondsOnline += (diff / 1000);
-                }
-                const ev = {
-                    type: "logout",
-                    sourceID: charID,
-                    timestamp: timestamp
-                };
-                char.events.push(ev);
-                self.emit(ev);
-                self.removeMember(charID);
-            }
-        }
-        else {
-            console.warn(`Unknown event type: ${event}\n${JSON.stringify(msg)}`);
-        }
-    }
-    else if (msg.type == "heartbeat") {
-        //console.log(`Heartbeat ${new Date().toISOString()}`);
-    }
-    else if (msg.type == "serviceStateChanged") {
-        console.log(`serviceStateChanged event`);
-    }
-    else if (msg.type == "connectionStateChanged") {
-        console.log(`connectionStateChanged event`);
-    }
-    else if (msg.type == undefined) {
-        // Occurs in response to subscribing to new events
-    }
-    else {
-        console.warn(`Unchecked message type: '${msg.type}'`);
-    }
-    if (save == true) {
-        self.rawData.push(JSON.stringify(msg));
-    }
-};
-
-
-/***/ }),
-
-/***/ "./src/core/CoreSettings.ts":
-/*!**********************************!*\
-  !*** ./src/core/CoreSettings.ts ***!
-  \**********************************/
-/*! exports provided: CoreSettings */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "CoreSettings", function() { return CoreSettings; });
-class CoreSettings {
-    constructor() {
-        /**
-         * Service ID used to connect to the event stream
-         */
-        this.serviceID = "";
-        /**
-         * If the dark mode CSS will be added
-         */
-        this.darkMode = false;
-        /**
-         * ID of the server to listen to login/logout and facility events
-         */
-        this.serverID = "1";
-    }
-}
-
-
-/***/ }),
-
-/***/ "./src/core/CoreSquad.ts":
-/*!*******************************!*\
-  !*** ./src/core/CoreSquad.ts ***!
-  \*******************************/
-/*! no exports provided */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony import */ var core_Core__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! core/Core */ "./src/core/Core.ts");
-/* harmony import */ var census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! census/PsLoadout */ "./src/census/PsLoadout.ts");
-/* harmony import */ var PsEvent__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! PsEvent */ "./src/PsEvent.ts");
-/* harmony import */ var _squad_Squad__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./squad/Squad */ "./src/core/squad/Squad.ts");
-
-
-
-
-const squadEvents = [
-    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadResupply,
-    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadHeal,
-    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadMaxRepair,
-    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadMotionDetect,
-    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadRadarDetect,
-    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadRevive,
-    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadShieldRepair,
-    //PsEvent.squadSpawn, // Other ID isn't a char ID
-    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadSpotKill
-];
-const nonSquadEvents = [
-    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].heal,
-    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].revive,
-    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].resupply,
-    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].shieldRepair,
-    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].motionDetect,
-    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].radarDetect,
-    PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].spotKill,
-];
-const log = (msg) => {
-    console.log(`[CoreSquad] ${msg}`);
-};
-const warn = (msg) => {
-    console.warn(`[CoreSquad] ${msg}`);
-};
-const debug = (msg) => {
-    console.log(`[CoreSquad] ${msg}`);
-};
-core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.squadInit = function () {
-    // Make the four default squads
-    this.createPermSquad();
-    this.createPermSquad();
-    this.createPermSquad();
-    this.createPermSquad();
-    setInterval(() => {
-        const time = new Date().getTime();
-        this.squad.members.forEach((member, charID) => {
-            if (member.state == "dying" && member.whenDied != null) {
-                member.timeDead = (time - member.whenDied) / 1000;
-                if (member.timeDead > 29) {
-                    member.state = "dead";
-                }
-            }
-            if (member.whenBeacon) {
-                member.beaconCooldown = (time - member.whenBeacon) / 1000;
-                if (member.beaconCooldown > 299) {
-                    member.whenBeacon = null;
-                    member.beaconCooldown = 0;
-                }
-            }
-        });
-    }, 1000);
-};
-function sortSquad(squad) {
-    squad.members.sort((a, b) => {
-        if (b.online == false && a.online == false) {
-            return a.name.localeCompare(b.name);
-        }
-        if (b.online == false || a.online == false) {
-            return -1;
-        }
-        return a.name.localeCompare(b.name);
-    });
-}
-core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.addMember = function (char) {
-    if (this.squad.members.has(char.ID)) {
-        this.squad.members.get(char.ID).online = true;
-        debug(`${char.name}/${char.ID} was online before, setting online again`);
-        return;
-    }
-    this.squad.members.set(char.ID, {
-        name: char.name,
-        charID: char.ID,
-        outfitTag: char.outfitTag,
-        class: "",
-        state: "alive",
-        timeDead: 0,
-        whenDied: null,
-        whenBeacon: null,
-        beaconCooldown: 0,
-        online: true
-    });
-    const member = this.squad.members.get(char.ID);
-    member.online = true;
-    debug(`Started squad tracking ${char.name}/${char.ID}`);
-    const squad = this.createGuessSquad();
-    squad.members.push(member);
-    sortSquad(squad);
-};
-core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processKillDeathEvent = function (event) {
-    var _a, _b;
-    if (event.type == "kill") {
-        if (this.squad.members.has(event.sourceID)) {
-            const member = this.squad.members.get(event.sourceID);
-            member.state = "alive";
-            member.timeDead = 0;
-            member.whenDied = null;
-            const loadout = (_a = census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadouts"].get(event.loadoutID), (_a !== null && _a !== void 0 ? _a : census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadout"].default));
-            switch (loadout.type) {
-                case "infil":
-                    member.class = "I";
-                    break;
-                case "lightAssault":
-                    member.class = "L";
-                    break;
-                case "medic":
-                    member.class = "M";
-                    break;
-                case "engineer":
-                    member.class = "E";
-                    break;
-                case "heavy":
-                    member.class = "H";
-                    break;
-                case "max":
-                    member.class = "W";
-                    break;
-                case "unknown":
-                    member.class = "";
-                    break;
-            }
-        }
-    }
-    else if (event.type == "death") {
-        if (this.squad.members.has(event.sourceID)) {
-            const member = this.squad.members.get(event.sourceID);
-            member.state = "dying";
-            member.whenDied = new Date().getTime();
-            member.timeDead = 0;
-            const loadout = (_b = census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadouts"].get(event.loadoutID), (_b !== null && _b !== void 0 ? _b : census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadout"].default));
-            switch (loadout.type) {
-                case "infil":
-                    member.class = "I";
-                    break;
-                case "lightAssault":
-                    member.class = "L";
-                    break;
-                case "medic":
-                    member.class = "M";
-                    break;
-                case "engineer":
-                    member.class = "E";
-                    break;
-                case "heavy":
-                    member.class = "H";
-                    break;
-                case "max":
-                    member.class = "W";
-                    break;
-                case "unknown":
-                    member.class = "";
-                    break;
-            }
-        }
-    }
-};
-const validRespawnEvent = (ev, whenDied) => {
-    // These events can happen whenever and aren't useful for knowing if someone is alive or not
-    if (ev.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].resupply || ev.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadResupply
-        || ev.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].shieldRepair || ev.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadShieldRepair
-        || ev.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].killAssist
-        || ev.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].ribbon
-        || ev.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].motionDetect || ev.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadMotionDetect
-        || ev.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadSpawn
-        || ev.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].drawfire
-    //|| ev.expID == PsEvent.heal || ev.expID == PsEvent.squadHeal // People rarely run mending field to make this an issue
-    ) {
-        return false;
-    }
-    // These events might be useful, depending on how long ago the player died, for example if they get a revive
-    //      within 1 second of death it might be a revive nade, but if it's after 8 seconds we know they had to respawn
-    //      in some other way as a revive nade takes 2.5 seconds to prime
-    /*
-    if (whenDied != null) {
-        console.log(`It's been ${ev.timestamp - whenDied} ms since death`);
-        if (((ev.expID == PsEvent.revive || ev.expID == PsEvent.squadRevive) && (ev.timestamp - whenDied <= 5)) // Revive nades take 2.5 seconds to prime
-            || ((ev.expID == PsEvent.heal || ev.expID == PsEvent.squadHeal) && (ev.timestamp - whenDied <= 15)) // Heal nades last for 10? seconds
-        ) {
-            return false;
-        }
-    }
-    */
-    return true;
-};
-core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.processExperienceEvent = function (event) {
-    var _a, _b, _c, _d, _e;
-    if (event.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].revive || event.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadRevive) {
-        if (this.squad.members.has(event.targetID)) {
-            const member = this.squad.members.get(event.targetID);
-            member.state = "alive";
-            member.timeDead = 0;
-            member.whenDied = null;
-        }
-    }
-    if (event.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadSpawn) {
-        if (this.squad.members.has(event.sourceID)) {
-            const member = this.squad.members.get(event.sourceID);
-            if (member.whenBeacon == null) {
-                console.log(`${member.name} placed a beacon`);
-                member.beaconCooldown = 300;
-                member.whenBeacon = new Date().getTime();
-            }
-        }
-    }
-    if (this.squad.members.has(event.sourceID)) {
-        const member = this.squad.members.get(event.sourceID);
-        if (member.state != "alive") {
-            if (validRespawnEvent(event, member.whenDied) == true) {
-                member.state = "alive";
-                member.whenDied = null;
-                member.timeDead = 0;
-                //debug(`${member.name} was revived from ${event}`);
-            }
-        }
-        const loadout = (_a = census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadouts"].get(event.loadoutID), (_a !== null && _a !== void 0 ? _a : census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadout"].default));
-        switch (loadout.type) {
-            case "infil":
-                member.class = "I";
-                break;
-            case "lightAssault":
-                member.class = "L";
-                break;
-            case "medic":
-                member.class = "M";
-                break;
-            case "engineer":
-                member.class = "E";
-                break;
-            case "heavy":
-                member.class = "H";
-                break;
-            case "max":
-                member.class = "W";
-                break;
-            case "unknown":
-                warn(`Unknown class from event: ${event}`);
-                member.class = "";
-                break;
-        }
-    }
-    const sourceMember = this.squad.members.get(event.sourceID);
-    const targetMember = this.squad.members.get(event.targetID);
-    if (sourceMember == undefined || targetMember == undefined) {
-        return;
-    }
-    let sourceSquad = this.getSquadOfMember(event.sourceID);
-    let targetSquad = this.getSquadOfMember(event.targetID);
-    if (sourceSquad == null) {
-        sourceSquad = this.createGuessSquad();
-        sourceSquad.members.push(sourceMember);
-    }
-    if (targetSquad == null) {
-        targetSquad = this.createGuessSquad();
-        targetSquad.members.push(targetMember);
-    }
-    // Check if the squads need to be merged into one another if this was a squad exp source
-    if (squadEvents.indexOf(event.trueExpID) > -1) {
-        if (sourceSquad.ID == targetSquad.ID) {
-            //console.log(`${sourceMember.name} // ${targetMember.name} are already in a squad`);
-        }
-        else {
-            const ev = PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvents"].get(event.expID);
-            // 3 cases:
-            //      1. Both squads are guesses => Merge squads
-            //      2. One squad isn't a guess => Move guess squad into non-guess squad
-            //      3. Neither squad is a guess => Move member who performed action into other squad
-            if (targetSquad.guess == true && sourceSquad.guess == true) {
-                debug(`Both guesses, merging ${sourceMember.name} (${sourceSquad}) into ${targetMember.name} (${targetSquad}) from ${(_b = ev) === null || _b === void 0 ? void 0 : _b.name}`);
-                this.mergeSquads(sourceSquad, targetSquad);
-            }
-            else if (targetSquad.guess == false && sourceSquad.guess == true) {
-                debug(`Target is not a guess, merging ${sourceMember.name} (${sourceSquad}) into ${targetMember.name} (${targetSquad}) from ${(_c = ev) === null || _c === void 0 ? void 0 : _c.name}`);
-                this.mergeSquads(targetSquad, sourceSquad);
-            }
-            else if (targetSquad.guess == true && sourceSquad.guess == false) {
-                debug(`Source is not a guess, merging ${targetMember.name} (${targetSquad}) into ${sourceMember.name} (${sourceSquad}) from ${(_d = ev) === null || _d === void 0 ? void 0 : _d.name}`);
-                this.mergeSquads(sourceSquad, targetSquad);
-            }
-            else if (targetSquad.guess == false && sourceSquad.guess == false) {
-                debug(`Neither squad is a guess, moving ${targetMember.name} into ${sourceMember} (${sourceSquad}) from ${(_e = ev) === null || _e === void 0 ? void 0 : _e.name}`);
-                sourceSquad.members.push(targetMember);
-                targetSquad.members = targetSquad.members.filter(iter => iter.charID != targetMember.charID);
-            }
-            sortSquad(sourceSquad);
-            sortSquad(targetSquad);
-        }
-    }
-    // Check if the squad is no longer valid and needs to be removed, i.e. moved squads
-    if (nonSquadEvents.indexOf(event.trueExpID) > -1) {
-        //console.log(`Non squad event: ${event.trueExpID}`);
-        if (sourceSquad.ID == targetSquad.ID) {
-            debug(`${sourceMember.name} was in squad with ${targetMember.name}, but didn't get an expect squad exp event`);
-            targetSquad.members = targetSquad.members.filter(iter => iter.charID != sourceMember.charID);
-            const squad = this.createGuessSquad();
-            squad.members.push(sourceMember);
-            sortSquad(squad);
-            sortSquad(targetSquad);
-            sortSquad(sourceSquad);
-        }
-    }
-};
-core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.getSquad = function (squadName) {
-    let squad = this.squad.perm.find(iter => iter.name == squadName) || null;
-    if (squad != null) {
-        return squad;
-    }
-    return this.squad.guesses.find(iter => iter.name == squadName) || null;
-};
-core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.addMemberToSquad = function (charID, squadName) {
-    const member = this.squad.members.get(charID);
-    if (member == undefined) {
-        return warn(`Cannot move ${charID} to ${squadName}: ${charID} is not a squad member`);
-    }
-    const squad = this.getSquad(squadName);
-    if (squad == null) {
-        return warn(`Cannot move ${charID} to ${squadName}: squad ${squadName} does not exist`);
-    }
-    if (squad.members.find(iter => iter.charID == charID) != null) {
-        return debug(`${charID} is already part of squad ${squadName}, no need to move`);
-    }
-    const oldSquad = this.getSquadOfMember(charID);
-    if (oldSquad != null) {
-        debug(`${charID} is currently in ${oldSquad.name}, moving out of it`);
-        oldSquad.members = oldSquad.members.filter(iter => iter.charID != charID);
-        if (oldSquad.members.length == 0 && oldSquad.guess == true) {
-            this.squad.guesses = this.squad.guesses.filter(iter => iter.ID != oldSquad.ID);
-        }
-    }
-    squad.members.push(member);
-    sortSquad(squad);
-};
-core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.getSquadOfMember = function (charID) {
-    const check = (squad) => {
-        return squad.members.find(iter => iter.charID == charID) != null;
-    };
-    for (const squad of this.squad.perm) {
-        if (check(squad) == true) {
-            return squad;
-        }
-    }
-    for (const squad of this.squad.guesses) {
-        if (check(squad) == true) {
-            return squad;
-        }
-    }
-    return null;
-};
-core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.mergeSquads = function (into, from) {
-    into.members.push(...from.members);
-    from.members = [];
-    if (from.guess == true) {
-        debug(`${from.name} is a guess, removing from list`);
-        this.squad.guesses = this.squad.guesses.filter(iter => iter.ID != from.ID);
-    }
-};
-let squadNameIndex = 0;
-let squadNames = [
-    "q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "a", "s", "d",
-    "f", "g", "h", "j", "k", "l", "z", "x", "c", "v", "b", "n", "m"
-];
-let permSquadNames = [
-    "Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf", "Hotel"
-];
-core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.createGuessSquad = function () {
-    const squad = new _squad_Squad__WEBPACK_IMPORTED_MODULE_3__["Squad"]();
-    squad.name = squadNames[(squadNameIndex++) % 26];
-    squad.guess = true;
-    debug(`Created new guess squad ${squad.name}`);
-    this.squad.guesses.push(squad);
-    return squad;
-};
-core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.createPermSquad = function () {
-    const squad = new _squad_Squad__WEBPACK_IMPORTED_MODULE_3__["Squad"]();
-    squad.name = `${this.squad.perm.length + 1}`;
-    squad.guess = false;
-    squad.display = permSquadNames[(this.squad.perm.length % permSquadNames.length)];
-    debug(`Created new perm squad ${squad.name}/${squad.display}`);
-    this.squad.perm.push(squad);
-    return squad;
-};
-core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.removePermSquad = function (squadName) {
-    for (const squad of this.squad.perm) {
-        if (squad.name == squadName && squad.members.length > 0) {
-            const newSquad = this.createGuessSquad();
-            for (const member of squad.members) {
-                newSquad.members.push(member);
-            }
-            sortSquad(newSquad);
-            squad.members = [];
-        }
-    }
-    this.squad.perm = this.squad.perm.filter(iter => iter.name != squadName);
-};
-core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.removeMember = function (charID) {
-    log(`${charID} is offline`);
-    if (this.squad.members.has(charID)) {
-        const char = this.squad.members.get(charID);
-        char.online = false;
-        char.state = "alive";
-        char.whenDied = null;
-        char.timeDead = 0;
-    }
-};
-
-
-/***/ }),
-
-/***/ "./src/core/Squad.ts":
-/*!***************************!*\
-  !*** ./src/core/Squad.ts ***!
-  \***************************/
+/***/ "./src/core/events/TCaptureEvent.ts":
+/*!******************************************!*\
+  !*** ./src/core/events/TCaptureEvent.ts ***!
+  \******************************************/
 /*! no static exports found */
 /***/ (function(module, exports) {
 
@@ -64636,73 +64647,183 @@ core_Core__WEBPACK_IMPORTED_MODULE_0__["Core"].prototype.removeMember = function
 
 /***/ }),
 
-/***/ "./src/core/TrackedPlayer.ts":
+/***/ "./src/core/events/TDeathEvent.ts":
+/*!****************************************!*\
+  !*** ./src/core/events/TDeathEvent.ts ***!
+  \****************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+
+
+/***/ }),
+
+/***/ "./src/core/events/TDefendEvent.ts":
+/*!*****************************************!*\
+  !*** ./src/core/events/TDefendEvent.ts ***!
+  \*****************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+
+
+/***/ }),
+
+/***/ "./src/core/events/TEvent.ts":
 /*!***********************************!*\
-  !*** ./src/core/TrackedPlayer.ts ***!
+  !*** ./src/core/events/TEvent.ts ***!
   \***********************************/
-/*! exports provided: TrackedPlayer */
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+
+
+/***/ }),
+
+/***/ "./src/core/events/TEventHandlers.ts":
+/*!*******************************************!*\
+  !*** ./src/core/events/TEventHandlers.ts ***!
+  \*******************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+
+
+/***/ }),
+
+/***/ "./src/core/events/TExpEvent.ts":
+/*!**************************************!*\
+  !*** ./src/core/events/TExpEvent.ts ***!
+  \**************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+
+
+/***/ }),
+
+/***/ "./src/core/events/TKillEvent.ts":
+/*!***************************************!*\
+  !*** ./src/core/events/TKillEvent.ts ***!
+  \***************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+
+
+/***/ }),
+
+/***/ "./src/core/events/TLoginEvent.ts":
+/*!****************************************!*\
+  !*** ./src/core/events/TLoginEvent.ts ***!
+  \****************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+
+
+/***/ }),
+
+/***/ "./src/core/events/TLogoutEvent.ts":
+/*!*****************************************!*\
+  !*** ./src/core/events/TLogoutEvent.ts ***!
+  \*****************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+
+
+/***/ }),
+
+/***/ "./src/core/events/TTeamkillEvent.ts":
+/*!*******************************************!*\
+  !*** ./src/core/events/TTeamkillEvent.ts ***!
+  \*******************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+
+
+/***/ }),
+
+/***/ "./src/core/events/TVehicleKillEvent.ts":
+/*!**********************************************!*\
+  !*** ./src/core/events/TVehicleKillEvent.ts ***!
+  \**********************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+
+
+/***/ }),
+
+/***/ "./src/core/events/index.ts":
+/*!**********************************!*\
+  !*** ./src/core/events/index.ts ***!
+  \**********************************/
+/*! exports provided: TEvent, TEventType, TExpEvent, TKillEvent, TDeathEvent, TTeamkillEvent, TCaptureEvent, TDefendEvent, TVehicleKillEvent, TLoginEvent, TLogoutEvent, TEventHandler */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "TrackedPlayer", function() { return TrackedPlayer; });
-/* harmony import */ var StatMap__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! StatMap */ "./src/StatMap.ts");
+/* harmony import */ var _TEvent__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./TEvent */ "./src/core/events/TEvent.ts");
+/* harmony import */ var _TEvent__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_TEvent__WEBPACK_IMPORTED_MODULE_0__);
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TEvent", function() { return _TEvent__WEBPACK_IMPORTED_MODULE_0__["TEvent"]; });
 
-/**
- * Represents a character that is being tracked
- */
-class TrackedPlayer {
-    constructor() {
-        /**
-         * Unique character ID of the tracked player
-         */
-        this.characterID = "";
-        /**
-         * Tag of the outfit, if the character is in one
-         */
-        this.outfitTag = "";
-        /**
-         * Name of the character
-         */
-        this.name = "";
-        /**
-         * What faction the character is a part of
-         */
-        this.faction = "";
-        /**
-         * How much accumulated score a character has gotten during tracking
-         */
-        this.score = 0;
-        /**
-         * If this character is currently online
-         */
-        this.online = true;
-        /**
-         * What time (in MS) the character more recently joined, to a minimum of when the tracker started
-         */
-        this.joinTime = 0;
-        /**
-         * How many seconds the character has been online for
-         */
-        this.secondsOnline = 0;
-        /**
-         * How many times a character has gotten each experience event
-         */
-        this.stats = new StatMap__WEBPACK_IMPORTED_MODULE_0__["default"]();
-        /**
-         * How many times a character has gotten each ribbon
-         */
-        this.ribbons = new StatMap__WEBPACK_IMPORTED_MODULE_0__["default"]();
-        /**
-         * Reference to the most recent death event, used for tracking revives
-         */
-        this.recentDeath = null;
-        /**
-         * The events that have occured because of a player
-         */
-        this.events = [];
-    }
-}
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TEventType", function() { return _TEvent__WEBPACK_IMPORTED_MODULE_0__["TEventType"]; });
+
+/* harmony import */ var _TExpEvent__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./TExpEvent */ "./src/core/events/TExpEvent.ts");
+/* harmony import */ var _TExpEvent__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(_TExpEvent__WEBPACK_IMPORTED_MODULE_1__);
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TExpEvent", function() { return _TExpEvent__WEBPACK_IMPORTED_MODULE_1__["TExpEvent"]; });
+
+/* harmony import */ var _TKillEvent__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./TKillEvent */ "./src/core/events/TKillEvent.ts");
+/* harmony import */ var _TKillEvent__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(_TKillEvent__WEBPACK_IMPORTED_MODULE_2__);
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TKillEvent", function() { return _TKillEvent__WEBPACK_IMPORTED_MODULE_2__["TKillEvent"]; });
+
+/* harmony import */ var _TDeathEvent__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./TDeathEvent */ "./src/core/events/TDeathEvent.ts");
+/* harmony import */ var _TDeathEvent__WEBPACK_IMPORTED_MODULE_3___default = /*#__PURE__*/__webpack_require__.n(_TDeathEvent__WEBPACK_IMPORTED_MODULE_3__);
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TDeathEvent", function() { return _TDeathEvent__WEBPACK_IMPORTED_MODULE_3__["TDeathEvent"]; });
+
+/* harmony import */ var _TTeamkillEvent__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./TTeamkillEvent */ "./src/core/events/TTeamkillEvent.ts");
+/* harmony import */ var _TTeamkillEvent__WEBPACK_IMPORTED_MODULE_4___default = /*#__PURE__*/__webpack_require__.n(_TTeamkillEvent__WEBPACK_IMPORTED_MODULE_4__);
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TTeamkillEvent", function() { return _TTeamkillEvent__WEBPACK_IMPORTED_MODULE_4__["TTeamkillEvent"]; });
+
+/* harmony import */ var _TCaptureEvent__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./TCaptureEvent */ "./src/core/events/TCaptureEvent.ts");
+/* harmony import */ var _TCaptureEvent__WEBPACK_IMPORTED_MODULE_5___default = /*#__PURE__*/__webpack_require__.n(_TCaptureEvent__WEBPACK_IMPORTED_MODULE_5__);
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TCaptureEvent", function() { return _TCaptureEvent__WEBPACK_IMPORTED_MODULE_5__["TCaptureEvent"]; });
+
+/* harmony import */ var _TDefendEvent__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./TDefendEvent */ "./src/core/events/TDefendEvent.ts");
+/* harmony import */ var _TDefendEvent__WEBPACK_IMPORTED_MODULE_6___default = /*#__PURE__*/__webpack_require__.n(_TDefendEvent__WEBPACK_IMPORTED_MODULE_6__);
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TDefendEvent", function() { return _TDefendEvent__WEBPACK_IMPORTED_MODULE_6__["TDefendEvent"]; });
+
+/* harmony import */ var _TVehicleKillEvent__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./TVehicleKillEvent */ "./src/core/events/TVehicleKillEvent.ts");
+/* harmony import */ var _TVehicleKillEvent__WEBPACK_IMPORTED_MODULE_7___default = /*#__PURE__*/__webpack_require__.n(_TVehicleKillEvent__WEBPACK_IMPORTED_MODULE_7__);
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TVehicleKillEvent", function() { return _TVehicleKillEvent__WEBPACK_IMPORTED_MODULE_7__["TVehicleKillEvent"]; });
+
+/* harmony import */ var _TLoginEvent__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./TLoginEvent */ "./src/core/events/TLoginEvent.ts");
+/* harmony import */ var _TLoginEvent__WEBPACK_IMPORTED_MODULE_8___default = /*#__PURE__*/__webpack_require__.n(_TLoginEvent__WEBPACK_IMPORTED_MODULE_8__);
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TLoginEvent", function() { return _TLoginEvent__WEBPACK_IMPORTED_MODULE_8__["TLoginEvent"]; });
+
+/* harmony import */ var _TLogoutEvent__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ./TLogoutEvent */ "./src/core/events/TLogoutEvent.ts");
+/* harmony import */ var _TLogoutEvent__WEBPACK_IMPORTED_MODULE_9___default = /*#__PURE__*/__webpack_require__.n(_TLogoutEvent__WEBPACK_IMPORTED_MODULE_9__);
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TLogoutEvent", function() { return _TLogoutEvent__WEBPACK_IMPORTED_MODULE_9__["TLogoutEvent"]; });
+
+/* harmony import */ var _TEventHandlers__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ./TEventHandlers */ "./src/core/events/TEventHandlers.ts");
+/* harmony import */ var _TEventHandlers__WEBPACK_IMPORTED_MODULE_10___default = /*#__PURE__*/__webpack_require__.n(_TEventHandlers__WEBPACK_IMPORTED_MODULE_10__);
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TEventHandler", function() { return _TEventHandlers__WEBPACK_IMPORTED_MODULE_10__["TEventHandler"]; });
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 /***/ }),
@@ -64725,6 +64846,556 @@ __webpack_require__.r(__webpack_exports__);
 
 
 /* harmony default export */ __webpack_exports__["default"] = (_Core__WEBPACK_IMPORTED_MODULE_0__["Core"]);
+
+
+/***/ }),
+
+/***/ "./src/core/reports/OutfitReport.ts":
+/*!******************************************!*\
+  !*** ./src/core/reports/OutfitReport.ts ***!
+  \******************************************/
+/*! exports provided: OutfitReportSettings, OutfitReportParameters, OutfitReport, OutfitReportGenerator */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "OutfitReportSettings", function() { return OutfitReportSettings; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "OutfitReportParameters", function() { return OutfitReportParameters; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "OutfitReport", function() { return OutfitReport; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "OutfitReportGenerator", function() { return OutfitReportGenerator; });
+/* harmony import */ var core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! core/census/ApiWrapper */ "./src/core/census/ApiWrapper.ts");
+/* harmony import */ var core_census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! core/census/PsLoadout */ "./src/core/census/PsLoadout.ts");
+/* harmony import */ var core_PsEvent__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! core/PsEvent */ "./src/core/PsEvent.ts");
+/* harmony import */ var core_EventReporter__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! core/EventReporter */ "./src/core/EventReporter.ts");
+/* harmony import */ var core_InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! core/InvididualGenerator */ "./src/core/InvididualGenerator.ts");
+/* harmony import */ var core_Core__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! core/Core */ "./src/core/Core.ts");
+/* harmony import */ var core_squad_Squad__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! core/squad/Squad */ "./src/core/squad/Squad.ts");
+
+
+
+
+
+
+
+class OutfitReportSettings {
+    constructor() {
+        /**
+         * ID of the zone to limit events to. Leaven null for all zones
+         */
+        this.zoneID = null;
+        /**
+         * If squad stats will be generated and displayed
+         */
+        this.showSquadStats = false;
+    }
+}
+/**
+ * Parameters used to generate an outfit report
+ */
+class OutfitReportParameters {
+    constructor() {
+        /**
+         * Settings used to generate the report
+         */
+        this.settings = new OutfitReportSettings();
+        /**
+         * Facility captures that will be included in the report
+         */
+        this.captures = [];
+        /**
+         * List of all the capture events related to players that will be included in the report
+         */
+        this.playerCaptures = [];
+        /**
+         * List of events that will be included in the report
+         */
+        this.events = [];
+        /**
+         * Map of players that will be part of the report <Character ID, TrackedPlayer>
+         */
+        this.players = new Map();
+        /**
+         * Squad stats
+         */
+        this.squads = {
+            perm: [],
+            guesses: []
+        };
+        /**
+         * List of outfit IDs that will be included in the report
+         */
+        this.outfits = [];
+        /**
+         * The period of time that the report will be generated over
+         */
+        this.tracking = new core_InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["TimeTracking"]();
+    }
+}
+/**
+ * Outfit report
+ */
+class OutfitReport {
+    constructor() {
+        /**
+         * The various stats and how many the outfit got, based on the exp events
+         */
+        this.stats = new Map();
+        /**
+         * Total score that was gained during the ops
+         */
+        this.score = 0;
+        /**
+         * The players that make the outfit report
+         */
+        this.players = [];
+        /**
+         * List of events that was generated during the outfit report
+         */
+        this.events = [];
+        /**
+         * The start and stop times that tracking was done over
+         */
+        this.tracking = new core_InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["TimeTracking"]();
+        /**
+         * The facility captures that took place
+         */
+        this.facilityCaptures = [];
+        /**
+         * Breakdown of each class and how many of each exp event each class got
+         */
+        this.classStats = new Map();
+        /**
+         * Breakdown of the score, what how many of each event and how much score
+         */
+        this.scoreBreakdown = [];
+        /**
+         * How many seconds each class is played over all members
+         */
+        this.classPlaytimes = new core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
+        /**
+         * Collection of stats per 5 minute blocks
+         */
+        this.overtimePer5 = {
+            kpm: [],
+            kd: [],
+            rpm: [],
+        };
+        /**
+         * Collection of stats per 1 minute blocks
+         */
+        this.overtimePer1 = {
+            kpm: [],
+            kd: [],
+            rpm: [],
+        };
+        /**
+         * Collection of stats updated everytime a relevant event is performed
+         */
+        this.perUpdate = {
+            kpm: [],
+            kd: [],
+            rpm: []
+        };
+        /**
+         * Numbers used to create the boxplot of KPMs
+         */
+        this.kpmBoxPlot = {
+            total: [],
+            infil: [],
+            lightAssault: [],
+            medic: [],
+            engineer: [],
+            heavy: [],
+            max: []
+        };
+        /**
+         * Numbers used to create the boxplot of KDs
+         */
+        this.kdBoxPlot = {
+            total: [],
+            infil: [],
+            lightAssault: [],
+            medic: [],
+            engineer: [],
+            heavy: [],
+            max: []
+        };
+        this.squadStats = {
+            data: [],
+            all: new core_Core__WEBPACK_IMPORTED_MODULE_5__["SquadStats"]()
+        };
+        this.weaponKillBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
+        this.weaponTypeKillBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
+        this.teamkillBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
+        this.teamkillTypeBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
+        this.deathAllBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
+        this.deathAllTypeBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
+        this.deathRevivedBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
+        this.deathRevivedTypeBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
+        this.deathKilledBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
+        this.deathKilledTypeBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
+        this.outfitVersusBreakdown = [];
+        this.weaponTypeDeathBreakdown = [];
+        this.vehicleKillBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
+        this.vehicleKillWeaponBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
+        /**
+         * Unused
+         */
+        this.timeUnrevived = [];
+        this.revivedLifeExpectance = [];
+        this.kmLifeExpectance = [];
+        this.kmTimeDead = [];
+        this.factionKillBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
+        this.factionDeathBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
+        this.continentKillBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
+        this.continentDeathBreakdown = new core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
+        this.baseCaptures = [];
+        /**
+         * The KD of class against all other classes, i.e. how many kills/deaths medics got against heavies
+         */
+        this.classKds = {
+            infil: Object(core_InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["classKdCollection"])(),
+            lightAssault: Object(core_InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["classKdCollection"])(),
+            medic: Object(core_InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["classKdCollection"])(),
+            engineer: Object(core_InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["classKdCollection"])(),
+            heavy: Object(core_InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["classKdCollection"])(),
+            max: Object(core_InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["classKdCollection"])(),
+            total: Object(core_InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["classKdCollection"])()
+        };
+        this.classTypeKills = {
+            infil: new core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"](),
+            lightAssault: new core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"](),
+            medic: new core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"](),
+            engineer: new core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"](),
+            heavy: new core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"](),
+            max: new core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"](),
+        };
+        this.classTypeDeaths = {
+            infil: new core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"](),
+            lightAssault: new core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"](),
+            medic: new core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"](),
+            engineer: new core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"](),
+            heavy: new core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"](),
+            max: new core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"](),
+        };
+    }
+}
+class OutfitReportGenerator {
+    static generate(parameters) {
+        const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        const report = new OutfitReport();
+        report.tracking = parameters.tracking;
+        let filterZoneID = parameters.settings.zoneID != null;
+        report.facilityCaptures = parameters.captures.filter((iter) => {
+            return (filterZoneID == false || (filterZoneID == true && iter.zoneID == parameters.settings.zoneID))
+                && parameters.outfits.indexOf(iter.outfitID) > -1;
+        });
+        report.facilityCaptures.sort((a, b) => {
+            return a.timestamp.getTime() - b.timestamp.getTime();
+        });
+        let opsLeft = +1 // Facility captures
+            + 1 // Weapon kills
+            + 1 // Weapon type kills
+            + 1 // Teamkills
+            + 1 // Faction kills
+            + 1 // Faction deaths
+            + 1 // Cont kills
+            + 1 // Cont deaths
+            + 1 // All weapon deaths
+            + 1 // Unrevived weapon deaths
+            + 1 // Revived weapon deaths
+            + 1 // All weapon type deaths
+            + 1 // Unrevived weapon type deaths
+            + 1 // Revived weapon type deaths
+            + 1 // Weapon death breakdown
+            + 6 // Weapon kill types for all classes
+            + 6 // Weapon death types for all classes
+            + 1 // Outfit VS KD
+            + 1 // Vehicle kills
+            + 1; // Vehicle weapon kills
+        const totalOps = opsLeft;
+        const callback = (step) => {
+            return () => {
+                console.log(`Finished ${step}: Have ${opsLeft - 1} ops left outta ${totalOps}`);
+                if (--opsLeft == 0) {
+                    response.resolveOk(report);
+                }
+            };
+        };
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].facilityCaptures({
+            captures: report.facilityCaptures,
+            players: parameters.playerCaptures
+        }).ok(data => report.baseCaptures = data).always(callback("Facility captures"));
+        const chars = Array.from(parameters.players.values());
+        report.kpmBoxPlot = {
+            total: core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kpmBoxplot(chars, parameters.tracking),
+            infil: core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kpmBoxplot(chars, parameters.tracking, "infil"),
+            lightAssault: core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kpmBoxplot(chars, parameters.tracking, "lightAssault"),
+            medic: core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kpmBoxplot(chars, parameters.tracking, "medic"),
+            engineer: core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kpmBoxplot(chars, parameters.tracking, "engineer"),
+            heavy: core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kpmBoxplot(chars, parameters.tracking, "heavy"),
+            max: core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kpmBoxplot(chars, parameters.tracking, "max"),
+        };
+        report.kdBoxPlot = {
+            total: core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kdBoxplot(chars, parameters.tracking),
+            infil: core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kdBoxplot(chars, parameters.tracking, "infil"),
+            lightAssault: core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kdBoxplot(chars, parameters.tracking, "lightAssault"),
+            medic: core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kdBoxplot(chars, parameters.tracking, "medic"),
+            engineer: core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kdBoxplot(chars, parameters.tracking, "engineer"),
+            heavy: core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kdBoxplot(chars, parameters.tracking, "heavy"),
+            max: core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kdBoxplot(chars, parameters.tracking, "max")
+        };
+        parameters.players.forEach((player, charID) => {
+            player.stats.getMap().forEach((amount, expID) => {
+                var _a;
+                const event = core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvents"].get(expID);
+                if (event == undefined) {
+                    return;
+                }
+                const reportAmount = (_a = report.stats.get(event.name), (_a !== null && _a !== void 0 ? _a : 0));
+                report.stats.set(event.name, reportAmount + amount);
+            });
+        });
+        const playtimes = [];
+        parameters.players.forEach((player, charID) => {
+            if (player.events.length == 0) {
+                return;
+            }
+            report.score += player.score;
+            report.events.push(...player.events);
+            const playtime = core_InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["IndividualReporter"].classUsage({
+                player: player,
+                events: [],
+                routers: [],
+                tracking: parameters.tracking
+            });
+            playtimes.push(playtime);
+            report.players.push(Object.assign({ name: `${(player.outfitTag != '' ? `[${player.outfitTag}] ` : '')}${player.name}` }, playtime));
+        });
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].classPlaytimes(playtimes).ok(data => report.classPlaytimes = data).always(() => callback("Class playtimes"));
+        report.events = report.events.sort((a, b) => a.timestamp - b.timestamp);
+        // Track how many headshots each class got
+        const headshots = Object(core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["classCollectionNumber"])();
+        for (const ev of report.events) {
+            if (ev.type != "kill" || ev.isHeadshot == false) {
+                continue;
+            }
+            const loadout = core_census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadouts"].get(ev.loadoutID);
+            if (loadout == undefined) {
+                continue;
+            }
+            if (loadout.type == "infil") {
+                ++headshots.infil;
+            }
+            else if (loadout.type == "lightAssault") {
+                ++headshots.lightAssault;
+            }
+            else if (loadout.type == "medic") {
+                ++headshots.medic;
+            }
+            else if (loadout.type == "engineer") {
+                ++headshots.engineer;
+            }
+            else if (loadout.type == "heavy") {
+                ++headshots.heavy;
+            }
+            else if (loadout.type == "max") {
+                ++headshots.max;
+            }
+            ++headshots.total;
+        }
+        report.classStats.set("Headshot", headshots);
+        for (const ev of report.events) {
+            let statName = "Other";
+            if (ev.type == "kill") {
+                statName = "Kill";
+            }
+            else if (ev.type == "death") {
+                statName = (ev.revived == true) ? "Revived" : "Death";
+            }
+            else if (ev.type == "exp") {
+                const event = core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvents"].get(ev.expID);
+                if (event != undefined) {
+                    if (event.track == false) {
+                        continue;
+                    }
+                    statName = event.name;
+                }
+            }
+            else {
+                continue;
+            }
+            if (!report.classStats.has(statName)) {
+                //console.log(`Added stats for '${statName}'`);
+                report.classStats.set(statName, Object(core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["classCollectionNumber"])());
+            }
+            const classCollection = report.classStats.get(statName);
+            ++classCollection.total;
+            const loadout = core_census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadouts"].get(ev.loadoutID);
+            if (loadout == undefined) {
+                continue;
+            }
+            if (loadout.type == "infil") {
+                ++classCollection.infil;
+            }
+            else if (loadout.type == "lightAssault") {
+                ++classCollection.lightAssault;
+            }
+            else if (loadout.type == "medic") {
+                ++classCollection.medic;
+            }
+            else if (loadout.type == "engineer") {
+                ++classCollection.engineer;
+            }
+            else if (loadout.type == "heavy") {
+                ++classCollection.heavy;
+            }
+            else if (loadout.type == "max") {
+                ++classCollection.max;
+            }
+        }
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponKills(report.events).ok(data => report.weaponKillBreakdown = data).always(callback("Weapon kills"));
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeKills(report.events).ok(data => report.weaponTypeKillBreakdown = data).always(callback("Weapon type kills"));
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTeamkills(report.events).ok(data => report.teamkillBreakdown = data).always(callback("Teamkills"));
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].factionKills(report.events).ok(data => report.factionKillBreakdown = data).always(callback("Faction kills"));
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].factionDeaths(report.events).ok(data => report.factionDeathBreakdown = data).always(callback("Faction deaths"));
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].continentKills(report.events).ok(data => report.continentKillBreakdown = data).always(callback("Cont kills"));
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].continentDeaths(report.events).ok(data => report.continentDeathBreakdown = data).always(callback("Cont deaths"));
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponDeaths(report.events).ok(data => report.deathAllBreakdown = data).always(callback("All weapon deaths"));
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponDeaths(report.events, true).ok(data => report.deathRevivedBreakdown = data).always(callback("Revived weapon deaths"));
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponDeaths(report.events, false).ok(data => report.deathKilledBreakdown = data).always(callback("Unrevived weapon deaths"));
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeDeaths(report.events).ok(data => report.deathAllTypeBreakdown = data).always(callback("All weapon type deaths"));
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeDeaths(report.events, true).ok(data => report.deathRevivedTypeBreakdown = data).always(callback("Revived weapon type deaths"));
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeDeaths(report.events, false).ok(data => report.deathKilledTypeBreakdown = data).always(callback("Unrevived weapon type deaths"));
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponDeathBreakdown(report.events).ok(data => report.weaponTypeDeathBreakdown = data).always(callback("Weapon death breakdown"));
+        /* Not super useful and take a long time to generate
+        report.timeUnrevived = IndividualReporter.unrevivedTime(report.events);
+        report.revivedLifeExpectance = IndividualReporter.reviveLifeExpectance(report.events);
+        report.kmLifeExpectance = IndividualReporter.lifeExpectanceRate(report.events);
+        report.kmTimeDead = IndividualReporter.timeUntilReviveRate(report.events);
+        */
+        const classFilter = (iter, type, loadouts) => {
+            if (iter.type == type) {
+                return loadouts.indexOf(iter.loadoutID) > -1;
+            }
+            return false;
+        };
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["1", "8", "15"])))
+            .ok(data => report.classTypeKills.infil = data).always(callback("Weapon type kills: Infil"));
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["3", "10", "17"])))
+            .ok(data => report.classTypeKills.lightAssault = data).always(callback("Weapon type kills: LA"));
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["4", "11", "18"])))
+            .ok(data => report.classTypeKills.medic = data).always(callback("Weapon type kills: Medic"));
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["5", "12", "19"])))
+            .ok(data => report.classTypeKills.engineer = data).always(callback("Weapon type kills: Eng"));
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["6", "13", "20"])))
+            .ok(data => report.classTypeKills.heavy = data).always(callback("Weapon type kills: Heavy"));
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["7", "14", "21"])))
+            .ok(data => report.classTypeKills.max = data).always(callback("Weapon type kills: MAX"));
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["1", "8", "15"])))
+            .ok(data => report.classTypeDeaths.infil = data).always(callback("Weapon type deaths: Infil"));
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["3", "10", "17"])))
+            .ok(data => report.classTypeDeaths.lightAssault = data).always(callback("Weapon type deaths: LA"));
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["4", "11", "18"])))
+            .ok(data => report.classTypeDeaths.medic = data).always(callback("Weapon type deaths: Medic"));
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["5", "12", "19"])))
+            .ok(data => report.classTypeDeaths.engineer = data).always(callback("Weapon type deaths: Eng"));
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["6", "13", "20"])))
+            .ok(data => report.classTypeDeaths.heavy = data).always(callback("Weapon type deaths: Heavy"));
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["7", "14", "21"])))
+            .ok(data => report.classTypeDeaths.max = data).always(callback("Weapon type deaths: MAX"));
+        report.classKds.infil = core_InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["IndividualReporter"].classVersusKd(report.events, "infil");
+        report.classKds.lightAssault = core_InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["IndividualReporter"].classVersusKd(report.events, "lightAssault");
+        report.classKds.medic = core_InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["IndividualReporter"].classVersusKd(report.events, "medic");
+        report.classKds.engineer = core_InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["IndividualReporter"].classVersusKd(report.events, "engineer");
+        report.classKds.heavy = core_InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["IndividualReporter"].classVersusKd(report.events, "heavy");
+        report.classKds.max = core_InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["IndividualReporter"].classVersusKd(report.events, "max");
+        report.classKds.total = core_InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["IndividualReporter"].classVersusKd(report.events);
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].outfitVersusBreakdown(report.events).ok(data => report.outfitVersusBreakdown = data).always(callback("Outfit VS KD"));
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].vehicleKills(report.events).ok(data => report.vehicleKillBreakdown = data).always(callback("Vehicle type kills"));
+        core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].vehicleWeaponKills(report.events).ok(data => report.vehicleKillWeaponBreakdown = data).always(callback("Vehicle weapon kills"));
+        const getSquadStats = (squad, name) => {
+            const squadIDs = squad.members.map(iter => iter.charID);
+            return {
+                name: name,
+                members: squad.members.map(iter => iter.name),
+                kills: parameters.events.filter(iter => iter.type == "kill"
+                    && squadIDs.indexOf(iter.sourceID) > -1).length,
+                deaths: parameters.events.filter(iter => iter.type == "death" && iter.revived == false
+                    && squadIDs.indexOf(iter.sourceID) > -1).length,
+                revives: parameters.events.filter(iter => iter.type == "exp"
+                    && (iter.expID == core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].revive || iter.expID == core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadRevive)
+                    && squadIDs.indexOf(iter.sourceID) > -1).length,
+                heals: parameters.events.filter(iter => iter.type == "exp"
+                    && (iter.expID == core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].heal || iter.expID == core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadHeal)
+                    && squadIDs.indexOf(iter.sourceID) > -1).length,
+                resupplies: parameters.events.filter(iter => iter.type == "exp"
+                    && (iter.expID == core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].resupply || iter.expID == core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadResupply)
+                    && squadIDs.indexOf(iter.sourceID) > -1).length,
+                repairs: parameters.events.filter(iter => iter.type == "exp"
+                    && (iter.expID == core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].maxRepair || iter.expID == core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadMaxRepair)
+                    && squadIDs.indexOf(iter.sourceID) > -1).length,
+                vKills: parameters.events.filter(iter => iter.type == "vehicle"
+                    && squadIDs.indexOf(iter.sourceID) > -1).length,
+            };
+        };
+        for (const squad of parameters.squads.perm) {
+            report.squadStats.data.push(getSquadStats(squad, squad.display || "Other"));
+        }
+        for (const squad of parameters.squads.guesses) {
+            report.squadStats.data.push(getSquadStats(squad, squad.display || "Other"));
+        }
+        const allSquad = new core_squad_Squad__WEBPACK_IMPORTED_MODULE_6__["Squad"]();
+        for (const squad of [...parameters.squads.perm, ...parameters.squads.guesses]) {
+            allSquad.members.push(...squad.members);
+        }
+        report.squadStats.all = getSquadStats(allSquad, "All");
+        report.squadStats.data.push(report.squadStats.all);
+        let otherIDs = [];
+        const breakdown = new Map();
+        for (const event of report.events) {
+            if (event.type == "exp") {
+                const exp = core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvents"].get(event.expID) || core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].other;
+                if (!breakdown.has(exp.name)) {
+                    breakdown.set(exp.name, new core_InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["ExpBreakdown"]());
+                }
+                const score = breakdown.get(exp.name);
+                score.name = exp.name;
+                score.score += event.amount;
+                score.amount += 1;
+                if (exp == core_PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].other) {
+                    otherIDs.push(event.expID);
+                }
+            }
+        }
+        console.log(`Untracked experience IDs: ${otherIDs.filter((v, i, a) => a.indexOf(v) == i).join(", ")}`);
+        // Sort all the entries by score, followed by amount, then lastly name
+        report.scoreBreakdown = [...breakdown.entries()].sort((a, b) => {
+            return (b[1].score - a[1].score)
+                || (b[1].amount - a[1].amount)
+                || (b[0].localeCompare(a[0]));
+        }).map((a) => a[1]); // Transform the tuple into the ExpBreakdown
+        report.overtimePer1.kpm = core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kpmOverTime(report.events, 60000);
+        report.overtimePer1.kd = core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kdOverTime(report.events, 60000);
+        report.overtimePer1.rpm = core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].revivesOverTime(report.events, 60000);
+        report.overtimePer5.kpm = core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kpmOverTime(report.events);
+        report.overtimePer5.kd = core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kdOverTime(report.events);
+        report.overtimePer5.rpm = core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].revivesOverTime(report.events);
+        report.perUpdate.kd = core_EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kdPerUpdate(report.events);
+        return response;
+    }
+}
+
+
+/***/ }),
+
+/***/ "./src/core/reports/PersonalReport.ts":
+/*!********************************************!*\
+  !*** ./src/core/reports/PersonalReport.ts ***!
+  \********************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
 
 
 /***/ }),
@@ -64834,198 +65505,6 @@ class SquadMember {
 
 /***/ }),
 
-/***/ "./src/events/TCaptureEvent.ts":
-/*!*************************************!*\
-  !*** ./src/events/TCaptureEvent.ts ***!
-  \*************************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
-
-
-/***/ }),
-
-/***/ "./src/events/TDeathEvent.ts":
-/*!***********************************!*\
-  !*** ./src/events/TDeathEvent.ts ***!
-  \***********************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
-
-
-/***/ }),
-
-/***/ "./src/events/TDefendEvent.ts":
-/*!************************************!*\
-  !*** ./src/events/TDefendEvent.ts ***!
-  \************************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
-
-
-/***/ }),
-
-/***/ "./src/events/TEvent.ts":
-/*!******************************!*\
-  !*** ./src/events/TEvent.ts ***!
-  \******************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
-
-
-/***/ }),
-
-/***/ "./src/events/TEventHandlers.ts":
-/*!**************************************!*\
-  !*** ./src/events/TEventHandlers.ts ***!
-  \**************************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
-
-
-/***/ }),
-
-/***/ "./src/events/TExpEvent.ts":
-/*!*********************************!*\
-  !*** ./src/events/TExpEvent.ts ***!
-  \*********************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
-
-
-/***/ }),
-
-/***/ "./src/events/TKillEvent.ts":
-/*!**********************************!*\
-  !*** ./src/events/TKillEvent.ts ***!
-  \**********************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
-
-
-/***/ }),
-
-/***/ "./src/events/TLoginEvent.ts":
-/*!***********************************!*\
-  !*** ./src/events/TLoginEvent.ts ***!
-  \***********************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
-
-
-/***/ }),
-
-/***/ "./src/events/TLogoutEvent.ts":
-/*!************************************!*\
-  !*** ./src/events/TLogoutEvent.ts ***!
-  \************************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
-
-
-/***/ }),
-
-/***/ "./src/events/TTeamkillEvent.ts":
-/*!**************************************!*\
-  !*** ./src/events/TTeamkillEvent.ts ***!
-  \**************************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
-
-
-/***/ }),
-
-/***/ "./src/events/TVehicleKillEvent.ts":
-/*!*****************************************!*\
-  !*** ./src/events/TVehicleKillEvent.ts ***!
-  \*****************************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
-
-
-/***/ }),
-
-/***/ "./src/events/index.ts":
-/*!*****************************!*\
-  !*** ./src/events/index.ts ***!
-  \*****************************/
-/*! exports provided: TEvent, TEventType, TExpEvent, TKillEvent, TDeathEvent, TTeamkillEvent, TCaptureEvent, TDefendEvent, TVehicleKillEvent, TLoginEvent, TLogoutEvent, TEventHandler */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony import */ var _TEvent__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./TEvent */ "./src/events/TEvent.ts");
-/* harmony import */ var _TEvent__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(_TEvent__WEBPACK_IMPORTED_MODULE_0__);
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TEvent", function() { return _TEvent__WEBPACK_IMPORTED_MODULE_0__["TEvent"]; });
-
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TEventType", function() { return _TEvent__WEBPACK_IMPORTED_MODULE_0__["TEventType"]; });
-
-/* harmony import */ var _TExpEvent__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./TExpEvent */ "./src/events/TExpEvent.ts");
-/* harmony import */ var _TExpEvent__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(_TExpEvent__WEBPACK_IMPORTED_MODULE_1__);
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TExpEvent", function() { return _TExpEvent__WEBPACK_IMPORTED_MODULE_1__["TExpEvent"]; });
-
-/* harmony import */ var _TKillEvent__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./TKillEvent */ "./src/events/TKillEvent.ts");
-/* harmony import */ var _TKillEvent__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(_TKillEvent__WEBPACK_IMPORTED_MODULE_2__);
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TKillEvent", function() { return _TKillEvent__WEBPACK_IMPORTED_MODULE_2__["TKillEvent"]; });
-
-/* harmony import */ var _TDeathEvent__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./TDeathEvent */ "./src/events/TDeathEvent.ts");
-/* harmony import */ var _TDeathEvent__WEBPACK_IMPORTED_MODULE_3___default = /*#__PURE__*/__webpack_require__.n(_TDeathEvent__WEBPACK_IMPORTED_MODULE_3__);
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TDeathEvent", function() { return _TDeathEvent__WEBPACK_IMPORTED_MODULE_3__["TDeathEvent"]; });
-
-/* harmony import */ var _TTeamkillEvent__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./TTeamkillEvent */ "./src/events/TTeamkillEvent.ts");
-/* harmony import */ var _TTeamkillEvent__WEBPACK_IMPORTED_MODULE_4___default = /*#__PURE__*/__webpack_require__.n(_TTeamkillEvent__WEBPACK_IMPORTED_MODULE_4__);
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TTeamkillEvent", function() { return _TTeamkillEvent__WEBPACK_IMPORTED_MODULE_4__["TTeamkillEvent"]; });
-
-/* harmony import */ var _TCaptureEvent__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./TCaptureEvent */ "./src/events/TCaptureEvent.ts");
-/* harmony import */ var _TCaptureEvent__WEBPACK_IMPORTED_MODULE_5___default = /*#__PURE__*/__webpack_require__.n(_TCaptureEvent__WEBPACK_IMPORTED_MODULE_5__);
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TCaptureEvent", function() { return _TCaptureEvent__WEBPACK_IMPORTED_MODULE_5__["TCaptureEvent"]; });
-
-/* harmony import */ var _TDefendEvent__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./TDefendEvent */ "./src/events/TDefendEvent.ts");
-/* harmony import */ var _TDefendEvent__WEBPACK_IMPORTED_MODULE_6___default = /*#__PURE__*/__webpack_require__.n(_TDefendEvent__WEBPACK_IMPORTED_MODULE_6__);
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TDefendEvent", function() { return _TDefendEvent__WEBPACK_IMPORTED_MODULE_6__["TDefendEvent"]; });
-
-/* harmony import */ var _TVehicleKillEvent__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./TVehicleKillEvent */ "./src/events/TVehicleKillEvent.ts");
-/* harmony import */ var _TVehicleKillEvent__WEBPACK_IMPORTED_MODULE_7___default = /*#__PURE__*/__webpack_require__.n(_TVehicleKillEvent__WEBPACK_IMPORTED_MODULE_7__);
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TVehicleKillEvent", function() { return _TVehicleKillEvent__WEBPACK_IMPORTED_MODULE_7__["TVehicleKillEvent"]; });
-
-/* harmony import */ var _TLoginEvent__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./TLoginEvent */ "./src/events/TLoginEvent.ts");
-/* harmony import */ var _TLoginEvent__WEBPACK_IMPORTED_MODULE_8___default = /*#__PURE__*/__webpack_require__.n(_TLoginEvent__WEBPACK_IMPORTED_MODULE_8__);
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TLoginEvent", function() { return _TLoginEvent__WEBPACK_IMPORTED_MODULE_8__["TLoginEvent"]; });
-
-/* harmony import */ var _TLogoutEvent__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! ./TLogoutEvent */ "./src/events/TLogoutEvent.ts");
-/* harmony import */ var _TLogoutEvent__WEBPACK_IMPORTED_MODULE_9___default = /*#__PURE__*/__webpack_require__.n(_TLogoutEvent__WEBPACK_IMPORTED_MODULE_9__);
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TLogoutEvent", function() { return _TLogoutEvent__WEBPACK_IMPORTED_MODULE_9__["TLogoutEvent"]; });
-
-/* harmony import */ var _TEventHandlers__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! ./TEventHandlers */ "./src/events/TEventHandlers.ts");
-/* harmony import */ var _TEventHandlers__WEBPACK_IMPORTED_MODULE_10___default = /*#__PURE__*/__webpack_require__.n(_TEventHandlers__WEBPACK_IMPORTED_MODULE_10__);
-/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "TEventHandler", function() { return _TEventHandlers__WEBPACK_IMPORTED_MODULE_10__["TEventHandler"]; });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/***/ }),
-
 /***/ "./src/index.ts":
 /*!**********************!*\
   !*** ./src/index.ts ***!
@@ -65042,7 +65521,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var bootstrap_dist_css_bootstrap_min_css__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! bootstrap/dist/css/bootstrap.min.css */ "./node_modules/bootstrap/dist/css/bootstrap.min.css");
 /* harmony import */ var bootstrap_dist_css_bootstrap_min_css__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(bootstrap_dist_css_bootstrap_min_css__WEBPACK_IMPORTED_MODULE_2__);
 /* harmony import */ var vue__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! vue */ "./node_modules/vue/dist/vue.esm.js");
-/* harmony import */ var census_ApiWrapper__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! census/ApiWrapper */ "./src/census/ApiWrapper.ts");
+/* harmony import */ var core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! core/census/ApiWrapper */ "./src/core/census/ApiWrapper.ts");
 /* harmony import */ var Loadable__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! Loadable */ "./src/Loadable.ts");
 /* harmony import */ var moment__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! moment */ "./node_modules/moment/moment.js");
 /* harmony import */ var moment__WEBPACK_IMPORTED_MODULE_6___default = /*#__PURE__*/__webpack_require__.n(moment__WEBPACK_IMPORTED_MODULE_6__);
@@ -65050,12 +65529,12 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var jquery__WEBPACK_IMPORTED_MODULE_7___default = /*#__PURE__*/__webpack_require__.n(jquery__WEBPACK_IMPORTED_MODULE_7__);
 /* harmony import */ var jszip__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! jszip */ "./node_modules/jszip/dist/jszip.min.js");
 /* harmony import */ var jszip__WEBPACK_IMPORTED_MODULE_8___default = /*#__PURE__*/__webpack_require__.n(jszip__WEBPACK_IMPORTED_MODULE_8__);
-/* harmony import */ var census_WeaponAPI__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! census/WeaponAPI */ "./src/census/WeaponAPI.ts");
-/* harmony import */ var census_FacilityAPI__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! census/FacilityAPI */ "./src/census/FacilityAPI.ts");
-/* harmony import */ var PsEvent__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! PsEvent */ "./src/PsEvent.ts");
-/* harmony import */ var InvididualGenerator__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! InvididualGenerator */ "./src/InvididualGenerator.ts");
+/* harmony import */ var core_census_WeaponAPI__WEBPACK_IMPORTED_MODULE_9__ = __webpack_require__(/*! core/census/WeaponAPI */ "./src/core/census/WeaponAPI.ts");
+/* harmony import */ var core_census_FacilityAPI__WEBPACK_IMPORTED_MODULE_10__ = __webpack_require__(/*! core/census/FacilityAPI */ "./src/core/census/FacilityAPI.ts");
+/* harmony import */ var core_PsEvent__WEBPACK_IMPORTED_MODULE_11__ = __webpack_require__(/*! core/PsEvent */ "./src/core/PsEvent.ts");
+/* harmony import */ var core_InvididualGenerator__WEBPACK_IMPORTED_MODULE_12__ = __webpack_require__(/*! core/InvididualGenerator */ "./src/core/InvididualGenerator.ts");
 /* harmony import */ var PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_13__ = __webpack_require__(/*! PersonalReportGenerator */ "./src/PersonalReportGenerator.ts");
-/* harmony import */ var reports_OutfitReport__WEBPACK_IMPORTED_MODULE_14__ = __webpack_require__(/*! reports/OutfitReport */ "./src/reports/OutfitReport.ts");
+/* harmony import */ var core_reports_OutfitReport__WEBPACK_IMPORTED_MODULE_14__ = __webpack_require__(/*! core/reports/OutfitReport */ "./src/core/reports/OutfitReport.ts");
 /* harmony import */ var _node_modules_file_saver_dist_FileSaver_js__WEBPACK_IMPORTED_MODULE_15__ = __webpack_require__(/*! ../node_modules/file-saver/dist/FileSaver.js */ "./node_modules/file-saver/dist/FileSaver.js");
 /* harmony import */ var _node_modules_file_saver_dist_FileSaver_js__WEBPACK_IMPORTED_MODULE_15___default = /*#__PURE__*/__webpack_require__.n(_node_modules_file_saver_dist_FileSaver_js__WEBPACK_IMPORTED_MODULE_15__);
 /* harmony import */ var _node_modules_chartjs_plugin_datalabels_dist_chartjs_plugin_datalabels_js__WEBPACK_IMPORTED_MODULE_16__ = __webpack_require__(/*! ../node_modules/chartjs-plugin-datalabels/dist/chartjs-plugin-datalabels.js */ "./node_modules/chartjs-plugin-datalabels/dist/chartjs-plugin-datalabels.js");
@@ -65173,8 +65652,8 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             settings: new winter_WinterReportParameters__WEBPACK_IMPORTED_MODULE_28__["WinterReportSettings"](),
             ignoredPlayers: ""
         },
-        outfitReport: new reports_OutfitReport__WEBPACK_IMPORTED_MODULE_14__["OutfitReport"](),
-        opsReportSettings: new reports_OutfitReport__WEBPACK_IMPORTED_MODULE_14__["OutfitReportSettings"](),
+        outfitReport: new core_reports_OutfitReport__WEBPACK_IMPORTED_MODULE_14__["OutfitReport"](),
+        opsReportSettings: new core_reports_OutfitReport__WEBPACK_IMPORTED_MODULE_14__["OutfitReportSettings"](),
         refreshIntervalID: -1,
         loadingOutfit: false,
         showFrog: false,
@@ -65183,8 +65662,8 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
     created: function () {
         this.refreshIntervalID = setInterval(this.updateDisplay, this.settings.updateRate * 1000);
         this.storage.enabled = Storage__WEBPACK_IMPORTED_MODULE_26__["StorageHelper"].isEnabled();
-        census_WeaponAPI__WEBPACK_IMPORTED_MODULE_9__["WeaponAPI"].loadJson();
-        census_FacilityAPI__WEBPACK_IMPORTED_MODULE_10__["FacilityAPI"].loadJson();
+        core_census_WeaponAPI__WEBPACK_IMPORTED_MODULE_9__["WeaponAPI"].loadJson();
+        core_census_FacilityAPI__WEBPACK_IMPORTED_MODULE_10__["FacilityAPI"].loadJson();
         this.settings.fromStorage = false;
         if (this.storage.enabled == true) {
             const settings = Storage__WEBPACK_IMPORTED_MODULE_26__["StorageHelper"].getSettings();
@@ -65341,7 +65820,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 }
                 let containsType = false;
                 char.stats.getMap().forEach((value, key) => {
-                    const psEvent = PsEvent__WEBPACK_IMPORTED_MODULE_11__["PsEvents"].get(key) || PsEvent__WEBPACK_IMPORTED_MODULE_11__["PsEvent"].default;
+                    const psEvent = core_PsEvent__WEBPACK_IMPORTED_MODULE_11__["PsEvents"].get(key) || core_PsEvent__WEBPACK_IMPORTED_MODULE_11__["PsEvent"].default;
                     // Is this stat one of the ones being displayed?
                     if (psEvent.types.indexOf(this.settings.eventType) > -1) {
                         //console.log(`Needed ${this.settings.eventType} to display ${char.name}, found from ${key}`);
@@ -65418,7 +65897,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             this.parameters.report = "";
         },
         generateOutfitReport: function () {
-            const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_4__["ApiResponse"]();
+            const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_4__["ApiResponse"]();
             let events = [];
             this.core.stats.forEach((player, charID) => {
                 events.push(...player.events);
@@ -65426,7 +65905,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             events.push(...this.core.miscEvents);
             events = events.sort((a, b) => a.timestamp - b.timestamp);
             this.opsReportSettings.showSquadStats = this.core.squad.perm.length > 0;
-            reports_OutfitReport__WEBPACK_IMPORTED_MODULE_14__["OutfitReportGenerator"].generate({
+            core_reports_OutfitReport__WEBPACK_IMPORTED_MODULE_14__["OutfitReportGenerator"].generate({
                 settings: {
                     zoneID: null,
                     showSquadStats: this.opsReportSettings.showSquadStats == true
@@ -65476,7 +65955,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
         generatePersonalReport: function (charID) {
             let opsLeft = 2;
             let html = "";
-            let report = new InvididualGenerator__WEBPACK_IMPORTED_MODULE_12__["Report"]();
+            let report = new core_InvididualGenerator__WEBPACK_IMPORTED_MODULE_12__["Report"]();
             PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_13__["PersonalReportGenerator"].getTemplate().ok((type) => {
                 html = type;
                 if (--opsLeft == 0) {
@@ -65497,7 +65976,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             };
         },
         generatePlayerReport: function (charID) {
-            const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_4__["ApiResponse"]();
+            const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_4__["ApiResponse"]();
             const player = this.core.stats.get(charID);
             if (player == undefined) {
                 response.resolve({ code: 404, data: `` });
@@ -65518,7 +65997,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                     tracking: Object.assign({}, this.core.tracking),
                     routers: [...this.core.routerTracking.routers]
                 };
-                InvididualGenerator__WEBPACK_IMPORTED_MODULE_12__["IndividualReporter"].generatePersonalReport(parameters).ok(data => {
+                core_InvididualGenerator__WEBPACK_IMPORTED_MODULE_12__["IndividualReporter"].generatePersonalReport(parameters).ok(data => {
                     response.resolveOk(data);
                 });
             }
@@ -65639,7 +66118,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             this.core.addPlayer(this.parameters.playerName);
         },
         exportWeaponData: function () {
-            const weapons = census_WeaponAPI__WEBPACK_IMPORTED_MODULE_9__["WeaponAPI"].getEntires();
+            const weapons = core_census_WeaponAPI__WEBPACK_IMPORTED_MODULE_9__["WeaponAPI"].getEntires();
             const lines = weapons.map((iter) => {
                 return {
                     item_id: iter.ID,
@@ -65679,556 +66158,6 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
     }
 });
 window.vm = vm;
-
-
-/***/ }),
-
-/***/ "./src/reports/OutfitReport.ts":
-/*!*************************************!*\
-  !*** ./src/reports/OutfitReport.ts ***!
-  \*************************************/
-/*! exports provided: OutfitReportSettings, OutfitReportParameters, OutfitReport, OutfitReportGenerator */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "OutfitReportSettings", function() { return OutfitReportSettings; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "OutfitReportParameters", function() { return OutfitReportParameters; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "OutfitReport", function() { return OutfitReport; });
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "OutfitReportGenerator", function() { return OutfitReportGenerator; });
-/* harmony import */ var census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! census/ApiWrapper */ "./src/census/ApiWrapper.ts");
-/* harmony import */ var census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! census/PsLoadout */ "./src/census/PsLoadout.ts");
-/* harmony import */ var PsEvent__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! PsEvent */ "./src/PsEvent.ts");
-/* harmony import */ var EventReporter__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! EventReporter */ "./src/EventReporter.ts");
-/* harmony import */ var InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! InvididualGenerator */ "./src/InvididualGenerator.ts");
-/* harmony import */ var core_Core__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! core/Core */ "./src/core/Core.ts");
-/* harmony import */ var core_squad_Squad__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! core/squad/Squad */ "./src/core/squad/Squad.ts");
-
-
-
-
-
-
-
-class OutfitReportSettings {
-    constructor() {
-        /**
-         * ID of the zone to limit events to. Leaven null for all zones
-         */
-        this.zoneID = null;
-        /**
-         * If squad stats will be generated and displayed
-         */
-        this.showSquadStats = false;
-    }
-}
-/**
- * Parameters used to generate an outfit report
- */
-class OutfitReportParameters {
-    constructor() {
-        /**
-         * Settings used to generate the report
-         */
-        this.settings = new OutfitReportSettings();
-        /**
-         * Facility captures that will be included in the report
-         */
-        this.captures = [];
-        /**
-         * List of all the capture events related to players that will be included in the report
-         */
-        this.playerCaptures = [];
-        /**
-         * List of events that will be included in the report
-         */
-        this.events = [];
-        /**
-         * Map of players that will be part of the report <Character ID, TrackedPlayer>
-         */
-        this.players = new Map();
-        /**
-         * Squad stats
-         */
-        this.squads = {
-            perm: [],
-            guesses: []
-        };
-        /**
-         * List of outfit IDs that will be included in the report
-         */
-        this.outfits = [];
-        /**
-         * The period of time that the report will be generated over
-         */
-        this.tracking = new InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["TimeTracking"]();
-    }
-}
-/**
- * Outfit report
- */
-class OutfitReport {
-    constructor() {
-        /**
-         * The various stats and how many the outfit got, based on the exp events
-         */
-        this.stats = new Map();
-        /**
-         * Total score that was gained during the ops
-         */
-        this.score = 0;
-        /**
-         * The players that make the outfit report
-         */
-        this.players = [];
-        /**
-         * List of events that was generated during the outfit report
-         */
-        this.events = [];
-        /**
-         * The start and stop times that tracking was done over
-         */
-        this.tracking = new InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["TimeTracking"]();
-        /**
-         * The facility captures that took place
-         */
-        this.facilityCaptures = [];
-        /**
-         * Breakdown of each class and how many of each exp event each class got
-         */
-        this.classStats = new Map();
-        /**
-         * Breakdown of the score, what how many of each event and how much score
-         */
-        this.scoreBreakdown = [];
-        /**
-         * How many seconds each class is played over all members
-         */
-        this.classPlaytimes = new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
-        /**
-         * Collection of stats per 5 minute blocks
-         */
-        this.overtimePer5 = {
-            kpm: [],
-            kd: [],
-            rpm: [],
-        };
-        /**
-         * Collection of stats per 1 minute blocks
-         */
-        this.overtimePer1 = {
-            kpm: [],
-            kd: [],
-            rpm: [],
-        };
-        /**
-         * Collection of stats updated everytime a relevant event is performed
-         */
-        this.perUpdate = {
-            kpm: [],
-            kd: [],
-            rpm: []
-        };
-        /**
-         * Numbers used to create the boxplot of KPMs
-         */
-        this.kpmBoxPlot = {
-            total: [],
-            infil: [],
-            lightAssault: [],
-            medic: [],
-            engineer: [],
-            heavy: [],
-            max: []
-        };
-        /**
-         * Numbers used to create the boxplot of KDs
-         */
-        this.kdBoxPlot = {
-            total: [],
-            infil: [],
-            lightAssault: [],
-            medic: [],
-            engineer: [],
-            heavy: [],
-            max: []
-        };
-        this.squadStats = {
-            data: [],
-            all: new core_Core__WEBPACK_IMPORTED_MODULE_5__["SquadStats"]()
-        };
-        this.weaponKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
-        this.weaponTypeKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
-        this.teamkillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
-        this.teamkillTypeBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
-        this.deathAllBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
-        this.deathAllTypeBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
-        this.deathRevivedBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
-        this.deathRevivedTypeBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
-        this.deathKilledBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
-        this.deathKilledTypeBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
-        this.outfitVersusBreakdown = [];
-        this.weaponTypeDeathBreakdown = [];
-        this.vehicleKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
-        this.vehicleKillWeaponBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
-        /**
-         * Unused
-         */
-        this.timeUnrevived = [];
-        this.revivedLifeExpectance = [];
-        this.kmLifeExpectance = [];
-        this.kmTimeDead = [];
-        this.factionKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
-        this.factionDeathBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
-        this.continentKillBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
-        this.continentDeathBreakdown = new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"]();
-        this.baseCaptures = [];
-        /**
-         * The KD of class against all other classes, i.e. how many kills/deaths medics got against heavies
-         */
-        this.classKds = {
-            infil: Object(InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["classKdCollection"])(),
-            lightAssault: Object(InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["classKdCollection"])(),
-            medic: Object(InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["classKdCollection"])(),
-            engineer: Object(InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["classKdCollection"])(),
-            heavy: Object(InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["classKdCollection"])(),
-            max: Object(InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["classKdCollection"])(),
-            total: Object(InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["classKdCollection"])()
-        };
-        this.classTypeKills = {
-            infil: new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"](),
-            lightAssault: new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"](),
-            medic: new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"](),
-            engineer: new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"](),
-            heavy: new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"](),
-            max: new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"](),
-        };
-        this.classTypeDeaths = {
-            infil: new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"](),
-            lightAssault: new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"](),
-            medic: new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"](),
-            engineer: new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"](),
-            heavy: new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"](),
-            max: new EventReporter__WEBPACK_IMPORTED_MODULE_3__["BreakdownArray"](),
-        };
-    }
-}
-class OutfitReportGenerator {
-    static generate(parameters) {
-        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
-        const report = new OutfitReport();
-        report.tracking = parameters.tracking;
-        let filterZoneID = parameters.settings.zoneID != null;
-        report.facilityCaptures = parameters.captures.filter((iter) => {
-            return (filterZoneID == false || (filterZoneID == true && iter.zoneID == parameters.settings.zoneID))
-                && parameters.outfits.indexOf(iter.outfitID) > -1;
-        });
-        report.facilityCaptures.sort((a, b) => {
-            return a.timestamp.getTime() - b.timestamp.getTime();
-        });
-        let opsLeft = +1 // Facility captures
-            + 1 // Weapon kills
-            + 1 // Weapon type kills
-            + 1 // Teamkills
-            + 1 // Faction kills
-            + 1 // Faction deaths
-            + 1 // Cont kills
-            + 1 // Cont deaths
-            + 1 // All weapon deaths
-            + 1 // Unrevived weapon deaths
-            + 1 // Revived weapon deaths
-            + 1 // All weapon type deaths
-            + 1 // Unrevived weapon type deaths
-            + 1 // Revived weapon type deaths
-            + 1 // Weapon death breakdown
-            + 6 // Weapon kill types for all classes
-            + 6 // Weapon death types for all classes
-            + 1 // Outfit VS KD
-            + 1 // Vehicle kills
-            + 1; // Vehicle weapon kills
-        const totalOps = opsLeft;
-        const callback = (step) => {
-            return () => {
-                console.log(`Finished ${step}: Have ${opsLeft - 1} ops left outta ${totalOps}`);
-                if (--opsLeft == 0) {
-                    response.resolveOk(report);
-                }
-            };
-        };
-        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].facilityCaptures({
-            captures: report.facilityCaptures,
-            players: parameters.playerCaptures
-        }).ok(data => report.baseCaptures = data).always(callback("Facility captures"));
-        const chars = Array.from(parameters.players.values());
-        report.kpmBoxPlot = {
-            total: EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kpmBoxplot(chars, parameters.tracking),
-            infil: EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kpmBoxplot(chars, parameters.tracking, "infil"),
-            lightAssault: EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kpmBoxplot(chars, parameters.tracking, "lightAssault"),
-            medic: EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kpmBoxplot(chars, parameters.tracking, "medic"),
-            engineer: EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kpmBoxplot(chars, parameters.tracking, "engineer"),
-            heavy: EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kpmBoxplot(chars, parameters.tracking, "heavy"),
-            max: EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kpmBoxplot(chars, parameters.tracking, "max"),
-        };
-        report.kdBoxPlot = {
-            total: EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kdBoxplot(chars, parameters.tracking),
-            infil: EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kdBoxplot(chars, parameters.tracking, "infil"),
-            lightAssault: EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kdBoxplot(chars, parameters.tracking, "lightAssault"),
-            medic: EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kdBoxplot(chars, parameters.tracking, "medic"),
-            engineer: EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kdBoxplot(chars, parameters.tracking, "engineer"),
-            heavy: EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kdBoxplot(chars, parameters.tracking, "heavy"),
-            max: EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kdBoxplot(chars, parameters.tracking, "max")
-        };
-        parameters.players.forEach((player, charID) => {
-            player.stats.getMap().forEach((amount, expID) => {
-                var _a;
-                const event = PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvents"].get(expID);
-                if (event == undefined) {
-                    return;
-                }
-                const reportAmount = (_a = report.stats.get(event.name), (_a !== null && _a !== void 0 ? _a : 0));
-                report.stats.set(event.name, reportAmount + amount);
-            });
-        });
-        const playtimes = [];
-        parameters.players.forEach((player, charID) => {
-            if (player.events.length == 0) {
-                return;
-            }
-            report.score += player.score;
-            report.events.push(...player.events);
-            const playtime = InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["IndividualReporter"].classUsage({
-                player: player,
-                events: [],
-                routers: [],
-                tracking: parameters.tracking
-            });
-            playtimes.push(playtime);
-            report.players.push(Object.assign({ name: `${(player.outfitTag != '' ? `[${player.outfitTag}] ` : '')}${player.name}` }, playtime));
-        });
-        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].classPlaytimes(playtimes).ok(data => report.classPlaytimes = data).always(() => callback("Class playtimes"));
-        report.events = report.events.sort((a, b) => a.timestamp - b.timestamp);
-        // Track how many headshots each class got
-        const headshots = Object(EventReporter__WEBPACK_IMPORTED_MODULE_3__["classCollectionNumber"])();
-        for (const ev of report.events) {
-            if (ev.type != "kill" || ev.isHeadshot == false) {
-                continue;
-            }
-            const loadout = census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadouts"].get(ev.loadoutID);
-            if (loadout == undefined) {
-                continue;
-            }
-            if (loadout.type == "infil") {
-                ++headshots.infil;
-            }
-            else if (loadout.type == "lightAssault") {
-                ++headshots.lightAssault;
-            }
-            else if (loadout.type == "medic") {
-                ++headshots.medic;
-            }
-            else if (loadout.type == "engineer") {
-                ++headshots.engineer;
-            }
-            else if (loadout.type == "heavy") {
-                ++headshots.heavy;
-            }
-            else if (loadout.type == "max") {
-                ++headshots.max;
-            }
-            ++headshots.total;
-        }
-        report.classStats.set("Headshot", headshots);
-        for (const ev of report.events) {
-            let statName = "Other";
-            if (ev.type == "kill") {
-                statName = "Kill";
-            }
-            else if (ev.type == "death") {
-                statName = (ev.revived == true) ? "Revived" : "Death";
-            }
-            else if (ev.type == "exp") {
-                const event = PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvents"].get(ev.expID);
-                if (event != undefined) {
-                    if (event.track == false) {
-                        continue;
-                    }
-                    statName = event.name;
-                }
-            }
-            else {
-                continue;
-            }
-            if (!report.classStats.has(statName)) {
-                //console.log(`Added stats for '${statName}'`);
-                report.classStats.set(statName, Object(EventReporter__WEBPACK_IMPORTED_MODULE_3__["classCollectionNumber"])());
-            }
-            const classCollection = report.classStats.get(statName);
-            ++classCollection.total;
-            const loadout = census_PsLoadout__WEBPACK_IMPORTED_MODULE_1__["PsLoadouts"].get(ev.loadoutID);
-            if (loadout == undefined) {
-                continue;
-            }
-            if (loadout.type == "infil") {
-                ++classCollection.infil;
-            }
-            else if (loadout.type == "lightAssault") {
-                ++classCollection.lightAssault;
-            }
-            else if (loadout.type == "medic") {
-                ++classCollection.medic;
-            }
-            else if (loadout.type == "engineer") {
-                ++classCollection.engineer;
-            }
-            else if (loadout.type == "heavy") {
-                ++classCollection.heavy;
-            }
-            else if (loadout.type == "max") {
-                ++classCollection.max;
-            }
-        }
-        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponKills(report.events).ok(data => report.weaponKillBreakdown = data).always(callback("Weapon kills"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeKills(report.events).ok(data => report.weaponTypeKillBreakdown = data).always(callback("Weapon type kills"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTeamkills(report.events).ok(data => report.teamkillBreakdown = data).always(callback("Teamkills"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].factionKills(report.events).ok(data => report.factionKillBreakdown = data).always(callback("Faction kills"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].factionDeaths(report.events).ok(data => report.factionDeathBreakdown = data).always(callback("Faction deaths"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].continentKills(report.events).ok(data => report.continentKillBreakdown = data).always(callback("Cont kills"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].continentDeaths(report.events).ok(data => report.continentDeathBreakdown = data).always(callback("Cont deaths"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponDeaths(report.events).ok(data => report.deathAllBreakdown = data).always(callback("All weapon deaths"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponDeaths(report.events, true).ok(data => report.deathRevivedBreakdown = data).always(callback("Revived weapon deaths"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponDeaths(report.events, false).ok(data => report.deathKilledBreakdown = data).always(callback("Unrevived weapon deaths"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeDeaths(report.events).ok(data => report.deathAllTypeBreakdown = data).always(callback("All weapon type deaths"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeDeaths(report.events, true).ok(data => report.deathRevivedTypeBreakdown = data).always(callback("Revived weapon type deaths"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeDeaths(report.events, false).ok(data => report.deathKilledTypeBreakdown = data).always(callback("Unrevived weapon type deaths"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponDeathBreakdown(report.events).ok(data => report.weaponTypeDeathBreakdown = data).always(callback("Weapon death breakdown"));
-        /* Not super useful and take a long time to generate
-        report.timeUnrevived = IndividualReporter.unrevivedTime(report.events);
-        report.revivedLifeExpectance = IndividualReporter.reviveLifeExpectance(report.events);
-        report.kmLifeExpectance = IndividualReporter.lifeExpectanceRate(report.events);
-        report.kmTimeDead = IndividualReporter.timeUntilReviveRate(report.events);
-        */
-        const classFilter = (iter, type, loadouts) => {
-            if (iter.type == type) {
-                return loadouts.indexOf(iter.loadoutID) > -1;
-            }
-            return false;
-        };
-        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["1", "8", "15"])))
-            .ok(data => report.classTypeKills.infil = data).always(callback("Weapon type kills: Infil"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["3", "10", "17"])))
-            .ok(data => report.classTypeKills.lightAssault = data).always(callback("Weapon type kills: LA"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["4", "11", "18"])))
-            .ok(data => report.classTypeKills.medic = data).always(callback("Weapon type kills: Medic"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["5", "12", "19"])))
-            .ok(data => report.classTypeKills.engineer = data).always(callback("Weapon type kills: Eng"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["6", "13", "20"])))
-            .ok(data => report.classTypeKills.heavy = data).always(callback("Weapon type kills: Heavy"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["7", "14", "21"])))
-            .ok(data => report.classTypeKills.max = data).always(callback("Weapon type kills: MAX"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["1", "8", "15"])))
-            .ok(data => report.classTypeDeaths.infil = data).always(callback("Weapon type deaths: Infil"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["3", "10", "17"])))
-            .ok(data => report.classTypeDeaths.lightAssault = data).always(callback("Weapon type deaths: LA"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["4", "11", "18"])))
-            .ok(data => report.classTypeDeaths.medic = data).always(callback("Weapon type deaths: Medic"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["5", "12", "19"])))
-            .ok(data => report.classTypeDeaths.engineer = data).always(callback("Weapon type deaths: Eng"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["6", "13", "20"])))
-            .ok(data => report.classTypeDeaths.heavy = data).always(callback("Weapon type deaths: Heavy"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["7", "14", "21"])))
-            .ok(data => report.classTypeDeaths.max = data).always(callback("Weapon type deaths: MAX"));
-        report.classKds.infil = InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["IndividualReporter"].classVersusKd(report.events, "infil");
-        report.classKds.lightAssault = InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["IndividualReporter"].classVersusKd(report.events, "lightAssault");
-        report.classKds.medic = InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["IndividualReporter"].classVersusKd(report.events, "medic");
-        report.classKds.engineer = InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["IndividualReporter"].classVersusKd(report.events, "engineer");
-        report.classKds.heavy = InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["IndividualReporter"].classVersusKd(report.events, "heavy");
-        report.classKds.max = InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["IndividualReporter"].classVersusKd(report.events, "max");
-        report.classKds.total = InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["IndividualReporter"].classVersusKd(report.events);
-        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].outfitVersusBreakdown(report.events).ok(data => report.outfitVersusBreakdown = data).always(callback("Outfit VS KD"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].vehicleKills(report.events).ok(data => report.vehicleKillBreakdown = data).always(callback("Vehicle type kills"));
-        EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].vehicleWeaponKills(report.events).ok(data => report.vehicleKillWeaponBreakdown = data).always(callback("Vehicle weapon kills"));
-        const getSquadStats = (squad, name) => {
-            const squadIDs = squad.members.map(iter => iter.charID);
-            return {
-                name: name,
-                members: squad.members.map(iter => iter.name),
-                kills: parameters.events.filter(iter => iter.type == "kill"
-                    && squadIDs.indexOf(iter.sourceID) > -1).length,
-                deaths: parameters.events.filter(iter => iter.type == "death" && iter.revived == false
-                    && squadIDs.indexOf(iter.sourceID) > -1).length,
-                revives: parameters.events.filter(iter => iter.type == "exp"
-                    && (iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].revive || iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadRevive)
-                    && squadIDs.indexOf(iter.sourceID) > -1).length,
-                heals: parameters.events.filter(iter => iter.type == "exp"
-                    && (iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].heal || iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadHeal)
-                    && squadIDs.indexOf(iter.sourceID) > -1).length,
-                resupplies: parameters.events.filter(iter => iter.type == "exp"
-                    && (iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].resupply || iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadResupply)
-                    && squadIDs.indexOf(iter.sourceID) > -1).length,
-                repairs: parameters.events.filter(iter => iter.type == "exp"
-                    && (iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].maxRepair || iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].squadMaxRepair)
-                    && squadIDs.indexOf(iter.sourceID) > -1).length,
-                vKills: parameters.events.filter(iter => iter.type == "vehicle"
-                    && squadIDs.indexOf(iter.sourceID) > -1).length,
-            };
-        };
-        for (const squad of parameters.squads.perm) {
-            report.squadStats.data.push(getSquadStats(squad, squad.display || "Other"));
-        }
-        for (const squad of parameters.squads.guesses) {
-            report.squadStats.data.push(getSquadStats(squad, squad.display || "Other"));
-        }
-        const allSquad = new core_squad_Squad__WEBPACK_IMPORTED_MODULE_6__["Squad"]();
-        for (const squad of [...parameters.squads.perm, ...parameters.squads.guesses]) {
-            allSquad.members.push(...squad.members);
-        }
-        report.squadStats.all = getSquadStats(allSquad, "All");
-        report.squadStats.data.push(report.squadStats.all);
-        let otherIDs = [];
-        const breakdown = new Map();
-        for (const event of report.events) {
-            if (event.type == "exp") {
-                const exp = PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvents"].get(event.expID) || PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].other;
-                if (!breakdown.has(exp.name)) {
-                    breakdown.set(exp.name, new InvididualGenerator__WEBPACK_IMPORTED_MODULE_4__["ExpBreakdown"]());
-                }
-                const score = breakdown.get(exp.name);
-                score.name = exp.name;
-                score.score += event.amount;
-                score.amount += 1;
-                if (exp == PsEvent__WEBPACK_IMPORTED_MODULE_2__["PsEvent"].other) {
-                    otherIDs.push(event.expID);
-                }
-            }
-        }
-        console.log(`Untracked experience IDs: ${otherIDs.filter((v, i, a) => a.indexOf(v) == i).join(", ")}`);
-        // Sort all the entries by score, followed by amount, then lastly name
-        report.scoreBreakdown = [...breakdown.entries()].sort((a, b) => {
-            return (b[1].score - a[1].score)
-                || (b[1].amount - a[1].amount)
-                || (b[0].localeCompare(a[0]));
-        }).map((a) => a[1]); // Transform the tuple into the ExpBreakdown
-        report.overtimePer1.kpm = EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kpmOverTime(report.events, 60000);
-        report.overtimePer1.kd = EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kdOverTime(report.events, 60000);
-        report.overtimePer1.rpm = EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].revivesOverTime(report.events, 60000);
-        report.overtimePer5.kpm = EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kpmOverTime(report.events);
-        report.overtimePer5.kd = EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kdOverTime(report.events);
-        report.overtimePer5.rpm = EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].revivesOverTime(report.events);
-        report.perUpdate.kd = EventReporter__WEBPACK_IMPORTED_MODULE_3__["default"].kdPerUpdate(report.events);
-        return response;
-    }
-}
-
-
-/***/ }),
-
-/***/ "./src/reports/PersonalReport.ts":
-/*!***************************************!*\
-  !*** ./src/reports/PersonalReport.ts ***!
-  \***************************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
 
 
 /***/ }),
@@ -66298,14 +66227,14 @@ class WinterReport {
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "WinterMetricIndex", function() { return WinterMetricIndex; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "WinterReportGenerator", function() { return WinterReportGenerator; });
-/* harmony import */ var census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! census/ApiWrapper */ "./src/census/ApiWrapper.ts");
+/* harmony import */ var core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! core/census/ApiWrapper */ "./src/core/census/ApiWrapper.ts");
 /* harmony import */ var _WinterReport__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./WinterReport */ "./src/winter/WinterReport.ts");
 /* harmony import */ var _WinterMetric__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./WinterMetric */ "./src/winter/WinterMetric.ts");
-/* harmony import */ var StatMap__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! StatMap */ "./src/StatMap.ts");
-/* harmony import */ var PsEvent__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! PsEvent */ "./src/PsEvent.ts");
-/* harmony import */ var census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! census/VehicleAPI */ "./src/census/VehicleAPI.ts");
-/* harmony import */ var census_WeaponAPI__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! census/WeaponAPI */ "./src/census/WeaponAPI.ts");
-/* harmony import */ var census_PsLoadout__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! census/PsLoadout */ "./src/census/PsLoadout.ts");
+/* harmony import */ var core_StatMap__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! core/StatMap */ "./src/core/StatMap.ts");
+/* harmony import */ var core_PsEvent__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! core/PsEvent */ "./src/core/PsEvent.ts");
+/* harmony import */ var core_census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! core/census/VehicleAPI */ "./src/core/census/VehicleAPI.ts");
+/* harmony import */ var core_census_WeaponAPI__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! core/census/WeaponAPI */ "./src/core/census/WeaponAPI.ts");
+/* harmony import */ var core_census_PsLoadout__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! core/census/PsLoadout */ "./src/core/census/PsLoadout.ts");
 
 
 
@@ -66324,7 +66253,7 @@ WinterMetricIndex.RESUPPLIES = 4;
 WinterMetricIndex.REPAIRS = 5;
 class WinterReportGenerator {
     static generate(parameters) {
-        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
         parameters.events = parameters.events.sort((a, b) => a.timestamp - b.timestamp);
         const report = new _WinterReport__WEBPACK_IMPORTED_MODULE_1__["WinterReport"]();
         report.start = new Date(parameters.events[0].timestamp);
@@ -66386,7 +66315,7 @@ class WinterReportGenerator {
         return response;
     }
     static revives(parameters) {
-        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].revive, PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadResupply], {
+        return this.metric(parameters, [core_PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].revive, core_PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadResupply], {
             name: "Revives",
             funName: "Necromancer",
             description: "Most revives",
@@ -66394,7 +66323,7 @@ class WinterReportGenerator {
         });
     }
     static heals(parameters) {
-        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].heal, PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadHeal], {
+        return this.metric(parameters, [core_PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].heal, core_PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadHeal], {
             name: "Heals",
             funName: "Green Wizard",
             description: "Most heals",
@@ -66402,7 +66331,7 @@ class WinterReportGenerator {
         });
     }
     static repairs(parameters) {
-        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].maxRepair, PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadMaxRepair], {
+        return this.metric(parameters, [core_PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].maxRepair, core_PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadMaxRepair], {
             name: "MAX Repairs",
             funName: "Welder",
             description: "Most MAX repairs",
@@ -66410,7 +66339,7 @@ class WinterReportGenerator {
         });
     }
     static resupplies(parameters) {
-        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].resupply, PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadResupply], {
+        return this.metric(parameters, [core_PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].resupply, core_PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadResupply], {
             name: "Resupply",
             funName: "Ammo printer",
             description: "Most resupplies",
@@ -66426,7 +66355,7 @@ class WinterReportGenerator {
         });
     }
     static kds(parameters) {
-        return this.value(parameters, (player) => (player.stats.get(PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].kill) > 24) ? player.stats.get(PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].kill) / player.stats.get(PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].death, 1) : 0, {
+        return this.value(parameters, (player) => (player.stats.get(core_PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].kill) > 24) ? player.stats.get(core_PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].kill) / player.stats.get(core_PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].death, 1) : 0, {
             name: "K/D",
             funName: "K/D",
             description: "Highest K/D",
@@ -66442,7 +66371,7 @@ class WinterReportGenerator {
         });
     }
     static mostTransportAssists(parameters) {
-        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].transportAssists], {
+        return this.metric(parameters, [core_PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].transportAssists], {
             name: "Transport assists",
             funName: "Logistics Specialists",
             description: "Most transport assists",
@@ -66450,7 +66379,7 @@ class WinterReportGenerator {
         });
     }
     static mostReconAssists(parameters) {
-        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].motionDetect, PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadMotionDetect], {
+        return this.metric(parameters, [core_PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].motionDetect, core_PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadMotionDetect], {
             name: "Recon detections",
             funName: "Flies on the Wall",
             description: "Most recon detection ticks",
@@ -66458,7 +66387,7 @@ class WinterReportGenerator {
         });
     }
     static mostDrawfireAssists(parameters) {
-        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].drawfire], {
+        return this.metric(parameters, [core_PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].drawfire], {
             name: "Drawfire Assists",
             funName: "Professional Distraction",
             description: "Most drawfire assists",
@@ -66466,7 +66395,7 @@ class WinterReportGenerator {
         });
     }
     static mostConcAssists(parameters) {
-        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].concAssist, PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadConcAssist], {
+        return this.metric(parameters, [core_PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].concAssist, core_PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadConcAssist], {
             name: "Conced killers",
             funName: "Concussive Maintenance",
             description: "Most kills on concussed players",
@@ -66474,7 +66403,7 @@ class WinterReportGenerator {
         });
     }
     static mostFlashAssists(parameters) {
-        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].flashAssist, PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadFlashAssist], {
+        return this.metric(parameters, [core_PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].flashAssist, core_PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadFlashAssist], {
             name: "Flashed killers",
             funName: "Darklight",
             description: "Most kills on flashed players",
@@ -66482,7 +66411,7 @@ class WinterReportGenerator {
         });
     }
     static mostEMPAssist(parameters) {
-        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].empAssist, PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadEmpAssist], {
+        return this.metric(parameters, [core_PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].empAssist, core_PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadEmpAssist], {
             name: "EMPed killers",
             funName: "Sparky Sparky Boom",
             description: "Most kills on EMPed players",
@@ -66490,7 +66419,7 @@ class WinterReportGenerator {
         });
     }
     static mostSaviors(parameters) {
-        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].savior], {
+        return this.metric(parameters, [core_PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].savior], {
             name: "Savior",
             funName: "Savior",
             description: "Most savior kills",
@@ -66498,7 +66427,7 @@ class WinterReportGenerator {
         });
     }
     static mostAssists(parameters) {
-        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].killAssist], {
+        return this.metric(parameters, [core_PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].killAssist], {
             name: "Kill assists",
             funName: "Wingmen",
             description: "Players with the most kill assists",
@@ -66506,7 +66435,7 @@ class WinterReportGenerator {
         });
     }
     static mostRouterKills(parameters) {
-        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].routerKill], {
+        return this.metric(parameters, [core_PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].routerKill], {
             name: "Router kills",
             funName: "Connectivity Issues",
             description: "Players with the most router kills",
@@ -66514,7 +66443,7 @@ class WinterReportGenerator {
         });
     }
     static mostBeaconKills(parameters) {
-        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].beaconKill], {
+        return this.metric(parameters, [core_PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].beaconKill], {
             name: "Beacon kills",
             funName: "Bacon Fryer",
             description: "Players with the most beacon kills",
@@ -66524,7 +66453,7 @@ class WinterReportGenerator {
     static mostUniqueRevives(parameters) {
         return this.value(parameters, ((player) => {
             const ev = player.events.filter(iter => iter.type == "exp"
-                && (iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].revive || iter.expID == PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadRevive));
+                && (iter.expID == core_PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].revive || iter.expID == core_PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].squadRevive));
             return ev.map(iter => iter.targetID).filter((value, index, array) => array.indexOf(value) == index).length;
         }), {
             name: "Most unique revives",
@@ -66549,7 +66478,7 @@ class WinterReportGenerator {
         metric.name = "Kill streaks";
         metric.funName = "Big fish";
         metric.description = "Longest kill streak";
-        const amounts = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        const amounts = new core_StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
         for (const player of parameters.players) {
             let currentStreak = 0;
             let longestStreak = 0;
@@ -66577,7 +66506,7 @@ class WinterReportGenerator {
         metric.name = "HSR";
         metric.funName = "Head poppers";
         metric.description = "Highest headshot ratio";
-        const map = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        const map = new core_StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
         for (const player of parameters.players) {
             const kills = player.events.filter(iter => iter.type == "kill").length || 1;
             const hsKills = player.events.filter(iter => iter.type == "kill" && iter.isHeadshot == true).length || 1;
@@ -66597,7 +66526,7 @@ class WinterReportGenerator {
         metric.name = "Different weapons";
         metric.funName = "Diverse Skillset";
         metric.description = "Most amount of unique weapons";
-        const stats = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        const stats = new core_StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
         for (const player of parameters.players) {
             const set = new Set();
             for (const ev of player.events) {
@@ -66612,7 +66541,7 @@ class WinterReportGenerator {
         return metric;
     }
     static mostESFSKills(parameters) {
-        return this.vehicle(parameters, [census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].mosquito, census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].reaver, census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].scythe], {
+        return this.vehicle(parameters, [core_census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].mosquito, core_census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].reaver, core_census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].scythe], {
             name: "ESFs destroyed",
             funName: "Fly Swatter",
             description: "Most ESFs destroyed",
@@ -66620,7 +66549,7 @@ class WinterReportGenerator {
         });
     }
     static mostMBTKills(parameters) {
-        return this.vehicle(parameters, [census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].vanguard, census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].prowler, census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].magrider], {
+        return this.vehicle(parameters, [core_census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].vanguard, core_census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].prowler, core_census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].magrider], {
             name: "MBTs destroyed",
             funName: "Heavy Hitter",
             description: "Most MBTs destroyed",
@@ -66628,7 +66557,7 @@ class WinterReportGenerator {
         });
     }
     static mostHarasserKills(parameters) {
-        return this.vehicle(parameters, [census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].harasser], {
+        return this.vehicle(parameters, [core_census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].harasser], {
             name: "Harassers destroyed",
             funName: "Rasser Harasser",
             description: "Most harassers destroyed",
@@ -66636,7 +66565,7 @@ class WinterReportGenerator {
         });
     }
     static mostLightningKills(parameters) {
-        return this.vehicle(parameters, [census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].lightning], {
+        return this.vehicle(parameters, [core_census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].lightning], {
             name: "Lightnings destroyed",
             funName: "Thunder Struck",
             description: "Most lightnings destroyed",
@@ -66644,7 +66573,7 @@ class WinterReportGenerator {
         });
     }
     static mostSunderersKilled(parameters) {
-        return this.vehicle(parameters, [census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].sunderer], {
+        return this.vehicle(parameters, [core_census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].sunderer], {
             name: "Sunderers killed",
             funName: "Bus Bully",
             description: "Most sundies destroyed",
@@ -66652,7 +66581,7 @@ class WinterReportGenerator {
         });
     }
     static mostRoadkills(parameters) {
-        return this.metric(parameters, [PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].roadkill], {
+        return this.metric(parameters, [core_PsEvent__WEBPACK_IMPORTED_MODULE_4__["PsEvent"].roadkill], {
             name: "Roadkills",
             funName: "Road rage",
             description: "Most roadkills",
@@ -66664,7 +66593,7 @@ class WinterReportGenerator {
         metric.name = "Kills after revives";
         metric.funName = "Rise of the Undead";
         metric.description = "Most kills 10 seconds after being revived";
-        const amounts = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        const amounts = new core_StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
         for (const player of parameters.players) {
             const revives = player.events.filter(iter => iter.type == "death" && iter.revivedEvent != null);
             for (const ev of revives) {
@@ -66697,7 +66626,7 @@ class WinterReportGenerator {
         metric.name = "Longest life expectance";
         metric.funName = "Elders";
         metric.description = "Longest average life expectance";
-        const amounts = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        const amounts = new core_StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
         for (const player of parameters.players) {
             if (player.events.length == 0) {
                 continue;
@@ -66734,7 +66663,7 @@ class WinterReportGenerator {
         metric.name = "Shortest life expectance";
         metric.funName = "Not elders";
         metric.description = "Shortest average life expectance";
-        const amounts = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        const amounts = new core_StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
         for (const player of parameters.players) {
             if (player.events.length == 0) {
                 continue;
@@ -66799,7 +66728,7 @@ class WinterReportGenerator {
         });
     }
     static weaponType(parameters, type, metric) {
-        const response = new census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
+        const response = new core_census_ApiWrapper__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"]();
         const wepIDs = new Set();
         for (const player of parameters.players) {
             const IDs = player.events.filter(iter => iter.type == "kill")
@@ -66808,8 +66737,8 @@ class WinterReportGenerator {
                 wepIDs.add(id);
             }
         }
-        const amounts = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
-        census_WeaponAPI__WEBPACK_IMPORTED_MODULE_6__["WeaponAPI"].getByIDs(Array.from(wepIDs.keys())).ok((data) => {
+        const amounts = new core_StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        core_census_WeaponAPI__WEBPACK_IMPORTED_MODULE_6__["WeaponAPI"].getByIDs(Array.from(wepIDs.keys())).ok((data) => {
             for (const player of parameters.players) {
                 const kills = player.events.filter(iter => iter.type == "kill");
                 for (const kill of kills) {
@@ -66828,7 +66757,7 @@ class WinterReportGenerator {
         return response;
     }
     static weapon(parameters, ids, metric) {
-        const amounts = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        const amounts = new core_StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
         for (const player of parameters.players) {
             for (const ev of player.events) {
                 if (ev.type == "kill") {
@@ -66842,21 +66771,21 @@ class WinterReportGenerator {
         return metric;
     }
     static vehicle(parameters, vehicles, metric) {
-        const amounts = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        const amounts = new core_StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
         for (const player of parameters.players) {
             for (const ev of player.events) {
                 if (ev.type != "vehicle") {
                     continue;
                 }
-                const loadout = census_PsLoadout__WEBPACK_IMPORTED_MODULE_7__["PsLoadouts"].get(ev.loadoutID);
+                const loadout = core_census_PsLoadout__WEBPACK_IMPORTED_MODULE_7__["PsLoadouts"].get(ev.loadoutID);
                 if (loadout != undefined) {
-                    if (loadout.faction == "VS" && (ev.vehicleID == census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].scythe || ev.vehicleID == census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].bastionScythe || ev.vehicleID == census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].magrider)) {
+                    if (loadout.faction == "VS" && (ev.vehicleID == core_census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].scythe || ev.vehicleID == core_census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].bastionScythe || ev.vehicleID == core_census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].magrider)) {
                         continue;
                     }
-                    if (loadout.faction == "TR" && (ev.vehicleID == census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].mosquito || ev.vehicleID == census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].bastionMosquite || ev.vehicleID == census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].prowler)) {
+                    if (loadout.faction == "TR" && (ev.vehicleID == core_census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].mosquito || ev.vehicleID == core_census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].bastionMosquite || ev.vehicleID == core_census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].prowler)) {
                         continue;
                     }
-                    if (loadout.faction == "NC" && (ev.vehicleID == census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].reaver || ev.vehicleID == census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].bastionReaver || ev.vehicleID == census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].vanguard)) {
+                    if (loadout.faction == "NC" && (ev.vehicleID == core_census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].reaver || ev.vehicleID == core_census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].bastionReaver || ev.vehicleID == core_census_VehicleAPI__WEBPACK_IMPORTED_MODULE_5__["Vehicles"].vanguard)) {
                         continue;
                     }
                 }
@@ -66869,7 +66798,7 @@ class WinterReportGenerator {
         return metric;
     }
     static metric(parameters, events, metric) {
-        const amounts = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        const amounts = new core_StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
         for (const player of parameters.players) {
             const evs = player.events.filter(iter => iter.type == "exp" && events.indexOf(iter.expID) > -1);
             if (evs.length > 0) {
@@ -66880,7 +66809,7 @@ class WinterReportGenerator {
         return metric;
     }
     static value(parameters, accessor, metric, display = null) {
-        const map = new StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
+        const map = new core_StatMap__WEBPACK_IMPORTED_MODULE_3__["default"]();
         for (const player of parameters.players) {
             map.set(player.name, accessor(player));
         }
@@ -66954,9 +66883,9 @@ class WinterReportSettings {
 /***/ }),
 
 /***/ 0:
-/*!*********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
-  !*** multi ./src/addons/Playback.ts ./src/addons/SquadAddon.ts ./src/app/App.ts ./src/app/AppRealtime.ts ./src/BreakdownBar.ts ./src/BreakdownBox.ts ./src/BreakdownChart.ts ./src/BreakdownInterval.ts ./src/BreakdownList.ts ./src/census/AchievementAPI.ts ./src/census/ApiWrapper.ts ./src/census/CensusAPI.ts ./src/census/CharacterAPI.ts ./src/census/EventAPI.ts ./src/census/FacilityAPI.ts ./src/census/OutfitAPI.ts ./src/census/PsLoadout.ts ./src/census/VehicleAPI.ts ./src/census/WeaponAPI.ts ./src/ColorHelper.ts ./src/core/Core.ts ./src/core/CoreConnection.ts ./src/core/CoreDebugHelper.ts ./src/core/CoreProcessing.ts ./src/core/CoreSettings.ts ./src/core/CoreSquad.ts ./src/core/index.ts ./src/core/Squad.ts ./src/core/squad/Squad.ts ./src/core/squad/SquadMember.ts ./src/core/TrackedPlayer.ts ./src/Event.ts ./src/EventReporter.ts ./src/events/index.ts ./src/events/TCaptureEvent.ts ./src/events/TDeathEvent.ts ./src/events/TDefendEvent.ts ./src/events/TEvent.ts ./src/events/TEventHandlers.ts ./src/events/TExpEvent.ts ./src/events/TKillEvent.ts ./src/events/TLoginEvent.ts ./src/events/TLogoutEvent.ts ./src/events/TTeamkillEvent.ts ./src/events/TVehicleKillEvent.ts ./src/index.ts ./src/InvididualGenerator.ts ./src/KillfeedSquad.ts ./src/Loadable.ts ./src/MomentFilter.ts ./src/OutfitTrends.ts ./src/PersonalReportGenerator.ts ./src/PsEvent.ts ./src/Quartile.ts ./src/reports/OutfitReport.ts ./src/reports/PersonalReport.ts ./src/StatMap.ts ./src/Storage.ts ./src/winter/WinterMetric.ts ./src/winter/WinterReport.ts ./src/winter/WinterReportGenerator.ts ./src/winter/WinterReportParameters.ts ***!
-  \*********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+/*!*****************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** multi ./src/addons/Playback.ts ./src/addons/SquadAddon.ts ./src/app/App.ts ./src/app/AppRealtime.ts ./src/BreakdownBar.ts ./src/BreakdownBox.ts ./src/BreakdownChart.ts ./src/BreakdownInterval.ts ./src/BreakdownList.ts ./src/ColorHelper.ts ./src/core/census/AchievementAPI.ts ./src/core/census/ApiWrapper.ts ./src/core/census/CensusAPI.ts ./src/core/census/CharacterAPI.ts ./src/core/census/EventAPI.ts ./src/core/census/FacilityAPI.ts ./src/core/census/OutfitAPI.ts ./src/core/census/PsLoadout.ts ./src/core/census/VehicleAPI.ts ./src/core/census/WeaponAPI.ts ./src/core/Core.ts ./src/core/CoreConnection.ts ./src/core/CoreDebugHelper.ts ./src/core/CoreProcessing.ts ./src/core/CoreSettings.ts ./src/core/CoreSquad.ts ./src/core/EventReporter.ts ./src/core/events/index.ts ./src/core/events/TCaptureEvent.ts ./src/core/events/TDeathEvent.ts ./src/core/events/TDefendEvent.ts ./src/core/events/TEvent.ts ./src/core/events/TEventHandlers.ts ./src/core/events/TExpEvent.ts ./src/core/events/TKillEvent.ts ./src/core/events/TLoginEvent.ts ./src/core/events/TLogoutEvent.ts ./src/core/events/TTeamkillEvent.ts ./src/core/events/TVehicleKillEvent.ts ./src/core/index.ts ./src/core/InvididualGenerator.ts ./src/core/PsEvent.ts ./src/core/reports/OutfitReport.ts ./src/core/reports/PersonalReport.ts ./src/core/Squad.ts ./src/core/squad/Squad.ts ./src/core/squad/SquadMember.ts ./src/core/StatMap.ts ./src/core/TrackedPlayer.ts ./src/Event.ts ./src/index.ts ./src/KillfeedSquad.ts ./src/Loadable.ts ./src/MomentFilter.ts ./src/OutfitTrends.ts ./src/PersonalReportGenerator.ts ./src/Quartile.ts ./src/Storage.ts ./src/winter/WinterMetric.ts ./src/winter/WinterReport.ts ./src/winter/WinterReportGenerator.ts ./src/winter/WinterReportParameters.ts ***!
+  \*****************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -66969,54 +66898,54 @@ __webpack_require__(/*! ./src/BreakdownBox.ts */"./src/BreakdownBox.ts");
 __webpack_require__(/*! ./src/BreakdownChart.ts */"./src/BreakdownChart.ts");
 __webpack_require__(/*! ./src/BreakdownInterval.ts */"./src/BreakdownInterval.ts");
 __webpack_require__(/*! ./src/BreakdownList.ts */"./src/BreakdownList.ts");
-__webpack_require__(/*! ./src/census/AchievementAPI.ts */"./src/census/AchievementAPI.ts");
-__webpack_require__(/*! ./src/census/ApiWrapper.ts */"./src/census/ApiWrapper.ts");
-__webpack_require__(/*! ./src/census/CensusAPI.ts */"./src/census/CensusAPI.ts");
-__webpack_require__(/*! ./src/census/CharacterAPI.ts */"./src/census/CharacterAPI.ts");
-__webpack_require__(/*! ./src/census/EventAPI.ts */"./src/census/EventAPI.ts");
-__webpack_require__(/*! ./src/census/FacilityAPI.ts */"./src/census/FacilityAPI.ts");
-__webpack_require__(/*! ./src/census/OutfitAPI.ts */"./src/census/OutfitAPI.ts");
-__webpack_require__(/*! ./src/census/PsLoadout.ts */"./src/census/PsLoadout.ts");
-__webpack_require__(/*! ./src/census/VehicleAPI.ts */"./src/census/VehicleAPI.ts");
-__webpack_require__(/*! ./src/census/WeaponAPI.ts */"./src/census/WeaponAPI.ts");
 __webpack_require__(/*! ./src/ColorHelper.ts */"./src/ColorHelper.ts");
+__webpack_require__(/*! ./src/core/census/AchievementAPI.ts */"./src/core/census/AchievementAPI.ts");
+__webpack_require__(/*! ./src/core/census/ApiWrapper.ts */"./src/core/census/ApiWrapper.ts");
+__webpack_require__(/*! ./src/core/census/CensusAPI.ts */"./src/core/census/CensusAPI.ts");
+__webpack_require__(/*! ./src/core/census/CharacterAPI.ts */"./src/core/census/CharacterAPI.ts");
+__webpack_require__(/*! ./src/core/census/EventAPI.ts */"./src/core/census/EventAPI.ts");
+__webpack_require__(/*! ./src/core/census/FacilityAPI.ts */"./src/core/census/FacilityAPI.ts");
+__webpack_require__(/*! ./src/core/census/OutfitAPI.ts */"./src/core/census/OutfitAPI.ts");
+__webpack_require__(/*! ./src/core/census/PsLoadout.ts */"./src/core/census/PsLoadout.ts");
+__webpack_require__(/*! ./src/core/census/VehicleAPI.ts */"./src/core/census/VehicleAPI.ts");
+__webpack_require__(/*! ./src/core/census/WeaponAPI.ts */"./src/core/census/WeaponAPI.ts");
 __webpack_require__(/*! ./src/core/Core.ts */"./src/core/Core.ts");
 __webpack_require__(/*! ./src/core/CoreConnection.ts */"./src/core/CoreConnection.ts");
 __webpack_require__(/*! ./src/core/CoreDebugHelper.ts */"./src/core/CoreDebugHelper.ts");
 __webpack_require__(/*! ./src/core/CoreProcessing.ts */"./src/core/CoreProcessing.ts");
 __webpack_require__(/*! ./src/core/CoreSettings.ts */"./src/core/CoreSettings.ts");
 __webpack_require__(/*! ./src/core/CoreSquad.ts */"./src/core/CoreSquad.ts");
+__webpack_require__(/*! ./src/core/EventReporter.ts */"./src/core/EventReporter.ts");
+__webpack_require__(/*! ./src/core/events/index.ts */"./src/core/events/index.ts");
+__webpack_require__(/*! ./src/core/events/TCaptureEvent.ts */"./src/core/events/TCaptureEvent.ts");
+__webpack_require__(/*! ./src/core/events/TDeathEvent.ts */"./src/core/events/TDeathEvent.ts");
+__webpack_require__(/*! ./src/core/events/TDefendEvent.ts */"./src/core/events/TDefendEvent.ts");
+__webpack_require__(/*! ./src/core/events/TEvent.ts */"./src/core/events/TEvent.ts");
+__webpack_require__(/*! ./src/core/events/TEventHandlers.ts */"./src/core/events/TEventHandlers.ts");
+__webpack_require__(/*! ./src/core/events/TExpEvent.ts */"./src/core/events/TExpEvent.ts");
+__webpack_require__(/*! ./src/core/events/TKillEvent.ts */"./src/core/events/TKillEvent.ts");
+__webpack_require__(/*! ./src/core/events/TLoginEvent.ts */"./src/core/events/TLoginEvent.ts");
+__webpack_require__(/*! ./src/core/events/TLogoutEvent.ts */"./src/core/events/TLogoutEvent.ts");
+__webpack_require__(/*! ./src/core/events/TTeamkillEvent.ts */"./src/core/events/TTeamkillEvent.ts");
+__webpack_require__(/*! ./src/core/events/TVehicleKillEvent.ts */"./src/core/events/TVehicleKillEvent.ts");
 __webpack_require__(/*! ./src/core/index.ts */"./src/core/index.ts");
+__webpack_require__(/*! ./src/core/InvididualGenerator.ts */"./src/core/InvididualGenerator.ts");
+__webpack_require__(/*! ./src/core/PsEvent.ts */"./src/core/PsEvent.ts");
+__webpack_require__(/*! ./src/core/reports/OutfitReport.ts */"./src/core/reports/OutfitReport.ts");
+__webpack_require__(/*! ./src/core/reports/PersonalReport.ts */"./src/core/reports/PersonalReport.ts");
 __webpack_require__(/*! ./src/core/Squad.ts */"./src/core/Squad.ts");
 __webpack_require__(/*! ./src/core/squad/Squad.ts */"./src/core/squad/Squad.ts");
 __webpack_require__(/*! ./src/core/squad/SquadMember.ts */"./src/core/squad/SquadMember.ts");
+__webpack_require__(/*! ./src/core/StatMap.ts */"./src/core/StatMap.ts");
 __webpack_require__(/*! ./src/core/TrackedPlayer.ts */"./src/core/TrackedPlayer.ts");
 __webpack_require__(/*! ./src/Event.ts */"./src/Event.ts");
-__webpack_require__(/*! ./src/EventReporter.ts */"./src/EventReporter.ts");
-__webpack_require__(/*! ./src/events/index.ts */"./src/events/index.ts");
-__webpack_require__(/*! ./src/events/TCaptureEvent.ts */"./src/events/TCaptureEvent.ts");
-__webpack_require__(/*! ./src/events/TDeathEvent.ts */"./src/events/TDeathEvent.ts");
-__webpack_require__(/*! ./src/events/TDefendEvent.ts */"./src/events/TDefendEvent.ts");
-__webpack_require__(/*! ./src/events/TEvent.ts */"./src/events/TEvent.ts");
-__webpack_require__(/*! ./src/events/TEventHandlers.ts */"./src/events/TEventHandlers.ts");
-__webpack_require__(/*! ./src/events/TExpEvent.ts */"./src/events/TExpEvent.ts");
-__webpack_require__(/*! ./src/events/TKillEvent.ts */"./src/events/TKillEvent.ts");
-__webpack_require__(/*! ./src/events/TLoginEvent.ts */"./src/events/TLoginEvent.ts");
-__webpack_require__(/*! ./src/events/TLogoutEvent.ts */"./src/events/TLogoutEvent.ts");
-__webpack_require__(/*! ./src/events/TTeamkillEvent.ts */"./src/events/TTeamkillEvent.ts");
-__webpack_require__(/*! ./src/events/TVehicleKillEvent.ts */"./src/events/TVehicleKillEvent.ts");
 __webpack_require__(/*! ./src/index.ts */"./src/index.ts");
-__webpack_require__(/*! ./src/InvididualGenerator.ts */"./src/InvididualGenerator.ts");
 __webpack_require__(/*! ./src/KillfeedSquad.ts */"./src/KillfeedSquad.ts");
 __webpack_require__(/*! ./src/Loadable.ts */"./src/Loadable.ts");
 __webpack_require__(/*! ./src/MomentFilter.ts */"./src/MomentFilter.ts");
 __webpack_require__(/*! ./src/OutfitTrends.ts */"./src/OutfitTrends.ts");
 __webpack_require__(/*! ./src/PersonalReportGenerator.ts */"./src/PersonalReportGenerator.ts");
-__webpack_require__(/*! ./src/PsEvent.ts */"./src/PsEvent.ts");
 __webpack_require__(/*! ./src/Quartile.ts */"./src/Quartile.ts");
-__webpack_require__(/*! ./src/reports/OutfitReport.ts */"./src/reports/OutfitReport.ts");
-__webpack_require__(/*! ./src/reports/PersonalReport.ts */"./src/reports/PersonalReport.ts");
-__webpack_require__(/*! ./src/StatMap.ts */"./src/StatMap.ts");
 __webpack_require__(/*! ./src/Storage.ts */"./src/Storage.ts");
 __webpack_require__(/*! ./src/winter/WinterMetric.ts */"./src/winter/WinterMetric.ts");
 __webpack_require__(/*! ./src/winter/WinterReport.ts */"./src/winter/WinterReport.ts");

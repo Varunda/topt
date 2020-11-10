@@ -1,4 +1,4 @@
-import { ClassCollection } from "EventReporter";
+import { ClassCollection } from "core/EventReporter";
 
 export type OutfitTrends = OutfitTrendsV1;
 

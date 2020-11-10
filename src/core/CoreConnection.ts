@@ -1,7 +1,6 @@
 import { Core } from "core/Core";
 
-import { Loading, Loadable } from "Loadable";
-import { ApiResponse } from "census/ApiWrapper";
+import { ApiResponse } from "core/census/ApiWrapper";
 
 declare module "Core" {
 

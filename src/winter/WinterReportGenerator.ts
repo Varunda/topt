@@ -1,16 +1,15 @@
-import { ApiResponse } from "census/ApiWrapper";
-import { CharacterAPI, Character } from "census/CharacterAPI";
+import { ApiResponse } from "core/census/ApiWrapper";
 
 import { WinterReport } from "./WinterReport";
 import { WinterMetric, WinterMetricEntry } from "./WinterMetric";
 import { WinterReportParameters } from "./WinterReportParameters";
 
-import StatMap from "StatMap";
-import { PsEvent } from "PsEvent";
-import { TrackedPlayer } from "InvididualGenerator";
-import { VehicleTypes, Vehicle, VehicleAPI, Vehicles } from "census/VehicleAPI";
-import { WeaponAPI, Weapon } from "census/WeaponAPI";
-import { PsLoadout, PsLoadouts } from "census/PsLoadout";
+import StatMap from "core/StatMap";
+import { PsEvent } from "core/PsEvent";
+import { TrackedPlayer } from "core/InvididualGenerator";
+import { Vehicles } from "core/census/VehicleAPI";
+import { WeaponAPI, Weapon } from "core/census/WeaponAPI";
+import { PsLoadout, PsLoadouts } from "core/census/PsLoadout";
 
 import {
     TEvent, TEventType,
@@ -18,7 +17,7 @@ import {
     TCaptureEvent, TDefendEvent,
     TVehicleKillEvent,
     TEventHandler
-} from "events/index";
+} from "core/events/index";
 
 export class WinterMetricIndex {
     public static KILLS: number = 0;
