@@ -1,5 +1,5 @@
 import Vue from "vue";
-import { BreakdownTimeslot } from "core/EventReporter";
+import { BreakdownTimeslot } from "tcore";
 import { ColorHelper } from "ColorHelper";
 
 import { Chart } from "chart.js";
@@ -70,6 +70,7 @@ Vue.component("breakdown-interval", {
                         padding: {
                             bottom: 10
                         },
+                        display: false
                     }
                 },
                 maintainAspectRatio: false,

@@ -1,5 +1,3 @@
-import { Squad } from "core/squad/Squad";
-import { SquadMember } from "core/squad/SquadMember";
 
 export class SquadAddon {
 

@@ -2,8 +2,8 @@
 import Vue, { PropType } from "vue";
 
 import { SquadAddon } from "addons/SquadAddon";
-import { SquadMember } from "core/squad/SquadMember";
-import { Squad } from "core/squad/Squad";
+import { SquadMember } from "tcore";
+import { Squad } from "tcore";
 
 type GroupInfo = {
     total: number;

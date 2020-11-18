@@ -51,8 +51,10 @@ module.exports = {
   ],
 
   resolve: {
+    symlinks: false,
     alias: {
-      'vue$': 'vue/dist/vue.esm.js'
+      'vue$': 'vue/dist/vue.esm.js',
+      "tcore": "topt-core"
     },
     extensions: ['*', '.js', '.vue', '.json', ".ts", ".js"], // why , ".d.ts"?
     plugins: [

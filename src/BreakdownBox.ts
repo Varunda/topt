@@ -1,9 +1,7 @@
 import Vue, { PropType } from "vue";
-import { BreakdownArray, Breakdown, BreakdownTrend } from "core/EventReporter";
 
 import { Chart } from "chart.js";
 
-import * as moment from "moment";
 import { Quartile } from "Quartile";
 
 Vue.component("breakdown-box", {

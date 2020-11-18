@@ -1,21 +1,23 @@
 {
 	"compileOnSave": true,
     "compilerOptions": {
-        "module": "esnext",
+        "module": "commonjs",
         "target": "es6",
         "lib": [ "es2015", "dom" ],
         "outDir": "build",
         "sourceMap": false,
+        "moduleResolution": "node",
         "experimentalDecorators": true,
         "emitDecoratorMetadata": true,
 
         "baseUrl": "./src",
         "paths": {
-            "*": [ "./*" ],
             "vue": [ "../node_modules/vue/types/index" ],
             "moment": [ "../node_modules/moment/moment" ],
             "chartjs": [ "../node_modules/@types/chart.js/index" ],
-            "jszip": [ "../node_modules/jszip/index" ]
+            "jszip": [ "../node_modules/jszip/index" ],
+            "tcore": [ "../node_modules/topt-core/build/index" ],
+            "*": [ "./*" ],
         },
 
         "noImplicitAny": true,

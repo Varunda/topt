@@ -1,5 +1,4 @@
 import Vue from "vue";
-import { BreakdownTimeslot } from "core/EventReporter";
 
 import { Chart } from "chart.js";
 
@@ -46,6 +45,11 @@ Vue.component("breakdown-bar", {
             this.chart.options = {
                 legend: {
                     display: false
+                },
+                plugins: {
+                    datalabels: {
+                        display: false
+                    } as any
                 },
                 maintainAspectRatio: false,
                 scales: {

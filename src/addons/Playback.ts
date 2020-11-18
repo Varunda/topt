@@ -1,7 +1,8 @@
-import Core from "core/index";
+import Core from "tcore";
 
-import OutfitAPI, { Outfit } from "core/census/OutfitAPI";
-import { ApiResponse } from "core/census/ApiWrapper";
+import { OutfitAPI, Outfit } from "tcore";
+import { Character } from "tcore";
+import { ApiResponse } from "tcore";
 
 const log = (msg: any): void => {
     console.log(`[Playback] ${msg}`);

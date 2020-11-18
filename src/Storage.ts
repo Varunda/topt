@@ -1,4 +1,4 @@
-import { CoreSettings } from "core/CoreSettings";
+import { CoreSettings } from "tcore";
 
 export class StorageMetadata<T> {
     public tag: string = "";
@@ -16,7 +16,7 @@ export class StorageHelper {
 
     public static KEY_TREND: string = "topt.trends";
     public static KEY_SESSION: string = "topt.session";
-    public static KEY_SETTINGS:string = "topt.settings";
+    public static KEY_SETTINGS: string = "topt.settings";
 
     public static isEnabled(): boolean {
         if (this._enabled == undefined) {

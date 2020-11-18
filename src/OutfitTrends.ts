@@ -1,4 +1,4 @@
-import { ClassCollection } from "core/EventReporter";
+import { ClassCollection } from "tcore";
 
 export type OutfitTrends = OutfitTrendsV1;
 

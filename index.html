@@ -1564,7 +1564,7 @@
                             </span>
                             <div class="list-group list-group-flush flex-grow-1">
                                 <div v-for="entry in metric.entries" class="list-group-item border-top">
-                                    [{{winter.settings.displayOutfitTag == true ? entry.outfitTag : ""}}]
+                                    {{winter.settings.displayOutfitTag == true ? entry.outfitTag : ""}}
                                     {{entry.name}} - {{entry.display != null ? entry.display : entry.value}}
                                 </div>
                             </div>

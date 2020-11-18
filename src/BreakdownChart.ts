@@ -1,5 +1,5 @@
 import Vue, { PropType } from "vue";
-import { BreakdownArray, Breakdown } from "core/EventReporter";
+import { BreakdownArray, Breakdown } from "tcore";
 
 import { Chart } from "chart.js";
 
@@ -98,6 +98,11 @@ Vue.component("breakdown-chart", {
                         },
                         hover: {
                             animationDuration: 0
+                        },
+                        plugins: {
+                            datalabels: {
+                                display: false
+                            }
                         },
                         maintainAspectRatio: false,
                         responsiveAnimationDuration: 0,

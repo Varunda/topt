@@ -4,7 +4,7 @@ import "bootstrap/dist/css/bootstrap.min.css";
 
 import Vue, { PropType } from "vue";
 
-import { ApiResponse } from "core/census/ApiWrapper";
+import { ApiResponse } from "tcore";
 import { Loading, Loadable } from "Loadable";
 
 import * as moment from "moment";
@@ -12,10 +12,10 @@ import * as $ from "jquery";
 import * as JSZip from "jszip";
 (window as any).moment = moment;
 
-import { Weapon, WeaponAPI } from "core/census/WeaponAPI";
-import { FacilityAPI, Facility } from "core/census/FacilityAPI";
+import { Weapon, WeaponAPI } from "tcore";
+import { FacilityAPI, Facility } from "tcore";
 
-import { PsEventType, PsEvent, PsEvents } from "core/PsEvent";
+import { PsEventType, PsEvent, PsEvents } from "tcore";
 
 import {
     TEvent, TEventType,
@@ -23,20 +23,20 @@ import {
     TCaptureEvent, TDefendEvent,
     TVehicleKillEvent,
     TEventHandler
-} from "core/events/index";
+} from "tcore";
 
-import { IndividualReporter, Report, ReportParameters } from "core/InvididualGenerator";
+import { IndividualReporter, Report, ReportParameters } from "tcore";
 import { PersonalReportGenerator } from "PersonalReportGenerator";
-import { OutfitReport, OutfitReportGenerator, OutfitReportSettings } from "core/reports/OutfitReport";
+import { OutfitReport, OutfitReportGenerator, OutfitReportSettings } from "tcore";
 
 // @ts-ignore
 import * as FileSaver from "../node_modules/file-saver/dist/FileSaver.js";
 
+import { Chart } from "chart.js";
+
 // @ts-ignore
 import ChartDataLabels from "../node_modules/chartjs-plugin-datalabels/dist/chartjs-plugin-datalabels.js";
 Chart.plugins.unregister(ChartDataLabels);
-
-import { Chart } from "chart.js";
 
 // @ts-ignore
 import "../node_modules/chartjs-chart-box-and-violin-plot/build/Chart.BoxPlot.js";
@@ -49,22 +49,17 @@ import "BreakdownBar";
 import "MomentFilter";
 import "KillfeedSquad";
 
-import { StorageHelper } from "Storage";
+import Core from "tcore";
+import { WinterReportGenerator } from "tcore";
+import { WinterReport } from "tcore";
+import { WinterReportParameters, WinterReportSettings } from "tcore";
+import { TrackedPlayer } from "tcore";
+import { CoreSettings } from "tcore";
+import { Squad } from "tcore";
 
-import { WinterReportGenerator } from "winter/WinterReportGenerator";
-import { WinterReport } from "winter/WinterReport";
-import { WinterReportParameters, WinterReportSettings } from "winter/WinterReportParameters";
-
-import Core from "core/index";
-import { TrackedPlayer } from "core/TrackedPlayer";
-import { CoreSettings } from "core/CoreSettings";
-import { SquadAddon } from "addons/SquadAddon";
-import { Squad } from "core/squad/Squad";
 import { Playback } from "addons/Playback";
-
-class OpReportSettings {
-    public zoneID: string | null = null;
-}
+import { SquadAddon } from "addons/SquadAddon";
+import { StorageHelper } from "Storage";
 
 (window as any).$ = $;
 
