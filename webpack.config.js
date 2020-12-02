@@ -51,7 +51,7 @@ module.exports = {
   ],
 
   resolve: {
-    symlinks: false,
+    symlinks: true,
     alias: {
       'vue$': 'vue/dist/vue.esm.js',
       "tcore": "topt-core"

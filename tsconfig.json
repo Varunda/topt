@@ -16,7 +16,7 @@
             "moment": [ "../node_modules/moment/moment" ],
             "chartjs": [ "../node_modules/@types/chart.js/index" ],
             "jszip": [ "../node_modules/jszip/index" ],
-            "tcore": [ "../node_modules/topt-core/build/index" ],
+            "tcore": [ "../node_modules/topt-core/build/core/index" ],
             "*": [ "./*" ],
         },
 

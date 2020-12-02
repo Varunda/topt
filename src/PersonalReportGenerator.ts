@@ -1,5 +1,6 @@
 import { Report } from "tcore";
 import { ApiResponse } from "tcore";
+import * as axios from "axios";
 
 export class PersonalReportGenerator {
 
@@ -14,7 +15,7 @@ export class PersonalReportGenerator {
 
     public static getTemplate(): ApiResponse<string> {
         const page: ApiResponse<string> = new ApiResponse(
-            $.get(`./personal/index.html?q=${new Date().getTime()}`),
+            axios.default.get(`./personal/index.html?q=${new Date().getTime()}`),
             (iter: any) => iter as string
         );
         return page;

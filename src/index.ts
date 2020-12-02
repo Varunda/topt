@@ -10,6 +10,7 @@ import { Loading, Loadable } from "Loadable";
 import * as moment from "moment";
 import * as $ from "jquery";
 import * as JSZip from "jszip";
+import * as prefix from "loglevel-plugin-prefix";
 (window as any).moment = moment;
 
 import { Weapon, WeaponAPI } from "tcore";
@@ -63,6 +64,19 @@ import { StorageHelper } from "Storage";
 
 (window as any).$ = $;
 
+import logger from "loglevel";
+prefix.reg(logger);
+
+const loggers = logger.getLoggers();
+for (const log in loggers) {
+    loggers[log].enableAll();
+    prefix.apply(loggers[log], {
+        format(level, name, timestamp) {
+            return `${name} ${level}> `
+        }
+    });
+}
+
 export const vm = new Vue({
     el: "#app" as string,
 
@@ -94,8 +108,6 @@ export const vm = new Vue({
             startTimeLeft: 0 as number,
 
             report: "" as string,
-
-            importing: false as boolean,
         },
 
         storage: {
@@ -167,9 +179,11 @@ export const vm = new Vue({
     },
 
     mounted: function(): void {
-        window.onbeforeunload = (ev: BeforeUnloadEvent) => {
-            this.core.disconnect();
-        };
+        // Confirm exiting the page
+        window.onbeforeunload = (ev: BeforeUnloadEvent) => { return false; };
+
+        // Disconnect to be polite
+        window.onunload = () => { this.core.disconnect(); }
 
         document.addEventListener("keyup", this.squadKeyEvent);
     },
@@ -449,7 +463,7 @@ export const vm = new Vue({
                     zoneID: null,
                     showSquadStats: this.opsReportSettings.showSquadStats == true
                 },
-                captures: this.core.facilityCaptures,
+                captures: this.core.captures,
                 playerCaptures: this.core.playerCaptures,
                 players: this.core.stats,
                 outfits: this.core.outfits.map(iter => iter.ID),
@@ -464,6 +478,7 @@ export const vm = new Vue({
                 this.view = "ops";
                 response.resolveOk();
             });
+
 
             return response;
         },
@@ -502,23 +517,30 @@ export const vm = new Vue({
             let html: string = "";
             let report: Report = new Report();
 
-            PersonalReportGenerator.getTemplate().ok((type: string) => {
+            const personalTemplate = PersonalReportGenerator.getTemplate().ok((type: string) => {
                 html = type;
                 if (--opsLeft == 0) {
                     done();
+                } else {
+                    console.log(`Template loaded, waiting on player report`);
                 }
+            }).always(() => {
+                console.log(`Report return ${personalTemplate.status}`);
             });
 
             this.generatePlayerReport(charID).ok((data: Report) => {
                 report = data;
                 console.log(`Made report: ${JSON.stringify(report.playerVersus)}`);
                 if (--opsLeft == 0) {
-                    done();
+                    done(); 
+                } else {
+                    console.log(`Report loaded, waiting on template`);
                 }
             });
 
             const done = () => {
                 const str: string = PersonalReportGenerator.generate(html, report);
+                console.log(`Saving report for ${charID}`);
 
                 FileSaver.saveAs(new File([str], `topt-${report.player?.name}.html`, { type: "text/html" }))
             };
