@@ -906,7 +906,6 @@ Core_1.Core.prototype.processMessage = function (input, override = false) {
                 zoneID: zoneID
             };
             self.playerCaptures.push(ev);
-            console.log(`${playerID} helped with capture of ${facilityID}`);
             let player = self.stats.get(playerID);
             if (player != undefined) {
                 player.stats.increment(PsEvent_1.PsEvent.baseCapture);
@@ -1710,8 +1709,8 @@ class EventReporter {
             if (ev.sourceID != charID) {
                 continue;
             }
-            if (ev.type == "exp") {
-                if (ev.expID == PsEvent_1.PsEvent.heal || ev.expID == PsEvent_1.PsEvent.squadHeal) {
+            if (ev.type == "exp" || ev.type == "kill") {
+                if (ev.type == "exp" && (ev.expID == PsEvent_1.PsEvent.heal || ev.expID == PsEvent_1.PsEvent.squadHeal)) {
                     if (current.start == 0) {
                         current.start = ev.timestamp;
                         log.debug(`${charID} streak started at ${ev.timestamp}`);
@@ -1720,15 +1719,21 @@ class EventReporter {
                         prevRevive = ev.timestamp;
                     }
                 }
-                else if (ev.expID == PsEvent_1.PsEvent.revive || ev.expID == PsEvent_1.PsEvent.squadRevive) {
+                else if (PsLoadout_1.PsLoadout.getLoadoutType(ev.loadoutID) == "medic"
+                    && (ev.type == "kill" || ev.expID == PsEvent_1.PsEvent.revive || ev.expID == PsEvent_1.PsEvent.squadRevive)) {
                     if (current.start == 0) {
                         current.start = ev.timestamp;
                         log.debug(`${charID} streak started at ${ev.timestamp}`);
                     }
                     if (prevRevive == 0) {
                         prevRevive = ev.timestamp;
-                        log.debug(`${charID} set prevRevive to ${ev.timestamp}`);
                     }
+                    juice += reviveJuice;
+                    if (juice > maxJuice) {
+                        juice = maxJuice;
+                    }
+                }
+                if (current.start != 0) {
                     const diff = ev.timestamp - prevRevive;
                     const juiceLost = diff * decayRate;
                     prevRevive = ev.timestamp;
@@ -1744,10 +1749,6 @@ class EventReporter {
                         current = new Streak();
                         current.start = 0; //ev.timestamp;
                         current.amount = 0;
-                        juice = maxJuice;
-                    }
-                    juice += reviveJuice;
-                    if (juice > maxJuice) {
                         juice = maxJuice;
                     }
                 }
@@ -1775,8 +1776,6 @@ class EventReporter {
                 entry.timestamp = capture.timestamp.getTime();
                 entry.name = capture.name;
                 entry.faction = capture.previousFaction;
-                const facilityID = capture.facilityID;
-                const name = capture.name;
                 const outfitID = capture.outfitID;
                 const outfit = data.find(iter => iter.ID == outfitID);
                 if (outfit == undefined) {
@@ -5560,6 +5559,33 @@ class PsLoadout {
         this.singleName = "";
         this.type = "unknown";
     }
+    /**
+     * Get the type of loadout a loadoutID is
+     *
+     * @param loadoutID ID of the loadout to get the type of
+     */
+    static getLoadoutType(loadoutID) {
+        // NC / TR / VS / NS
+        if (loadoutID == "1" || loadoutID == "8" || loadoutID == "15" || loadoutID == "28") {
+            return "infil";
+        }
+        else if (loadoutID == "3" || loadoutID == "10" || loadoutID == "17" || loadoutID == "29") {
+            return "lightAssault";
+        }
+        else if (loadoutID == "4" || loadoutID == "11" || loadoutID == "18" || loadoutID == "30") {
+            return "medic";
+        }
+        else if (loadoutID == "5" || loadoutID == "12" || loadoutID == "19" || loadoutID == "31") {
+            return "engineer";
+        }
+        else if (loadoutID == "6" || loadoutID == "13" || loadoutID == "20" || loadoutID == "32") {
+            return "heavy";
+        }
+        else if (loadoutID == "7" || loadoutID == "14" || loadoutID == "21" || loadoutID == "33") {
+            return "medic";
+        }
+        return "unknown";
+    }
 }
 exports.PsLoadout = PsLoadout;
 PsLoadout.default = {
@@ -6855,6 +6881,7 @@ const PsLoadout_1 = __webpack_require__(/*! ../census/PsLoadout */ "../topt-core
 const EventReporter_1 = __webpack_require__(/*! ../EventReporter */ "../topt-core/build/core/EventReporter.js");
 const loglevel_1 = __webpack_require__(/*! loglevel */ "../topt-core/node_modules/loglevel/lib/loglevel.js");
 const log = loglevel_1.default.getLogger("WinterReportGenerator");
+log.enableAll();
 class WinterMetricIndex {
 }
 exports.WinterMetricIndex = WinterMetricIndex;
@@ -7013,13 +7040,27 @@ class WinterReportGenerator {
     static longestHealStreak(parameters) {
         return this.value(parameters, ((player) => {
             const streaks = EventReporter_1.default.medicHealStreaks(player.events, player.characterID);
-            return Math.max(...streaks.map(iter => iter.amount));
+            if (streaks.length == 0) {
+                return 0;
+            }
+            let max = 0;
+            let maxStreak = streaks[0]; // Will always have one, length check above
+            for (const streak of streaks) {
+                if (streak.amount > max) {
+                    max = streak.amount;
+                    maxStreak = streak;
+                }
+            }
+            log.debug(`Longest heal streak of ${player.name} started ${maxStreak.start} for ${maxStreak.amount} seconds`);
+            return maxStreak.amount;
         }), {
             name: "Longest heal streak",
             funName: "Long time healer",
-            description: "Longest theoretical time with AOE heal",
+            description: "Longest theoretical time with AOE heal, assuming combat surgeon 5",
             entries: []
-        });
+        }, ((display) => {
+            return `${display.toFixed(2)} seconds`;
+        }));
     }
     static mostConcAssists(parameters) {
         return this.metric(parameters, [PsEvent_1.PsEvent.concAssist, PsEvent_1.PsEvent.squadConcAssist], {

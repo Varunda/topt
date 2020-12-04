@@ -1553,7 +1553,7 @@
                     <h2 class="strike">Summary</h2>
 
                     <div class="d-flex">
-                        <div v-for="metric in winter.report.data.essential.filter(iter => iter != undefined && iter.entries.length > 0)" class="card mr-2 mb-2">
+                        <div v-for="metric in winter.report.data.essential.filter(iter => iter != undefined && iter.entries.length > 0)" class="card mr-2 mb-2" style="max-width: min(20%, 390px)">
                             <span class="card-header">
                                 <h5>
                                     {{winter.settings.useFunNames ? metric.funName : metric.name}}
@@ -1574,7 +1574,7 @@
                     <h2 class="strike">Leaderboards</h2>
 
                     <div class="d-flex" style="flex-wrap: wrap">
-                        <div v-for="metric in winter.report.data.fun.filter(iter => iter != undefined && iter.entries.length > 0)" class="card mr-2 mb-2">
+                        <div v-for="metric in winter.report.data.fun.filter(iter => iter != undefined && iter.entries.length > 0)" class="card mr-2 mb-2" style="max-width: min(20%, 390px)">
                             <span class="card-header">
                                 <h5>
                                     {{winter.settings.useFunNames ? metric.funName : metric.name}}
