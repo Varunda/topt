@@ -10,7 +10,6 @@ import { Loading, Loadable } from "Loadable";
 import * as moment from "moment";
 import * as $ from "jquery";
 import * as JSZip from "jszip";
-import * as prefix from "loglevel-plugin-prefix";
 (window as any).moment = moment;
 
 import { Weapon, WeaponAPI } from "tcore";
@@ -29,6 +28,9 @@ import {
 import { IndividualReporter, Report, ReportParameters } from "tcore";
 import { PersonalReportGenerator } from "PersonalReportGenerator";
 import { OutfitReport, OutfitReportGenerator, OutfitReportSettings } from "tcore";
+
+import { Logger } from "tcore";
+(window as any).Logger = Logger;
 
 // @ts-ignore
 import * as FileSaver from "../node_modules/file-saver/dist/FileSaver.js";
@@ -63,19 +65,6 @@ import { SquadAddon } from "addons/SquadAddon";
 import { StorageHelper } from "Storage";
 
 (window as any).$ = $;
-
-import logger from "loglevel";
-prefix.reg(logger);
-
-const loggers = logger.getLoggers();
-for (const log in loggers) {
-    loggers[log].enableAll();
-    prefix.apply(loggers[log], {
-        format(level, name, timestamp) {
-            return `${name} ${level}> `
-        }
-    });
-}
 
 export const vm = new Vue({
     el: "#app" as string,
@@ -426,7 +415,11 @@ export const vm = new Vue({
                 this.core.mergeSquads(squad, selectedSquad);
                 this.updateDisplay();
             } else if (whatHovered == "member" && SquadAddon.selectedMemberID != null) {
-                this.core.addMemberToSquad(SquadAddon.selectedMemberID, ev.key);
+                if (ev.key == "Delete") {
+                    this.core.removeMemberFromSquad(SquadAddon.selectedMemberID);
+                } else {
+                    this.core.addMemberToSquad(SquadAddon.selectedMemberID, ev.key);
+                }
                 this.updateDisplay();
             } else {
 
@@ -438,6 +431,8 @@ export const vm = new Vue({
                 this.generateOutfitReport();
             } else if (this.parameters.report == "winter") {
                 this.generateWinterReport();
+            } else if (this.parameters.report == "personal") {
+                this.generateAllReports();
             }
 
             $("#report-modal").modal("hide");
@@ -457,11 +452,10 @@ export const vm = new Vue({
 
             events = events.sort((a, b) => a.timestamp - b.timestamp);
 
-            this.opsReportSettings.showSquadStats = this.core.squad.perm.length > 0;
             OutfitReportGenerator.generate({
                 settings: {
                     zoneID: null,
-                    showSquadStats: this.opsReportSettings.showSquadStats == true
+                    showSquadStats: this.opsReportSettings.showSquadStats
                 },
                 captures: this.core.captures,
                 playerCaptures: this.core.playerCaptures,
@@ -478,7 +472,6 @@ export const vm = new Vue({
                 this.view = "ops";
                 response.resolveOk();
             });
-
 
             return response;
         },

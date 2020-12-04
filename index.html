@@ -311,10 +311,6 @@
                         <button class="btn btn-success w-100" data-toggle="modal" data-target="#report-modal">
                             Reports
                         </button>
-
-                        <button class="btn btn-primary w-100" @click="generateAllReports">
-                            Generate
-                        </button>
                     </div>
 
                     <hr/>
@@ -590,6 +586,10 @@
                     <button class="btn btn-sm btn-danger" @click="removeMostRecentPermSquad">
                         Delete named squad
                     </button>
+
+                    <span class="ml-2" style="font-size: 14;">
+                        Press the letters and numbers at the top to move members and merge squads when hovering over them. Use delete to remove someone from a squad
+                    </span>
                 </h2>
 
                 <div class="d-flex flex-column">
@@ -1564,7 +1564,7 @@
                             </span>
                             <div class="list-group list-group-flush flex-grow-1">
                                 <div v-for="entry in metric.entries" class="list-group-item border-top">
-                                    {{winter.settings.displayOutfitTag == true ? entry.outfitTag : ""}}
+                                    {{winter.settings.displayOutfitTag == true ? `[${entry.outfitTag}]` : ""}}
                                     {{entry.name}} - {{entry.display != null ? entry.display : entry.value}}
                                 </div>
                             </div>
@@ -1585,7 +1585,7 @@
                             </span>
                             <div class="list-group list-group-flush flex-grow-1">
                                 <div v-for="entry in metric.entries" class="list-group-item border-top">
-                                    {{winter.settings.displayOutfitTag == true ? entry.outfitTag : ""}}
+                                    {{winter.settings.displayOutfitTag == true ? `[${entry.outfitTag}]` : ""}}
                                     {{entry.name}} - {{entry.display != null ? entry.display : entry.value}}
                                 </div>
                             </div>
@@ -1659,12 +1659,19 @@
                             <option disabled selected>Select a report</option>
                             <option value="ops">OPs report</option>
                             <option value="winter">Winter report</option>
+                            <option value="personal">Personal reports</option>
                         </select>
 
                         <hr>
 
                         <div v-if="parameters.report == 'ops'">
                             <h6 class="strike">OPs report settings</h6>
+
+                            <label class="col-form-label">Generate squad stats?</label>
+                            <select v-model="opsReportSettings.showSquadStats" class="form-control">
+                                <option :value="true">Yes</option>
+                                <option :value="false">No</option>
+                            </select>
                         </div>
 
                         <div v-else-if="parameters.report == 'winter'">
@@ -1699,6 +1706,10 @@
                             <label class="col-form-label">Players to ignore (separate with a space)</label>
                             <textarea v-model="winter.ignoredPlayers" class="form-control">
                             </textarea>
+                        </div>
+
+                        <div v-else-if="parameters.report == 'personal'">
+                            <h6 class="strike">Personal report settings</h6>
                         </div>
 
                         <hr>

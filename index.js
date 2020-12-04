@@ -96,31 +96,23 @@
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Core = exports.SquadStats = void 0;
+exports.Core = void 0;
 const ApiWrapper_1 = __webpack_require__(/*! ./census/ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
 const CensusAPI_1 = __webpack_require__(/*! ./census/CensusAPI */ "../topt-core/build/core/census/CensusAPI.js");
 const OutfitAPI_1 = __webpack_require__(/*! ./census/OutfitAPI */ "../topt-core/build/core/census/OutfitAPI.js");
 const CharacterAPI_1 = __webpack_require__(/*! ./census/CharacterAPI */ "../topt-core/build/core/census/CharacterAPI.js");
-const TrackedPlayer_1 = __webpack_require__(/*! ./TrackedPlayer */ "../topt-core/build/core/TrackedPlayer.js");
+const index_1 = __webpack_require__(/*! ./Objects/index */ "../topt-core/build/core/Objects/index.js");
 const InvididualGenerator_1 = __webpack_require__(/*! ./InvididualGenerator */ "../topt-core/build/core/InvididualGenerator.js");
-const loglevel_1 = __webpack_require__(/*! loglevel */ "../topt-core/node_modules/loglevel/lib/loglevel.js");
-const log = loglevel_1.default.getLogger("Core");
-class SquadStats {
-    constructor() {
-        this.name = "";
-        this.members = [];
-        this.kills = 0;
-        this.deaths = 0;
-        this.revives = 0;
-        this.heals = 0;
-        this.resupplies = 0;
-        this.repairs = 0;
-        this.vKills = 0;
-    }
-}
-exports.SquadStats = SquadStats;
+const Loggers_1 = __webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("Core");
+/**
+ * Core class that manages all tracking, sockets, event processing, etc.
+ */
 class Core {
     constructor(serviceID, serverID) {
+        /**
+         * Collection of sockets used for tracking
+         */
         this.sockets = {
             tracked: null,
             logistics: null,
@@ -128,30 +120,72 @@ class Core {
             facility: null,
             debug: null
         };
+        /**
+         * Collection of variables used to track router placements
+         */
         this.routerTracking = {
             // key - Who placed the router
             // value - Lastest npc ID that gave them a router spawn tick
             routerNpcs: new Map(),
             routers: [] // All routers that have been placed
         };
+        /**
+         * Collection of squad related vars
+         */
         this.squad = {
             debug: false,
             perm: [],
             guesses: [],
             members: new Map(),
         };
+        /**
+         * Queue of messages to prevent duplicate messages from being processed
+         */
         this.socketMessageQueue = [];
+        /**
+         * All messages collected in the debug socket
+         */
         this.debugSocketMessages = [];
+        /**
+         * Collection of players who are being tracked, with the key being the character ID,
+         *      and value being where player specific stats are stored
+         */
         this.stats = new Map();
+        /**
+         * List of outfits being tracked
+         */
         this.outfits = [];
+        /**
+         * List of characters being tracked
+         */
         this.characters = [];
+        /**
+         * Misc events that are needed for processing, but are not attached to a single player, such as a FacilityCapture
+         */
         this.miscEvents = [];
+        /**
+         * List of PlayerFacilityCapture and PlayerFacilityDefend events, including those who are not tracked
+         */
         this.playerCaptures = [];
-        //public facilityCaptures: FacilityCapture[] = [];
+        /**
+         * List of all base captures that have occure
+         */
         this.captures = [];
+        /**
+         * List of all events in raw unprocessed form, used to export data
+         */
         this.rawData = [];
+        /**
+         * Tracking tracking
+         */
         this.tracking = new InvididualGenerator_1.TimeTracking();
+        /**
+         * If core is corrently connected to Census or not
+         */
         this.connected = false;
+        /**
+         * Event handlers that can be added onto
+         */
         this.handlers = {
             exp: [],
             kill: [],
@@ -237,7 +271,7 @@ class Core {
         }
     }
     /**
-     * Start the tracking and begin saving events
+     * Start the tracking and begin saving events, the core must be connected for this to work
      */
     start() {
         if (this.connected == false) {
@@ -249,7 +283,7 @@ class Core {
         this.stats.forEach((char, charID) => {
             char.joinTime = nowMs;
         });
-        log.debug(`Started core`);
+        log.info(`Started core`);
     }
     /**
      * Stop running the tracker
@@ -280,11 +314,11 @@ class Core {
         });
     }
     /**
-     * Begin tracking all members of an outfit
+     * Begin tracking all members of an outfit. The core must be connected before this is called
      *
      * @param tag Tag of the outfit to track. Case-insensitive
      *
-     * @returns A Loading that will contain the state of
+     * @returns An ApiResponse that will resolve when the outfit has been loaded
      */
     addOutfit(tag) {
         if (this.connected == false) {
@@ -305,7 +339,7 @@ class Core {
         return response;
     }
     /**
-     * Begin tracking a new player
+     * Begin tracking a new player. The core must be connected before calling
      *
      * @param name Name of the player to track. Case-insensitive
      *
@@ -327,7 +361,7 @@ class Core {
         return response;
     }
     /**
-     * Subscribe to the events in the event stream
+     * Subscribe to the events in the event stream and begin tracking them in the squad tracker
      *
      * @param chars Characters to subscribe to
      */
@@ -347,12 +381,12 @@ class Core {
             return a.name.localeCompare(b.name);
         });
         chars.forEach((character) => {
-            const player = new TrackedPlayer_1.TrackedPlayer();
+            const player = new index_1.TrackedPlayer();
             player.characterID = character.ID;
             player.faction = character.faction;
             player.outfitTag = character.outfitTag;
             player.name = character.name;
-            if (character.online == true) {
+            if (character.online == true) { // Begin squad tracking if they're online
                 player.joinTime = new Date().getTime();
                 this.addMember({ ID: player.characterID, name: player.name, outfitTag: character.outfitTag });
             }
@@ -381,6 +415,11 @@ class Core {
             this.sockets.tracked.send(JSON.stringify(subscribeExp));
         }
     }
+    /**
+     * Method called when a socket receives a new message
+     *
+     * @param ev Event from a websocket
+     */
     onmessage(ev) {
         for (const message of this.socketMessageQueue) {
             if (ev.data == message) {
@@ -415,8 +454,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const Core_1 = __webpack_require__(/*! ./Core */ "../topt-core/build/core/Core.js");
 const ApiWrapper_1 = __webpack_require__(/*! ./census/ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
 const websocket_1 = __webpack_require__(/*! websocket */ "../topt-core/node_modules/websocket/lib/browser.js");
-const loglevel_1 = __webpack_require__(/*! loglevel */ "../topt-core/node_modules/loglevel/lib/loglevel.js");
-const log = loglevel_1.default.getLogger("Core:Connection");
+const Loggers_1 = __webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("Core:Connection");
 Core_1.Core.prototype.connect = function () {
     const self = this;
     const response = new ApiWrapper_1.ApiResponse();
@@ -426,22 +465,18 @@ Core_1.Core.prototype.connect = function () {
         + 1 // Logistics
         + 1 // Facilities
         + 1; // Debug
-    setupTrackerSocket(self).always(() => { if (--opsLeft == 0) {
-        response.resolveOk();
-    } });
-    setupLoginSocket(self).always(() => { if (--opsLeft == 0) {
-        response.resolveOk();
-    } });
-    setupLogisticsSocket(self).always(() => { if (--opsLeft == 0) {
-        response.resolveOk();
-    } });
-    setupFacilitySocket(self).always(() => { if (--opsLeft == 0) {
-        response.resolveOk();
-    } });
-    setupDebugSocket(self).always(() => { if (--opsLeft == 0) {
-        response.resolveOk();
-    } });
-    self.connected = true;
+    // Common handler used when all sockets have connected
+    const handler = () => {
+        if (--opsLeft == 0) {
+            self.connected = true;
+            response.resolveOk();
+        }
+    };
+    setupTrackerSocket(self).always(() => { handler(); });
+    setupLoginSocket(self).always(() => { handler(); });
+    setupLogisticsSocket(self).always(() => { handler(); });
+    setupFacilitySocket(self).always(() => { handler(); });
+    setupDebugSocket(self).always(() => { handler(); });
     return response;
 };
 Core_1.Core.prototype.disconnect = function () {
@@ -488,8 +523,7 @@ function setupTrackerSocket(core) {
 function setupDebugSocket(core) {
     const response = new ApiWrapper_1.ApiResponse();
     core.sockets.debug = new websocket_1.w3cwebsocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${core.serviceID}`);
-    core.sockets.debug.onopen = () => {
-    };
+    core.sockets.debug.onopen = () => { };
     core.sockets.debug.onerror = () => {
         response.resolve({ code: 500, data: `` });
     };
@@ -601,8 +635,8 @@ function setupFacilitySocket(core) {
 
 Object.defineProperty(exports, "__esModule", { value: true });
 const Core_1 = __webpack_require__(/*! ./Core */ "../topt-core/build/core/Core.js");
-const loglevel_1 = __webpack_require__(/*! loglevel */ "../topt-core/node_modules/loglevel/lib/loglevel.js");
-const log = loglevel_1.default.getLogger("Core.Debug");
+const Loggers_1 = __webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("Core.Debug");
 Core_1.Core.prototype.printExpEvent = function (expID) {
     const self = this;
     const events = Array.from(self.stats.values())
@@ -677,12 +711,12 @@ Core_1.Core.prototype.subscribeToItemAdded = function () {
 
 Object.defineProperty(exports, "__esModule", { value: true });
 const Core_1 = __webpack_require__(/*! ./Core */ "../topt-core/build/core/Core.js");
-const PsLoadout_1 = __webpack_require__(/*! ./census/PsLoadout */ "../topt-core/build/core/census/PsLoadout.js");
 const PsEvent_1 = __webpack_require__(/*! ./PsEvent */ "../topt-core/build/core/PsEvent.js");
+const PsLoadout_1 = __webpack_require__(/*! ./census/PsLoadout */ "../topt-core/build/core/census/PsLoadout.js");
 const WeaponAPI_1 = __webpack_require__(/*! ./census/WeaponAPI */ "../topt-core/build/core/census/WeaponAPI.js");
 const CharacterAPI_1 = __webpack_require__(/*! ./census/CharacterAPI */ "../topt-core/build/core/census/CharacterAPI.js");
-const loglevel_1 = __webpack_require__(/*! loglevel */ "../topt-core/node_modules/loglevel/lib/loglevel.js");
-const log = loglevel_1.default.getLogger("Core.Processing");
+const Loggers_1 = __webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("Core.Processing");
 Core_1.Core.prototype.processMessage = function (input, override = false) {
     const self = this;
     if (self.tracking.running == false && override == false) {
@@ -846,7 +880,9 @@ Core_1.Core.prototype.processMessage = function (input, override = false) {
                 };
                 targetTicks.events.push(ev);
                 targetTicks.recentDeath = ev;
-                WeaponAPI_1.WeaponAPI.precache(ev.weaponID);
+                if (self.tracking.running == true) {
+                    WeaponAPI_1.WeaponAPI.precache(ev.weaponID);
+                }
                 self.emit(ev);
                 self.processKillDeathEvent(ev);
                 save = true;
@@ -1084,6 +1120,9 @@ Core_1.Core.prototype.processMessage = function (input, override = false) {
 
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CoreSettings = void 0;
+/**
+ * Collection of settings used in core
+ */
 class CoreSettings {
     constructor() {
         /**
@@ -1119,8 +1158,8 @@ const Core_1 = __webpack_require__(/*! ./Core */ "../topt-core/build/core/Core.j
 const PsLoadout_1 = __webpack_require__(/*! ./census/PsLoadout */ "../topt-core/build/core/census/PsLoadout.js");
 const PsEvent_1 = __webpack_require__(/*! ./PsEvent */ "../topt-core/build/core/PsEvent.js");
 const Squad_1 = __webpack_require__(/*! ./squad/Squad */ "../topt-core/build/core/squad/Squad.js");
-const loglevel_1 = __webpack_require__(/*! loglevel */ "../topt-core/node_modules/loglevel/lib/loglevel.js");
-const log = loglevel_1.default.getLogger("Core.Squad");
+const Loggers_1 = __webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("Core.Squad");
 const squadEvents = [
     PsEvent_1.PsEvent.squadResupply,
     PsEvent_1.PsEvent.squadHeal,
@@ -1147,15 +1186,18 @@ Core_1.Core.prototype.squadInit = function () {
     this.createPermSquad();
     this.createPermSquad();
     this.createPermSquad();
+    // Every second update the death timer and beacon cooldown if needed
     setInterval(() => {
         const time = new Date().getTime();
         this.squad.members.forEach((member, charID) => {
+            // If they've died update their dying timer
             if (member.state == "dying" && member.whenDied != null) {
-                member.timeDead = (time - member.whenDied) / 1000;
+                member.timeDead = (time - member.whenDied) / 1000; // ms to seconds
                 if (member.timeDead > 29) {
-                    member.state = "dead";
+                    member.state = "dead"; // They've been dead too long
                 }
             }
+            // If they've placed a beacon update the timer
             if (member.whenBeacon) {
                 member.beaconCooldown = (time - member.whenBeacon) / 1000;
                 if (member.beaconCooldown > 299) {
@@ -1166,13 +1208,21 @@ Core_1.Core.prototype.squadInit = function () {
         });
     }, 1000);
 };
+/**
+ * Sort the names in a squad, by online status, then name
+ *
+ * @param squad Squad to sort the members of
+ */
 function sortSquad(squad) {
     squad.members.sort((a, b) => {
         if (b.online == false && a.online == false) {
             return a.name.localeCompare(b.name);
         }
-        if (b.online == false || a.online == false) {
+        if (b.online == false && a.online == true) {
             return -1;
+        }
+        if (b.online == true && a.online == false) {
+            return 1;
         }
         return a.name.localeCompare(b.name);
     });
@@ -1421,17 +1471,24 @@ Core_1.Core.prototype.getSquad = function (squadName) {
     }
     return this.squad.guesses.find(iter => iter.name == squadName) || null;
 };
-Core_1.Core.prototype.addMemberToSquad = function (charID, squadName) {
+Core_1.Core.prototype.getSquadByID = function (squadID) {
+    let squad = this.squad.perm.find(iter => iter.ID == squadID) || null;
+    if (squad != null) {
+        return squad;
+    }
+    return this.squad.guesses.find(iter => iter.ID == squadID) || null;
+};
+Core_1.Core.prototype.addMemberToSquad = function (charID, squadRef) {
     const member = this.squad.members.get(charID);
     if (member == undefined) {
-        return log.warn(`Cannot move ${charID} to ${squadName}: ${charID} is not a squad member`);
+        return log.warn(`Cannot move ${charID} to ${squadRef}: ${charID} is not a squad member`);
     }
-    const squad = this.getSquad(squadName);
+    const squad = (typeof (squadRef) == "string") ? this.getSquad(squadRef) : this.getSquadByID(squadRef);
     if (squad == null) {
-        return log.warn(`Cannot move ${charID} to ${squadName}: squad ${squadName} does not exist`);
+        return log.warn(`Cannot move ${charID} to ${squadRef}: squad ${squadRef} does not exist`);
     }
     if (squad.members.find(iter => iter.charID == charID) != null) {
-        return log.debug(`${charID} is already part of squad ${squadName}, no need to move`);
+        return log.debug(`${charID} is already part of squad ${squadRef}, no need to move`);
     }
     const oldSquad = this.getSquadOfMember(charID);
     if (oldSquad != null) {
@@ -1458,6 +1515,7 @@ Core_1.Core.prototype.getSquadOfMember = function (charID) {
             return squad;
         }
     }
+    log.debug(`Failed to find a squad for ${charID}`);
     return null;
 };
 Core_1.Core.prototype.mergeSquads = function (into, from) {
@@ -1489,7 +1547,7 @@ Core_1.Core.prototype.createPermSquad = function () {
     squad.name = `${this.squad.perm.length + 1}`;
     squad.guess = false;
     squad.display = permSquadNames[(this.squad.perm.length % permSquadNames.length)];
-    log.trace(`Created new perm squad ${squad.name}/${squad.display}`);
+    log.debug(`Created new perm squad ${squad.name}/${squad.display}`);
     this.squad.perm.push(squad);
     return squad;
 };
@@ -1506,14 +1564,46 @@ Core_1.Core.prototype.removePermSquad = function (squadName) {
     }
     this.squad.perm = this.squad.perm.filter(iter => iter.name != squadName);
 };
+Core_1.Core.prototype.removeMemberFromSquad = function (charID) {
+    log.debug(`Remove ${charID} from their current squad into a new one`);
+    const member = this.squad.members.get(charID);
+    if (member == undefined) {
+        log.warn(`Cannot remove ${charID} from their current squad, they are not tracked`);
+        return;
+    }
+    const squad = this.getSquadOfMember(charID);
+    if (squad == null) {
+        log.warn(`Failed to find the squad that ${charID} is in`);
+        return;
+    }
+    const newSquad = this.createGuessSquad();
+    this.addMemberToSquad(charID, newSquad.ID);
+};
 Core_1.Core.prototype.removeMember = function (charID) {
-    log.trace(`${charID} is offline`);
+    log.debug(`${charID} went offline`);
     if (this.squad.members.has(charID)) {
         const char = this.squad.members.get(charID);
         char.online = false;
         char.state = "alive";
         char.whenDied = null;
         char.timeDead = 0;
+    }
+};
+Core_1.Core.prototype.printSquadInfo = function () {
+    log.info(`Perm squads:`);
+    for (const squad of this.squad.perm) {
+        log.info(`\t${squad}`);
+    }
+    log.info(`Guess squads:`);
+    for (const squad of this.squad.guesses) {
+        log.info(`\t${squad}`);
+    }
+    log.info(`Members:`);
+    for (const entry of this.squad.members) {
+        const charID = entry[0];
+        const member = entry[1];
+        const squad = this.getSquadOfMember(charID);
+        log.info(`\t${member.name}/${member.charID} is in ${squad === null || squad === void 0 ? void 0 : squad.name}/${squad === null || squad === void 0 ? void 0 : squad.ID} ${squad == null ? "Missing squad" : ""}`);
     }
 };
 
@@ -1540,9 +1630,8 @@ const VehicleAPI_1 = __webpack_require__(/*! ./census/VehicleAPI */ "../topt-cor
 const PsEvent_1 = __webpack_require__(/*! ./PsEvent */ "../topt-core/build/core/PsEvent.js");
 const InvididualGenerator_1 = __webpack_require__(/*! ./InvididualGenerator */ "../topt-core/build/core/InvididualGenerator.js");
 const OutfitAPI_1 = __webpack_require__(/*! ./census/OutfitAPI */ "../topt-core/build/core/census/OutfitAPI.js");
-const loglevel_1 = __webpack_require__(/*! loglevel */ "../topt-core/node_modules/loglevel/lib/loglevel.js");
-const log = loglevel_1.default.getLogger("EventReporter");
-log.enableAll();
+const Loggers_1 = __webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("EventReporter");
 class BreakdownArray {
     constructor() {
         this.data = [];
@@ -2573,9 +2662,9 @@ const PsLoadout_1 = __webpack_require__(/*! ./census/PsLoadout */ "../topt-core/
 const PsEvent_1 = __webpack_require__(/*! ./PsEvent */ "../topt-core/build/core/PsEvent.js");
 const StatMap_1 = __webpack_require__(/*! ./StatMap */ "../topt-core/build/core/StatMap.js");
 const EventReporter_1 = __webpack_require__(/*! ./EventReporter */ "../topt-core/build/core/EventReporter.js");
-const TrackedPlayer_1 = __webpack_require__(/*! ./TrackedPlayer */ "../topt-core/build/core/TrackedPlayer.js");
-const loglevel_1 = __webpack_require__(/*! loglevel */ "../topt-core/node_modules/loglevel/lib/loglevel.js");
-const log = loglevel_1.default.getLogger("IndividualGenerator");
+const TrackedPlayer_1 = __webpack_require__(/*! ./Objects/TrackedPlayer */ "../topt-core/build/core/Objects/TrackedPlayer.js");
+const Loggers_1 = __webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("IndividualGenerator");
 class ClassBreakdown {
     constructor() {
         this.secondsAs = 0;
@@ -3678,6 +3767,249 @@ exports.IndividualReporter = IndividualReporter;
 
 /***/ }),
 
+/***/ "../topt-core/build/core/Loggers.js":
+/*!******************************************!*\
+  !*** ../topt-core/build/core/Loggers.js ***!
+  \******************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.Logger = void 0;
+const log = __webpack_require__(/*! loglevel */ "../topt-core/node_modules/loglevel/lib/loglevel.js");
+const prefix = __webpack_require__(/*! loglevel-plugin-prefix */ "../topt-core/node_modules/loglevel-plugin-prefix/lib/loglevel-plugin-prefix.js");
+prefix.reg(log);
+class Logger {
+    /**
+     * Get a logger by it's name, creating a new one in the process if needed
+     *
+     * @param name Name of the logger to get
+     */
+    static getLogger(name) {
+        if (this.loggers.has(name) == false) {
+            const logger = log.getLogger(name);
+            logger.setLevel("info");
+            prefix.apply(logger, {
+                format(level, name, timestamp) {
+                    return `[${level}] ${name}>`;
+                }
+            });
+            this.loggers.set(name, logger);
+        }
+        return this.loggers.get(name);
+    }
+    /**
+     * Get the names of all loggers used
+     */
+    static getLoggerNames() {
+        return Array.from(this.loggers.keys());
+    }
+}
+exports.Logger = Logger;
+Logger.loggers = new Map();
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/Objects/BaseExchange.js":
+/*!*******************************************************!*\
+  !*** ../topt-core/build/core/Objects/BaseExchange.js ***!
+  \*******************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.BaseExchange = void 0;
+class BaseExchange {
+    constructor() {
+        /**
+         * ID of the facility that was captured
+         */
+        this.facilityID = "";
+        /**
+         * ID of the zone the capture took place
+         */
+        this.zoneID = "";
+        /**
+         * Timestamp of when the capture too place
+         */
+        this.timestamp = new Date();
+        /**
+         * How many ms the base was held before it was captured
+         */
+        this.timeHeld = 0;
+        /**
+         * ID of the faction that captured the base
+         */
+        this.factionID = "";
+        /**
+         * ID of the outfit that captured the base
+         */
+        this.outfitID = "";
+        /**
+         * ID of the previous faction that held the base before it was captured
+         */
+        this.previousFaction = "";
+    }
+}
+exports.BaseExchange = BaseExchange;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/Objects/SquadStat.js":
+/*!****************************************************!*\
+  !*** ../topt-core/build/core/Objects/SquadStat.js ***!
+  \****************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.SquadStat = void 0;
+class SquadStat {
+    constructor() {
+        /**
+         * Name of the squad these stats are for
+         */
+        this.name = "";
+        /**
+         * Lets of members in the squad
+         */
+        this.members = [];
+        /**
+         * Number of kills people in the squad got
+         */
+        this.kills = 0;
+        /**
+         * Number of deaths people in the squad got
+         */
+        this.deaths = 0;
+        /**
+         * Number of revives the people in the squad got
+         */
+        this.revives = 0;
+        /**
+         * Number of heals people in the squad got
+         */
+        this.heals = 0;
+        /**
+         * Number of resupplies people in the squad got
+         */
+        this.resupplies = 0;
+        /**
+         * Number of repairs people in the squad got
+         */
+        this.repairs = 0;
+        /**
+         * Number of vehicle kills people in the squad got
+         */
+        this.vKills = 0;
+    }
+}
+exports.SquadStat = SquadStat;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/Objects/TrackedPlayer.js":
+/*!********************************************************!*\
+  !*** ../topt-core/build/core/Objects/TrackedPlayer.js ***!
+  \********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.TrackedPlayer = void 0;
+const StatMap_1 = __webpack_require__(/*! ../StatMap */ "../topt-core/build/core/StatMap.js");
+/**
+ * Represents a character that is being tracked
+ */
+class TrackedPlayer {
+    constructor() {
+        /**
+         * Unique character ID of the tracked player
+         */
+        this.characterID = "";
+        /**
+         * Tag of the outfit, if the character is in one
+         */
+        this.outfitTag = "";
+        /**
+         * Name of the character
+         */
+        this.name = "";
+        /**
+         * What faction the character is a part of
+         */
+        this.faction = "";
+        /**
+         * How much accumulated score a character has gotten during tracking
+         */
+        this.score = 0;
+        /**
+         * If this character is currently online
+         */
+        this.online = true;
+        /**
+         * What time (in MS) the character more recently joined, to a minimum of when the tracker started
+         */
+        this.joinTime = 0;
+        /**
+         * How many seconds the character has been online for
+         */
+        this.secondsOnline = 0;
+        /**
+         * How many times a character has gotten each experience event
+         */
+        this.stats = new StatMap_1.default();
+        /**
+         * How many times a character has gotten each ribbon
+         */
+        this.ribbons = new StatMap_1.default();
+        /**
+         * Reference to the most recent death event, used for tracking revives
+         */
+        this.recentDeath = null;
+        /**
+         * The events that have occured because of a player
+         */
+        this.events = [];
+    }
+}
+exports.TrackedPlayer = TrackedPlayer;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/Objects/index.js":
+/*!************************************************!*\
+  !*** ../topt-core/build/core/Objects/index.js ***!
+  \************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.SquadStat = exports.TrackedPlayer = exports.BaseExchange = void 0;
+const BaseExchange_1 = __webpack_require__(/*! ./BaseExchange */ "../topt-core/build/core/Objects/BaseExchange.js");
+Object.defineProperty(exports, "BaseExchange", { enumerable: true, get: function () { return BaseExchange_1.BaseExchange; } });
+const TrackedPlayer_1 = __webpack_require__(/*! ./TrackedPlayer */ "../topt-core/build/core/Objects/TrackedPlayer.js");
+Object.defineProperty(exports, "TrackedPlayer", { enumerable: true, get: function () { return TrackedPlayer_1.TrackedPlayer; } });
+const SquadStat_1 = __webpack_require__(/*! ./SquadStat */ "../topt-core/build/core/Objects/SquadStat.js");
+Object.defineProperty(exports, "SquadStat", { enumerable: true, get: function () { return SquadStat_1.SquadStat; } });
+
+
+/***/ }),
+
 /***/ "../topt-core/build/core/Playback.js":
 /*!*******************************************!*\
   !*** ../topt-core/build/core/Playback.js ***!
@@ -3691,8 +4023,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Playback = exports.PlaybackOptions = void 0;
 const OutfitAPI_1 = __webpack_require__(/*! ./census/OutfitAPI */ "../topt-core/build/core/census/OutfitAPI.js");
 const ApiWrapper_1 = __webpack_require__(/*! ./census/ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
-const loglevel_1 = __webpack_require__(/*! loglevel */ "../topt-core/node_modules/loglevel/lib/loglevel.js");
-const log = loglevel_1.default.getLogger("Playback");
+const Loggers_1 = __webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("Playback");
 class PlaybackOptions {
     constructor() {
         this.speed = 0;
@@ -4320,78 +4652,6 @@ exports.default = StatMap;
 
 /***/ }),
 
-/***/ "../topt-core/build/core/TrackedPlayer.js":
-/*!************************************************!*\
-  !*** ../topt-core/build/core/TrackedPlayer.js ***!
-  \************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.TrackedPlayer = void 0;
-const StatMap_1 = __webpack_require__(/*! ./StatMap */ "../topt-core/build/core/StatMap.js");
-/**
- * Represents a character that is being tracked
- */
-class TrackedPlayer {
-    constructor() {
-        /**
-         * Unique character ID of the tracked player
-         */
-        this.characterID = "";
-        /**
-         * Tag of the outfit, if the character is in one
-         */
-        this.outfitTag = "";
-        /**
-         * Name of the character
-         */
-        this.name = "";
-        /**
-         * What faction the character is a part of
-         */
-        this.faction = "";
-        /**
-         * How much accumulated score a character has gotten during tracking
-         */
-        this.score = 0;
-        /**
-         * If this character is currently online
-         */
-        this.online = true;
-        /**
-         * What time (in MS) the character more recently joined, to a minimum of when the tracker started
-         */
-        this.joinTime = 0;
-        /**
-         * How many seconds the character has been online for
-         */
-        this.secondsOnline = 0;
-        /**
-         * How many times a character has gotten each experience event
-         */
-        this.stats = new StatMap_1.default();
-        /**
-         * How many times a character has gotten each ribbon
-         */
-        this.ribbons = new StatMap_1.default();
-        /**
-         * Reference to the most recent death event, used for tracking revives
-         */
-        this.recentDeath = null;
-        /**
-         * The events that have occured because of a player
-         */
-        this.events = [];
-    }
-}
-exports.TrackedPlayer = TrackedPlayer;
-
-
-/***/ }),
-
 /***/ "../topt-core/build/core/census/AchievementAPI.js":
 /*!********************************************************!*\
   !*** ../topt-core/build/core/census/AchievementAPI.js ***!
@@ -4405,8 +4665,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AchievementAPI = exports.Achievement = void 0;
 const CensusAPI_1 = __webpack_require__(/*! ./CensusAPI */ "../topt-core/build/core/census/CensusAPI.js");
 const ApiWrapper_1 = __webpack_require__(/*! ./ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
-const loglevel_1 = __webpack_require__(/*! loglevel */ "../topt-core/node_modules/loglevel/lib/loglevel.js");
-const log = loglevel_1.default.getLogger("AchievementAPI");
+const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("AchievementAPI");
 class Achievement {
     constructor() {
         this.ID = "";
@@ -4575,7 +4835,7 @@ class ApiResponse {
             //      ResponseContent. Maybe use a switch on localStatus?
             this.resolve({ code: localStatus, data: localData });
         }).catch((error) => {
-            throw `Don't expect this`;
+            throw `Don't expect this: ${error}`;
         });
         /*
         // JQuery uses data and jq differently depending on if the request is rejected (status code 404/500)
@@ -5016,8 +5276,8 @@ exports.APIWrapper = APIWrapper;
 Object.defineProperty(exports, "__esModule", { value: true });
 const ApiWrapper_1 = __webpack_require__(/*! ./ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
 const axios = __webpack_require__(/*! axios */ "../topt-core/node_modules/axios/index.js");
-const loglevel_1 = __webpack_require__(/*! loglevel */ "../topt-core/node_modules/loglevel/lib/loglevel.js");
-const log = loglevel_1.default.getLogger("CensusAPI");
+const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("CensusAPI");
 class CensusAPI {
     static baseUrl() {
         return `https://census.daybreakgames.com/s:${CensusAPI.serviceID}/get/ps2:v2`;
@@ -5065,8 +5325,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CharacterAPI = exports.Character = void 0;
 const CensusAPI_1 = __webpack_require__(/*! ./CensusAPI */ "../topt-core/build/core/census/CensusAPI.js");
 const ApiWrapper_1 = __webpack_require__(/*! ./ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
-const loglevel_1 = __webpack_require__(/*! loglevel */ "../topt-core/node_modules/loglevel/lib/loglevel.js");
-const log = loglevel_1.default.getLogger("CharacterAPI");
+const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("CharacterAPI");
 class Character {
     constructor() {
         this.ID = "";
@@ -5251,8 +5511,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.FacilityAPI = exports.Facility = void 0;
 const CensusAPI_1 = __webpack_require__(/*! ./CensusAPI */ "../topt-core/build/core/census/CensusAPI.js");
 const ApiWrapper_1 = __webpack_require__(/*! ./ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
-const loglevel_1 = __webpack_require__(/*! loglevel */ "../topt-core/node_modules/loglevel/lib/loglevel.js");
-const log = loglevel_1.default.getLogger("FacilityAPI");
+const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("FacilityAPI");
 class Facility {
     constructor() {
         this.ID = "";
@@ -5421,8 +5681,8 @@ exports.OutfitAPI = exports.Outfit = void 0;
 const CensusAPI_1 = __webpack_require__(/*! ./CensusAPI */ "../topt-core/build/core/census/CensusAPI.js");
 const ApiWrapper_1 = __webpack_require__(/*! ./ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
 const CharacterAPI_1 = __webpack_require__(/*! ./CharacterAPI */ "../topt-core/build/core/census/CharacterAPI.js");
-const loglevel_1 = __webpack_require__(/*! loglevel */ "../topt-core/node_modules/loglevel/lib/loglevel.js");
-const log = loglevel_1.default.getLogger("OutfitAPI");
+const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("OutfitAPI");
 class Outfit {
     constructor() {
         this.ID = "";
@@ -5807,8 +6067,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.VehicleAPI = exports.Vehicles = exports.VehicleTypes = exports.Vehicle = void 0;
 const CensusAPI_1 = __webpack_require__(/*! ./CensusAPI */ "../topt-core/build/core/census/CensusAPI.js");
 const ApiWrapper_1 = __webpack_require__(/*! ./ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
-const loglevel_1 = __webpack_require__(/*! loglevel */ "../topt-core/node_modules/loglevel/lib/loglevel.js");
-const log = loglevel_1.default.getLogger("VehicleAPI");
+const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("VehicleAPI");
 class Vehicle {
     constructor() {
         this.ID = "";
@@ -5907,8 +6167,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.WeaponAPI = exports.Weapon = void 0;
 const CensusAPI_1 = __webpack_require__(/*! ./CensusAPI */ "../topt-core/build/core/census/CensusAPI.js");
 const ApiWrapper_1 = __webpack_require__(/*! ./ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
-const loglevel_1 = __webpack_require__(/*! loglevel */ "../topt-core/node_modules/loglevel/lib/loglevel.js");
-const log = loglevel_1.default.getLogger("WeaponAPI");
+const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("WeaponAPI");
 class Weapon {
     constructor() {
         this.ID = "";
@@ -6117,6 +6377,7 @@ __exportStar(__webpack_require__(/*! ./census/OutfitAPI */ "../topt-core/build/c
 __exportStar(__webpack_require__(/*! ./census/PsLoadout */ "../topt-core/build/core/census/PsLoadout.js"), exports);
 __exportStar(__webpack_require__(/*! ./census/VehicleAPI */ "../topt-core/build/core/census/VehicleAPI.js"), exports);
 __exportStar(__webpack_require__(/*! ./census/WeaponAPI */ "../topt-core/build/core/census/WeaponAPI.js"), exports);
+__exportStar(__webpack_require__(/*! ./objects/index */ "../topt-core/build/core/objects/index.js"), exports);
 __exportStar(__webpack_require__(/*! ./Playback */ "../topt-core/build/core/Playback.js"), exports);
 __exportStar(__webpack_require__(/*! ./events/index */ "../topt-core/build/core/events/index.js"), exports);
 __exportStar(__webpack_require__(/*! ./reports/OutfitReport */ "../topt-core/build/core/reports/OutfitReport.js"), exports);
@@ -6127,8 +6388,205 @@ __exportStar(__webpack_require__(/*! ./EventReporter */ "../topt-core/build/core
 __exportStar(__webpack_require__(/*! ./InvididualGenerator */ "../topt-core/build/core/InvididualGenerator.js"), exports);
 __exportStar(__webpack_require__(/*! ./PsEvent */ "../topt-core/build/core/PsEvent.js"), exports);
 __exportStar(__webpack_require__(/*! ./StatMap */ "../topt-core/build/core/StatMap.js"), exports);
-__exportStar(__webpack_require__(/*! ./TrackedPlayer */ "../topt-core/build/core/TrackedPlayer.js"), exports);
 __exportStar(__webpack_require__(/*! ./winter/index */ "../topt-core/build/core/winter/index.js"), exports);
+__exportStar(__webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Loggers.js"), exports);
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/objects/BaseExchange.js":
+/*!*******************************************************!*\
+  !*** ../topt-core/build/core/objects/BaseExchange.js ***!
+  \*******************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.BaseExchange = void 0;
+class BaseExchange {
+    constructor() {
+        /**
+         * ID of the facility that was captured
+         */
+        this.facilityID = "";
+        /**
+         * ID of the zone the capture took place
+         */
+        this.zoneID = "";
+        /**
+         * Timestamp of when the capture too place
+         */
+        this.timestamp = new Date();
+        /**
+         * How many ms the base was held before it was captured
+         */
+        this.timeHeld = 0;
+        /**
+         * ID of the faction that captured the base
+         */
+        this.factionID = "";
+        /**
+         * ID of the outfit that captured the base
+         */
+        this.outfitID = "";
+        /**
+         * ID of the previous faction that held the base before it was captured
+         */
+        this.previousFaction = "";
+    }
+}
+exports.BaseExchange = BaseExchange;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/objects/SquadStat.js":
+/*!****************************************************!*\
+  !*** ../topt-core/build/core/objects/SquadStat.js ***!
+  \****************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.SquadStat = void 0;
+class SquadStat {
+    constructor() {
+        /**
+         * Name of the squad these stats are for
+         */
+        this.name = "";
+        /**
+         * Lets of members in the squad
+         */
+        this.members = [];
+        /**
+         * Number of kills people in the squad got
+         */
+        this.kills = 0;
+        /**
+         * Number of deaths people in the squad got
+         */
+        this.deaths = 0;
+        /**
+         * Number of revives the people in the squad got
+         */
+        this.revives = 0;
+        /**
+         * Number of heals people in the squad got
+         */
+        this.heals = 0;
+        /**
+         * Number of resupplies people in the squad got
+         */
+        this.resupplies = 0;
+        /**
+         * Number of repairs people in the squad got
+         */
+        this.repairs = 0;
+        /**
+         * Number of vehicle kills people in the squad got
+         */
+        this.vKills = 0;
+    }
+}
+exports.SquadStat = SquadStat;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/objects/TrackedPlayer.js":
+/*!********************************************************!*\
+  !*** ../topt-core/build/core/objects/TrackedPlayer.js ***!
+  \********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.TrackedPlayer = void 0;
+const StatMap_1 = __webpack_require__(/*! ../StatMap */ "../topt-core/build/core/StatMap.js");
+/**
+ * Represents a character that is being tracked
+ */
+class TrackedPlayer {
+    constructor() {
+        /**
+         * Unique character ID of the tracked player
+         */
+        this.characterID = "";
+        /**
+         * Tag of the outfit, if the character is in one
+         */
+        this.outfitTag = "";
+        /**
+         * Name of the character
+         */
+        this.name = "";
+        /**
+         * What faction the character is a part of
+         */
+        this.faction = "";
+        /**
+         * How much accumulated score a character has gotten during tracking
+         */
+        this.score = 0;
+        /**
+         * If this character is currently online
+         */
+        this.online = true;
+        /**
+         * What time (in MS) the character more recently joined, to a minimum of when the tracker started
+         */
+        this.joinTime = 0;
+        /**
+         * How many seconds the character has been online for
+         */
+        this.secondsOnline = 0;
+        /**
+         * How many times a character has gotten each experience event
+         */
+        this.stats = new StatMap_1.default();
+        /**
+         * How many times a character has gotten each ribbon
+         */
+        this.ribbons = new StatMap_1.default();
+        /**
+         * Reference to the most recent death event, used for tracking revives
+         */
+        this.recentDeath = null;
+        /**
+         * The events that have occured because of a player
+         */
+        this.events = [];
+    }
+}
+exports.TrackedPlayer = TrackedPlayer;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/objects/index.js":
+/*!************************************************!*\
+  !*** ../topt-core/build/core/objects/index.js ***!
+  \************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.SquadStat = exports.TrackedPlayer = exports.BaseExchange = void 0;
+const BaseExchange_1 = __webpack_require__(/*! ./BaseExchange */ "../topt-core/build/core/objects/BaseExchange.js");
+Object.defineProperty(exports, "BaseExchange", { enumerable: true, get: function () { return BaseExchange_1.BaseExchange; } });
+const TrackedPlayer_1 = __webpack_require__(/*! ./TrackedPlayer */ "../topt-core/build/core/objects/TrackedPlayer.js");
+Object.defineProperty(exports, "TrackedPlayer", { enumerable: true, get: function () { return TrackedPlayer_1.TrackedPlayer; } });
+const SquadStat_1 = __webpack_require__(/*! ./SquadStat */ "../topt-core/build/core/objects/SquadStat.js");
+Object.defineProperty(exports, "SquadStat", { enumerable: true, get: function () { return SquadStat_1.SquadStat; } });
 
 
 /***/ }),
@@ -6149,11 +6607,11 @@ const PsLoadout_1 = __webpack_require__(/*! ../census/PsLoadout */ "../topt-core
 const PsEvent_1 = __webpack_require__(/*! ../PsEvent */ "../topt-core/build/core/PsEvent.js");
 const EventReporter_1 = __webpack_require__(/*! ../EventReporter */ "../topt-core/build/core/EventReporter.js");
 const InvididualGenerator_1 = __webpack_require__(/*! ../InvididualGenerator */ "../topt-core/build/core/InvididualGenerator.js");
-const Core_1 = __webpack_require__(/*! ../Core */ "../topt-core/build/core/Core.js");
+const index_1 = __webpack_require__(/*! ../Objects/index */ "../topt-core/build/core/Objects/index.js");
 const Squad_1 = __webpack_require__(/*! ../squad/Squad */ "../topt-core/build/core/squad/Squad.js");
 const FacilityAPI_1 = __webpack_require__(/*! ../census/FacilityAPI */ "../topt-core/build/core/census/FacilityAPI.js");
-const loglevel_1 = __webpack_require__(/*! loglevel */ "../topt-core/node_modules/loglevel/lib/loglevel.js");
-const log = loglevel_1.default.getLogger("OutfitReport");
+const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("OutfitReport");
 class OutfitReportSettings {
     constructor() {
         /**
@@ -6302,7 +6760,7 @@ class OutfitReport {
         };
         this.squadStats = {
             data: [],
-            all: new Core_1.SquadStats()
+            all: new index_1.SquadStat()
         };
         this.weaponKillBreakdown = new EventReporter_1.BreakdownArray();
         this.weaponTypeKillBreakdown = new EventReporter_1.BreakdownArray();
@@ -6879,9 +7337,8 @@ const VehicleAPI_1 = __webpack_require__(/*! ../census/VehicleAPI */ "../topt-co
 const WeaponAPI_1 = __webpack_require__(/*! ../census/WeaponAPI */ "../topt-core/build/core/census/WeaponAPI.js");
 const PsLoadout_1 = __webpack_require__(/*! ../census/PsLoadout */ "../topt-core/build/core/census/PsLoadout.js");
 const EventReporter_1 = __webpack_require__(/*! ../EventReporter */ "../topt-core/build/core/EventReporter.js");
-const loglevel_1 = __webpack_require__(/*! loglevel */ "../topt-core/node_modules/loglevel/lib/loglevel.js");
-const log = loglevel_1.default.getLogger("WinterReportGenerator");
-log.enableAll();
+const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("WinterReportGenerator");
 class WinterMetricIndex {
 }
 exports.WinterMetricIndex = WinterMetricIndex;
@@ -9467,6 +9924,166 @@ module.exports = (function () {
 		delete Object.prototype.__global__;
 	}
 })();
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/loglevel-plugin-prefix/lib/loglevel-plugin-prefix.js":
+/*!**************************************************************************************!*\
+  !*** ../topt-core/node_modules/loglevel-plugin-prefix/lib/loglevel-plugin-prefix.js ***!
+  \**************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_RESULT__;(function (root, factory) {
+  if (true) {
+    !(__WEBPACK_AMD_DEFINE_FACTORY__ = (factory),
+				__WEBPACK_AMD_DEFINE_RESULT__ = (typeof __WEBPACK_AMD_DEFINE_FACTORY__ === 'function' ?
+				(__WEBPACK_AMD_DEFINE_FACTORY__.call(exports, __webpack_require__, exports, module)) :
+				__WEBPACK_AMD_DEFINE_FACTORY__),
+				__WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
+  } else {}
+}(this, function (root) {
+  'use strict';
+
+  var merge = function (target) {
+    var i = 1;
+    var length = arguments.length;
+    var key;
+    for (; i < length; i++) {
+      for (key in arguments[i]) {
+        if (Object.prototype.hasOwnProperty.call(arguments[i], key)) {
+          target[key] = arguments[i][key];
+        }
+      }
+    }
+    return target;
+  };
+
+  var defaults = {
+    template: '[%t] %l:',
+    levelFormatter: function (level) {
+      return level.toUpperCase();
+    },
+    nameFormatter: function (name) {
+      return name || 'root';
+    },
+    timestampFormatter: function (date) {
+      return date.toTimeString().replace(/.*(\d{2}:\d{2}:\d{2}).*/, '$1');
+    },
+    format: undefined
+  };
+
+  var loglevel;
+  var configs = {};
+
+  var reg = function (rootLogger) {
+    if (!rootLogger || !rootLogger.getLogger) {
+      throw new TypeError('Argument is not a root logger');
+    }
+    loglevel = rootLogger;
+  };
+
+  var apply = function (logger, config) {
+    if (!logger || !logger.setLevel) {
+      throw new TypeError('Argument is not a logger');
+    }
+
+    /* eslint-disable vars-on-top */
+    var originalFactory = logger.methodFactory;
+    var name = logger.name || '';
+    var parent = configs[name] || configs[''] || defaults;
+    /* eslint-enable vars-on-top */
+
+    function methodFactory(methodName, logLevel, loggerName) {
+      var originalMethod = originalFactory(methodName, logLevel, loggerName);
+      var options = configs[loggerName] || configs[''];
+
+      var hasTimestamp = options.template.indexOf('%t') !== -1;
+      var hasLevel = options.template.indexOf('%l') !== -1;
+      var hasName = options.template.indexOf('%n') !== -1;
+
+      return function () {
+        var content = '';
+
+        var length = arguments.length;
+        var args = Array(length);
+        var key = 0;
+        for (; key < length; key++) {
+          args[key] = arguments[key];
+        }
+
+        // skip the root method for child loggers to prevent duplicate logic
+        if (name || !configs[loggerName]) {
+          /* eslint-disable vars-on-top */
+          var timestamp = options.timestampFormatter(new Date());
+          var level = options.levelFormatter(methodName);
+          var lname = options.nameFormatter(loggerName);
+          /* eslint-enable vars-on-top */
+
+          if (options.format) {
+            content += options.format(level, lname, timestamp);
+          } else {
+            content += options.template;
+            if (hasTimestamp) {
+              content = content.replace(/%t/, timestamp);
+            }
+            if (hasLevel) content = content.replace(/%l/, level);
+            if (hasName) content = content.replace(/%n/, lname);
+          }
+
+          if (args.length && typeof args[0] === 'string') {
+            // concat prefix with first argument to support string substitutions
+            args[0] = content + ' ' + args[0];
+          } else {
+            args.unshift(content);
+          }
+        }
+
+        originalMethod.apply(undefined, args);
+      };
+    }
+
+    if (!configs[name]) {
+      logger.methodFactory = methodFactory;
+    }
+
+    // for remove inherited format option if template option preset
+    config = config || {};
+    if (config.template) config.format = undefined;
+
+    configs[name] = merge({}, parent, config);
+
+    logger.setLevel(logger.getLevel());
+
+    if (!loglevel) {
+      logger.warn(
+        'It is necessary to call the function reg() of loglevel-plugin-prefix before calling apply. From the next release, it will throw an error. See more: https://github.com/kutuluk/loglevel-plugin-prefix/blob/master/README.md'
+      );
+    }
+
+    return logger;
+  };
+
+  var api = {
+    reg: reg,
+    apply: apply
+  };
+
+  var save;
+
+  if (root) {
+    save = root.prefix;
+    api.noConflict = function () {
+      if (root.prefix === api) {
+        root.prefix = save;
+      }
+      return api;
+    };
+  }
+
+  return api;
+}));
 
 
 /***/ }),
@@ -48559,451 +49176,6 @@ https://github.com/nodeca/pako/blob/master/LICENSE
 
 /***/ }),
 
-/***/ "./node_modules/loglevel-plugin-prefix/lib/loglevel-plugin-prefix.js":
-/*!***************************************************************************!*\
-  !*** ./node_modules/loglevel-plugin-prefix/lib/loglevel-plugin-prefix.js ***!
-  \***************************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_RESULT__;(function (root, factory) {
-  if (true) {
-    !(__WEBPACK_AMD_DEFINE_FACTORY__ = (factory),
-				__WEBPACK_AMD_DEFINE_RESULT__ = (typeof __WEBPACK_AMD_DEFINE_FACTORY__ === 'function' ?
-				(__WEBPACK_AMD_DEFINE_FACTORY__.call(exports, __webpack_require__, exports, module)) :
-				__WEBPACK_AMD_DEFINE_FACTORY__),
-				__WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
-  } else {}
-}(this, function (root) {
-  'use strict';
-
-  var merge = function (target) {
-    var i = 1;
-    var length = arguments.length;
-    var key;
-    for (; i < length; i++) {
-      for (key in arguments[i]) {
-        if (Object.prototype.hasOwnProperty.call(arguments[i], key)) {
-          target[key] = arguments[i][key];
-        }
-      }
-    }
-    return target;
-  };
-
-  var defaults = {
-    template: '[%t] %l:',
-    levelFormatter: function (level) {
-      return level.toUpperCase();
-    },
-    nameFormatter: function (name) {
-      return name || 'root';
-    },
-    timestampFormatter: function (date) {
-      return date.toTimeString().replace(/.*(\d{2}:\d{2}:\d{2}).*/, '$1');
-    },
-    format: undefined
-  };
-
-  var loglevel;
-  var configs = {};
-
-  var reg = function (rootLogger) {
-    if (!rootLogger || !rootLogger.getLogger) {
-      throw new TypeError('Argument is not a root logger');
-    }
-    loglevel = rootLogger;
-  };
-
-  var apply = function (logger, config) {
-    if (!logger || !logger.setLevel) {
-      throw new TypeError('Argument is not a logger');
-    }
-
-    /* eslint-disable vars-on-top */
-    var originalFactory = logger.methodFactory;
-    var name = logger.name || '';
-    var parent = configs[name] || configs[''] || defaults;
-    /* eslint-enable vars-on-top */
-
-    function methodFactory(methodName, logLevel, loggerName) {
-      var originalMethod = originalFactory(methodName, logLevel, loggerName);
-      var options = configs[loggerName] || configs[''];
-
-      var hasTimestamp = options.template.indexOf('%t') !== -1;
-      var hasLevel = options.template.indexOf('%l') !== -1;
-      var hasName = options.template.indexOf('%n') !== -1;
-
-      return function () {
-        var content = '';
-
-        var length = arguments.length;
-        var args = Array(length);
-        var key = 0;
-        for (; key < length; key++) {
-          args[key] = arguments[key];
-        }
-
-        // skip the root method for child loggers to prevent duplicate logic
-        if (name || !configs[loggerName]) {
-          /* eslint-disable vars-on-top */
-          var timestamp = options.timestampFormatter(new Date());
-          var level = options.levelFormatter(methodName);
-          var lname = options.nameFormatter(loggerName);
-          /* eslint-enable vars-on-top */
-
-          if (options.format) {
-            content += options.format(level, lname, timestamp);
-          } else {
-            content += options.template;
-            if (hasTimestamp) {
-              content = content.replace(/%t/, timestamp);
-            }
-            if (hasLevel) content = content.replace(/%l/, level);
-            if (hasName) content = content.replace(/%n/, lname);
-          }
-
-          if (args.length && typeof args[0] === 'string') {
-            // concat prefix with first argument to support string substitutions
-            args[0] = content + ' ' + args[0];
-          } else {
-            args.unshift(content);
-          }
-        }
-
-        originalMethod.apply(undefined, args);
-      };
-    }
-
-    if (!configs[name]) {
-      logger.methodFactory = methodFactory;
-    }
-
-    // for remove inherited format option if template option preset
-    config = config || {};
-    if (config.template) config.format = undefined;
-
-    configs[name] = merge({}, parent, config);
-
-    logger.setLevel(logger.getLevel());
-
-    if (!loglevel) {
-      logger.warn(
-        'It is necessary to call the function reg() of loglevel-plugin-prefix before calling apply. From the next release, it will throw an error. See more: https://github.com/kutuluk/loglevel-plugin-prefix/blob/master/README.md'
-      );
-    }
-
-    return logger;
-  };
-
-  var api = {
-    reg: reg,
-    apply: apply
-  };
-
-  var save;
-
-  if (root) {
-    save = root.prefix;
-    api.noConflict = function () {
-      if (root.prefix === api) {
-        root.prefix = save;
-      }
-      return api;
-    };
-  }
-
-  return api;
-}));
-
-
-/***/ }),
-
-/***/ "./node_modules/loglevel/lib/loglevel.js":
-/*!***********************************************!*\
-  !*** ./node_modules/loglevel/lib/loglevel.js ***!
-  \***********************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_RESULT__;/*
-* loglevel - https://github.com/pimterry/loglevel
-*
-* Copyright (c) 2013 Tim Perry
-* Licensed under the MIT license.
-*/
-(function (root, definition) {
-    "use strict";
-    if (true) {
-        !(__WEBPACK_AMD_DEFINE_FACTORY__ = (definition),
-				__WEBPACK_AMD_DEFINE_RESULT__ = (typeof __WEBPACK_AMD_DEFINE_FACTORY__ === 'function' ?
-				(__WEBPACK_AMD_DEFINE_FACTORY__.call(exports, __webpack_require__, exports, module)) :
-				__WEBPACK_AMD_DEFINE_FACTORY__),
-				__WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
-    } else {}
-}(this, function () {
-    "use strict";
-
-    // Slightly dubious tricks to cut down minimized file size
-    var noop = function() {};
-    var undefinedType = "undefined";
-    var isIE = (typeof window !== undefinedType) && (typeof window.navigator !== undefinedType) && (
-        /Trident\/|MSIE /.test(window.navigator.userAgent)
-    );
-
-    var logMethods = [
-        "trace",
-        "debug",
-        "info",
-        "warn",
-        "error"
-    ];
-
-    // Cross-browser bind equivalent that works at least back to IE6
-    function bindMethod(obj, methodName) {
-        var method = obj[methodName];
-        if (typeof method.bind === 'function') {
-            return method.bind(obj);
-        } else {
-            try {
-                return Function.prototype.bind.call(method, obj);
-            } catch (e) {
-                // Missing bind shim or IE8 + Modernizr, fallback to wrapping
-                return function() {
-                    return Function.prototype.apply.apply(method, [obj, arguments]);
-                };
-            }
-        }
-    }
-
-    // Trace() doesn't print the message in IE, so for that case we need to wrap it
-    function traceForIE() {
-        if (console.log) {
-            if (console.log.apply) {
-                console.log.apply(console, arguments);
-            } else {
-                // In old IE, native console methods themselves don't have apply().
-                Function.prototype.apply.apply(console.log, [console, arguments]);
-            }
-        }
-        if (console.trace) console.trace();
-    }
-
-    // Build the best logging method possible for this env
-    // Wherever possible we want to bind, not wrap, to preserve stack traces
-    function realMethod(methodName) {
-        if (methodName === 'debug') {
-            methodName = 'log';
-        }
-
-        if (typeof console === undefinedType) {
-            return false; // No method possible, for now - fixed later by enableLoggingWhenConsoleArrives
-        } else if (methodName === 'trace' && isIE) {
-            return traceForIE;
-        } else if (console[methodName] !== undefined) {
-            return bindMethod(console, methodName);
-        } else if (console.log !== undefined) {
-            return bindMethod(console, 'log');
-        } else {
-            return noop;
-        }
-    }
-
-    // These private functions always need `this` to be set properly
-
-    function replaceLoggingMethods(level, loggerName) {
-        /*jshint validthis:true */
-        for (var i = 0; i < logMethods.length; i++) {
-            var methodName = logMethods[i];
-            this[methodName] = (i < level) ?
-                noop :
-                this.methodFactory(methodName, level, loggerName);
-        }
-
-        // Define log.log as an alias for log.debug
-        this.log = this.debug;
-    }
-
-    // In old IE versions, the console isn't present until you first open it.
-    // We build realMethod() replacements here that regenerate logging methods
-    function enableLoggingWhenConsoleArrives(methodName, level, loggerName) {
-        return function () {
-            if (typeof console !== undefinedType) {
-                replaceLoggingMethods.call(this, level, loggerName);
-                this[methodName].apply(this, arguments);
-            }
-        };
-    }
-
-    // By default, we use closely bound real methods wherever possible, and
-    // otherwise we wait for a console to appear, and then try again.
-    function defaultMethodFactory(methodName, level, loggerName) {
-        /*jshint validthis:true */
-        return realMethod(methodName) ||
-               enableLoggingWhenConsoleArrives.apply(this, arguments);
-    }
-
-    function Logger(name, defaultLevel, factory) {
-      var self = this;
-      var currentLevel;
-
-      var storageKey = "loglevel";
-      if (typeof name === "string") {
-        storageKey += ":" + name;
-      } else if (typeof name === "symbol") {
-        storageKey = undefined;
-      }
-
-      function persistLevelIfPossible(levelNum) {
-          var levelName = (logMethods[levelNum] || 'silent').toUpperCase();
-
-          if (typeof window === undefinedType || !storageKey) return;
-
-          // Use localStorage if available
-          try {
-              window.localStorage[storageKey] = levelName;
-              return;
-          } catch (ignore) {}
-
-          // Use session cookie as fallback
-          try {
-              window.document.cookie =
-                encodeURIComponent(storageKey) + "=" + levelName + ";";
-          } catch (ignore) {}
-      }
-
-      function getPersistedLevel() {
-          var storedLevel;
-
-          if (typeof window === undefinedType || !storageKey) return;
-
-          try {
-              storedLevel = window.localStorage[storageKey];
-          } catch (ignore) {}
-
-          // Fallback to cookies if local storage gives us nothing
-          if (typeof storedLevel === undefinedType) {
-              try {
-                  var cookie = window.document.cookie;
-                  var location = cookie.indexOf(
-                      encodeURIComponent(storageKey) + "=");
-                  if (location !== -1) {
-                      storedLevel = /^([^;]+)/.exec(cookie.slice(location))[1];
-                  }
-              } catch (ignore) {}
-          }
-
-          // If the stored level is not valid, treat it as if nothing was stored.
-          if (self.levels[storedLevel] === undefined) {
-              storedLevel = undefined;
-          }
-
-          return storedLevel;
-      }
-
-      /*
-       *
-       * Public logger API - see https://github.com/pimterry/loglevel for details
-       *
-       */
-
-      self.name = name;
-
-      self.levels = { "TRACE": 0, "DEBUG": 1, "INFO": 2, "WARN": 3,
-          "ERROR": 4, "SILENT": 5};
-
-      self.methodFactory = factory || defaultMethodFactory;
-
-      self.getLevel = function () {
-          return currentLevel;
-      };
-
-      self.setLevel = function (level, persist) {
-          if (typeof level === "string" && self.levels[level.toUpperCase()] !== undefined) {
-              level = self.levels[level.toUpperCase()];
-          }
-          if (typeof level === "number" && level >= 0 && level <= self.levels.SILENT) {
-              currentLevel = level;
-              if (persist !== false) {  // defaults to true
-                  persistLevelIfPossible(level);
-              }
-              replaceLoggingMethods.call(self, level, name);
-              if (typeof console === undefinedType && level < self.levels.SILENT) {
-                  return "No console available for logging";
-              }
-          } else {
-              throw "log.setLevel() called with invalid level: " + level;
-          }
-      };
-
-      self.setDefaultLevel = function (level) {
-          if (!getPersistedLevel()) {
-              self.setLevel(level, false);
-          }
-      };
-
-      self.enableAll = function(persist) {
-          self.setLevel(self.levels.TRACE, persist);
-      };
-
-      self.disableAll = function(persist) {
-          self.setLevel(self.levels.SILENT, persist);
-      };
-
-      // Initialize with the right level
-      var initialLevel = getPersistedLevel();
-      if (initialLevel == null) {
-          initialLevel = defaultLevel == null ? "WARN" : defaultLevel;
-      }
-      self.setLevel(initialLevel, false);
-    }
-
-    /*
-     *
-     * Top-level API
-     *
-     */
-
-    var defaultLogger = new Logger();
-
-    var _loggersByName = {};
-    defaultLogger.getLogger = function getLogger(name) {
-        if ((typeof name !== "symbol" && typeof name !== "string") || name === "") {
-          throw new TypeError("You must supply a name when creating a logger.");
-        }
-
-        var logger = _loggersByName[name];
-        if (!logger) {
-          logger = _loggersByName[name] = new Logger(
-            name, defaultLogger.getLevel(), defaultLogger.methodFactory);
-        }
-        return logger;
-    };
-
-    // Grab the current global log variable in case of overwrite
-    var _log = (typeof window !== undefinedType) ? window.log : undefined;
-    defaultLogger.noConflict = function() {
-        if (typeof window !== undefinedType &&
-               window.log === defaultLogger) {
-            window.log = _log;
-        }
-
-        return defaultLogger;
-    };
-
-    defaultLogger.getLoggers = function getLoggers() {
-        return _loggersByName;
-    };
-
-    // ES6 default export, for compatibility
-    defaultLogger['default'] = defaultLogger;
-
-    return defaultLogger;
-}));
-
-
-/***/ }),
-
 /***/ "./node_modules/moment/moment.js":
 /*!***************************************!*\
   !*** ./node_modules/moment/moment.js ***!
@@ -69248,6 +69420,11 @@ vue_1.default.component("breakdown-box", {
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
+                        plugins: {
+                            datalabels: {
+                                display: false
+                            }
+                        },
                         title: {
                             display: false
                         },
@@ -70262,13 +70439,25 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.PersonalReportGenerator = void 0;
 const tcore_1 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
 const axios = __webpack_require__(/*! axios */ "./node_modules/axios/index.js");
+/**
+ * Helper class for generating personal reports
+ */
 class PersonalReportGenerator {
+    /**
+     * Return a string containing the HTML of a player report
+     *
+     * @param html      HTML template the report will be generated from
+     * @param report    Report to be put into the template
+     */
     static generate(html, report) {
         let anyReport = Object.assign({}, report);
         anyReport.stats = Array.from(report.stats.entries());
         const personalReport = html.replace("REPORT_HERE_REPLACE_ME", JSON.stringify(anyReport));
         return personalReport;
     }
+    /**
+     * Get an ApiResponse that will contain the HTML template when resolved OK
+     */
     static getTemplate() {
         const page = new tcore_1.ApiResponse(axios.default.get(`./personal/index.html?q=${new Date().getTime()}`), (iter) => iter);
         return page;
@@ -70314,7 +70503,8 @@ class Quartile {
         quart.q1 = this.quartile(data, 0.25);
         quart.median = this.quartile(data, 0.5);
         quart.q3 = this.quartile(data, 0.75);
-        const stdDev = this.standardDeviation(data);
+        /*
+        const stdDev: number = this.standardDeviation(data);
         for (let i = data.length - 1; i >= 0; --i) {
             if (data[i] <= quart.q3 + stdDev) {
                 quart.max = data[i];
@@ -70327,6 +70517,7 @@ class Quartile {
                 break;
             }
         }
+        */
         quart.max = quart.max == 0 ? data[data.length - 1] : quart.max;
         quart.min = quart.min == 0 ? data[0] : quart.min;
         return quart;
@@ -70679,7 +70870,6 @@ const Loadable_1 = __webpack_require__(/*! Loadable */ "./src/Loadable.ts");
 const moment = __webpack_require__(/*! moment */ "./node_modules/moment/moment.js");
 const $ = __webpack_require__(/*! jquery */ "./node_modules/jquery/dist/jquery.js");
 const JSZip = __webpack_require__(/*! jszip */ "./node_modules/jszip/dist/jszip.min.js");
-const prefix = __webpack_require__(/*! loglevel-plugin-prefix */ "./node_modules/loglevel-plugin-prefix/lib/loglevel-plugin-prefix.js");
 window.moment = moment;
 const tcore_2 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
 const tcore_3 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
@@ -70687,6 +70877,8 @@ const tcore_4 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.
 const tcore_5 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
 const PersonalReportGenerator_1 = __webpack_require__(/*! PersonalReportGenerator */ "./src/PersonalReportGenerator.ts");
 const tcore_6 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
+const tcore_7 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
+window.Logger = tcore_7.Logger;
 // @ts-ignore
 const FileSaver = __webpack_require__(/*! ../node_modules/file-saver/dist/FileSaver.js */ "./node_modules/file-saver/dist/FileSaver.js");
 const chart_js_1 = __webpack_require__(/*! chart.js */ "./node_modules/chart.js/dist/Chart.js");
@@ -70702,25 +70894,14 @@ __webpack_require__(/*! BreakdownBox */ "./src/BreakdownBox.ts");
 __webpack_require__(/*! BreakdownBar */ "./src/BreakdownBar.ts");
 __webpack_require__(/*! MomentFilter */ "./src/MomentFilter.ts");
 __webpack_require__(/*! KillfeedSquad */ "./src/KillfeedSquad.ts");
-const tcore_7 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
 const tcore_8 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
 const tcore_9 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
 const tcore_10 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
+const tcore_11 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
 const Playback_1 = __webpack_require__(/*! addons/Playback */ "./src/addons/Playback.ts");
 const SquadAddon_1 = __webpack_require__(/*! addons/SquadAddon */ "./src/addons/SquadAddon.ts");
 const Storage_1 = __webpack_require__(/*! Storage */ "./src/Storage.ts");
 window.$ = $;
-const loglevel_1 = __webpack_require__(/*! loglevel */ "./node_modules/loglevel/lib/loglevel.js");
-prefix.reg(loglevel_1.default);
-const loggers = loglevel_1.default.getLoggers();
-for (const log in loggers) {
-    loggers[log].enableAll();
-    prefix.apply(loggers[log], {
-        format(level, name, timestamp) {
-            return `${name} ${level}> `;
-        }
-    });
-}
 exports.vm = new vue_1.default({
     el: "#app",
     data: {
@@ -70768,7 +70949,7 @@ exports.vm = new vue_1.default({
         ],
         winter: {
             report: Loadable_1.Loadable.idle(),
-            settings: new tcore_9.WinterReportSettings(),
+            settings: new tcore_10.WinterReportSettings(),
             ignoredPlayers: ""
         },
         outfitReport: new tcore_6.OutfitReport(),
@@ -70811,7 +70992,7 @@ exports.vm = new vue_1.default({
                 this.coreObject.disconnect();
                 this.coreObject = null;
             }
-            this.coreObject = new tcore_7.default(this.settings.serviceToken, this.settings.serverID);
+            this.coreObject = new tcore_8.default(this.settings.serviceToken, this.settings.serverID);
             this.coreObject.connect().ok(() => {
                 this.view = "realtime";
             });
@@ -70928,7 +71109,7 @@ exports.vm = new vue_1.default({
                 if (char.stats.size() == 0) {
                     return;
                 }
-                const collection = new tcore_10.TrackedPlayer();
+                const collection = new tcore_11.TrackedPlayer();
                 collection.name = char.name;
                 collection.outfitTag = char.outfitTag;
                 collection.characterID = char.characterID;
@@ -71000,7 +71181,12 @@ exports.vm = new vue_1.default({
                 this.updateDisplay();
             }
             else if (whatHovered == "member" && SquadAddon_1.SquadAddon.selectedMemberID != null) {
-                this.core.addMemberToSquad(SquadAddon_1.SquadAddon.selectedMemberID, ev.key);
+                if (ev.key == "Delete") {
+                    this.core.removeMemberFromSquad(SquadAddon_1.SquadAddon.selectedMemberID);
+                }
+                else {
+                    this.core.addMemberToSquad(SquadAddon_1.SquadAddon.selectedMemberID, ev.key);
+                }
                 this.updateDisplay();
             }
             else {
@@ -71013,6 +71199,9 @@ exports.vm = new vue_1.default({
             else if (this.parameters.report == "winter") {
                 this.generateWinterReport();
             }
+            else if (this.parameters.report == "personal") {
+                this.generateAllReports();
+            }
             $("#report-modal").modal("hide");
             this.parameters.report = "";
         },
@@ -71024,11 +71213,10 @@ exports.vm = new vue_1.default({
             });
             events.push(...this.core.miscEvents);
             events = events.sort((a, b) => a.timestamp - b.timestamp);
-            this.opsReportSettings.showSquadStats = this.core.squad.perm.length > 0;
             tcore_6.OutfitReportGenerator.generate({
                 settings: {
                     zoneID: null,
-                    showSquadStats: this.opsReportSettings.showSquadStats == true
+                    showSquadStats: this.opsReportSettings.showSquadStats
                 },
                 captures: this.core.captures,
                 playerCaptures: this.core.playerCaptures,
@@ -71053,7 +71241,7 @@ exports.vm = new vue_1.default({
             const players = Array.from(this.core.stats.values())
                 .filter(iter => playerNames.indexOf(iter.name.toLowerCase()) == -1);
             console.log(`Making a winter report with: ${players.map(iter => iter.name).join(", ")}`);
-            const params = new tcore_9.WinterReportParameters();
+            const params = new tcore_10.WinterReportParameters();
             params.players = players;
             params.timeTracking = this.core.tracking;
             params.settings = this.winter.settings;
@@ -71067,7 +71255,7 @@ exports.vm = new vue_1.default({
                 params.events.push(...player.events);
             });
             this.winter.report = Loadable_1.Loadable.loading();
-            tcore_8.WinterReportGenerator.generate(params).ok((data) => {
+            tcore_9.WinterReportGenerator.generate(params).ok((data) => {
                 this.winter.report = Loadable_1.Loadable.loaded(data);
                 this.view = "winter";
             });

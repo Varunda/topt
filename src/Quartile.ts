@@ -25,6 +25,7 @@ export class Quartile {
         quart.median = this.quartile(data, 0.5);
         quart.q3 = this.quartile(data, 0.75);
 
+        /*
         const stdDev: number = this.standardDeviation(data);
         for (let i = data.length - 1; i >= 0; --i) {
             if (data[i] <= quart.q3 + stdDev) {
@@ -38,6 +39,7 @@ export class Quartile {
                 break;
             }
         }
+        */
 
         quart.max = quart.max == 0 ? data[data.length - 1] : quart.max;
         quart.min = quart.min == 0 ? data[0] : quart.min;
