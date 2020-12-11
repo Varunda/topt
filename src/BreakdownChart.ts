@@ -115,7 +115,7 @@ Vue.component("breakdown-chart", {
                                     const dataset = chart.data.datasets![0];
                                     let sum: number = 0;
                                     for (const datum of dataset.data!) {
-                                        if (typeof(datum) == "number"){
+                                        if (typeof(datum) == "number") {
                                             sum += datum;
                                         }
                                     }

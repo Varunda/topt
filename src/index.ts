@@ -59,10 +59,15 @@ import { WinterReportParameters, WinterReportSettings } from "tcore";
 import { TrackedPlayer } from "tcore";
 import { CoreSettings } from "tcore";
 import { Squad } from "tcore";
+import { BaseOverview } from "tcore";
+import { BreakdownTimeslot } from "tcore";
 
-import { Playback } from "addons/Playback";
+import { Playback } from "tcore";
 import { SquadAddon } from "addons/SquadAddon";
 import { StorageHelper } from "Storage";
+
+import { CharacterAPI } from "tcore";
+(window as any).CharacterAPI = CharacterAPI;
 
 (window as any).$ = $;
 
@@ -72,7 +77,7 @@ export const vm = new Vue({
     data: {
         coreObject: null as (Core | null),
 
-        view: "setup" as "setup" | "realtime" | "ops" | "killfeed" | "winter",
+        view: "setup" as "setup" | "realtime" | "ops" | "killfeed" | "winter" | "example",
 
         // Field related to settings about how TOPT runs
         settings: {
@@ -132,6 +137,7 @@ export const vm = new Vue({
 
         outfitReport: new OutfitReport() as OutfitReport,
         opsReportSettings: new OutfitReportSettings() as OutfitReportSettings,
+        outfitReportResponse: null as ApiResponse<OutfitReport> | null,
 
         refreshIntervalID: -1 as number, // ID of the timed interval to refresh the realtime view
 
@@ -428,15 +434,20 @@ export const vm = new Vue({
 
         generateReport: function(): void {
             if (this.parameters.report == "ops") {
-                this.generateOutfitReport();
+                this.generateOutfitReport().ok(() => {
+                    $("#report-modal").modal("hide");
+                    this.parameters.report = "";
+                    console.log(`Report generated`);
+                });
             } else if (this.parameters.report == "winter") {
                 this.generateWinterReport();
+                $("#report-modal").modal("hide");
+                this.parameters.report = "";
             } else if (this.parameters.report == "personal") {
                 this.generateAllReports();
+                $("#report-modal").modal("hide");
+                this.parameters.report = "";
             }
-
-            $("#report-modal").modal("hide");
-            this.parameters.report = "";
         },
 
         generateOutfitReport: function(): ApiResponse {
@@ -452,7 +463,7 @@ export const vm = new Vue({
 
             events = events.sort((a, b) => a.timestamp - b.timestamp);
 
-            OutfitReportGenerator.generate({
+            const outfitResponse: ApiResponse<OutfitReport> = OutfitReportGenerator.generate({
                 settings: {
                     zoneID: null,
                     showSquadStats: this.opsReportSettings.showSquadStats
@@ -467,10 +478,16 @@ export const vm = new Vue({
                     perm: this.core.squad.perm,
                     guesses: this.core.squad.guesses
                 }
-            }).ok((data: OutfitReport) => { 
+            });
+
+            this.outfitReportResponse = outfitResponse;
+            console.log(`Have ${this.outfitReportResponse.getSteps().length} steps to complete`);
+
+            outfitResponse.ok((data: OutfitReport) => { 
                 this.outfitReport = data;
                 this.view = "ops";
                 response.resolveOk();
+                this.outfitReportResponse = null;
             });
 
             return response;

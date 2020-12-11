@@ -101,7 +101,7 @@ const ApiWrapper_1 = __webpack_require__(/*! ./census/ApiWrapper */ "../topt-cor
 const CensusAPI_1 = __webpack_require__(/*! ./census/CensusAPI */ "../topt-core/build/core/census/CensusAPI.js");
 const OutfitAPI_1 = __webpack_require__(/*! ./census/OutfitAPI */ "../topt-core/build/core/census/OutfitAPI.js");
 const CharacterAPI_1 = __webpack_require__(/*! ./census/CharacterAPI */ "../topt-core/build/core/census/CharacterAPI.js");
-const index_1 = __webpack_require__(/*! ./Objects/index */ "../topt-core/build/core/Objects/index.js");
+const index_1 = __webpack_require__(/*! ./objects/index */ "../topt-core/build/core/objects/index.js");
 const InvididualGenerator_1 = __webpack_require__(/*! ./InvididualGenerator */ "../topt-core/build/core/InvididualGenerator.js");
 const Loggers_1 = __webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Loggers.js");
 const log = Loggers_1.Logger.getLogger("Core");
@@ -134,6 +134,7 @@ class Core {
          */
         this.squad = {
             debug: false,
+            autoadd: false,
             perm: [],
             guesses: [],
             members: new Map(),
@@ -343,7 +344,7 @@ class Core {
      *
      * @param name Name of the player to track. Case-insensitive
      *
-     * @returns A loading that will contain the state of
+     * @returns An ApiResponse that will resolve when the character has been loaded and tracked
      */
     addPlayer(name) {
         if (this.connected == false) {
@@ -356,6 +357,32 @@ class Core {
         else {
             CharacterAPI_1.CharacterAPI.getByName(name).ok((data) => {
                 this.subscribeToEvents([data]);
+                response.resolveOk();
+            });
+        }
+        return response;
+    }
+    /**
+     * Being tracking a character by the character ID. Core must be connected before calling
+     *
+     * @param charID Character ID of the player to begin tracking
+     *
+     * @returns An ApiResponse that will resolve when the character has been loaded and tracked
+     */
+    addPlayerByID(charID) {
+        if (this.connected == false) {
+            throw `Cannot tracker character ${charID}: Core is not connected`;
+        }
+        const response = new ApiWrapper_1.ApiResponse();
+        if (charID.trim().length == 0) {
+            response.resolveOk();
+        }
+        else {
+            CharacterAPI_1.CharacterAPI.getByID(charID).ok((data) => {
+                this.subscribeToEvents([data]);
+                response.resolveOk();
+            }).notFound((err) => {
+                response.resolve({ code: 500, data: `Character ID ${charID} does not exist` });
             });
         }
         return response;
@@ -1405,8 +1432,36 @@ Core_1.Core.prototype.processExperienceEvent = function (event) {
     }
     const sourceMember = this.squad.members.get(event.sourceID);
     const targetMember = this.squad.members.get(event.targetID);
-    if (sourceMember == undefined || targetMember == undefined) {
+    // There are events that happen where no one is tracked
+    if (sourceMember == undefined && targetMember == undefined) {
         return;
+    }
+    if (this.squad.autoadd == false && (sourceMember == undefined || targetMember == undefined)) {
+        return;
+    }
+    if (this.squad.autoadd == true) {
+        if (squadEvents.indexOf(event.trueExpID) > -1) {
+            if (sourceMember == undefined && targetMember != undefined) {
+                log.info(`${event.sourceID} is not tracked, adding them to the tracker from ${JSON.stringify(event)}`);
+                this.addPlayerByID(event.sourceID).ok(() => {
+                    this.processExperienceEvent(event);
+                });
+            }
+            if (sourceMember != undefined && targetMember == undefined) {
+                log.info(`${event.targetID} is not tracked, adding them to the tracker from ${JSON.stringify(event)}`);
+                this.addPlayerByID(event.targetID).ok(() => {
+                    this.processExperienceEvent(event);
+                });
+            }
+            return;
+        }
+    }
+    if (this.squad.autoadd == true && (sourceMember == undefined || targetMember == undefined)) {
+        log.warn(`Not sure how we got here`);
+        return;
+    }
+    if (sourceMember == undefined || targetMember == undefined) {
+        throw `Bad logic above ^^^`;
     }
     let sourceSquad = this.getSquadOfMember(event.sourceID);
     let targetSquad = this.getSquadOfMember(event.targetID);
@@ -1632,6 +1687,7 @@ const InvididualGenerator_1 = __webpack_require__(/*! ./InvididualGenerator */ "
 const OutfitAPI_1 = __webpack_require__(/*! ./census/OutfitAPI */ "../topt-core/build/core/census/OutfitAPI.js");
 const Loggers_1 = __webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Loggers.js");
 const log = Loggers_1.Logger.getLogger("EventReporter");
+log.enableAll();
 class BreakdownArray {
     constructor() {
         this.data = [];
@@ -1850,15 +1906,18 @@ class EventReporter {
         const baseCaptures = [];
         const captures = data.captures;
         const players = data.players;
-        const outfitIDs = players
-            .map(iter => iter.outfitID)
-            .filter((value, index, arr) => arr.indexOf(value) == index);
         log.debug(`Have ${data.captures.length} captures`);
+        const outfitIDs = players.map(iter => iter.outfitID)
+            .filter((value, index, arr) => arr.indexOf(value) == index);
+        log.debug(`Getting these outfits: [${outfitIDs.join(", ")}]`);
         OutfitAPI_1.OutfitAPI.getByIDs(outfitIDs).ok((data) => {
             var _a, _b;
+            log.debug(`Loaded ${data.length}/${outfitIDs.length}. Processing ${captures.length} captures`);
             for (const capture of captures) {
                 // Same faction caps are boring
+                log.debug(`processing ${JSON.stringify(capture)}`);
                 if (capture.factionID == capture.previousFaction) {
+                    log.debug(`Skipping capture: ${JSON.stringify(capture)}`);
                     continue;
                 }
                 const entry = new BaseCapture();
@@ -2662,7 +2721,7 @@ const PsLoadout_1 = __webpack_require__(/*! ./census/PsLoadout */ "../topt-core/
 const PsEvent_1 = __webpack_require__(/*! ./PsEvent */ "../topt-core/build/core/PsEvent.js");
 const StatMap_1 = __webpack_require__(/*! ./StatMap */ "../topt-core/build/core/StatMap.js");
 const EventReporter_1 = __webpack_require__(/*! ./EventReporter */ "../topt-core/build/core/EventReporter.js");
-const TrackedPlayer_1 = __webpack_require__(/*! ./Objects/TrackedPlayer */ "../topt-core/build/core/Objects/TrackedPlayer.js");
+const TrackedPlayer_1 = __webpack_require__(/*! ./objects/TrackedPlayer */ "../topt-core/build/core/objects/TrackedPlayer.js");
 const Loggers_1 = __webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Loggers.js");
 const log = Loggers_1.Logger.getLogger("IndividualGenerator");
 class ClassBreakdown {
@@ -3813,203 +3872,6 @@ Logger.loggers = new Map();
 
 /***/ }),
 
-/***/ "../topt-core/build/core/Objects/BaseExchange.js":
-/*!*******************************************************!*\
-  !*** ../topt-core/build/core/Objects/BaseExchange.js ***!
-  \*******************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.BaseExchange = void 0;
-class BaseExchange {
-    constructor() {
-        /**
-         * ID of the facility that was captured
-         */
-        this.facilityID = "";
-        /**
-         * ID of the zone the capture took place
-         */
-        this.zoneID = "";
-        /**
-         * Timestamp of when the capture too place
-         */
-        this.timestamp = new Date();
-        /**
-         * How many ms the base was held before it was captured
-         */
-        this.timeHeld = 0;
-        /**
-         * ID of the faction that captured the base
-         */
-        this.factionID = "";
-        /**
-         * ID of the outfit that captured the base
-         */
-        this.outfitID = "";
-        /**
-         * ID of the previous faction that held the base before it was captured
-         */
-        this.previousFaction = "";
-    }
-}
-exports.BaseExchange = BaseExchange;
-
-
-/***/ }),
-
-/***/ "../topt-core/build/core/Objects/SquadStat.js":
-/*!****************************************************!*\
-  !*** ../topt-core/build/core/Objects/SquadStat.js ***!
-  \****************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.SquadStat = void 0;
-class SquadStat {
-    constructor() {
-        /**
-         * Name of the squad these stats are for
-         */
-        this.name = "";
-        /**
-         * Lets of members in the squad
-         */
-        this.members = [];
-        /**
-         * Number of kills people in the squad got
-         */
-        this.kills = 0;
-        /**
-         * Number of deaths people in the squad got
-         */
-        this.deaths = 0;
-        /**
-         * Number of revives the people in the squad got
-         */
-        this.revives = 0;
-        /**
-         * Number of heals people in the squad got
-         */
-        this.heals = 0;
-        /**
-         * Number of resupplies people in the squad got
-         */
-        this.resupplies = 0;
-        /**
-         * Number of repairs people in the squad got
-         */
-        this.repairs = 0;
-        /**
-         * Number of vehicle kills people in the squad got
-         */
-        this.vKills = 0;
-    }
-}
-exports.SquadStat = SquadStat;
-
-
-/***/ }),
-
-/***/ "../topt-core/build/core/Objects/TrackedPlayer.js":
-/*!********************************************************!*\
-  !*** ../topt-core/build/core/Objects/TrackedPlayer.js ***!
-  \********************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.TrackedPlayer = void 0;
-const StatMap_1 = __webpack_require__(/*! ../StatMap */ "../topt-core/build/core/StatMap.js");
-/**
- * Represents a character that is being tracked
- */
-class TrackedPlayer {
-    constructor() {
-        /**
-         * Unique character ID of the tracked player
-         */
-        this.characterID = "";
-        /**
-         * Tag of the outfit, if the character is in one
-         */
-        this.outfitTag = "";
-        /**
-         * Name of the character
-         */
-        this.name = "";
-        /**
-         * What faction the character is a part of
-         */
-        this.faction = "";
-        /**
-         * How much accumulated score a character has gotten during tracking
-         */
-        this.score = 0;
-        /**
-         * If this character is currently online
-         */
-        this.online = true;
-        /**
-         * What time (in MS) the character more recently joined, to a minimum of when the tracker started
-         */
-        this.joinTime = 0;
-        /**
-         * How many seconds the character has been online for
-         */
-        this.secondsOnline = 0;
-        /**
-         * How many times a character has gotten each experience event
-         */
-        this.stats = new StatMap_1.default();
-        /**
-         * How many times a character has gotten each ribbon
-         */
-        this.ribbons = new StatMap_1.default();
-        /**
-         * Reference to the most recent death event, used for tracking revives
-         */
-        this.recentDeath = null;
-        /**
-         * The events that have occured because of a player
-         */
-        this.events = [];
-    }
-}
-exports.TrackedPlayer = TrackedPlayer;
-
-
-/***/ }),
-
-/***/ "../topt-core/build/core/Objects/index.js":
-/*!************************************************!*\
-  !*** ../topt-core/build/core/Objects/index.js ***!
-  \************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.SquadStat = exports.TrackedPlayer = exports.BaseExchange = void 0;
-const BaseExchange_1 = __webpack_require__(/*! ./BaseExchange */ "../topt-core/build/core/Objects/BaseExchange.js");
-Object.defineProperty(exports, "BaseExchange", { enumerable: true, get: function () { return BaseExchange_1.BaseExchange; } });
-const TrackedPlayer_1 = __webpack_require__(/*! ./TrackedPlayer */ "../topt-core/build/core/Objects/TrackedPlayer.js");
-Object.defineProperty(exports, "TrackedPlayer", { enumerable: true, get: function () { return TrackedPlayer_1.TrackedPlayer; } });
-const SquadStat_1 = __webpack_require__(/*! ./SquadStat */ "../topt-core/build/core/Objects/SquadStat.js");
-Object.defineProperty(exports, "SquadStat", { enumerable: true, get: function () { return SquadStat_1.SquadStat; } });
-
-
-/***/ }),
-
 /***/ "../topt-core/build/core/Playback.js":
 /*!*******************************************!*\
   !*** ../topt-core/build/core/Playback.js ***!
@@ -4025,6 +3887,7 @@ const OutfitAPI_1 = __webpack_require__(/*! ./census/OutfitAPI */ "../topt-core/
 const ApiWrapper_1 = __webpack_require__(/*! ./census/ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
 const Loggers_1 = __webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Loggers.js");
 const log = Loggers_1.Logger.getLogger("Playback");
+log.enableAll();
 class PlaybackOptions {
     constructor() {
         this.speed = 0;
@@ -4041,13 +3904,13 @@ class Playback {
         }
         const response = new ApiWrapper_1.ApiResponse();
         if (typeof (file) == "string") {
-            log.trace(`using a string`);
+            log.debug(`using a string`);
             this.process(file).ok(() => {
                 response.resolveOk();
             });
         }
         else {
-            log.trace(`using a file`);
+            log.debug(`using a file`);
             const reader = new FileReader();
             reader.onload = ((ev) => {
                 this.process(reader.result).ok(() => {
@@ -4089,6 +3952,7 @@ class Playback {
                 }
                 OutfitAPI_1.OutfitAPI.getByIDs(outfitIDs).ok((data) => {
                     this._core.outfits = data;
+                    log.info(`From [${outfitIDs.join(", ")}] loaded: ${JSON.stringify(data)}`);
                 }).always(() => {
                     response.resolveOk();
                 });
@@ -4778,6 +4642,7 @@ AchievementAPI.unknown = {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.APIWrapper = exports.ApiResponse = void 0;
 const axios = __webpack_require__(/*! axios */ "../topt-core/node_modules/axios/index.js");
+const log = __webpack_require__(/*! loglevel */ "../topt-core/node_modules/loglevel/lib/loglevel.js");
 // Default to void as undefined is assignable to void. Would prefer to use never, but there is
 // no default value for never, and never cannot be assigned
 /**
@@ -4810,6 +4675,7 @@ class ApiResponse {
          * constructor is called (due to the late timeout) will immediately be ran
          */
         this._resolved = false;
+        this._steps = null;
         if (responseData == null) {
             return;
         }
@@ -4837,65 +4703,6 @@ class ApiResponse {
         }).catch((error) => {
             throw `Don't expect this: ${error}`;
         });
-        /*
-        // JQuery uses data and jq differently depending on if the request is rejected (status code 404/500)
-        // or accepted (anything but a 404/500), so that's pretty neat :^)
-        responseData.always((data: any, state: string, jq: any) => {
-            let localStatus: number = 0;
-            let localData: T | null | number | string = null;
-            let localUrl: string = "";
-            let localMethod: string = "";
-
-            if (state == "success") { // data is the object, jq is the JQueryXHR
-                if (jq.status === undefined) { throw `Failed to get the status from jq`; }
-                localStatus = Number(jq.status);
-                localUrl = jq.url;
-                localMethod = jq.method;
-
-                if (reader != null && jq.status == 200) {
-                    if (data.error != undefined || data.errorCode != undefined || data == "") {
-                        localStatus = 500;
-                        localData = data;
-                    } else {
-                        localData = reader(data);
-                    }
-                } else {
-                    localData = data;
-                }
-            } else if (state == "error") { // data is the JQueryXHR, jq is the status code string
-                if (data.status === undefined || data.responseText === undefined) {
-                    throw `Invalid data ${data}`;
-                }
-
-                localStatus = Number(data.status);
-                localData = String(data.responseText);
-                localUrl = data.url;
-                localMethod = data.method;
-            } else if (state == "nocontent") {
-                localStatus = 204;
-                localData = null;
-                localUrl = jq.url;
-                localMethod = jq.method;
-            } else {
-                debugger;
-                throw `Unhandled state ${state}`;
-            }
-
-            // TODO: Get rid of this any
-            // I need to figure out a way to remove this any. Because the type of each element in codes is
-            //      a ResponseCode, not a number, and localStatus is a number, TS assumes that this can't be possible,
-            //      when in fact it is
-            if (ApiResponse.codes.indexOf(localStatus as any) == -1) {
-                throw `Unhandle status code: ${localStatus}`;
-            }
-
-            // TODO: AHHHH, it's an any!
-            // I need to find a better way to do this. Because the type of data is not known, Typescript rightly
-            //      assumes that code could be 204 and data is a string, which doesn't meet the requirements of a
-            //      ResponseContent. Maybe use a switch on localStatus?
-            this.resolve({ code: localStatus as ResponseCodes, data: localData } as any);
-        });
-        */
     }
     isResolved() { return this._resolved; }
     /**
@@ -4936,7 +4743,54 @@ class ApiResponse {
      * @param data Data to resolve this response with
      */
     resolveOk(data) {
+        if (this._steps != null) {
+            const steps = this.getSteps();
+            let notDone = [];
+            for (const step of steps) {
+                if (this.getStepState(step) != "done") {
+                    notDone.push(step);
+                }
+            }
+            if (notDone.length > 0) {
+                log.warn(`The following steps are not done: [${notDone.join(", ")}]`);
+            }
+        }
         this.resolve({ code: 200, data: data });
+    }
+    addStep(step) {
+        if (this._steps == null) {
+            this._steps = new Map();
+        }
+        if (this._steps.has(step)) {
+            log.warn(`Duplicate step '${step}' in ApiResponse. Current steps: ${Array.from(this._steps.keys()).join(", ")}`);
+        }
+        this._steps.set(step, "working");
+        return this;
+    }
+    updateStep(step, state) {
+        if (this._steps == null) {
+            log.warn(`Cannot update setp '${step}' to ${state}: No steps have been created`);
+            return;
+        }
+        if (!this._steps.has(step)) {
+            log.warn(`Cannot update step '${step}' to ${state}: Step not found`);
+        }
+        this._steps.set(step, state);
+    }
+    finishStep(step) {
+        this.updateStep(step, "done");
+    }
+    getSteps() {
+        if (this._steps == null) {
+            throw `No steps defined. Cannot get steps`;
+        }
+        return Array.from(this._steps.keys());
+    }
+    getStepState(step) {
+        if (this._steps == null) {
+            throw `Not steps defined. Cannot get step state`;
+        }
+        return this._steps.get(step) || null;
     }
     /**
      * Forward the resolution of a response to a different ApiResponse. If a callback for the status code has already
@@ -5603,16 +5457,14 @@ class FacilityAPI {
         for (const facID of IDs) {
             if (FacilityAPI._cache.has(facID)) {
                 const fac = FacilityAPI._cache.get(facID);
-                if (fac != null) {
-                    facilities.push(fac);
-                }
+                facilities.push(fac);
             }
             else {
                 requestIDs.push(facID);
             }
         }
         if (requestIDs.length > 0) {
-            const request = CensusAPI_1.default.get(`/map_region?facility_id=${requestIDs.join(",")}`);
+            const request = CensusAPI_1.default.get(`/map_region?facility_id=${requestIDs.join(",")}&c:limit=100`);
             request.ok((data) => {
                 if (data.returned == 0) {
                     if (facilities.length == 0) {
@@ -6442,6 +6294,117 @@ exports.BaseExchange = BaseExchange;
 
 /***/ }),
 
+/***/ "../topt-core/build/core/objects/BaseFightEncounter.js":
+/*!*************************************************************!*\
+  !*** ../topt-core/build/core/objects/BaseFightEncounter.js ***!
+  \*************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.BaseFightEncounter = void 0;
+class BaseFightEncounter {
+    constructor() {
+        /**
+         * In milliseconds
+         */
+        this.timestamp = 0;
+        this.sourceID = "";
+        this.targetID = "";
+        this.outcome = "unknown";
+    }
+}
+exports.BaseFightEncounter = BaseFightEncounter;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/objects/BaseFightEntry.js":
+/*!*********************************************************!*\
+  !*** ../topt-core/build/core/objects/BaseFightEntry.js ***!
+  \*********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.BaseFightEntry = void 0;
+class BaseFightEntry {
+    constructor() {
+        this.charID = "";
+        this.name = "";
+        this.score = 0;
+        this.kills = [];
+        this.deaths = [];
+        this.events = [];
+    }
+}
+exports.BaseFightEntry = BaseFightEntry;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/objects/BaseOverview.js":
+/*!*******************************************************!*\
+  !*** ../topt-core/build/core/objects/BaseOverview.js ***!
+  \*******************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.BaseOverview = void 0;
+class BaseOverview {
+    constructor() {
+        this.facilityID = "";
+        this.facilityName = "";
+        this.facilityType = "";
+        this.fightDuration = 0;
+        this.participants = [];
+        this.events = [];
+        this.encounters = [];
+        this.enc = [];
+        this.top = {
+            kills: ["", 0],
+            heals: ["", 0],
+            revives: ["", 0],
+            resupplies: ["", 0],
+        };
+    }
+}
+exports.BaseOverview = BaseOverview;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/objects/BaseStatus.js":
+/*!*****************************************************!*\
+  !*** ../topt-core/build/core/objects/BaseStatus.js ***!
+  \*****************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.BaseStatus = void 0;
+class BaseStatus {
+    constructor() {
+        this.timestamp = 0;
+        this.alive = 0;
+        this.dead = 0;
+        this.total = 0;
+    }
+}
+exports.BaseStatus = BaseStatus;
+
+
+/***/ }),
+
 /***/ "../topt-core/build/core/objects/SquadStat.js":
 /*!****************************************************!*\
   !*** ../topt-core/build/core/objects/SquadStat.js ***!
@@ -6580,13 +6543,21 @@ exports.TrackedPlayer = TrackedPlayer;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SquadStat = exports.TrackedPlayer = exports.BaseExchange = void 0;
+exports.BaseStatus = exports.BaseFightEncounter = exports.BaseFightEntry = exports.BaseOverview = exports.SquadStat = exports.TrackedPlayer = exports.BaseExchange = void 0;
 const BaseExchange_1 = __webpack_require__(/*! ./BaseExchange */ "../topt-core/build/core/objects/BaseExchange.js");
 Object.defineProperty(exports, "BaseExchange", { enumerable: true, get: function () { return BaseExchange_1.BaseExchange; } });
 const TrackedPlayer_1 = __webpack_require__(/*! ./TrackedPlayer */ "../topt-core/build/core/objects/TrackedPlayer.js");
 Object.defineProperty(exports, "TrackedPlayer", { enumerable: true, get: function () { return TrackedPlayer_1.TrackedPlayer; } });
 const SquadStat_1 = __webpack_require__(/*! ./SquadStat */ "../topt-core/build/core/objects/SquadStat.js");
 Object.defineProperty(exports, "SquadStat", { enumerable: true, get: function () { return SquadStat_1.SquadStat; } });
+const BaseOverview_1 = __webpack_require__(/*! ./BaseOverview */ "../topt-core/build/core/objects/BaseOverview.js");
+Object.defineProperty(exports, "BaseOverview", { enumerable: true, get: function () { return BaseOverview_1.BaseOverview; } });
+const BaseFightEntry_1 = __webpack_require__(/*! ./BaseFightEntry */ "../topt-core/build/core/objects/BaseFightEntry.js");
+Object.defineProperty(exports, "BaseFightEntry", { enumerable: true, get: function () { return BaseFightEntry_1.BaseFightEntry; } });
+const BaseFightEncounter_1 = __webpack_require__(/*! ./BaseFightEncounter */ "../topt-core/build/core/objects/BaseFightEncounter.js");
+Object.defineProperty(exports, "BaseFightEncounter", { enumerable: true, get: function () { return BaseFightEncounter_1.BaseFightEncounter; } });
+const BaseStatus_1 = __webpack_require__(/*! ./BaseStatus */ "../topt-core/build/core/objects/BaseStatus.js");
+Object.defineProperty(exports, "BaseStatus", { enumerable: true, get: function () { return BaseStatus_1.BaseStatus; } });
 
 
 /***/ }),
@@ -6607,7 +6578,7 @@ const PsLoadout_1 = __webpack_require__(/*! ../census/PsLoadout */ "../topt-core
 const PsEvent_1 = __webpack_require__(/*! ../PsEvent */ "../topt-core/build/core/PsEvent.js");
 const EventReporter_1 = __webpack_require__(/*! ../EventReporter */ "../topt-core/build/core/EventReporter.js");
 const InvididualGenerator_1 = __webpack_require__(/*! ../InvididualGenerator */ "../topt-core/build/core/InvididualGenerator.js");
-const index_1 = __webpack_require__(/*! ../Objects/index */ "../topt-core/build/core/Objects/index.js");
+const index_1 = __webpack_require__(/*! ../objects/index */ "../topt-core/build/core/objects/index.js");
 const Squad_1 = __webpack_require__(/*! ../squad/Squad */ "../topt-core/build/core/squad/Squad.js");
 const FacilityAPI_1 = __webpack_require__(/*! ../census/FacilityAPI */ "../topt-core/build/core/census/FacilityAPI.js");
 const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
@@ -6824,32 +6795,40 @@ class OutfitReportGenerator {
         const response = new ApiWrapper_1.ApiResponse();
         const report = new OutfitReport();
         report.tracking = parameters.tracking;
-        let opsLeft = +1 // Facility captures
-            + 1 // Weapon kills
-            + 1 // Weapon type kills
-            + 1 // Teamkills
-            + 1 // Faction kills
-            + 1 // Faction deaths
-            + 1 // Cont kills
-            + 1 // Cont deaths
-            + 1 // All weapon deaths
-            + 1 // Unrevived weapon deaths
-            + 1 // Revived weapon deaths
-            + 1 // All weapon type deaths
-            + 1 // Unrevived weapon type deaths
-            + 1 // Revived weapon type deaths
-            + 1 // Weapon death breakdown
-            + 6 // Weapon kill types for all classes
-            + 6 // Weapon death types for all classes
-            + 1 // Outfit VS KD
-            + 1 // Vehicle kills
-            + 1; // Vehicle weapon kills
+        response.addStep("Facility captures")
+            .addStep("Weapon kills")
+            .addStep("Weapon type kills")
+            .addStep("Teamkills")
+            .addStep("Faction kills")
+            .addStep("Faction deaths")
+            .addStep("Continent kills")
+            .addStep("Continent deaths")
+            .addStep("All weapon deaths")
+            .addStep("Unrevived weapon deaths")
+            .addStep("Revived weapon deaths")
+            .addStep("All weapon type deaths")
+            .addStep("Unrevived weapon type deaths")
+            .addStep("Revived weapon type deaths")
+            .addStep("Weapon death breakdown")
+            .addStep("Outfit KD")
+            .addStep("Vehicle kills")
+            .addStep("Vehicle weapon kills");
+        for (const clazz of ["Infil", "LA", "Medic", "Engineer", "Heavy", "MAX"]) {
+            response.addStep(`Weapon type kills for ${clazz}`);
+            response.addStep(`Weapon type deaths for ${clazz}`);
+        }
+        let opsLeft = response.getSteps().length;
         const totalOps = opsLeft;
         const facilityIDs = parameters.captures.filter(iter => parameters.outfits.indexOf(iter.outfitID) > -1)
             .map(iter => iter.facilityID)
             .filter((value, index, arr) => arr.indexOf(value) == index);
         FacilityAPI_1.FacilityAPI.getByIDs(facilityIDs).ok((data) => {
+            log.debug(`Got these facilities when loaded: [${facilityIDs.join(", ")}]:\n${JSON.stringify(data)}`);
+            let missing = [];
             for (const capture of parameters.captures) {
+                if (parameters.outfits.indexOf(capture.outfitID) == -1) {
+                    continue;
+                }
                 const facility = data.find(iter => iter.ID == capture.facilityID);
                 if (facility != undefined) {
                     const cap = {
@@ -6860,32 +6839,36 @@ class OutfitReportGenerator {
                         type: facility.type,
                         timestamp: capture.timestamp,
                         timeHeld: capture.timeHeld,
-                        factionID: capture.facilityID,
+                        factionID: capture.factionID,
                         outfitID: capture.outfitID,
                         previousFaction: capture.previousFaction
                     };
                     report.facilityCaptures.push(cap);
                 }
                 else {
-                    log.warn(`Failed to find facility ID ${capture.facilityID}`);
+                    if (missing.indexOf(capture.facilityID) == -1) {
+                        log.warn(`Failed to find facility ID ${capture.facilityID}`);
+                        missing.push(capture.facilityID);
+                    }
                 }
             }
             report.facilityCaptures.sort((a, b) => {
                 return a.timestamp.getTime() - b.timestamp.getTime();
             });
+            EventReporter_1.default.facilityCaptures({
+                captures: report.facilityCaptures,
+                players: parameters.playerCaptures
+            }).ok(data => report.baseCaptures = data).always(callback("Facility captures"));
         });
         const callback = (step) => {
             return () => {
                 log.debug(`Finished ${step}: Have ${opsLeft - 1} ops left outta ${totalOps}`);
+                response.finishStep(step);
                 if (--opsLeft == 0) {
                     response.resolveOk(report);
                 }
             };
         };
-        EventReporter_1.default.facilityCaptures({
-            captures: report.facilityCaptures,
-            players: parameters.playerCaptures
-        }).ok(data => report.baseCaptures = data).always(callback("Facility captures"));
         const chars = Array.from(parameters.players.values());
         report.kpmBoxPlot = {
             total: EventReporter_1.default.kpmBoxplot(chars, parameters.tracking),
@@ -7019,8 +7002,8 @@ class OutfitReportGenerator {
         EventReporter_1.default.weaponTeamkills(report.events).ok(data => report.teamkillBreakdown = data).always(callback("Teamkills"));
         EventReporter_1.default.factionKills(report.events).ok(data => report.factionKillBreakdown = data).always(callback("Faction kills"));
         EventReporter_1.default.factionDeaths(report.events).ok(data => report.factionDeathBreakdown = data).always(callback("Faction deaths"));
-        EventReporter_1.default.continentKills(report.events).ok(data => report.continentKillBreakdown = data).always(callback("Cont kills"));
-        EventReporter_1.default.continentDeaths(report.events).ok(data => report.continentDeathBreakdown = data).always(callback("Cont deaths"));
+        EventReporter_1.default.continentKills(report.events).ok(data => report.continentKillBreakdown = data).always(callback("Continent kills"));
+        EventReporter_1.default.continentDeaths(report.events).ok(data => report.continentDeathBreakdown = data).always(callback("Continent deaths"));
         EventReporter_1.default.weaponDeaths(report.events).ok(data => report.deathAllBreakdown = data).always(callback("All weapon deaths"));
         EventReporter_1.default.weaponDeaths(report.events, true).ok(data => report.deathRevivedBreakdown = data).always(callback("Revived weapon deaths"));
         EventReporter_1.default.weaponDeaths(report.events, false).ok(data => report.deathKilledBreakdown = data).always(callback("Unrevived weapon deaths"));
@@ -7041,29 +7024,29 @@ class OutfitReportGenerator {
             return false;
         };
         EventReporter_1.default.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["1", "8", "15"])))
-            .ok(data => report.classTypeKills.infil = data).always(callback("Weapon type kills: Infil"));
+            .ok(data => report.classTypeKills.infil = data).always(callback("Weapon type kills for Infil"));
         EventReporter_1.default.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["3", "10", "17"])))
-            .ok(data => report.classTypeKills.lightAssault = data).always(callback("Weapon type kills: LA"));
+            .ok(data => report.classTypeKills.lightAssault = data).always(callback("Weapon type kills for LA"));
         EventReporter_1.default.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["4", "11", "18"])))
-            .ok(data => report.classTypeKills.medic = data).always(callback("Weapon type kills: Medic"));
+            .ok(data => report.classTypeKills.medic = data).always(callback("Weapon type kills for Medic"));
         EventReporter_1.default.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["5", "12", "19"])))
-            .ok(data => report.classTypeKills.engineer = data).always(callback("Weapon type kills: Eng"));
+            .ok(data => report.classTypeKills.engineer = data).always(callback("Weapon type kills for Engineer"));
         EventReporter_1.default.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["6", "13", "20"])))
-            .ok(data => report.classTypeKills.heavy = data).always(callback("Weapon type kills: Heavy"));
+            .ok(data => report.classTypeKills.heavy = data).always(callback("Weapon type kills for Heavy"));
         EventReporter_1.default.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["7", "14", "21"])))
-            .ok(data => report.classTypeKills.max = data).always(callback("Weapon type kills: MAX"));
+            .ok(data => report.classTypeKills.max = data).always(callback("Weapon type kills for MAX"));
         EventReporter_1.default.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["1", "8", "15"])))
-            .ok(data => report.classTypeDeaths.infil = data).always(callback("Weapon type deaths: Infil"));
+            .ok(data => report.classTypeDeaths.infil = data).always(callback("Weapon type deaths for Infil"));
         EventReporter_1.default.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["3", "10", "17"])))
-            .ok(data => report.classTypeDeaths.lightAssault = data).always(callback("Weapon type deaths: LA"));
+            .ok(data => report.classTypeDeaths.lightAssault = data).always(callback("Weapon type deaths for LA"));
         EventReporter_1.default.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["4", "11", "18"])))
-            .ok(data => report.classTypeDeaths.medic = data).always(callback("Weapon type deaths: Medic"));
+            .ok(data => report.classTypeDeaths.medic = data).always(callback("Weapon type deaths for Medic"));
         EventReporter_1.default.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["5", "12", "19"])))
-            .ok(data => report.classTypeDeaths.engineer = data).always(callback("Weapon type deaths: Eng"));
+            .ok(data => report.classTypeDeaths.engineer = data).always(callback("Weapon type deaths for Engineer"));
         EventReporter_1.default.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["6", "13", "20"])))
-            .ok(data => report.classTypeDeaths.heavy = data).always(callback("Weapon type deaths: Heavy"));
+            .ok(data => report.classTypeDeaths.heavy = data).always(callback("Weapon type deaths for Heavy"));
         EventReporter_1.default.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["7", "14", "21"])))
-            .ok(data => report.classTypeDeaths.max = data).always(callback("Weapon type deaths: MAX"));
+            .ok(data => report.classTypeDeaths.max = data).always(callback("Weapon type deaths for MAX"));
         report.classKds.infil = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events, "infil");
         report.classKds.lightAssault = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events, "lightAssault");
         report.classKds.medic = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events, "medic");
@@ -7071,8 +7054,8 @@ class OutfitReportGenerator {
         report.classKds.heavy = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events, "heavy");
         report.classKds.max = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events, "max");
         report.classKds.total = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events);
-        EventReporter_1.default.outfitVersusBreakdown(report.events).ok(data => report.outfitVersusBreakdown = data).always(callback("Outfit VS KD"));
-        EventReporter_1.default.vehicleKills(report.events).ok(data => report.vehicleKillBreakdown = data).always(callback("Vehicle type kills"));
+        EventReporter_1.default.outfitVersusBreakdown(report.events).ok(data => report.outfitVersusBreakdown = data).always(callback("Outfit KD"));
+        EventReporter_1.default.vehicleKills(report.events).ok(data => report.vehicleKillBreakdown = data).always(callback("Vehicle kills"));
         EventReporter_1.default.vehicleWeaponKills(report.events).ok(data => report.vehicleKillWeaponBreakdown = data).always(callback("Vehicle weapon kills"));
         const getSquadStats = (squad, name) => {
             const squadIDs = squad.members.map(iter => iter.charID);
@@ -70635,140 +70618,6 @@ window.StorageHelper = StorageHelper;
 
 /***/ }),
 
-/***/ "./src/addons/Playback.ts":
-/*!********************************!*\
-  !*** ./src/addons/Playback.ts ***!
-  \********************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.Playback = exports.PlaybackOptions = void 0;
-const tcore_1 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
-const tcore_2 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
-const log = (msg) => {
-    console.log(`[Playback] ${msg}`);
-};
-const warn = (msg) => {
-    console.warn(`[Playback] ${msg}`);
-};
-const error = (msg) => {
-    console.error(`[Playback] ${msg}`);
-};
-const debug = (msg) => {
-    console.log(`[Playback] ${msg}`);
-};
-class PlaybackOptions {
-    constructor() {
-        this.speed = 0;
-    }
-}
-exports.PlaybackOptions = PlaybackOptions;
-class Playback {
-    static setCore(core) {
-        Playback._core = core;
-    }
-    static loadFile(file) {
-        if (Playback._core == null) {
-            throw `Cannot load file: Core has not been set. Did you forget to use Playback.setCore()?`;
-        }
-        Playback._file = file;
-        const response = new tcore_2.ApiResponse();
-        const reader = new FileReader();
-        reader.onload = ((ev) => {
-            const data = JSON.parse(reader.result);
-            if (!data.version) {
-                error(`Missing version from import`);
-            }
-            else if (data.version == "1") {
-                const nowMs = new Date().getTime();
-                debug(`Exported data uses version 1`);
-                const chars = data.players;
-                const outfits = data.outfits;
-                const events = data.events;
-                // Force online for squad tracking
-                this._core.subscribeToEvents(chars.map(iter => { iter.online = iter.secondsPlayed > 0; return iter; }));
-                tcore_1.OutfitAPI.getByIDs(outfits).ok((data) => {
-                    this._core.outfits = data;
-                });
-                if (events != undefined && events.length != 0) {
-                    Playback._events = events;
-                    const parsedData = events.map(iter => JSON.parse(iter));
-                    Playback._parsed = parsedData;
-                }
-                debug(`Took ${new Date().getTime() - nowMs}ms to import data`);
-                response.resolveOk();
-            }
-            else {
-                error(`Unchecked version: ${data.version}`);
-                response.resolve({ code: 400, data: `` });
-            }
-        });
-        reader.readAsText(file);
-        return response;
-    }
-    static start(parameters) {
-        if (this._core == null) {
-            throw `Cannot start playback, core is null. Did you forget to call Playback.setCore()?`;
-        }
-        // Instant playback
-        if (parameters.speed <= 0) {
-            debug(`Doing instant playback`);
-            this._core.tracking.startTime = Math.min(...Playback._parsed.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
-            this._core.tracking.endTime = Math.max(...Playback._parsed.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
-            for (const ev of Playback._events) {
-                this._core.processMessage(ev, true);
-            }
-            this._core.stop();
-        }
-        else {
-            const start = Math.min(...Playback._parsed.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
-            const end = Math.max(...Playback._parsed.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
-            this._core.tracking.startTime = start;
-            const slots = new Map();
-            for (const ev of Playback._parsed) {
-                const time = Number.parseInt(ev.payload.timestamp) * 1000;
-                if (Number.isNaN(time)) {
-                    warn(`Failed to get a timestamp from ${ev}`);
-                }
-                const diff = time - start;
-                if (!slots.has(diff)) {
-                    slots.set(diff, []);
-                }
-                slots.get(diff).push(ev);
-            }
-            let index = 0;
-            const intervalID = setInterval(() => {
-                if (!slots.has(index)) {
-                    debug(`Index ${index} has no events, skipping`);
-                }
-                else {
-                    const events = slots.get(index);
-                    for (const ev of events) {
-                        this._core.processMessage(JSON.stringify(ev), true);
-                    }
-                }
-                index += 1000;
-                if (index > end) {
-                    debug(`Ended on index ${index}`);
-                    clearInterval(intervalID);
-                }
-            }, 1000 * parameters.speed);
-        }
-    }
-}
-exports.Playback = Playback;
-Playback._core = null;
-Playback._file = null;
-Playback._events = [];
-Playback._parsed = [];
-window.Playback = Playback;
-
-
-/***/ }),
-
 /***/ "./src/addons/SquadAddon.ts":
 /*!**********************************!*\
   !*** ./src/addons/SquadAddon.ts ***!
@@ -70898,9 +70747,11 @@ const tcore_8 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.
 const tcore_9 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
 const tcore_10 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
 const tcore_11 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
-const Playback_1 = __webpack_require__(/*! addons/Playback */ "./src/addons/Playback.ts");
+const tcore_12 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
 const SquadAddon_1 = __webpack_require__(/*! addons/SquadAddon */ "./src/addons/SquadAddon.ts");
 const Storage_1 = __webpack_require__(/*! Storage */ "./src/Storage.ts");
+const tcore_13 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
+window.CharacterAPI = tcore_13.CharacterAPI;
 window.$ = $;
 exports.vm = new vue_1.default({
     el: "#app",
@@ -70954,6 +70805,7 @@ exports.vm = new vue_1.default({
         },
         outfitReport: new tcore_6.OutfitReport(),
         opsReportSettings: new tcore_6.OutfitReportSettings(),
+        outfitReportResponse: null,
         refreshIntervalID: -1,
         loadingOutfit: false,
         showFrog: false,
@@ -71047,9 +70899,9 @@ exports.vm = new vue_1.default({
                 return console.warn(`Cannot import data, no file selected`);
             }
             const file = input.files[0];
-            Playback_1.Playback.setCore(this.core);
-            Playback_1.Playback.loadFile(file).ok(() => {
-                Playback_1.Playback.start({ speed: 0.0 });
+            tcore_12.Playback.setCore(this.core);
+            tcore_12.Playback.loadFile(file).ok(() => {
+                tcore_12.Playback.start({ speed: 0.0 });
             });
         },
         exportData: function () {
@@ -71194,16 +71046,22 @@ exports.vm = new vue_1.default({
         },
         generateReport: function () {
             if (this.parameters.report == "ops") {
-                this.generateOutfitReport();
+                this.generateOutfitReport().ok(() => {
+                    $("#report-modal").modal("hide");
+                    this.parameters.report = "";
+                    console.log(`Report generated`);
+                });
             }
             else if (this.parameters.report == "winter") {
                 this.generateWinterReport();
+                $("#report-modal").modal("hide");
+                this.parameters.report = "";
             }
             else if (this.parameters.report == "personal") {
                 this.generateAllReports();
+                $("#report-modal").modal("hide");
+                this.parameters.report = "";
             }
-            $("#report-modal").modal("hide");
-            this.parameters.report = "";
         },
         generateOutfitReport: function () {
             const response = new tcore_1.ApiResponse();
@@ -71213,7 +71071,7 @@ exports.vm = new vue_1.default({
             });
             events.push(...this.core.miscEvents);
             events = events.sort((a, b) => a.timestamp - b.timestamp);
-            tcore_6.OutfitReportGenerator.generate({
+            const outfitResponse = tcore_6.OutfitReportGenerator.generate({
                 settings: {
                     zoneID: null,
                     showSquadStats: this.opsReportSettings.showSquadStats
@@ -71228,10 +71086,14 @@ exports.vm = new vue_1.default({
                     perm: this.core.squad.perm,
                     guesses: this.core.squad.guesses
                 }
-            }).ok((data) => {
+            });
+            this.outfitReportResponse = outfitResponse;
+            console.log(`Have ${this.outfitReportResponse.getSteps().length} steps to complete`);
+            outfitResponse.ok((data) => {
                 this.outfitReport = data;
                 this.view = "ops";
                 response.resolveOk();
+                this.outfitReportResponse = null;
             });
             return response;
         },
@@ -71480,13 +71342,12 @@ window.vm = exports.vm;
 /***/ }),
 
 /***/ 0:
-/*!******************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
-  !*** multi ./src/addons/Playback.ts ./src/addons/SquadAddon.ts ./src/app/App.ts ./src/app/AppRealtime.ts ./src/BreakdownBar.ts ./src/BreakdownBox.ts ./src/BreakdownChart.ts ./src/BreakdownInterval.ts ./src/BreakdownList.ts ./src/ColorHelper.ts ./src/index.ts ./src/KillfeedSquad.ts ./src/Loadable.ts ./src/MomentFilter.ts ./src/OutfitTrends.ts ./src/PersonalReportGenerator.ts ./src/Quartile.ts ./src/Storage.ts ***!
-  \******************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+/*!*****************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** multi ./src/addons/SquadAddon.ts ./src/app/App.ts ./src/app/AppRealtime.ts ./src/BreakdownBar.ts ./src/BreakdownBox.ts ./src/BreakdownChart.ts ./src/BreakdownInterval.ts ./src/BreakdownList.ts ./src/ColorHelper.ts ./src/index.ts ./src/KillfeedSquad.ts ./src/Loadable.ts ./src/MomentFilter.ts ./src/OutfitTrends.ts ./src/PersonalReportGenerator.ts ./src/Quartile.ts ./src/Storage.ts ***!
+  \*****************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
-__webpack_require__(/*! ./src/addons/Playback.ts */"./src/addons/Playback.ts");
 __webpack_require__(/*! ./src/addons/SquadAddon.ts */"./src/addons/SquadAddon.ts");
 __webpack_require__(/*! ./src/app/App.ts */"./src/app/App.ts");
 __webpack_require__(/*! ./src/app/AppRealtime.ts */"./src/app/AppRealtime.ts");

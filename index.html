@@ -1595,6 +1595,127 @@
             </template>
         </div>
 
+        <div v-else-if="view == 'example'" class="row">
+            <div class="col-12">
+                <div class="row">
+                    <div class="col-12">
+                        <h2>Capture - Hvar (Tech Plant)</h2>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-4">
+                        <div>
+                            <b>Start:</b> 2020-12-08 07:15:30PM
+                        </div>
+                        <div>
+                            <b>End:</b> 2020-12-08 07:22:30PM
+                        </div>
+                        <div>
+                            <b>Duration:</b> 7 minutes 0 seconds
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div>
+                            <b>Participants:</b> 22 attackers (10 tracked) / 31 defenders (0 tracked)
+                        </div>
+                        <div>
+                            <b>Heavies/Medics/Other:</b> 5/4/1
+                        </div>
+                        <div>
+                            <b>Previous owner: </b> FNXS - Pheonix Syndicate (NC) 
+                        </div>
+                    </div>
+                </div>
+
+                <hr>
+
+                <div class="row">
+                    <div class="col-4">
+                        <h4>Percent alive</h4>
+                        <breakdown-interval :src="exampleSlots" :show-labels="false"></breakdown-interval>
+                    </div>
+                    <div class="col-4">
+                        <h4>Top contributers:</h4>
+                        <table class="table table-sm">
+                            <tr class="table-secondary">
+                                <th>Action</th>
+                                <th>Player/Amount</th>
+                            </tr>
+
+                            <tr>
+                                <td>Kills</td>
+                                <td>Asc3nder / 14</td>
+                            </tr>
+
+                            <tr>
+                                <td>Heals</td>
+                                <td>RedFranz / 44</td>
+                            </tr>
+
+                            <tr>
+                                <td>Revives</td>
+                                <td>RedFranz / 35</td>
+                            </tr>
+
+                            <tr>
+                                <td>Resupplies</td>
+                                <td>Letus / 90</td>
+                            </tr>
+
+                            <tr>
+                                <td>Spawns</td>
+                                <td>Hypochaeris / 78</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-4">
+                        <h4>Participant stats:</h4>
+
+                        <table class="table table-sm">
+                            <tr class="table-secondary">
+                                <th>Stat</th>
+                                <th>Average</th>
+                                <th>Total</th>
+                            </tr>
+
+                            <tr>
+                                <td>K/D</td>
+                                <td>3.56</td>
+                                <td>--</td>
+                            </tr>
+
+                            <tr>
+                                <td>KPM</td>
+                                <td>1.2</td>
+                                <th>--</th>
+                            </tr>
+
+                            <tr>
+                                <td>Kills</td>
+                                <td>8.4</td>
+                                <td>84</td>
+                            </tr>
+
+                            <tr>
+                                <td>RPM</td>
+                                <td>2.2</td>
+                                <td>--</td>
+                            </tr>
+
+                            <tr>
+                                <td>Revives</td>
+                                <td>15.4</td>
+                                <td>77</td>
+                            </tr>
+                        </table>
+
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
         <div v-else>
             Unknown view: {{view}}
 
@@ -1643,6 +1764,10 @@
             </div>
         </div>
 
+        <div class="modal" id="outfit-report-modal">
+
+        </div>
+
         <div class="modal" id="report-modal">
             <div class="modal-dialog">
                 <div class="modal-content">
@@ -1672,6 +1797,27 @@
                                 <option :value="true">Yes</option>
                                 <option :value="false">No</option>
                             </select>
+
+                            <hr>
+
+                            <div v-if="outfitReportResponse != null">
+                                Progresss:
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>Step</th>
+                                            <th>State</th>
+                                        </tr>
+                                    </thead>
+
+                                    <tbody>
+                                        <tr v-for="step in outfitReportResponse.getSteps()">
+                                            <td>{{step}}</td>
+                                            <td>{{outfitReportResponse.getStepState(step)}}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
 
                         <div v-else-if="parameters.report == 'winter'">
@@ -1715,7 +1861,7 @@
                         <hr>
 
                         <button @click="generateReport" :disabled="parameters.report == ''"
-                                class="btn btn-success" data-dismiss="modal">
+                                class="btn btn-success">
                             Generate
                         </button>
                     </div>
