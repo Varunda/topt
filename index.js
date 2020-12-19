@@ -196,7 +196,8 @@ class Core {
             defend: [],
             vehicle: [],
             login: [],
-            logout: []
+            logout: [],
+            marker: []
         };
         this.serviceID = serviceID;
         this.serverID = serverID;
@@ -247,6 +248,9 @@ class Core {
             case "logout":
                 this.handlers.logout.push(handler);
                 break;
+            case "marker":
+                this.handlers.marker.push(handler);
+                break;
             default: throw `Unchecked event type ${type}`;
         }
     }
@@ -266,6 +270,7 @@ class Core {
             this.handlers.vehicle.length = 0;
             this.handlers.login.length = 0;
             this.handlers.logout.length = 0;
+            this.handlers.marker.length = 0;
         }
         else {
             this.handlers[type].length = 0;
@@ -386,6 +391,30 @@ class Core {
             });
         }
         return response;
+    }
+    /**
+     * Insert a new marker event at the current time. Calling this while the tracker is not running can be dangerous as it
+     *      modifies the event collection
+     *
+     * @param mark Mark to be made
+     */
+    addMarker(mark) {
+        if (this.tracking.running == false) {
+            log.warn(`A new marker for ${mark} is being added, adding a marker while not running is not recommended`);
+        }
+        const ev = {
+            type: "marker",
+            sourceID: "7103",
+            timestamp: new Date().getTime(),
+            mark: mark
+        };
+        this.rawData.push(JSON.stringify({
+            payload: ev,
+            service: "event",
+            type: "toptMarker"
+        }));
+        this.miscEvents.push(ev);
+        this.emit(ev);
     }
     /**
      * Subscribe to the events in the event stream and begin tracking them in the squad tracker
@@ -1124,6 +1153,14 @@ Core_1.Core.prototype.processMessage = function (input, override = false) {
     }
     else if (msg.type == undefined) {
         // Occurs in response to subscribing to new events
+    }
+    else if (msg.type == "toptMarker") {
+        // These events are special because they will only be encountered during playback, not during
+        //      traacking, as these are manually added by an outside source
+        log.info(`Processed a toptMarker event: ${JSON.stringify(msg)}`);
+        const ev = msg.payload;
+        self.miscEvents.push(ev);
+        save = true;
     }
     else {
         log.warn(`Unchecked message type: '${msg.type}'`);
@@ -3535,7 +3572,7 @@ class IndividualReporter {
         usage.characterID = parameters.player.characterID;
         usage.secondsOnline = (finalTimestamp - lastTimestamp) / 1000;
         parameters.player.events.forEach((event) => {
-            if (event.type == "capture" || event.type == "defend" || event.type == "login" || event.type == "logout") {
+            if (event.type == "capture" || event.type == "defend" || event.type == "login" || event.type == "logout" || event.type == "marker") {
                 return;
             }
             lastLoadout = PsLoadout_1.PsLoadouts.get(event.loadoutID);
@@ -4107,6 +4144,8 @@ PsEvent.savior = "335";
 PsEvent.ribbon = "291";
 PsEvent.routerKill = "1409";
 PsEvent.beaconKill = "270";
+PsEvent.controlPointAttack = "16";
+PsEvent.controlPointDefend = "15";
 const remap = (expID, toID) => {
     return [expID, { name: "", types: [], track: true, alsoIncrement: toID }];
 };
@@ -6233,6 +6272,7 @@ __exportStar(__webpack_require__(/*! ./objects/index */ "../topt-core/build/core
 __exportStar(__webpack_require__(/*! ./Playback */ "../topt-core/build/core/Playback.js"), exports);
 __exportStar(__webpack_require__(/*! ./events/index */ "../topt-core/build/core/events/index.js"), exports);
 __exportStar(__webpack_require__(/*! ./reports/OutfitReport */ "../topt-core/build/core/reports/OutfitReport.js"), exports);
+__exportStar(__webpack_require__(/*! ./reports/FightReport */ "../topt-core/build/core/reports/FightReport.js"), exports);
 __exportStar(__webpack_require__(/*! ./squad/Squad */ "../topt-core/build/core/squad/Squad.js"), exports);
 __exportStar(__webpack_require__(/*! ./squad/SquadMember */ "../topt-core/build/core/squad/SquadMember.js"), exports);
 __exportStar(__webpack_require__(/*! ./CoreSettings */ "../topt-core/build/core/CoreSettings.js"), exports);
@@ -6562,6 +6602,166 @@ Object.defineProperty(exports, "BaseStatus", { enumerable: true, get: function (
 
 /***/ }),
 
+/***/ "../topt-core/build/core/reports/FightReport.js":
+/*!******************************************************!*\
+  !*** ../topt-core/build/core/reports/FightReport.js ***!
+  \******************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.FightReportGenerator = exports.FightReportEntry = exports.FightReport = exports.FightReportParameters = void 0;
+const ApiWrapper_1 = __webpack_require__(/*! ../census/ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
+const PsEvent_1 = __webpack_require__(/*! ../PsEvent */ "../topt-core/build/core/PsEvent.js");
+const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("FightReport");
+class FightReportParameters {
+    constructor() {
+        this.events = [];
+        /**
+         * Map of players that will be part of the report <Character ID, TrackedPlayer>
+         */
+        this.players = new Map();
+    }
+}
+exports.FightReportParameters = FightReportParameters;
+class FightReport {
+    constructor() {
+        this.startTime = new Date();
+        this.endTime = new Date();
+        this.entries = [];
+    }
+}
+exports.FightReport = FightReport;
+class FightReportEntry {
+    constructor() {
+        /**
+         * When the fight started
+         */
+        this.startTime = new Date();
+        /**
+         * When the fight ended
+         */
+        this.endTime = new Date();
+        /**
+         * How long the fight lasted in seconds
+         */
+        this.duration = 0;
+        /**
+         * Idk what I'll use this for yet
+         */
+        this.name = "Unknown fight";
+        this.participants = [];
+        this.count = {
+            score: 0,
+            kills: 0,
+            deaths: 0,
+            revives: 0,
+            heals: 0
+        };
+    }
+}
+exports.FightReportEntry = FightReportEntry;
+class FightReportGenerator {
+    static generate(parameters) {
+        const response = new ApiWrapper_1.ApiResponse();
+        const report = new FightReport();
+        if (parameters.events.length == 0 || parameters.players.size == 0) {
+            response.resolveOk(report);
+            return response;
+        }
+        report.startTime = new Date(parameters.events[0].timestamp);
+        report.endTime = new Date(parameters.events[parameters.events.length - 1].timestamp);
+        let inFight = false;
+        let entry = new FightReportEntry();
+        for (let i = 0; i < parameters.events.length; ++i) {
+            const event = parameters.events[i];
+            // Check if this is a fight start marker
+            if (event.type == "marker") {
+                // Check if we're starting a fight or not
+                if (event.mark == "battle-start") {
+                    if (inFight == false) {
+                        log.debug(`New fight started at ${event.timestamp}`);
+                        entry.startTime = new Date(event.timestamp);
+                    }
+                    inFight = true;
+                }
+                else if (event.mark == "battle-end") {
+                    if (inFight == true) {
+                        log.debug(`Current fight ended, saving`);
+                        entry.endTime = new Date(event.timestamp);
+                        entry.duration = (event.timestamp - entry.startTime.getTime()) / 1000; // ms to seconds
+                        report.entries.push(entry);
+                        entry = new FightReportEntry();
+                    }
+                    inFight = false;
+                }
+            }
+            // Who cares if we're not in a fight
+            if (inFight == false) {
+                continue;
+            }
+            // Handle the event based on it's type
+            if (event.type == "kill") {
+                ++entry.count.kills;
+                if (entry.participants.find(iter => iter.characterID == event.sourceID) == null) {
+                    const player = parameters.players.get(event.sourceID);
+                    if (player == null) {
+                        log.warn(`Missing TrackedCharacter for ${event.sourceID} from ${JSON.stringify(event)}`);
+                    }
+                    else {
+                        entry.participants.push(player);
+                    }
+                }
+            }
+            else if (event.type == "death") {
+                if (event.revived == false) {
+                    ++entry.count.deaths;
+                }
+                if (entry.participants.find(iter => iter.characterID == event.sourceID) == null) {
+                    const player = parameters.players.get(event.sourceID);
+                    if (player == null) {
+                        log.warn(`Missing TrackedCharacter for ${event.sourceID} from ${JSON.stringify(event)}`);
+                    }
+                    else {
+                        entry.participants.push(player);
+                    }
+                }
+            }
+            else if (event.type == "exp") {
+                let addchar = false;
+                if (event.expID == PsEvent_1.PsEvent.heal || event.expID == PsEvent_1.PsEvent.squadHeal) {
+                    ++entry.count.heals;
+                    addchar = true;
+                }
+                else if (event.expID == PsEvent_1.PsEvent.revive || event.expID == PsEvent_1.PsEvent.squadRevive) {
+                    ++entry.count.revives;
+                    addchar = true;
+                }
+                if (addchar == true) {
+                    if (entry.participants.find(iter => iter.characterID == event.sourceID) == null) {
+                        const player = parameters.players.get(event.sourceID);
+                        if (player == null) {
+                            log.warn(`Missing TrackedCharacter for ${event.sourceID} from ${JSON.stringify(event)}`);
+                        }
+                        else {
+                            entry.participants.push(player);
+                        }
+                    }
+                }
+            }
+        }
+        response.resolveOk(report);
+        return response;
+    }
+}
+exports.FightReportGenerator = FightReportGenerator;
+
+
+/***/ }),
+
 /***/ "../topt-core/build/core/reports/OutfitReport.js":
 /*!*******************************************************!*\
   !*** ../topt-core/build/core/reports/OutfitReport.js ***!
@@ -6819,6 +7019,15 @@ class OutfitReportGenerator {
         }
         let opsLeft = response.getSteps().length;
         const totalOps = opsLeft;
+        const callback = (step) => {
+            return () => {
+                log.debug(`Finished ${step}: Have ${opsLeft - 1} ops left outta ${totalOps}`);
+                response.finishStep(step);
+                if (--opsLeft == 0) {
+                    response.resolveOk(report);
+                }
+            };
+        };
         const facilityIDs = parameters.captures.filter(iter => parameters.outfits.indexOf(iter.outfitID) > -1)
             .map(iter => iter.facilityID)
             .filter((value, index, arr) => arr.indexOf(value) == index);
@@ -6860,15 +7069,6 @@ class OutfitReportGenerator {
                 players: parameters.playerCaptures
             }).ok(data => report.baseCaptures = data).always(callback("Facility captures"));
         });
-        const callback = (step) => {
-            return () => {
-                log.debug(`Finished ${step}: Have ${opsLeft - 1} ops left outta ${totalOps}`);
-                response.finishStep(step);
-                if (--opsLeft == 0) {
-                    response.resolveOk(report);
-                }
-            };
-        };
         const chars = Array.from(parameters.players.values());
         report.kpmBoxPlot = {
             total: EventReporter_1.default.kpmBoxplot(chars, parameters.tracking),
@@ -70727,7 +70927,8 @@ const tcore_5 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.
 const PersonalReportGenerator_1 = __webpack_require__(/*! PersonalReportGenerator */ "./src/PersonalReportGenerator.ts");
 const tcore_6 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
 const tcore_7 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
-window.Logger = tcore_7.Logger;
+const tcore_8 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
+window.Logger = tcore_8.Logger;
 // @ts-ignore
 const FileSaver = __webpack_require__(/*! ../node_modules/file-saver/dist/FileSaver.js */ "./node_modules/file-saver/dist/FileSaver.js");
 const chart_js_1 = __webpack_require__(/*! chart.js */ "./node_modules/chart.js/dist/Chart.js");
@@ -70743,15 +70944,15 @@ __webpack_require__(/*! BreakdownBox */ "./src/BreakdownBox.ts");
 __webpack_require__(/*! BreakdownBar */ "./src/BreakdownBar.ts");
 __webpack_require__(/*! MomentFilter */ "./src/MomentFilter.ts");
 __webpack_require__(/*! KillfeedSquad */ "./src/KillfeedSquad.ts");
-const tcore_8 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
 const tcore_9 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
 const tcore_10 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
 const tcore_11 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
 const tcore_12 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
+const tcore_13 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
 const SquadAddon_1 = __webpack_require__(/*! addons/SquadAddon */ "./src/addons/SquadAddon.ts");
 const Storage_1 = __webpack_require__(/*! Storage */ "./src/Storage.ts");
-const tcore_13 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
-window.CharacterAPI = tcore_13.CharacterAPI;
+const tcore_14 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
+window.CharacterAPI = tcore_14.CharacterAPI;
 window.$ = $;
 exports.vm = new vue_1.default({
     el: "#app",
@@ -70800,9 +71001,10 @@ exports.vm = new vue_1.default({
         ],
         winter: {
             report: Loadable_1.Loadable.idle(),
-            settings: new tcore_10.WinterReportSettings(),
+            settings: new tcore_11.WinterReportSettings(),
             ignoredPlayers: ""
         },
+        battleReport: new tcore_7.FightReport(),
         outfitReport: new tcore_6.OutfitReport(),
         opsReportSettings: new tcore_6.OutfitReportSettings(),
         outfitReportResponse: null,
@@ -70844,7 +71046,7 @@ exports.vm = new vue_1.default({
                 this.coreObject.disconnect();
                 this.coreObject = null;
             }
-            this.coreObject = new tcore_8.default(this.settings.serviceToken, this.settings.serverID);
+            this.coreObject = new tcore_9.default(this.settings.serviceToken, this.settings.serverID);
             this.coreObject.connect().ok(() => {
                 this.view = "realtime";
             });
@@ -70899,9 +71101,9 @@ exports.vm = new vue_1.default({
                 return console.warn(`Cannot import data, no file selected`);
             }
             const file = input.files[0];
-            tcore_12.Playback.setCore(this.core);
-            tcore_12.Playback.loadFile(file).ok(() => {
-                tcore_12.Playback.start({ speed: 0.0 });
+            tcore_13.Playback.setCore(this.core);
+            tcore_13.Playback.loadFile(file).ok(() => {
+                tcore_13.Playback.start({ speed: 0.0 });
             });
         },
         exportData: function () {
@@ -70961,7 +71163,7 @@ exports.vm = new vue_1.default({
                 if (char.stats.size() == 0) {
                     return;
                 }
-                const collection = new tcore_11.TrackedPlayer();
+                const collection = new tcore_12.TrackedPlayer();
                 collection.name = char.name;
                 collection.outfitTag = char.outfitTag;
                 collection.characterID = char.characterID;
@@ -71062,6 +71264,11 @@ exports.vm = new vue_1.default({
                 $("#report-modal").modal("hide");
                 this.parameters.report = "";
             }
+            else if (this.parameters.report == "battle") {
+                this.generateBattleReport();
+                $("#report-modal").modal("hide");
+                this.parameters.report = "";
+            }
         },
         generateOutfitReport: function () {
             const response = new tcore_1.ApiResponse();
@@ -71097,13 +71304,29 @@ exports.vm = new vue_1.default({
             });
             return response;
         },
+        generateBattleReport: function () {
+            const params = new tcore_7.FightReportParameters();
+            this.core.stats.forEach((player, charID) => {
+                if (player.events.length == 0) {
+                    return;
+                }
+                params.events.push(...player.events);
+            });
+            params.events.push(...this.core.miscEvents);
+            params.events = params.events.sort((a, b) => a.timestamp - b.timestamp);
+            params.players = this.core.stats;
+            tcore_7.FightReportGenerator.generate(params).ok((data) => {
+                this.battleReport = data;
+                this.view = "battle";
+            });
+        },
         generateWinterReport: function () {
             const playerNames = this.winter.ignoredPlayers.split(" ")
                 .map(iter => iter.toLowerCase());
             const players = Array.from(this.core.stats.values())
                 .filter(iter => playerNames.indexOf(iter.name.toLowerCase()) == -1);
             console.log(`Making a winter report with: ${players.map(iter => iter.name).join(", ")}`);
-            const params = new tcore_10.WinterReportParameters();
+            const params = new tcore_11.WinterReportParameters();
             params.players = players;
             params.timeTracking = this.core.tracking;
             params.settings = this.winter.settings;
@@ -71117,7 +71340,7 @@ exports.vm = new vue_1.default({
                 params.events.push(...player.events);
             });
             this.winter.report = Loadable_1.Loadable.loading();
-            tcore_9.WinterReportGenerator.generate(params).ok((data) => {
+            tcore_10.WinterReportGenerator.generate(params).ok((data) => {
                 this.winter.report = Loadable_1.Loadable.loaded(data);
                 this.view = "winter";
             });
@@ -71286,6 +71509,7 @@ exports.vm = new vue_1.default({
             }
             this.loadingOutfit = true;
             this.core.addOutfit(this.parameters.outfitTag).ok(() => {
+                console.log(`Loaded ${this.parameters.outfitTag}`);
                 this.loadingOutfit = false;
                 this.parameters.outfitTag = "";
             });

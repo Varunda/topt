@@ -28,6 +28,7 @@ import {
 import { IndividualReporter, Report, ReportParameters } from "tcore";
 import { PersonalReportGenerator } from "PersonalReportGenerator";
 import { OutfitReport, OutfitReportGenerator, OutfitReportSettings } from "tcore";
+import { FightReport, FightReportParameters, FightReportGenerator, FightReportEntry } from "tcore";
 
 import { Logger } from "tcore";
 (window as any).Logger = Logger;
@@ -77,7 +78,7 @@ export const vm = new Vue({
     data: {
         coreObject: null as (Core | null),
 
-        view: "setup" as "setup" | "realtime" | "ops" | "killfeed" | "winter" | "example",
+        view: "setup" as "setup" | "realtime" | "ops" | "killfeed" | "winter" | "example" | "battle",
 
         // Field related to settings about how TOPT runs
         settings: {
@@ -134,6 +135,8 @@ export const vm = new Vue({
 
             ignoredPlayers: "" as string
         },
+
+        battleReport: new FightReport() as FightReport,
 
         outfitReport: new OutfitReport() as OutfitReport,
         opsReportSettings: new OutfitReportSettings() as OutfitReportSettings,
@@ -447,6 +450,10 @@ export const vm = new Vue({
                 this.generateAllReports();
                 $("#report-modal").modal("hide");
                 this.parameters.report = "";
+            } else if (this.parameters.report == "battle") {
+                this.generateBattleReport();
+                $("#report-modal").modal("hide");
+                this.parameters.report = "";
             }
         },
 
@@ -491,6 +498,26 @@ export const vm = new Vue({
             });
 
             return response;
+        },
+
+        generateBattleReport: function(): void {
+            const params: FightReportParameters = new FightReportParameters();
+
+            this.core.stats.forEach((player: TrackedPlayer, charID: string) => {
+                if (player.events.length == 0) { return; }
+
+                params.events.push(...player.events);
+            });
+            
+            params.events.push(...this.core.miscEvents);
+            params.events = params.events.sort((a, b) => a.timestamp - b.timestamp);
+
+            params.players = this.core.stats;
+
+            FightReportGenerator.generate(params).ok((data: FightReport) => {
+                this.battleReport = data;
+                this.view = "battle";
+            });
         },
 
         generateWinterReport: function(): void {
@@ -718,6 +745,7 @@ export const vm = new Vue({
 
             this.loadingOutfit = true;
             this.core.addOutfit(this.parameters.outfitTag).ok(() => {
+                console.log(`Loaded ${this.parameters.outfitTag}`);
                 this.loadingOutfit = false;
                 this.parameters.outfitTag = "";
             });

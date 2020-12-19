@@ -1716,6 +1716,86 @@
             </div>
         </div>
 
+        <div v-else-if="view == 'battle'" class="row">
+            <div class="col-12"> <!-- Header -->
+                <div class="d-flex align-items-center mb-2">
+                    <img :src="showFrog == false ? '/data/logo.png' : '/data/frog.png'" class="mr-1" style="max-width: 128px; max-height: 128px; border-radius: 30%;" title="Tide logo">
+                    <div class="d-flex flex-row flex-grow-1">
+                        <div class="flex-grow-1">
+                            <h2>Tide OP Tracker (TOPT)</h2>
+                            <h5 class="text-muted">Fight report</h5>
+                            <h5>
+                                <a href="https://github.com/Varunda/topt/">https://github.com/Varunda/topt/</a>
+                            </h5>
+                        </div>
+
+                        <div class="flex-grow-1">
+                            <div><b>Start:</b> {{battleReport.startTime | moment}}</div>
+                            <div><b>End:</b> {{battleReport.endTime | moment}}</div>
+                            <div><b>#Fights:</b> {{battleReport.entries.length}}</div>
+                        </div>
+
+                        <div>
+                            <button @click="view = 'realtime'" type="button" class="btn btn-secondary float-right">
+                                &times;
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div v-for="entry in battleReport.entries" class="col-12">
+                <h3>{{entry.name}}</h3>
+
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Key</th>
+                            <th>Value</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        <tr>
+                            <td>Time</td>
+                            <td>{{entry.startTime | moment("hh:mm")}} - {{entry.endTime | moment("hh:mm")}}</td>
+                        </tr>
+
+                        <tr>
+                            <td>Duration</td>
+                            <td>{{entry.startTime | between(entry.endTime)}}</td>
+                        </tr>
+
+                        <tr>
+                            <td>Participants</td>
+                            <td>{{entry.participants.length}}</td>
+                        </tr>
+
+                        <tr>
+                            <td>Kills</td>
+                            <td>{{entry.count.kills}}</td>
+                        </tr>
+
+                        <tr>
+                            <td>Deaths</td>
+                            <td>{{entry.count.deaths}}</td>
+                        </tr>
+
+                        <tr>
+                            <td>Heals</td>
+                            <td>{{entry.count.heals}}</td>
+                        </tr>
+
+                        <tr>
+                            <td>Revives</td>
+                            <td>{{entry.count.revives}}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+
         <div v-else>
             Unknown view: {{view}}
 
@@ -1784,6 +1864,7 @@
                             <option disabled selected>Select a report</option>
                             <option value="ops">OPs report</option>
                             <option value="winter">Winter report</option>
+                            <option value="battle">Fight report</option>
                             <option value="personal">Personal reports</option>
                         </select>
 
