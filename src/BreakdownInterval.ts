@@ -12,7 +12,7 @@ Vue.component("breakdown-interval", {
     props: {
         src: { type: Array, required: true },
         MaxHeight: { type: Number, required: false, default: 200 },
-        ShowLabels: { type: Boolean, required: false, default: true },
+        ShowLabels: { type: Boolean, required: false, default: false },
         ShowXAxis: { type: Boolean, required: false, default: false },
         ShowYAxis: { type: Boolean, required: false, default: true },
         YAxisTickStep: { type: Number, required: false, default: 0.5 },

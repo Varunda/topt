@@ -87,9 +87,9 @@
 /******/ ({
 
 /***/ "../topt-core/build/core/Core.js":
-/*!***************************************!*\
-  !*** ../topt-core/build/core/Core.js ***!
-  \***************************************/
+/*!*********************************!*\
+  !*** .-core/build/core/Core.js ***!
+  \*********************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -498,9 +498,9 @@ exports.Core = Core;
 /***/ }),
 
 /***/ "../topt-core/build/core/CoreConnection.js":
-/*!*************************************************!*\
-  !*** ../topt-core/build/core/CoreConnection.js ***!
-  \*************************************************/
+/*!*******************************************!*\
+  !*** .-core/build/core/CoreConnection.js ***!
+  \*******************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -681,9 +681,9 @@ function setupFacilitySocket(core) {
 /***/ }),
 
 /***/ "../topt-core/build/core/CoreDebugHelper.js":
-/*!**************************************************!*\
-  !*** ../topt-core/build/core/CoreDebugHelper.js ***!
-  \**************************************************/
+/*!********************************************!*\
+  !*** .-core/build/core/CoreDebugHelper.js ***!
+  \********************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -757,9 +757,9 @@ Core_1.Core.prototype.subscribeToItemAdded = function () {
 /***/ }),
 
 /***/ "../topt-core/build/core/CoreProcessing.js":
-/*!*************************************************!*\
-  !*** ../topt-core/build/core/CoreProcessing.js ***!
-  \*************************************************/
+/*!*******************************************!*\
+  !*** .-core/build/core/CoreProcessing.js ***!
+  \*******************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -773,6 +773,7 @@ const WeaponAPI_1 = __webpack_require__(/*! ./census/WeaponAPI */ "../topt-core/
 const CharacterAPI_1 = __webpack_require__(/*! ./census/CharacterAPI */ "../topt-core/build/core/census/CharacterAPI.js");
 const Loggers_1 = __webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Loggers.js");
 const log = Loggers_1.Logger.getLogger("Core.Processing");
+log.enableAll();
 Core_1.Core.prototype.processMessage = function (input, override = false) {
     const self = this;
     if (self.tracking.running == false && override == false) {
@@ -1000,6 +1001,8 @@ Core_1.Core.prototype.processMessage = function (input, override = false) {
             self.playerCaptures.push(ev);
             let player = self.stats.get(playerID);
             if (player != undefined) {
+                log.debug(`Tracked player ${player.name} got a capture on ${ev.facilityID}`);
+                console.log(`Tracked player ${player.name} got a capture on ${ev.facilityID}`);
                 player.stats.increment(PsEvent_1.PsEvent.baseCapture);
                 player.events.push(ev);
             }
@@ -1019,11 +1022,12 @@ Core_1.Core.prototype.processMessage = function (input, override = false) {
                 zoneID: zoneID,
             };
             self.playerCaptures.push(ev);
-            self.emit(ev);
             let player = self.stats.get(playerID);
             if (player != undefined) {
                 player.stats.increment(PsEvent_1.PsEvent.baseDefense);
+                player.events.push(ev);
             }
+            self.emit(ev);
             save = true;
         }
         else if (event == "AchievementEarned") {
@@ -1174,9 +1178,9 @@ Core_1.Core.prototype.processMessage = function (input, override = false) {
 /***/ }),
 
 /***/ "../topt-core/build/core/CoreSettings.js":
-/*!***********************************************!*\
-  !*** ../topt-core/build/core/CoreSettings.js ***!
-  \***********************************************/
+/*!*****************************************!*\
+  !*** .-core/build/core/CoreSettings.js ***!
+  \*****************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -1201,6 +1205,10 @@ class CoreSettings {
          * ID of the server to listen to login/logout and facility events
          */
         this.serverID = "1";
+        /**
+         * If debug options will be shown
+         */
+        this.debug = false;
     }
 }
 exports.CoreSettings = CoreSettings;
@@ -1209,9 +1217,9 @@ exports.CoreSettings = CoreSettings;
 /***/ }),
 
 /***/ "../topt-core/build/core/CoreSquad.js":
-/*!********************************************!*\
-  !*** ../topt-core/build/core/CoreSquad.js ***!
-  \********************************************/
+/*!**************************************!*\
+  !*** .-core/build/core/CoreSquad.js ***!
+  \**************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -1703,9 +1711,9 @@ Core_1.Core.prototype.printSquadInfo = function () {
 /***/ }),
 
 /***/ "../topt-core/build/core/EventReporter.js":
-/*!************************************************!*\
-  !*** ../topt-core/build/core/EventReporter.js ***!
-  \************************************************/
+/*!******************************************!*\
+  !*** .-core/build/core/EventReporter.js ***!
+  \******************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -2740,9 +2748,9 @@ exports.default = EventReporter;
 /***/ }),
 
 /***/ "../topt-core/build/core/InvididualGenerator.js":
-/*!******************************************************!*\
-  !*** ../topt-core/build/core/InvididualGenerator.js ***!
-  \******************************************************/
+/*!************************************************!*\
+  !*** .-core/build/core/InvididualGenerator.js ***!
+  \************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -3864,9 +3872,9 @@ exports.IndividualReporter = IndividualReporter;
 /***/ }),
 
 /***/ "../topt-core/build/core/Loggers.js":
-/*!******************************************!*\
-  !*** ../topt-core/build/core/Loggers.js ***!
-  \******************************************/
+/*!************************************!*\
+  !*** .-core/build/core/Loggers.js ***!
+  \************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -3910,9 +3918,9 @@ Logger.loggers = new Map();
 /***/ }),
 
 /***/ "../topt-core/build/core/Playback.js":
-/*!*******************************************!*\
-  !*** ../topt-core/build/core/Playback.js ***!
-  \*******************************************/
+/*!*************************************!*\
+  !*** .-core/build/core/Playback.js ***!
+  \*************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -3991,13 +3999,14 @@ class Playback {
                     this._core.outfits = data;
                     log.info(`From [${outfitIDs.join(", ")}] loaded: ${JSON.stringify(data)}`);
                 }).always(() => {
+                    log.debug(`Took ${new Date().getTime() - nowMs}ms to import data`);
                     response.resolveOk();
                 });
             }
             else {
+                log.debug(`Took ${new Date().getTime() - nowMs}ms to import data`);
                 response.resolveOk();
             }
-            log.debug(`Took ${new Date().getTime() - nowMs}ms to import data`);
         }
         else {
             log.error(`Unchecked version: ${data.version}`);
@@ -4012,12 +4021,30 @@ class Playback {
         // Instant playback
         if (parameters.speed <= 0) {
             log.debug(`Doing instant playback`);
-            this._core.tracking.startTime = Math.min(...Playback._parsed.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
-            this._core.tracking.endTime = Math.max(...Playback._parsed.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
+            const nowMs = new Date().getTime();
+            const timestamps = Playback._parsed.map((iter) => {
+                const ts = iter.payload.timestamp;
+                if (typeof (ts) == "number") { // An old bugged version of expo uses numbers not strings
+                    return ts;
+                }
+                if (ts.length == 10) {
+                    return Number.parseInt(ts) * 1000;
+                }
+                else if (ts.length == 13) { // Expo exports with the MS part, Census does not
+                    return Number.parseInt(ts);
+                }
+                else {
+                    log.warn(`Unchecked length of timestamp: ${ts.length} '${ts}'`);
+                    throw ``;
+                }
+            });
+            this._core.tracking.startTime = Math.min(...timestamps);
+            this._core.tracking.endTime = Math.max(...timestamps);
             for (const ev of Playback._events) {
                 this._core.processMessage(ev, true);
             }
             this._core.stop();
+            log.debug(`Took ${new Date().getTime() - nowMs}ms to process data`);
         }
         else {
             const start = Math.min(...Playback._parsed.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
@@ -4057,7 +4084,6 @@ class Playback {
 }
 exports.Playback = Playback;
 Playback._core = null;
-Playback._file = null;
 Playback._events = [];
 Playback._parsed = [];
 
@@ -4065,9 +4091,9 @@ Playback._parsed = [];
 /***/ }),
 
 /***/ "../topt-core/build/core/PsEvent.js":
-/*!******************************************!*\
-  !*** ../topt-core/build/core/PsEvent.js ***!
-  \******************************************/
+/*!************************************!*\
+  !*** .-core/build/core/PsEvent.js ***!
+  \************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -4134,6 +4160,7 @@ PsEvent.radarDetect = "353";
 PsEvent.squadRadarDetect = "354";
 PsEvent.roadkill = "26";
 PsEvent.transportAssists = "30";
+PsEvent.galaxySpawn = "201";
 PsEvent.concAssist = "550";
 PsEvent.squadConcAssist = "551";
 PsEvent.empAssist = "552";
@@ -4190,25 +4217,21 @@ exports.PsEvents = new Map([
             name: "Kill assist",
             types: ["versus"],
             track: true,
-            alsoIncrement: undefined
         }],
     [PsEvent.heal, {
             name: "Heal",
             types: ["medic"],
             track: true,
-            alsoIncrement: undefined
         }],
     [PsEvent.healAssist, {
             name: "Heal assist",
             types: [],
             track: true,
-            alsoIncrement: undefined
         }],
     [PsEvent.maxRepair, {
             name: "MAX repair",
             types: ["engineer"],
             track: true,
-            alsoIncrement: undefined
         }],
     [PsEvent.revive, {
             name: "Revive",
@@ -4319,7 +4342,7 @@ exports.PsEvents = new Map([
             track: true,
             alsoIncrement: PsEvent.maxRepair
         }],
-    ["201", {
+    [PsEvent.galaxySpawn, {
             name: "Galaxy spawn bonus",
             types: ["logistics"],
             track: true,
@@ -4515,9 +4538,9 @@ exports.PsEvents = new Map([
 /***/ }),
 
 /***/ "../topt-core/build/core/StatMap.js":
-/*!******************************************!*\
-  !*** ../topt-core/build/core/StatMap.js ***!
-  \******************************************/
+/*!************************************!*\
+  !*** .-core/build/core/StatMap.js ***!
+  \************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -4532,6 +4555,9 @@ class StatMap {
         return this._stats.get(statName) || fallback;
     }
     increment(statName, amount = 1) {
+        if (statName == "-3") {
+            console.log(`Got a capture`);
+        }
         this._stats.set(statName, (this._stats.get(statName) || 0) + amount);
     }
     decrement(statName, amount = 1) {
@@ -4556,9 +4582,9 @@ exports.default = StatMap;
 /***/ }),
 
 /***/ "../topt-core/build/core/census/AchievementAPI.js":
-/*!********************************************************!*\
-  !*** ../topt-core/build/core/census/AchievementAPI.js ***!
-  \********************************************************/
+/*!**************************************************!*\
+  !*** .-core/build/core/census/AchievementAPI.js ***!
+  \**************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -4670,9 +4696,9 @@ AchievementAPI.unknown = {
 /***/ }),
 
 /***/ "../topt-core/build/core/census/ApiWrapper.js":
-/*!****************************************************!*\
-  !*** ../topt-core/build/core/census/ApiWrapper.js ***!
-  \****************************************************/
+/*!**********************************************!*\
+  !*** .-core/build/core/census/ApiWrapper.js ***!
+  \**********************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -5158,9 +5184,9 @@ exports.APIWrapper = APIWrapper;
 /***/ }),
 
 /***/ "../topt-core/build/core/census/CensusAPI.js":
-/*!***************************************************!*\
-  !*** ../topt-core/build/core/census/CensusAPI.js ***!
-  \***************************************************/
+/*!*********************************************!*\
+  !*** .-core/build/core/census/CensusAPI.js ***!
+  \*********************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -5206,9 +5232,9 @@ CensusAPI.requestCount = 0;
 /***/ }),
 
 /***/ "../topt-core/build/core/census/CharacterAPI.js":
-/*!******************************************************!*\
-  !*** ../topt-core/build/core/census/CharacterAPI.js ***!
-  \******************************************************/
+/*!************************************************!*\
+  !*** .-core/build/core/census/CharacterAPI.js ***!
+  \************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -5370,9 +5396,9 @@ CharacterAPI._pendingResolveID = 0;
 /***/ }),
 
 /***/ "../topt-core/build/core/census/EventAPI.js":
-/*!**************************************************!*\
-  !*** ../topt-core/build/core/census/EventAPI.js ***!
-  \**************************************************/
+/*!********************************************!*\
+  !*** .-core/build/core/census/EventAPI.js ***!
+  \********************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -5392,9 +5418,9 @@ exports.EventAPI = EventAPI;
 /***/ }),
 
 /***/ "../topt-core/build/core/census/FacilityAPI.js":
-/*!*****************************************************!*\
-  !*** ../topt-core/build/core/census/FacilityAPI.js ***!
-  \*****************************************************/
+/*!***********************************************!*\
+  !*** .-core/build/core/census/FacilityAPI.js ***!
+  \***********************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -5426,19 +5452,10 @@ class FacilityAPI {
             type: elem.facility_type
         };
     }
-    static loadJson() {
-        /*
-        new ApiResponse(
-            $.get("/bases.json"),
-            ((data: any) => {
-                const bs: any[] = Array.isArray(data) ? data : JSON.parse(data);
-                for (const datum of bs) {
-                    const wep: Facility = FacilityAPI.parse(datum);
-                    this._cache.set(wep.ID, wep);
-                }
-            })
-        );
-        */
+    static setCache(data) {
+        for (const fac of data) {
+            FacilityAPI._cache.set(fac.ID, fac);
+        }
     }
     static precache(facilityID) {
         clearTimeout(this._timeoutID);
@@ -5559,9 +5576,9 @@ FacilityAPI._timeoutID = -1;
 /***/ }),
 
 /***/ "../topt-core/build/core/census/OutfitAPI.js":
-/*!***************************************************!*\
-  !*** ../topt-core/build/core/census/OutfitAPI.js ***!
-  \***************************************************/
+/*!*********************************************!*\
+  !*** .-core/build/core/census/OutfitAPI.js ***!
+  \*********************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -5691,9 +5708,9 @@ exports.OutfitAPI = OutfitAPI;
 /***/ }),
 
 /***/ "../topt-core/build/core/census/PsLoadout.js":
-/*!***************************************************!*\
-  !*** ../topt-core/build/core/census/PsLoadout.js ***!
-  \***************************************************/
+/*!*********************************************!*\
+  !*** .-core/build/core/census/PsLoadout.js ***!
+  \*********************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -5946,9 +5963,9 @@ exports.PsLoadouts = new Map([
 /***/ }),
 
 /***/ "../topt-core/build/core/census/VehicleAPI.js":
-/*!****************************************************!*\
-  !*** ../topt-core/build/core/census/VehicleAPI.js ***!
-  \****************************************************/
+/*!**********************************************!*\
+  !*** .-core/build/core/census/VehicleAPI.js ***!
+  \**********************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -6046,9 +6063,9 @@ VehicleAPI._cache = null;
 /***/ }),
 
 /***/ "../topt-core/build/core/census/WeaponAPI.js":
-/*!***************************************************!*\
-  !*** ../topt-core/build/core/census/WeaponAPI.js ***!
-  \***************************************************/
+/*!*********************************************!*\
+  !*** .-core/build/core/census/WeaponAPI.js ***!
+  \*********************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -6095,19 +6112,10 @@ class WeaponAPI {
             imageID: elem.image_id
         };
     }
-    static loadJson() {
-        /*
-        const response = new ApiResponse(
-            $.get("/data/weapons_new.json"),
-            ((data: any) => {
-                const weapons: any[] = Array.isArray(data) ? data : JSON.parse(data);
-                for (const datum of weapons) {
-                    const wep: Weapon = WeaponAPI.parseCharacter(datum);
-                    this._cache.set(wep.ID, wep);
-                }
-            })
-        )
-        */
+    static setCache(weapons) {
+        for (const weapon of weapons) {
+            WeaponAPI._cache.set(weapon.ID, weapon);
+        }
     }
     static getEntires() {
         // P sure this is safe
@@ -6219,9 +6227,9 @@ WeaponAPI._pendingRequests = new Map();
 /***/ }),
 
 /***/ "../topt-core/build/core/events/index.js":
-/*!***********************************************!*\
-  !*** ../topt-core/build/core/events/index.js ***!
-  \***********************************************/
+/*!*****************************************!*\
+  !*** .-core/build/core/events/index.js ***!
+  \*****************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -6233,9 +6241,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 /***/ }),
 
 /***/ "../topt-core/build/core/index.js":
-/*!****************************************!*\
-  !*** ../topt-core/build/core/index.js ***!
-  \****************************************/
+/*!**********************************!*\
+  !*** .-core/build/core/index.js ***!
+  \**********************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -6287,9 +6295,9 @@ __exportStar(__webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Logge
 /***/ }),
 
 /***/ "../topt-core/build/core/objects/BaseExchange.js":
-/*!*******************************************************!*\
-  !*** ../topt-core/build/core/objects/BaseExchange.js ***!
-  \*******************************************************/
+/*!*************************************************!*\
+  !*** .-core/build/core/objects/BaseExchange.js ***!
+  \*************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -6335,9 +6343,9 @@ exports.BaseExchange = BaseExchange;
 /***/ }),
 
 /***/ "../topt-core/build/core/objects/BaseFightEncounter.js":
-/*!*************************************************************!*\
-  !*** ../topt-core/build/core/objects/BaseFightEncounter.js ***!
-  \*************************************************************/
+/*!*******************************************************!*\
+  !*** .-core/build/core/objects/BaseFightEncounter.js ***!
+  \*******************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -6362,9 +6370,9 @@ exports.BaseFightEncounter = BaseFightEncounter;
 /***/ }),
 
 /***/ "../topt-core/build/core/objects/BaseFightEntry.js":
-/*!*********************************************************!*\
-  !*** ../topt-core/build/core/objects/BaseFightEntry.js ***!
-  \*********************************************************/
+/*!***************************************************!*\
+  !*** .-core/build/core/objects/BaseFightEntry.js ***!
+  \***************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -6388,9 +6396,9 @@ exports.BaseFightEntry = BaseFightEntry;
 /***/ }),
 
 /***/ "../topt-core/build/core/objects/BaseOverview.js":
-/*!*******************************************************!*\
-  !*** ../topt-core/build/core/objects/BaseOverview.js ***!
-  \*******************************************************/
+/*!*************************************************!*\
+  !*** .-core/build/core/objects/BaseOverview.js ***!
+  \*************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -6422,9 +6430,9 @@ exports.BaseOverview = BaseOverview;
 /***/ }),
 
 /***/ "../topt-core/build/core/objects/BaseStatus.js":
-/*!*****************************************************!*\
-  !*** ../topt-core/build/core/objects/BaseStatus.js ***!
-  \*****************************************************/
+/*!***********************************************!*\
+  !*** .-core/build/core/objects/BaseStatus.js ***!
+  \***********************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -6446,9 +6454,9 @@ exports.BaseStatus = BaseStatus;
 /***/ }),
 
 /***/ "../topt-core/build/core/objects/SquadStat.js":
-/*!****************************************************!*\
-  !*** ../topt-core/build/core/objects/SquadStat.js ***!
-  \****************************************************/
+/*!**********************************************!*\
+  !*** .-core/build/core/objects/SquadStat.js ***!
+  \**********************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -6502,9 +6510,9 @@ exports.SquadStat = SquadStat;
 /***/ }),
 
 /***/ "../topt-core/build/core/objects/TrackedPlayer.js":
-/*!********************************************************!*\
-  !*** ../topt-core/build/core/objects/TrackedPlayer.js ***!
-  \********************************************************/
+/*!**************************************************!*\
+  !*** .-core/build/core/objects/TrackedPlayer.js ***!
+  \**************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -6574,9 +6582,9 @@ exports.TrackedPlayer = TrackedPlayer;
 /***/ }),
 
 /***/ "../topt-core/build/core/objects/index.js":
-/*!************************************************!*\
-  !*** ../topt-core/build/core/objects/index.js ***!
-  \************************************************/
+/*!******************************************!*\
+  !*** .-core/build/core/objects/index.js ***!
+  \******************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -6603,20 +6611,24 @@ Object.defineProperty(exports, "BaseStatus", { enumerable: true, get: function (
 /***/ }),
 
 /***/ "../topt-core/build/core/reports/FightReport.js":
-/*!******************************************************!*\
-  !*** ../topt-core/build/core/reports/FightReport.js ***!
-  \******************************************************/
+/*!************************************************!*\
+  !*** .-core/build/core/reports/FightReport.js ***!
+  \************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.FightReportGenerator = exports.FightReportEntry = exports.FightReport = exports.FightReportParameters = void 0;
+exports.FightReportGenerator = exports.FightReportPlayer = exports.FightReportEntry = exports.FightReport = exports.FightReportParameters = void 0;
 const ApiWrapper_1 = __webpack_require__(/*! ../census/ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
 const PsEvent_1 = __webpack_require__(/*! ../PsEvent */ "../topt-core/build/core/PsEvent.js");
+const EventReporter_1 = __webpack_require__(/*! ../EventReporter */ "../topt-core/build/core/EventReporter.js");
+const InvididualGenerator_1 = __webpack_require__(/*! ../InvididualGenerator */ "../topt-core/build/core/InvididualGenerator.js");
+const FacilityAPI_1 = __webpack_require__(/*! ../census/FacilityAPI */ "../topt-core/build/core/census/FacilityAPI.js");
 const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
 const log = Loggers_1.Logger.getLogger("FightReport");
+log.enableAll();
 class FightReportParameters {
     constructor() {
         this.events = [];
@@ -6629,8 +6641,17 @@ class FightReportParameters {
 exports.FightReportParameters = FightReportParameters;
 class FightReport {
     constructor() {
+        /**
+         * When the first event was created
+         */
         this.startTime = new Date();
+        /**
+         * When the last event was produced
+         */
         this.endTime = new Date();
+        /**
+         * Each fight in the session
+         */
         this.entries = [];
     }
 }
@@ -6650,20 +6671,103 @@ class FightReportEntry {
          */
         this.duration = 0;
         /**
+         * ID of the facility the fight might have taken place at
+         */
+        this.facilityID = null;
+        /**
          * Idk what I'll use this for yet
          */
         this.name = "Unknown fight";
+        /**
+         * Players who were tracked for this fight
+         */
         this.participants = [];
+        /**
+         * Breakdown of classes at the fight
+         */
+        this.classBreakdown = new EventReporter_1.BreakdownArray();
+        /**
+         * Events that occured during the fight
+         */
+        this.events = [];
         this.count = {
             score: 0,
             kills: 0,
             deaths: 0,
             revives: 0,
-            heals: 0
+            heals: 0,
+            spawns: 0
+        };
+        this.perPlayer = {
+            kpm: [],
+            dpm: [],
+            kd: [],
+            hpm: [],
+            rpm: []
+        };
+        this.charts = {
+            kills: [],
+            deaths: [],
+            heals: [],
+            revives: [],
+            kpm: [],
+            uniqueEnemies: []
         };
     }
 }
 exports.FightReportEntry = FightReportEntry;
+/**
+ * What a single player did during a single fight
+ */
+class FightReportPlayer {
+    constructor() {
+        /**
+         * ID of the player
+         */
+        this.ID = "";
+        /**
+         * Name of the player
+         */
+        this.name = "";
+        /**
+         * Outfit tag of the player
+         */
+        this.tag = "";
+        /**
+         * When the first event during a fight was
+         */
+        this.startDate = new Date();
+        /**
+         * When the last event during a fight was
+         */
+        this.endDate = new Date();
+        /**
+         * How long in seconds this player was part of the fight
+         */
+        this.duration = 0;
+        /**
+         * How many kills this player got during the fight
+         */
+        this.kills = 0;
+        /**
+         * How many times this player died during the fight
+         */
+        this.deaths = 0;
+        /**
+         * How many heals they got during this fight
+         */
+        this.heals = 0;
+        /**
+         * How many revives they got during the fight
+         */
+        this.revives = 0;
+        /**
+         * How many spawns they got during the fight
+         */
+        this.spawns = 0;
+    }
+}
+exports.FightReportPlayer = FightReportPlayer;
 class FightReportGenerator {
     static generate(parameters) {
         const response = new ApiWrapper_1.ApiResponse();
@@ -6676,85 +6780,258 @@ class FightReportGenerator {
         report.endTime = new Date(parameters.events[parameters.events.length - 1].timestamp);
         let inFight = false;
         let entry = new FightReportEntry();
-        for (let i = 0; i < parameters.events.length; ++i) {
-            const event = parameters.events[i];
-            // Check if this is a fight start marker
-            if (event.type == "marker") {
-                // Check if we're starting a fight or not
-                if (event.mark == "battle-start") {
-                    if (inFight == false) {
-                        log.debug(`New fight started at ${event.timestamp}`);
-                        entry.startTime = new Date(event.timestamp);
+        const playerIDs = [];
+        parameters.players.forEach((player, charID) => {
+            playerIDs.push(charID);
+        });
+        log.debug(`Looking for these char IDs for capture/defend events: [${playerIDs.join(", ")}]`);
+        const facilityIDs = parameters.events.filter(iter => iter.type == "capture" || iter.type == "defend")
+            .map(iter => iter.facilityID)
+            .filter((v, i, a) => a.indexOf(v) == i);
+        FacilityAPI_1.FacilityAPI.getByIDs(facilityIDs).ok((facilities) => {
+            var _a, _b;
+            log.debug(`Loaded ${facilities.length} from ${facilityIDs.length} IDs`);
+            for (let i = 0; i < parameters.events.length; ++i) {
+                const event = parameters.events[i];
+                // Check if this is a fight start marker
+                if (event.type == "marker") {
+                    // Check if we're starting a fight or not
+                    if (event.mark == "battle-start") {
+                        if (inFight == false) {
+                            log.debug(`New fight started at ${event.timestamp}`);
+                            entry.startTime = new Date(event.timestamp);
+                        }
+                        inFight = true;
                     }
-                    inFight = true;
-                }
-                else if (event.mark == "battle-end") {
-                    if (inFight == true) {
-                        log.debug(`Current fight ended, saving`);
-                        entry.endTime = new Date(event.timestamp);
-                        entry.duration = (event.timestamp - entry.startTime.getTime()) / 1000; // ms to seconds
-                        report.entries.push(entry);
-                        entry = new FightReportEntry();
-                    }
-                    inFight = false;
-                }
-            }
-            // Who cares if we're not in a fight
-            if (inFight == false) {
-                continue;
-            }
-            // Handle the event based on it's type
-            if (event.type == "kill") {
-                ++entry.count.kills;
-                if (entry.participants.find(iter => iter.characterID == event.sourceID) == null) {
-                    const player = parameters.players.get(event.sourceID);
-                    if (player == null) {
-                        log.warn(`Missing TrackedCharacter for ${event.sourceID} from ${JSON.stringify(event)}`);
-                    }
-                    else {
-                        entry.participants.push(player);
+                    else if (event.mark == "battle-end") {
+                        if (inFight == true) {
+                            log.debug(`Current fight ended, saving`);
+                            entry.endTime = new Date(event.timestamp);
+                            entry.duration = (event.timestamp - entry.startTime.getTime()) / 1000; // ms to seconds
+                            report.entries.push(this.finalizeEntry(entry, parameters));
+                            entry = new FightReportEntry();
+                        }
+                        inFight = false;
                     }
                 }
-            }
-            else if (event.type == "death") {
-                if (event.revived == false) {
+                // Who cares if we're not in a fight
+                if (inFight == false) {
+                    continue;
+                }
+                entry.events.push(event);
+                // Handle the event based on it's type
+                if (event.type == "kill") {
+                    ++entry.count.kills;
+                }
+                else if (event.type == "death" && event.revived == false) {
                     ++entry.count.deaths;
                 }
-                if (entry.participants.find(iter => iter.characterID == event.sourceID) == null) {
-                    const player = parameters.players.get(event.sourceID);
-                    if (player == null) {
-                        log.warn(`Missing TrackedCharacter for ${event.sourceID} from ${JSON.stringify(event)}`);
+                else if (event.type == "exp") {
+                    if (event.expID == PsEvent_1.PsEvent.heal || event.expID == PsEvent_1.PsEvent.squadHeal) {
+                        ++entry.count.heals;
+                    }
+                    else if (event.expID == PsEvent_1.PsEvent.revive || event.expID == PsEvent_1.PsEvent.squadRevive) {
+                        ++entry.count.revives;
+                    }
+                    else if (event.expID == PsEvent_1.PsEvent.squadSpawn || ["201", "233", "355", "1410"].indexOf(event.expID) > -1) {
+                        ++entry.count.spawns;
+                    }
+                }
+                else if (event.type == "capture") {
+                    if (playerIDs.indexOf(event.sourceID) > -1) {
+                        if (entry.facilityID == null) {
+                            const fac = facilities.find(iter => iter.ID == event.facilityID);
+                            entry.name = `Capture of ${(_a = fac === null || fac === void 0 ? void 0 : fac.name) !== null && _a !== void 0 ? _a : `bad ID ${event.facilityID}`}`;
+                        }
+                        else if (entry.facilityID != event.facilityID) {
+                            log.warn(`Fight already has a name: ${entry.name}`);
+                        }
                     }
                     else {
-                        entry.participants.push(player);
+                        //log.debug(`${event.sourceID} is not tracked, skipping`);
+                    }
+                }
+                else if (event.type == "defend" && playerIDs.indexOf(event.sourceID) > -1) {
+                    if (entry.facilityID == null) {
+                        const fac = facilities.find(iter => iter.ID == event.facilityID);
+                        entry.name = `Defense of ${(_b = fac === null || fac === void 0 ? void 0 : fac.name) !== null && _b !== void 0 ? _b : `bad ID ${event.facilityID}`}`;
+                    }
+                    else if (entry.facilityID != event.facilityID) {
+                        log.warn(`Fight already has a name: ${entry.name}`);
                     }
                 }
             }
+            response.resolveOk(report);
+        });
+        return response;
+    }
+    /**
+     * Finalize the entry to be added to a report, such as getting the top contributers, kills over time, etc.
+     *
+     * @param entry Entry to finalize before inserting
+     *
+     * @returns |entry|
+     */
+    static finalizeEntry(entry, parameters) {
+        // Get all the participants during a fight
+        for (const event of entry.events) {
+            const player = parameters.players.get(event.sourceID);
+            if (player == undefined) {
+                continue;
+            }
+            let part = entry.participants.find(iter => iter.ID == event.sourceID);
+            if (part == undefined) {
+                part = {
+                    ID: player.characterID,
+                    name: player.name,
+                    tag: player.outfitTag,
+                    startDate: entry.startTime,
+                    endDate: new Date(),
+                    duration: 0,
+                    kills: 0,
+                    deaths: 0,
+                    heals: 0,
+                    revives: 0,
+                    spawns: 0
+                };
+                entry.participants.push(part);
+            }
+            if (event.type == "kill") {
+                ++part.kills;
+            }
+            else if (event.type == "death" && event.revived == false) {
+                ++part.deaths;
+            }
             else if (event.type == "exp") {
-                let addchar = false;
                 if (event.expID == PsEvent_1.PsEvent.heal || event.expID == PsEvent_1.PsEvent.squadHeal) {
-                    ++entry.count.heals;
-                    addchar = true;
+                    ++part.heals;
                 }
                 else if (event.expID == PsEvent_1.PsEvent.revive || event.expID == PsEvent_1.PsEvent.squadRevive) {
-                    ++entry.count.revives;
-                    addchar = true;
+                    ++part.revives;
                 }
-                if (addchar == true) {
-                    if (entry.participants.find(iter => iter.characterID == event.sourceID) == null) {
-                        const player = parameters.players.get(event.sourceID);
-                        if (player == null) {
-                            log.warn(`Missing TrackedCharacter for ${event.sourceID} from ${JSON.stringify(event)}`);
-                        }
-                        else {
-                            entry.participants.push(player);
-                        }
-                    }
+                else if (event.expID == PsEvent_1.PsEvent.squadSpawn || ["201", "233", "355", "1410"].indexOf(event.expID) > -1) {
+                    ++part.spawns;
                 }
             }
         }
-        response.resolveOk(report);
-        return response;
+        const classBreakdown = new EventReporter_1.BreakdownArray();
+        const classArray = [
+            { display: "Infiltrator", sortField: "", amount: 0, color: undefined },
+            { display: "LA", sortField: "", amount: 0, color: undefined },
+            { display: "Medic", sortField: "", amount: 0, color: undefined },
+            { display: "Engineer", sortField: "", amount: 0, color: undefined },
+            { display: "Heavy", sortField: "", amount: 0, color: undefined },
+            { display: "MAX", sortField: "", amount: 0, color: undefined },
+        ];
+        const reversedEvents = [...entry.events].reverse();
+        for (const part of entry.participants) {
+            part.endDate = entry.endTime;
+            //part.endDate = new Date(reversedEvents.find(iter => iter.sourceID == part.ID)!.timestamp);
+            part.duration = (part.endDate.getTime() - part.startDate.getTime()) / 1000;
+            let kpm = part.kills / (part.duration / 60);
+            entry.perPlayer.kpm.push(Number.isFinite(kpm) == false ? 0 : kpm);
+            let dpm = part.deaths / (part.duration / 60);
+            entry.perPlayer.dpm.push(Number.isFinite(dpm) == false ? 0 : dpm);
+            let hpm = part.heals / (part.duration / 60);
+            entry.perPlayer.hpm.push(Number.isFinite(hpm) == false ? 0 : hpm);
+            let rpm = part.revives / (part.duration / 60);
+            entry.perPlayer.rpm.push(Number.isFinite(rpm) == false ? 0 : rpm);
+            let kd = part.kills / (part.deaths || 1);
+            entry.perPlayer.kd.push(Number.isFinite(kd) == false ? 0 : kd);
+            const playtime = InvididualGenerator_1.IndividualReporter.classUsage({
+                events: entry.events,
+                player: parameters.players.get(part.ID),
+                routers: [],
+                tracking: { startTime: 0, endTime: 0, running: false }
+            });
+            const c = classArray.find(iter => iter.display == playtime.mostPlayed.name);
+            if (c == undefined) {
+                log.warn(`Failed to find Breakdown for class '${playtime.mostPlayed.name}'`);
+            }
+            else {
+                c.amount += 1;
+            }
+            //log.info(`${part.name} playtime: ${JSON.stringify(playtime)}`);
+        }
+        classBreakdown.data = classArray;
+        classBreakdown.total = classArray.length;
+        entry.classBreakdown = classBreakdown;
+        entry.perPlayer.kpm.sort((a, b) => a - b);
+        entry.perPlayer.dpm.sort((a, b) => a - b);
+        entry.perPlayer.hpm.sort((a, b) => a - b);
+        entry.perPlayer.rpm.sort((a, b) => a - b);
+        entry.perPlayer.kd.sort((a, b) => a - b);
+        let killCount = 0;
+        let deathCount = 0;
+        let reviveCount = 0;
+        let healCount = 0;
+        let kpm = 0;
+        let kpmTime = entry.events[0].timestamp;
+        const kpmInterval = 10;
+        const encountered = [];
+        for (const event of entry.events) {
+            if (event.type == "kill") {
+                killCount += 1;
+                entry.charts.kills.push({
+                    startTime: event.timestamp,
+                    endTime: event.timestamp,
+                    value: killCount
+                });
+                if (event.timestamp > (kpmTime + (kpmInterval * 1000))) {
+                    entry.charts.kpm.push({
+                        startTime: event.timestamp,
+                        endTime: event.timestamp,
+                        value: (kpm * (60 / kpmInterval)) / entry.participants.length
+                    });
+                    kpm = 0;
+                    kpmTime = event.timestamp;
+                }
+                kpm += 1;
+                if (encountered.indexOf(event.targetID) == -1) {
+                    encountered.push(event.targetID);
+                    entry.charts.uniqueEnemies.push({
+                        startTime: event.timestamp,
+                        endTime: event.timestamp,
+                        value: encountered.length
+                    });
+                }
+            }
+            else if (event.type == "death") {
+                deathCount += 1;
+                entry.charts.deaths.push({
+                    startTime: event.timestamp,
+                    endTime: event.timestamp,
+                    value: deathCount
+                });
+                if (encountered.indexOf(event.targetID) == -1) {
+                    encountered.push(event.targetID);
+                    entry.charts.uniqueEnemies.push({
+                        startTime: event.timestamp,
+                        endTime: event.timestamp,
+                        value: encountered.length
+                    });
+                }
+            }
+            else if (event.type == "exp") {
+                if (event.expID == PsEvent_1.PsEvent.heal || event.expID == PsEvent_1.PsEvent.squadHeal) {
+                    healCount += 1;
+                    entry.charts.heals.push({
+                        startTime: event.timestamp,
+                        endTime: event.timestamp,
+                        value: healCount
+                    });
+                }
+                else if (event.expID == PsEvent_1.PsEvent.revive || event.expID == PsEvent_1.PsEvent.squadRevive) {
+                    reviveCount += 1;
+                    entry.charts.revives.push({
+                        startTime: event.timestamp,
+                        endTime: event.timestamp,
+                        value: reviveCount
+                    });
+                }
+            }
+        }
+        return entry;
     }
 }
 exports.FightReportGenerator = FightReportGenerator;
@@ -6763,9 +7040,9 @@ exports.FightReportGenerator = FightReportGenerator;
 /***/ }),
 
 /***/ "../topt-core/build/core/reports/OutfitReport.js":
-/*!*******************************************************!*\
-  !*** ../topt-core/build/core/reports/OutfitReport.js ***!
-  \*******************************************************/
+/*!*************************************************!*\
+  !*** .-core/build/core/reports/OutfitReport.js ***!
+  \*************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -6783,6 +7060,7 @@ const Squad_1 = __webpack_require__(/*! ../squad/Squad */ "../topt-core/build/co
 const FacilityAPI_1 = __webpack_require__(/*! ../census/FacilityAPI */ "../topt-core/build/core/census/FacilityAPI.js");
 const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
 const log = Loggers_1.Logger.getLogger("OutfitReport");
+log.enableAll();
 class OutfitReportSettings {
     constructor() {
         /**
@@ -7334,9 +7612,9 @@ exports.OutfitReportGenerator = OutfitReportGenerator;
 /***/ }),
 
 /***/ "../topt-core/build/core/squad/Squad.js":
-/*!**********************************************!*\
-  !*** ../topt-core/build/core/squad/Squad.js ***!
-  \**********************************************/
+/*!****************************************!*\
+  !*** .-core/build/core/squad/Squad.js ***!
+  \****************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -7383,9 +7661,9 @@ Squad._previousID = 0;
 /***/ }),
 
 /***/ "../topt-core/build/core/squad/SquadMember.js":
-/*!****************************************************!*\
-  !*** ../topt-core/build/core/squad/SquadMember.js ***!
-  \****************************************************/
+/*!**********************************************!*\
+  !*** .-core/build/core/squad/SquadMember.js ***!
+  \**********************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -7443,9 +7721,9 @@ exports.SquadMember = SquadMember;
 /***/ }),
 
 /***/ "../topt-core/build/core/winter/WinterMetric.js":
-/*!******************************************************!*\
-  !*** ../topt-core/build/core/winter/WinterMetric.js ***!
-  \******************************************************/
+/*!************************************************!*\
+  !*** .-core/build/core/winter/WinterMetric.js ***!
+  \************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -7476,9 +7754,9 @@ exports.WinterMetricEntry = WinterMetricEntry;
 /***/ }),
 
 /***/ "../topt-core/build/core/winter/WinterReport.js":
-/*!******************************************************!*\
-  !*** ../topt-core/build/core/winter/WinterReport.js ***!
-  \******************************************************/
+/*!************************************************!*\
+  !*** .-core/build/core/winter/WinterReport.js ***!
+  \************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -7501,9 +7779,9 @@ exports.WinterReport = WinterReport;
 /***/ }),
 
 /***/ "../topt-core/build/core/winter/WinterReportGenerator.js":
-/*!***************************************************************!*\
-  !*** ../topt-core/build/core/winter/WinterReportGenerator.js ***!
-  \***************************************************************/
+/*!*********************************************************!*\
+  !*** .-core/build/core/winter/WinterReportGenerator.js ***!
+  \*********************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -8161,9 +8439,9 @@ exports.WinterReportGenerator = WinterReportGenerator;
 /***/ }),
 
 /***/ "../topt-core/build/core/winter/WinterReportParameters.js":
-/*!****************************************************************!*\
-  !*** ../topt-core/build/core/winter/WinterReportParameters.js ***!
-  \****************************************************************/
+/*!**********************************************************!*\
+  !*** .-core/build/core/winter/WinterReportParameters.js ***!
+  \**********************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -8210,9 +8488,9 @@ exports.WinterReportSettings = WinterReportSettings;
 /***/ }),
 
 /***/ "../topt-core/build/core/winter/index.js":
-/*!***********************************************!*\
-  !*** ../topt-core/build/core/winter/index.js ***!
-  \***********************************************/
+/*!*****************************************!*\
+  !*** .-core/build/core/winter/index.js ***!
+  \*****************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -8232,9 +8510,9 @@ Object.defineProperty(exports, "WinterReportSettings", { enumerable: true, get: 
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/index.js":
-/*!************************************************!*\
-  !*** ../topt-core/node_modules/axios/index.js ***!
-  \************************************************/
+/*!******************************************!*\
+  !*** .-core/node_modules/axios/index.js ***!
+  \******************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -8243,9 +8521,9 @@ module.exports = __webpack_require__(/*! ./lib/axios */ "../topt-core/node_modul
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/adapters/xhr.js":
-/*!***********************************************************!*\
-  !*** ../topt-core/node_modules/axios/lib/adapters/xhr.js ***!
-  \***********************************************************/
+/*!*****************************************************!*\
+  !*** .-core/node_modules/axios/lib/adapters/xhr.js ***!
+  \*****************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -8434,9 +8712,9 @@ module.exports = function xhrAdapter(config) {
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/axios.js":
-/*!****************************************************!*\
-  !*** ../topt-core/node_modules/axios/lib/axios.js ***!
-  \****************************************************/
+/*!**********************************************!*\
+  !*** .-core/node_modules/axios/lib/axios.js ***!
+  \**********************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -8499,9 +8777,9 @@ module.exports.default = axios;
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/cancel/Cancel.js":
-/*!************************************************************!*\
-  !*** ../topt-core/node_modules/axios/lib/cancel/Cancel.js ***!
-  \************************************************************/
+/*!******************************************************!*\
+  !*** .-core/node_modules/axios/lib/cancel/Cancel.js ***!
+  \******************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -8530,9 +8808,9 @@ module.exports = Cancel;
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/cancel/CancelToken.js":
-/*!*****************************************************************!*\
-  !*** ../topt-core/node_modules/axios/lib/cancel/CancelToken.js ***!
-  \*****************************************************************/
+/*!***********************************************************!*\
+  !*** .-core/node_modules/axios/lib/cancel/CancelToken.js ***!
+  \***********************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -8599,9 +8877,9 @@ module.exports = CancelToken;
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/cancel/isCancel.js":
-/*!**************************************************************!*\
-  !*** ../topt-core/node_modules/axios/lib/cancel/isCancel.js ***!
-  \**************************************************************/
+/*!********************************************************!*\
+  !*** .-core/node_modules/axios/lib/cancel/isCancel.js ***!
+  \********************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -8616,9 +8894,9 @@ module.exports = function isCancel(value) {
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/core/Axios.js":
-/*!*********************************************************!*\
-  !*** ../topt-core/node_modules/axios/lib/core/Axios.js ***!
-  \*********************************************************/
+/*!***************************************************!*\
+  !*** .-core/node_modules/axios/lib/core/Axios.js ***!
+  \***************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -8723,9 +9001,9 @@ module.exports = Axios;
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/core/InterceptorManager.js":
-/*!**********************************************************************!*\
-  !*** ../topt-core/node_modules/axios/lib/core/InterceptorManager.js ***!
-  \**********************************************************************/
+/*!****************************************************************!*\
+  !*** .-core/node_modules/axios/lib/core/InterceptorManager.js ***!
+  \****************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -8787,9 +9065,9 @@ module.exports = InterceptorManager;
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/core/buildFullPath.js":
-/*!*****************************************************************!*\
-  !*** ../topt-core/node_modules/axios/lib/core/buildFullPath.js ***!
-  \*****************************************************************/
+/*!***********************************************************!*\
+  !*** .-core/node_modules/axios/lib/core/buildFullPath.js ***!
+  \***********************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -8819,9 +9097,9 @@ module.exports = function buildFullPath(baseURL, requestedURL) {
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/core/createError.js":
-/*!***************************************************************!*\
-  !*** ../topt-core/node_modules/axios/lib/core/createError.js ***!
-  \***************************************************************/
+/*!*********************************************************!*\
+  !*** .-core/node_modules/axios/lib/core/createError.js ***!
+  \*********************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -8849,9 +9127,9 @@ module.exports = function createError(message, config, code, request, response) 
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/core/dispatchRequest.js":
-/*!*******************************************************************!*\
-  !*** ../topt-core/node_modules/axios/lib/core/dispatchRequest.js ***!
-  \*******************************************************************/
+/*!*************************************************************!*\
+  !*** .-core/node_modules/axios/lib/core/dispatchRequest.js ***!
+  \*************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -8940,9 +9218,9 @@ module.exports = function dispatchRequest(config) {
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/core/enhanceError.js":
-/*!****************************************************************!*\
-  !*** ../topt-core/node_modules/axios/lib/core/enhanceError.js ***!
-  \****************************************************************/
+/*!**********************************************************!*\
+  !*** .-core/node_modules/axios/lib/core/enhanceError.js ***!
+  \**********************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -8994,9 +9272,9 @@ module.exports = function enhanceError(error, config, code, request, response) {
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/core/mergeConfig.js":
-/*!***************************************************************!*\
-  !*** ../topt-core/node_modules/axios/lib/core/mergeConfig.js ***!
-  \***************************************************************/
+/*!*********************************************************!*\
+  !*** .-core/node_modules/axios/lib/core/mergeConfig.js ***!
+  \*********************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -9093,9 +9371,9 @@ module.exports = function mergeConfig(config1, config2) {
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/core/settle.js":
-/*!**********************************************************!*\
-  !*** ../topt-core/node_modules/axios/lib/core/settle.js ***!
-  \**********************************************************/
+/*!****************************************************!*\
+  !*** .-core/node_modules/axios/lib/core/settle.js ***!
+  \****************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -9130,9 +9408,9 @@ module.exports = function settle(resolve, reject, response) {
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/core/transformData.js":
-/*!*****************************************************************!*\
-  !*** ../topt-core/node_modules/axios/lib/core/transformData.js ***!
-  \*****************************************************************/
+/*!***********************************************************!*\
+  !*** .-core/node_modules/axios/lib/core/transformData.js ***!
+  \***********************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -9162,9 +9440,9 @@ module.exports = function transformData(data, headers, fns) {
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/defaults.js":
-/*!*******************************************************!*\
-  !*** ../topt-core/node_modules/axios/lib/defaults.js ***!
-  \*******************************************************/
+/*!*************************************************!*\
+  !*** .-core/node_modules/axios/lib/defaults.js ***!
+  \*************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -9268,14 +9546,14 @@ utils.forEach(['post', 'put', 'patch'], function forEachMethodWithData(method) {
 
 module.exports = defaults;
 
-/* WEBPACK VAR INJECTION */}.call(this, __webpack_require__(/*! ./../../../../TOPT/node_modules/process/browser.js */ "./node_modules/process/browser.js")))
+/* WEBPACK VAR INJECTION */}.call(this, __webpack_require__(/*! ./../../../../topt/node_modules/process/browser.js */ "./node_modules/process/browser.js")))
 
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/helpers/bind.js":
-/*!***********************************************************!*\
-  !*** ../topt-core/node_modules/axios/lib/helpers/bind.js ***!
-  \***********************************************************/
+/*!*****************************************************!*\
+  !*** .-core/node_modules/axios/lib/helpers/bind.js ***!
+  \*****************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -9296,9 +9574,9 @@ module.exports = function bind(fn, thisArg) {
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/helpers/buildURL.js":
-/*!***************************************************************!*\
-  !*** ../topt-core/node_modules/axios/lib/helpers/buildURL.js ***!
-  \***************************************************************/
+/*!*********************************************************!*\
+  !*** .-core/node_modules/axios/lib/helpers/buildURL.js ***!
+  \*********************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -9378,9 +9656,9 @@ module.exports = function buildURL(url, params, paramsSerializer) {
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/helpers/combineURLs.js":
-/*!******************************************************************!*\
-  !*** ../topt-core/node_modules/axios/lib/helpers/combineURLs.js ***!
-  \******************************************************************/
+/*!************************************************************!*\
+  !*** .-core/node_modules/axios/lib/helpers/combineURLs.js ***!
+  \************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -9404,9 +9682,9 @@ module.exports = function combineURLs(baseURL, relativeURL) {
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/helpers/cookies.js":
-/*!**************************************************************!*\
-  !*** ../topt-core/node_modules/axios/lib/helpers/cookies.js ***!
-  \**************************************************************/
+/*!********************************************************!*\
+  !*** .-core/node_modules/axios/lib/helpers/cookies.js ***!
+  \********************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -9469,9 +9747,9 @@ module.exports = (
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/helpers/isAbsoluteURL.js":
-/*!********************************************************************!*\
-  !*** ../topt-core/node_modules/axios/lib/helpers/isAbsoluteURL.js ***!
-  \********************************************************************/
+/*!**************************************************************!*\
+  !*** .-core/node_modules/axios/lib/helpers/isAbsoluteURL.js ***!
+  \**************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -9495,9 +9773,9 @@ module.exports = function isAbsoluteURL(url) {
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/helpers/isURLSameOrigin.js":
-/*!**********************************************************************!*\
-  !*** ../topt-core/node_modules/axios/lib/helpers/isURLSameOrigin.js ***!
-  \**********************************************************************/
+/*!****************************************************************!*\
+  !*** .-core/node_modules/axios/lib/helpers/isURLSameOrigin.js ***!
+  \****************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -9575,9 +9853,9 @@ module.exports = (
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/helpers/normalizeHeaderName.js":
-/*!**************************************************************************!*\
-  !*** ../topt-core/node_modules/axios/lib/helpers/normalizeHeaderName.js ***!
-  \**************************************************************************/
+/*!********************************************************************!*\
+  !*** .-core/node_modules/axios/lib/helpers/normalizeHeaderName.js ***!
+  \********************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -9599,9 +9877,9 @@ module.exports = function normalizeHeaderName(headers, normalizedName) {
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/helpers/parseHeaders.js":
-/*!*******************************************************************!*\
-  !*** ../topt-core/node_modules/axios/lib/helpers/parseHeaders.js ***!
-  \*******************************************************************/
+/*!*************************************************************!*\
+  !*** .-core/node_modules/axios/lib/helpers/parseHeaders.js ***!
+  \*************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -9664,9 +9942,9 @@ module.exports = function parseHeaders(headers) {
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/helpers/spread.js":
-/*!*************************************************************!*\
-  !*** ../topt-core/node_modules/axios/lib/helpers/spread.js ***!
-  \*************************************************************/
+/*!*******************************************************!*\
+  !*** .-core/node_modules/axios/lib/helpers/spread.js ***!
+  \*******************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -9703,9 +9981,9 @@ module.exports = function spread(callback) {
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/utils.js":
-/*!****************************************************!*\
-  !*** ../topt-core/node_modules/axios/lib/utils.js ***!
-  \****************************************************/
+/*!**********************************************!*\
+  !*** .-core/node_modules/axios/lib/utils.js ***!
+  \**********************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -10066,9 +10344,9 @@ module.exports = {
 /***/ }),
 
 /***/ "../topt-core/node_modules/es5-ext/global.js":
-/*!***************************************************!*\
-  !*** ../topt-core/node_modules/es5-ext/global.js ***!
-  \***************************************************/
+/*!*********************************************!*\
+  !*** .-core/node_modules/es5-ext/global.js ***!
+  \*********************************************/
 /*! no static exports found */
 /***/ (function(module, exports) {
 
@@ -10112,9 +10390,9 @@ module.exports = (function () {
 /***/ }),
 
 /***/ "../topt-core/node_modules/loglevel-plugin-prefix/lib/loglevel-plugin-prefix.js":
-/*!**************************************************************************************!*\
-  !*** ../topt-core/node_modules/loglevel-plugin-prefix/lib/loglevel-plugin-prefix.js ***!
-  \**************************************************************************************/
+/*!********************************************************************************!*\
+  !*** .-core/node_modules/loglevel-plugin-prefix/lib/loglevel-plugin-prefix.js ***!
+  \********************************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -10272,9 +10550,9 @@ var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_RESULT__;(function (roo
 /***/ }),
 
 /***/ "../topt-core/node_modules/loglevel/lib/loglevel.js":
-/*!**********************************************************!*\
-  !*** ../topt-core/node_modules/loglevel/lib/loglevel.js ***!
-  \**********************************************************/
+/*!****************************************************!*\
+  !*** .-core/node_modules/loglevel/lib/loglevel.js ***!
+  \****************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -10557,9 +10835,9 @@ var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_RESULT__;/*
 /***/ }),
 
 /***/ "../topt-core/node_modules/websocket/lib/browser.js":
-/*!**********************************************************!*\
-  !*** ../topt-core/node_modules/websocket/lib/browser.js ***!
-  \**********************************************************/
+/*!****************************************************!*\
+  !*** .-core/node_modules/websocket/lib/browser.js ***!
+  \****************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -10618,9 +10896,9 @@ module.exports = {
 /***/ }),
 
 /***/ "../topt-core/node_modules/websocket/lib/version.js":
-/*!**********************************************************!*\
-  !*** ../topt-core/node_modules/websocket/lib/version.js ***!
-  \**********************************************************/
+/*!****************************************************!*\
+  !*** .-core/node_modules/websocket/lib/version.js ***!
+  \****************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -10630,13 +10908,13 @@ module.exports = __webpack_require__(/*! ../package.json */ "../topt-core/node_m
 /***/ }),
 
 /***/ "../topt-core/node_modules/websocket/package.json":
-/*!********************************************************!*\
-  !*** ../topt-core/node_modules/websocket/package.json ***!
-  \********************************************************/
-/*! exports provided: _from, _id, _inBundle, _integrity, _location, _phantomChildren, _requested, _requiredBy, _resolved, _shasum, _spec, _where, author, browser, bugs, bundleDependencies, config, contributors, dependencies, deprecated, description, devDependencies, directories, engines, homepage, keywords, license, main, name, repository, scripts, version, default */
+/*!**************************************************!*\
+  !*** .-core/node_modules/websocket/package.json ***!
+  \**************************************************/
+/*! exports provided: _args, _from, _id, _inBundle, _integrity, _location, _phantomChildren, _requested, _requiredBy, _resolved, _spec, _where, author, browser, bugs, config, contributors, dependencies, description, devDependencies, directories, engines, homepage, keywords, license, main, name, repository, scripts, version, default */
 /***/ (function(module) {
 
-module.exports = JSON.parse("{\"_from\":\"websocket\",\"_id\":\"websocket@1.0.32\",\"_inBundle\":false,\"_integrity\":\"sha512-i4yhcllSP4wrpoPMU2N0TQ/q0O94LRG/eUQjEAamRltjQ1oT1PFFKOG4i877OlJgCG8rw6LrrowJp+TYCEWF7Q==\",\"_location\":\"/websocket\",\"_phantomChildren\":{},\"_requested\":{\"type\":\"tag\",\"registry\":true,\"raw\":\"websocket\",\"name\":\"websocket\",\"escapedName\":\"websocket\",\"rawSpec\":\"\",\"saveSpec\":null,\"fetchSpec\":\"latest\"},\"_requiredBy\":[\"#USER\",\"/\"],\"_resolved\":\"https://registry.npmjs.org/websocket/-/websocket-1.0.32.tgz\",\"_shasum\":\"1f16ddab3a21a2d929dec1687ab21cfdc6d3dbb1\",\"_spec\":\"websocket\",\"_where\":\"C:\\\\Users\\\\Hdt\\\\Programming\\\\topt-core\",\"author\":{\"name\":\"Brian McKelvey\",\"email\":\"theturtle32@gmail.com\",\"url\":\"https://github.com/theturtle32\"},\"browser\":\"lib/browser.js\",\"bugs\":{\"url\":\"https://github.com/theturtle32/WebSocket-Node/issues\"},\"bundleDependencies\":false,\"config\":{\"verbose\":false},\"contributors\":[{\"name\":\"Iñaki Baz Castillo\",\"email\":\"ibc@aliax.net\",\"url\":\"http://dev.sipdoc.net\"}],\"dependencies\":{\"bufferutil\":\"^4.0.1\",\"debug\":\"^2.2.0\",\"es5-ext\":\"^0.10.50\",\"typedarray-to-buffer\":\"^3.1.5\",\"utf-8-validate\":\"^5.0.2\",\"yaeti\":\"^0.0.6\"},\"deprecated\":false,\"description\":\"Websocket Client & Server Library implementing the WebSocket protocol as specified in RFC 6455.\",\"devDependencies\":{\"buffer-equal\":\"^1.0.0\",\"gulp\":\"^4.0.2\",\"gulp-jshint\":\"^2.0.4\",\"jshint\":\"^2.0.0\",\"jshint-stylish\":\"^2.2.1\",\"tape\":\"^4.9.1\"},\"directories\":{\"lib\":\"./lib\"},\"engines\":{\"node\":\">=4.0.0\"},\"homepage\":\"https://github.com/theturtle32/WebSocket-Node\",\"keywords\":[\"websocket\",\"websockets\",\"socket\",\"networking\",\"comet\",\"push\",\"RFC-6455\",\"realtime\",\"server\",\"client\"],\"license\":\"Apache-2.0\",\"main\":\"index\",\"name\":\"websocket\",\"repository\":{\"type\":\"git\",\"url\":\"git+https://github.com/theturtle32/WebSocket-Node.git\"},\"scripts\":{\"gulp\":\"gulp\",\"test\":\"tape test/unit/*.js\"},\"version\":\"1.0.32\"}");
+module.exports = JSON.parse("{\"_args\":[[\"websocket@1.0.32\",\"/home/hdt/code/topt-core\"]],\"_from\":\"websocket@1.0.32\",\"_id\":\"websocket@1.0.32\",\"_inBundle\":false,\"_integrity\":\"sha512-i4yhcllSP4wrpoPMU2N0TQ/q0O94LRG/eUQjEAamRltjQ1oT1PFFKOG4i877OlJgCG8rw6LrrowJp+TYCEWF7Q==\",\"_location\":\"/websocket\",\"_phantomChildren\":{},\"_requested\":{\"type\":\"version\",\"registry\":true,\"raw\":\"websocket@1.0.32\",\"name\":\"websocket\",\"escapedName\":\"websocket\",\"rawSpec\":\"1.0.32\",\"saveSpec\":null,\"fetchSpec\":\"1.0.32\"},\"_requiredBy\":[\"/\"],\"_resolved\":\"https://registry.npmjs.org/websocket/-/websocket-1.0.32.tgz\",\"_spec\":\"1.0.32\",\"_where\":\"/home/hdt/code/topt-core\",\"author\":{\"name\":\"Brian McKelvey\",\"email\":\"theturtle32@gmail.com\",\"url\":\"https://github.com/theturtle32\"},\"browser\":\"lib/browser.js\",\"bugs\":{\"url\":\"https://github.com/theturtle32/WebSocket-Node/issues\"},\"config\":{\"verbose\":false},\"contributors\":[{\"name\":\"Iñaki Baz Castillo\",\"email\":\"ibc@aliax.net\",\"url\":\"http://dev.sipdoc.net\"}],\"dependencies\":{\"bufferutil\":\"^4.0.1\",\"debug\":\"^2.2.0\",\"es5-ext\":\"^0.10.50\",\"typedarray-to-buffer\":\"^3.1.5\",\"utf-8-validate\":\"^5.0.2\",\"yaeti\":\"^0.0.6\"},\"description\":\"Websocket Client & Server Library implementing the WebSocket protocol as specified in RFC 6455.\",\"devDependencies\":{\"buffer-equal\":\"^1.0.0\",\"gulp\":\"^4.0.2\",\"gulp-jshint\":\"^2.0.4\",\"jshint\":\"^2.0.0\",\"jshint-stylish\":\"^2.2.1\",\"tape\":\"^4.9.1\"},\"directories\":{\"lib\":\"./lib\"},\"engines\":{\"node\":\">=4.0.0\"},\"homepage\":\"https://github.com/theturtle32/WebSocket-Node\",\"keywords\":[\"websocket\",\"websockets\",\"socket\",\"networking\",\"comet\",\"push\",\"RFC-6455\",\"realtime\",\"server\",\"client\"],\"license\":\"Apache-2.0\",\"main\":\"index\",\"name\":\"websocket\",\"repository\":{\"type\":\"git\",\"url\":\"git+https://github.com/theturtle32/WebSocket-Node.git\"},\"scripts\":{\"gulp\":\"gulp\",\"test\":\"tape test/unit/*.js\"},\"version\":\"1.0.32\"}");
 
 /***/ }),
 
@@ -69882,7 +70160,7 @@ vue_1.default.component("breakdown-interval", {
     props: {
         src: { type: Array, required: true },
         MaxHeight: { type: Number, required: false, default: 200 },
-        ShowLabels: { type: Boolean, required: false, default: true },
+        ShowLabels: { type: Boolean, required: false, default: false },
         ShowXAxis: { type: Boolean, required: false, default: false },
         ShowYAxis: { type: Boolean, required: false, default: true },
         YAxisTickStep: { type: Number, required: false, default: 0.5 },
@@ -70090,6 +70368,55 @@ class ColorHelper {
 }
 exports.ColorHelper = ColorHelper;
 window.ColorHelper = ColorHelper;
+
+
+/***/ }),
+
+/***/ "./src/FightReportTop.ts":
+/*!*******************************!*\
+  !*** ./src/FightReportTop.ts ***!
+  \*******************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+const vue_1 = __webpack_require__(/*! vue */ "./node_modules/vue/dist/vue.esm.js");
+vue_1.default.component("fight-report-top", {
+    props: {
+        name: { type: String, required: true },
+        total: { type: Number, required: true },
+        duration: { type: Number, required: true },
+        entry: { required: true }
+    },
+    data: function () {
+        return {};
+    },
+    methods: {},
+    template: `
+        <tr>
+            <td>{{name}}</td>
+            <td>{{player}}</td>
+            <td>
+                {{amount}}
+                ({{(amount / (duration / 60)).toFixed(2)}})
+            </td>
+            <td>
+                {{(amount / total * 100).toFixed(2)}}%
+                ({{total}} total)
+            </td>
+        </tr>
+    `,
+    computed: {
+        player: function () {
+            return this.entry[1];
+        },
+        amount: function () {
+            return this.entry[0];
+        }
+    }
+});
 
 
 /***/ }),
@@ -70787,6 +71114,10 @@ class StorageHelper {
                 console.warn(`Cannot get settings: localStorage item ${this.KEY_SETTINGS} contained the wrong tag: ${item.tag}`);
                 return null;
             }
+            // Make sure a valid value is loaded even when that field isn't present
+            if (item.data.debug == undefined) {
+                item.data.debug = false;
+            }
             this._settings = item.data;
         }
         return this._settings;
@@ -70920,13 +71251,15 @@ const moment = __webpack_require__(/*! moment */ "./node_modules/moment/moment.j
 const $ = __webpack_require__(/*! jquery */ "./node_modules/jquery/dist/jquery.js");
 const JSZip = __webpack_require__(/*! jszip */ "./node_modules/jszip/dist/jszip.min.js");
 window.moment = moment;
+const axios = __webpack_require__(/*! axios */ "./node_modules/axios/index.js");
 const tcore_2 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
 const tcore_3 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
 const tcore_4 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
+window.PsEvent = tcore_4.PsEvent;
 const tcore_5 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
-const PersonalReportGenerator_1 = __webpack_require__(/*! PersonalReportGenerator */ "./src/PersonalReportGenerator.ts");
 const tcore_6 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
 const tcore_7 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
+const PersonalReportGenerator_1 = __webpack_require__(/*! PersonalReportGenerator */ "./src/PersonalReportGenerator.ts");
 const tcore_8 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
 window.Logger = tcore_8.Logger;
 // @ts-ignore
@@ -70944,6 +71277,7 @@ __webpack_require__(/*! BreakdownBox */ "./src/BreakdownBox.ts");
 __webpack_require__(/*! BreakdownBar */ "./src/BreakdownBar.ts");
 __webpack_require__(/*! MomentFilter */ "./src/MomentFilter.ts");
 __webpack_require__(/*! KillfeedSquad */ "./src/KillfeedSquad.ts");
+__webpack_require__(/*! FightReportTop */ "./src/FightReportTop.ts");
 const tcore_9 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
 const tcore_10 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
 const tcore_11 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
@@ -70953,6 +71287,7 @@ const SquadAddon_1 = __webpack_require__(/*! addons/SquadAddon */ "./src/addons/
 const Storage_1 = __webpack_require__(/*! Storage */ "./src/Storage.ts");
 const tcore_14 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
 window.CharacterAPI = tcore_14.CharacterAPI;
+window.Playback = tcore_13.Playback;
 window.$ = $;
 exports.vm = new vue_1.default({
     el: "#app",
@@ -70967,7 +71302,8 @@ exports.vm = new vue_1.default({
             sortColumn: "name",
             fromStorage: false,
             serverID: "1",
-            darkMode: false
+            darkMode: false,
+            debug: false
         },
         // Field related to filtering or adding data
         parameters: {
@@ -71016,8 +71352,14 @@ exports.vm = new vue_1.default({
     created: function () {
         this.refreshIntervalID = setInterval(this.updateDisplay, this.settings.updateRate * 1000);
         this.storage.enabled = Storage_1.StorageHelper.isEnabled();
-        tcore_2.WeaponAPI.loadJson();
-        tcore_3.FacilityAPI.loadJson();
+        new tcore_1.ApiResponse(axios.default.get(`/data/weapons.json`)).ok((data) => {
+            console.log(`Loaded ${data.length} weapons`);
+            tcore_2.WeaponAPI.setCache(data);
+        });
+        new tcore_1.ApiResponse(axios.default.get(`/data/bases.json`)).ok((data) => {
+            console.log(`Loaded ${data.length} facilities`);
+            tcore_3.FacilityAPI.setCache(data);
+        });
         this.settings.fromStorage = false;
         if (this.storage.enabled == true) {
             const settings = Storage_1.StorageHelper.getSettings();
@@ -71025,6 +71367,7 @@ exports.vm = new vue_1.default({
                 this.settings.darkMode = settings.darkMode;
                 this.settings.serverID = settings.serverID;
                 this.settings.serviceToken = settings.serviceID;
+                this.settings.debug = settings.debug;
                 this.settings.fromStorage = true;
                 this.connect();
             }
@@ -71130,7 +71473,8 @@ exports.vm = new vue_1.default({
             const settings = {
                 serviceID: this.settings.serviceToken,
                 serverID: this.settings.serverID,
-                darkMode: this.settings.darkMode
+                darkMode: this.settings.darkMode,
+                debug: this.settings.debug
             };
             Storage_1.StorageHelper.setSettings(settings);
             this.connect();
@@ -71140,6 +71484,31 @@ exports.vm = new vue_1.default({
                 return;
             }
             Storage_1.StorageHelper.setSettings(null);
+        },
+        debugLoadfile: function (reportType) {
+            const response = new tcore_1.ApiResponse(axios.default.get(`/test-data/2020-12-12-T1DE.json`)).ok((data) => {
+                const type = typeof (data);
+                tcore_13.Playback.setCore(this.core);
+                if (type == "string") {
+                    tcore_13.Playback.loadFile(data).ok(() => {
+                        tcore_13.Playback.start({ speed: 0 });
+                    });
+                }
+                else if (type == "object") {
+                    tcore_13.Playback.loadFile(JSON.stringify(data)).ok(() => {
+                        tcore_13.Playback.start({ speed: 0 });
+                        if (reportType != undefined) {
+                            this.parameters.report = reportType;
+                            this.generateReport();
+                        }
+                    });
+                }
+                else {
+                    console.error(`Unknown type of data: ${typeof (data)}`);
+                }
+            }).always(() => {
+                console.log(`Response resolved ${response.status}`);
+            });
         },
         updateDisplay: function () {
             //console.time("update display");
@@ -71313,6 +71682,8 @@ exports.vm = new vue_1.default({
                 params.events.push(...player.events);
             });
             params.events.push(...this.core.miscEvents);
+            params.events.push(...this.core.playerCaptures);
+            //params.events.push(...this.core.captures)
             params.events = params.events.sort((a, b) => a.timestamp - b.timestamp);
             params.players = this.core.stats;
             tcore_7.FightReportGenerator.generate(params).ok((data) => {
@@ -71566,9 +71937,9 @@ window.vm = exports.vm;
 /***/ }),
 
 /***/ 0:
-/*!*****************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
-  !*** multi ./src/addons/SquadAddon.ts ./src/app/App.ts ./src/app/AppRealtime.ts ./src/BreakdownBar.ts ./src/BreakdownBox.ts ./src/BreakdownChart.ts ./src/BreakdownInterval.ts ./src/BreakdownList.ts ./src/ColorHelper.ts ./src/index.ts ./src/KillfeedSquad.ts ./src/Loadable.ts ./src/MomentFilter.ts ./src/OutfitTrends.ts ./src/PersonalReportGenerator.ts ./src/Quartile.ts ./src/Storage.ts ***!
-  \*****************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+/*!*****************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** multi ./src/addons/SquadAddon.ts ./src/app/App.ts ./src/app/AppRealtime.ts ./src/BreakdownBar.ts ./src/BreakdownBox.ts ./src/BreakdownChart.ts ./src/BreakdownInterval.ts ./src/BreakdownList.ts ./src/ColorHelper.ts ./src/FightReportTop.ts ./src/index.ts ./src/KillfeedSquad.ts ./src/Loadable.ts ./src/MomentFilter.ts ./src/OutfitTrends.ts ./src/PersonalReportGenerator.ts ./src/Quartile.ts ./src/Storage.ts ***!
+  \*****************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -71581,6 +71952,7 @@ __webpack_require__(/*! ./src/BreakdownChart.ts */"./src/BreakdownChart.ts");
 __webpack_require__(/*! ./src/BreakdownInterval.ts */"./src/BreakdownInterval.ts");
 __webpack_require__(/*! ./src/BreakdownList.ts */"./src/BreakdownList.ts");
 __webpack_require__(/*! ./src/ColorHelper.ts */"./src/ColorHelper.ts");
+__webpack_require__(/*! ./src/FightReportTop.ts */"./src/FightReportTop.ts");
 __webpack_require__(/*! ./src/index.ts */"./src/index.ts");
 __webpack_require__(/*! ./src/KillfeedSquad.ts */"./src/KillfeedSquad.ts");
 __webpack_require__(/*! ./src/Loadable.ts */"./src/Loadable.ts");

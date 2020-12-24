@@ -332,6 +332,21 @@
                         </div>
                     </div>
 
+                    <template v-if="settings.debug == true">
+                        <hr/>
+
+                        Debug stuff
+
+                        <button class="btn btn-primary" @click="debugLoadfile('battle')">
+                            Load fight report test
+                        </button>
+
+                        <button class="btn btn-primary" @click="debugLoadfile('ops')">
+                            Load ops report test
+                        </button>
+
+                    </template>
+
                     <hr/>
 
                     <div class="w-100 mt-2"> <!-- Settings -->
@@ -1747,53 +1762,132 @@
             <div v-for="entry in battleReport.entries" class="col-12">
                 <h3>{{entry.name}}</h3>
 
-                <table class="table table-sm">
-                    <thead>
-                        <tr>
-                            <th>Key</th>
-                            <th>Value</th>
-                        </tr>
-                    </thead>
+                <div class="row">
+                    <div class="col-4">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Property</th>
+                                    <th>Value</th>
+                                    <th>Per minute</th>
+                                </tr>
+                            </thead>
 
-                    <tbody>
-                        <tr>
-                            <td>Time</td>
-                            <td>{{entry.startTime | moment("hh:mm")}} - {{entry.endTime | moment("hh:mm")}}</td>
-                        </tr>
+                            <tbody>
+                                <tr>
+                                    <td>Time</td>
+                                    <td>{{entry.startTime | moment("hh:mm")}} - {{entry.endTime | moment("hh:mm")}}</td>
+                                    <td>--</td>
+                                </tr>
 
-                        <tr>
-                            <td>Duration</td>
-                            <td>{{entry.startTime | between(entry.endTime)}}</td>
-                        </tr>
+                                <tr>
+                                    <td>Duration</td>
+                                    <td>{{entry.startTime | between(entry.endTime)}}</td>
+                                    <td>--</td>
+                                </tr>
 
-                        <tr>
-                            <td>Participants</td>
-                            <td>{{entry.participants.length}}</td>
-                        </tr>
+                                <tr>
+                                    <td>Participants</td>
+                                    <td>{{entry.participants.length}}</td>
+                                    <td>--</td>
+                                </tr>
 
-                        <tr>
-                            <td>Kills</td>
-                            <td>{{entry.count.kills}}</td>
-                        </tr>
+                                <tr>
+                                    <td>Kills</td>
+                                    <td>{{entry.count.kills}}</td>
+                                    <td>{{(entry.count.kills / (entry.duration / 60)).toFixed(2)}}</td>
+                                </tr>
 
-                        <tr>
-                            <td>Deaths</td>
-                            <td>{{entry.count.deaths}}</td>
-                        </tr>
+                                <tr>
+                                    <td>Deaths</td>
+                                    <td>{{entry.count.deaths}}</td>
+                                    <td>{{(entry.count.deaths / (entry.duration / 60)).toFixed(2)}}</td>
+                                </tr>
 
-                        <tr>
-                            <td>Heals</td>
-                            <td>{{entry.count.heals}}</td>
-                        </tr>
+                                <tr>
+                                    <td>Revives</td>
+                                    <td>{{entry.count.revives}}</td>
+                                    <td>{{(entry.count.revives / (entry.duration / 60)).toFixed(2)}}</td>
+                                </tr>
 
-                        <tr>
-                            <td>Revives</td>
-                            <td>{{entry.count.revives}}</td>
-                        </tr>
-                    </tbody>
-                </table>
+                                <tr>
+                                    <td>Heals</td>
+                                    <td>{{entry.count.heals}}</td>
+                                    <td>{{(entry.count.heals / (entry.duration / 60)).toFixed(2)}}</td>
+                                </tr>
+
+                                <tr>
+                                    <td>Spawns</td>
+                                    <td>{{entry.count.spawns}}</td>
+                                    <td>{{(entry.count.spawns / (entry.duration / 60)).toFixed(2)}}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="col-3">
+                        <h4>KPM over time</h4>
+                        <breakdown-interval :src="entry.charts.kpm"></breakdown-interval>
+                    </div>
+
+                    <div class="col-3">
+                        <h4>#Unique enemies encountered</h4>
+                        <breakdown-interval :src="entry.charts.uniqueEnemies"></breakdown-interval>
+                    </div>
+
+                    <div class="col-2">
+                        <breakdown-chart :src="entry.classBreakdown" style="height: 200px;"
+                            :show-all="true" :clipped-amount="7">
+                        </breakdown-chart>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-3">
+                        <h4>Total #Kills</h4>
+                        <breakdown-interval :src="entry.charts.kills"></breakdown-interval>
+                    </div>
+
+                    <div class="col-3">
+                        <h4>Total #Deaths</h4>
+                        <breakdown-interval :src="entry.charts.deaths"></breakdown-interval>
+                    </div>
+
+                    <div class="col-3">
+                        <h4>Total #Heals</h4>
+                        <breakdown-interval :src="entry.charts.heals"></breakdown-interval>
+                    </div>
+
+                    <div class="col-3">
+                        <h4>Total #Revives</h4>
+                        <breakdown-interval :src="entry.charts.revives"></breakdown-interval>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-3">
+                        <h4>KPM</h4>
+                        <breakdown-box :src="entry.perPlayer.kpm"></breakdown-box>
+                    </div>
+
+                    <div class="col-3">
+                        <h4>KD</h4>
+                        <breakdown-box :src="entry.perPlayer.kd"></breakdown-box>
+                    </div>
+
+                    <div class="col-3">
+                        <h4>Heals per minute</h4>
+                        <breakdown-box :src="entry.perPlayer.hpm.filter(i => i > 0)"></breakdown-box>
+                    </div>
+
+                    <div class="col-3">
+                        <h4>Revives per minute</h4>
+                        <breakdown-box :src="entry.perPlayer.rpm.filter(i => i > 0)"></breakdown-box>
+                    </div>
+                </div>
+
+                <hr/>
             </div>
-
         </div>
 
         <div v-else>

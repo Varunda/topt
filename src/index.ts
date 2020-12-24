@@ -12,10 +12,13 @@ import * as $ from "jquery";
 import * as JSZip from "jszip";
 (window as any).moment = moment;
 
+import * as axios from "axios";
+
 import { Weapon, WeaponAPI } from "tcore";
 import { FacilityAPI, Facility } from "tcore";
 
 import { PsEventType, PsEvent, PsEvents } from "tcore";
+(window as any).PsEvent = PsEvent;
 
 import {
     TEvent, TEventType,
@@ -26,9 +29,9 @@ import {
 } from "tcore";
 
 import { IndividualReporter, Report, ReportParameters } from "tcore";
-import { PersonalReportGenerator } from "PersonalReportGenerator";
 import { OutfitReport, OutfitReportGenerator, OutfitReportSettings } from "tcore";
 import { FightReport, FightReportParameters, FightReportGenerator, FightReportEntry } from "tcore";
+import { PersonalReportGenerator } from "PersonalReportGenerator";
 
 import { Logger } from "tcore";
 (window as any).Logger = Logger;
@@ -52,6 +55,7 @@ import "BreakdownBox";
 import "BreakdownBar";
 import "MomentFilter";
 import "KillfeedSquad";
+import "FightReportTop";
 
 import Core from "tcore";
 import { WinterReportGenerator } from "tcore";
@@ -69,6 +73,7 @@ import { StorageHelper } from "Storage";
 
 import { CharacterAPI } from "tcore";
 (window as any).CharacterAPI = CharacterAPI;
+(window as any).Playback = Playback;
 
 (window as any).$ = $;
 
@@ -89,7 +94,8 @@ export const vm = new Vue({
 
             fromStorage: false as boolean,
             serverID: "1" as string,
-            darkMode: false as boolean
+            darkMode: false as boolean,
+            debug: false as boolean
         },
 
         // Field related to filtering or adding data
@@ -156,8 +162,15 @@ export const vm = new Vue({
 
         this.storage.enabled = StorageHelper.isEnabled();
 
-        WeaponAPI.loadJson();
-        FacilityAPI.loadJson();
+        new ApiResponse<Weapon[]>(axios.default.get(`/data/weapons.json`)).ok((data: Weapon[]) => {
+            console.log(`Loaded ${data.length} weapons`);
+            WeaponAPI.setCache(data);
+        });
+
+        new ApiResponse<Facility[]>(axios.default.get(`/data/bases.json`)).ok((data: Facility[]) => {
+            console.log(`Loaded ${data.length} facilities`);
+            FacilityAPI.setCache(data);
+        });
 
         this.settings.fromStorage = false;
 
@@ -168,6 +181,7 @@ export const vm = new Vue({
                 this.settings.darkMode = settings.darkMode;
                 this.settings.serverID = settings.serverID;
                 this.settings.serviceToken = settings.serviceID;
+                this.settings.debug = settings.debug;
 
                 this.settings.fromStorage = true;
 
@@ -302,7 +316,8 @@ export const vm = new Vue({
             const settings: CoreSettings = {
                 serviceID: this.settings.serviceToken,
                 serverID: this.settings.serverID,
-                darkMode: this.settings.darkMode
+                darkMode: this.settings.darkMode,
+                debug: this.settings.debug
             };
 
             StorageHelper.setSettings(settings);
@@ -316,6 +331,32 @@ export const vm = new Vue({
             }
 
             StorageHelper.setSettings(null);
+        },
+
+        debugLoadfile: function(reportType?: string): void {
+            const response = new ApiResponse<unknown>(axios.default.get(`/test-data/2020-12-12-T1DE.json`)).ok((data: unknown) => {
+                const type = typeof(data);
+
+                Playback.setCore(this.core);
+                if (type == "string") {
+                    Playback.loadFile(data as string).ok(() => {
+                        Playback.start({ speed: 0 });
+                    });
+                } else if (type == "object") {
+                    Playback.loadFile(JSON.stringify(data)).ok(() => {
+                        Playback.start({ speed: 0 });
+
+                        if (reportType != undefined) {
+                            this.parameters.report = reportType;
+                            this.generateReport();
+                        }
+                    });
+                } else {
+                    console.error(`Unknown type of data: ${typeof(data)}`);
+                }
+            }).always(() => {
+                console.log(`Response resolved ${response.status}`);
+            });
         },
 
         updateDisplay: function(): void {
@@ -510,6 +551,8 @@ export const vm = new Vue({
             });
             
             params.events.push(...this.core.miscEvents);
+            params.events.push(...this.core.playerCaptures);
+            //params.events.push(...this.core.captures)
             params.events = params.events.sort((a, b) => a.timestamp - b.timestamp);
 
             params.players = this.core.stats;

@@ -59,6 +59,11 @@ export class StorageHelper {
                 return null;
             }
 
+            // Make sure a valid value is loaded even when that field isn't present
+            if (item.data.debug == undefined) {
+                item.data.debug = false;
+            }
+
             this._settings = item.data;
         }
 
