@@ -4,37 +4,12 @@ import "bootstrap/dist/css/bootstrap.min.css";
 
 import Vue, { PropType } from "vue";
 
-import { ApiResponse } from "tcore";
 import { Loading, Loadable } from "Loadable";
 
 import * as moment from "moment";
 import * as $ from "jquery";
 import * as JSZip from "jszip";
-(window as any).moment = moment;
-
 import * as axios from "axios";
-
-import { Weapon, WeaponAPI } from "tcore";
-import { FacilityAPI, Facility } from "tcore";
-
-import { PsEventType, PsEvent, PsEvents } from "tcore";
-(window as any).PsEvent = PsEvent;
-
-import {
-    TEvent, TEventType,
-    TExpEvent, TKillEvent, TDeathEvent, TTeamkillEvent,
-    TCaptureEvent, TDefendEvent,
-    TVehicleKillEvent,
-    TEventHandler
-} from "tcore";
-
-import { IndividualReporter, Report, ReportParameters } from "tcore";
-import { OutfitReport, OutfitReportGenerator, OutfitReportSettings } from "tcore";
-import { FightReport, FightReportParameters, FightReportGenerator, FightReportEntry } from "tcore";
-import { PersonalReportGenerator } from "PersonalReportGenerator";
-
-import { Logger } from "tcore";
-(window as any).Logger = Logger;
 
 // @ts-ignore
 import * as FileSaver from "../node_modules/file-saver/dist/FileSaver.js";
@@ -57,23 +32,35 @@ import "MomentFilter";
 import "KillfeedSquad";
 import "FightReportTop";
 
-import Core from "tcore";
-import { WinterReportGenerator } from "tcore";
-import { WinterReport } from "tcore";
-import { WinterReportParameters, WinterReportSettings } from "tcore";
-import { TrackedPlayer } from "tcore";
-import { CoreSettings } from "tcore";
-import { Squad } from "tcore";
-import { BaseOverview } from "tcore";
-import { BreakdownTimeslot } from "tcore";
+import Core, {
+    ApiResponse,
+    WinterReportGenerator, WinterReport, WinterReportParameters, WinterReportSettings,
+    IndividualReporter, Report, ReportParameters,
+    OutfitReport, OutfitReportGenerator, OutfitReportSettings,
+    FightReport, FightReportParameters, FightReportGenerator, FightReportEntry,
+    TrackedPlayer,
+    CoreSettings,
+    Squad,
+    Playback, Logger,
+    CharacterAPI,
+    Weapon, WeaponAPI,
+    Facility, FacilityAPI,
+    TEvent,
+    PsEvent, PsEventType, PsEvents
+} from "tcore";
 
-import { Playback } from "tcore";
+import { PersonalReportGenerator } from "PersonalReportGenerator";
+
 import { SquadAddon } from "addons/SquadAddon";
 import { StorageHelper } from "Storage";
+import { LoggerMetadata, LoggerMetadataLevel } from "LoggerMetadata";
+import * as log from "loglevel";
 
-import { CharacterAPI } from "tcore";
 (window as any).CharacterAPI = CharacterAPI;
 (window as any).Playback = Playback;
+(window as any).Logger = Logger;
+(window as any).PsEvent = PsEvent;
+(window as any).moment = moment;
 
 (window as any).$ = $;
 
@@ -152,6 +139,8 @@ export const vm = new Vue({
 
         loadingOutfit: false as boolean,
 
+        loggers: [] as LoggerMetadata[],
+
         showFrog: false as boolean,
 
         display: [] as TrackedPlayer[] // The currently displayed stats
@@ -186,6 +175,22 @@ export const vm = new Vue({
                 this.settings.fromStorage = true;
 
                 this.connect();
+            }
+
+            const loggerMeta: LoggerMetadata[] | null = StorageHelper.getLoggers();
+            if (loggerMeta != null) {
+                const existingLoggers: string[] = Logger.getLoggerNames();
+
+                for (const meta of loggerMeta) {
+                    if (existingLoggers.indexOf(meta.name) > -1) {
+                        Logger.getLogger(meta.name).setLevel(meta.level);
+                        console.log(`Loaded logger ${meta.name} to ${meta.level}`);
+                    } else {
+                        console.warn(`Logger ${meta.name} does not exist`);
+                    }
+                }
+
+                this.updateLoggers();
             }
         }
     },
@@ -552,7 +557,6 @@ export const vm = new Vue({
             
             params.events.push(...this.core.miscEvents);
             params.events.push(...this.core.playerCaptures);
-            //params.events.push(...this.core.captures)
             params.events = params.events.sort((a, b) => a.timestamp - b.timestamp);
 
             params.players = this.core.stats;
@@ -800,6 +804,60 @@ export const vm = new Vue({
             }
 
             this.core.addPlayer(this.parameters.playerName);
+        },
+
+        updateLoggers: function(): void {
+            const loggers: string[] = Logger.getLoggerNames();
+
+            const levelLookup: Map<number, "TRACE" | "DEBUG" | "INFO" | "WARN" | "ERROR" | "SILENT"> = new Map([
+                [0, "TRACE"],
+                [1, "DEBUG"],
+                [2, "INFO"],
+                [3, "WARN"],
+                [4, "ERROR"],
+                [5, "SILENT"]
+            ]);
+
+            this.loggers = [];
+
+            for (const loggerName of loggers) {
+                const logger: log.Logger = Logger.getLogger(loggerName);
+
+                this.loggers.push({
+                    name: loggerName,
+                    level: levelLookup.get(logger.getLevel())!
+                });
+            }
+
+            this.loggers.sort((a, b) => a.name.localeCompare(b.name));
+
+            StorageHelper.setLoggers(this.loggers);
+        },
+
+        openLoggerModal: function(): void {
+            this.updateLoggers();
+
+            $("#logger-modal").modal("show");
+        },
+
+        updateLogger: function(name: string, mod: (logger: log.Logger) => void): void {
+            const logger: log.Logger = Logger.getLogger(name);
+
+            mod(logger);
+
+            this.updateLoggers();
+        },
+
+        insertBattleStartMarker: function(): void {
+            if (this.core.tracking.running == true) {
+                this.core.addMarker("battle-start");
+            }
+        },
+
+        insertBattleEndMarker: function(): void {
+            if (this.core.tracking.running == true) {
+                this.core.addMarker("battle-end");
+            }
         },
 
         exportWeaponData: function(): void {

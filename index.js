@@ -95,6 +95,15 @@
 
 "use strict";
 
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Core = void 0;
 const ApiWrapper_1 = __webpack_require__(/*! ./census/ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
@@ -409,12 +418,33 @@ class Core {
             mark: mark
         };
         this.rawData.push(JSON.stringify({
-            payload: ev,
+            payload: {
+                type: ev.type,
+                sourceID: ev.sourceID,
+                timestamp: ev.timestamp.toString(),
+                mark: mark
+            },
             service: "event",
             type: "toptMarker"
         }));
         this.miscEvents.push(ev);
         this.emit(ev);
+    }
+    promiseTest() {
+        const t = new ApiWrapper_1.ApiResponse();
+        const p = t.promise();
+        setTimeout(() => __awaiter(this, void 0, void 0, function* () {
+            const contents = yield p;
+            if (contents.code == 200) {
+                console.log(`200: ${contents.data}`);
+            }
+            else if (contents.code == 500) {
+                console.error(`500: ${contents.data}`);
+            }
+        }));
+        setTimeout(() => {
+            t.resolve({ code: 200, data: `Hello from the other side` });
+        }, 3000);
     }
     /**
      * Subscribe to the events in the event stream and begin tracking them in the squad tracker
@@ -773,7 +803,6 @@ const WeaponAPI_1 = __webpack_require__(/*! ./census/WeaponAPI */ "../topt-core/
 const CharacterAPI_1 = __webpack_require__(/*! ./census/CharacterAPI */ "../topt-core/build/core/census/CharacterAPI.js");
 const Loggers_1 = __webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Loggers.js");
 const log = Loggers_1.Logger.getLogger("Core.Processing");
-log.enableAll();
 Core_1.Core.prototype.processMessage = function (input, override = false) {
     const self = this;
     if (self.tracking.running == false && override == false) {
@@ -1162,7 +1191,12 @@ Core_1.Core.prototype.processMessage = function (input, override = false) {
         // These events are special because they will only be encountered during playback, not during
         //      traacking, as these are manually added by an outside source
         log.info(`Processed a toptMarker event: ${JSON.stringify(msg)}`);
-        const ev = msg.payload;
+        const ev = {
+            type: "marker",
+            mark: msg.payload.mark,
+            sourceID: msg.payload.sourceID,
+            timestamp: Number.parseInt(msg.payload.timestamp)
+        };
         self.miscEvents.push(ev);
         save = true;
     }
@@ -1732,7 +1766,6 @@ const InvididualGenerator_1 = __webpack_require__(/*! ./InvididualGenerator */ "
 const OutfitAPI_1 = __webpack_require__(/*! ./census/OutfitAPI */ "../topt-core/build/core/census/OutfitAPI.js");
 const Loggers_1 = __webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Loggers.js");
 const log = Loggers_1.Logger.getLogger("EventReporter");
-log.enableAll();
 class BreakdownArray {
     constructor() {
         this.data = [];
@@ -3932,7 +3965,6 @@ const OutfitAPI_1 = __webpack_require__(/*! ./census/OutfitAPI */ "../topt-core/
 const ApiWrapper_1 = __webpack_require__(/*! ./census/ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
 const Loggers_1 = __webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Loggers.js");
 const log = Loggers_1.Logger.getLogger("Playback");
-log.enableAll();
 class PlaybackOptions {
     constructor() {
         this.speed = 0;
@@ -4555,9 +4587,6 @@ class StatMap {
         return this._stats.get(statName) || fallback;
     }
     increment(statName, amount = 1) {
-        if (statName == "-3") {
-            console.log(`Got a capture`);
-        }
         this._stats.set(statName, (this._stats.get(statName) || 0) + amount);
     }
     decrement(statName, amount = 1) {
@@ -4575,6 +4604,9 @@ class StatMap {
     size() { return this._stats.size; }
     getMap() { return this._stats; }
     clear() { this._stats.clear(); }
+    toString() {
+        return JSON.stringify(Array.from(this._stats.entries()));
+    }
 }
 exports.default = StatMap;
 
@@ -4707,7 +4739,8 @@ AchievementAPI.unknown = {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.APIWrapper = exports.ApiResponse = void 0;
 const axios = __webpack_require__(/*! axios */ "../topt-core/node_modules/axios/index.js");
-const log = __webpack_require__(/*! loglevel */ "../topt-core/node_modules/loglevel/lib/loglevel.js");
+const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("ApiWrapper");
 // Default to void as undefined is assignable to void. Would prefer to use never, but there is
 // no default value for never, and never cannot be assigned
 /**
@@ -4822,6 +4855,11 @@ class ApiResponse {
         }
         this.resolve({ code: 200, data: data });
     }
+    /**
+     * Add a new step to be tracked
+     *
+     * @param step Step being completed
+     */
     addStep(step) {
         if (this._steps == null) {
             this._steps = new Map();
@@ -4832,6 +4870,12 @@ class ApiResponse {
         this._steps.set(step, "working");
         return this;
     }
+    /**
+     * Update the state a step has
+     *
+     * @param step  Step to update
+     * @param state New state of the step being updated
+     */
     updateStep(step, state) {
         if (this._steps == null) {
             log.warn(`Cannot update setp '${step}' to ${state}: No steps have been created`);
@@ -4842,15 +4886,28 @@ class ApiResponse {
         }
         this._steps.set(step, state);
     }
+    /**
+     * Shortcut method to mark a step as done
+     *
+     * @param step Step to mark as done
+     */
     finishStep(step) {
         this.updateStep(step, "done");
     }
+    /**
+     * Get the steps in this ApiResponse
+     */
     getSteps() {
         if (this._steps == null) {
             throw `No steps defined. Cannot get steps`;
         }
         return Array.from(this._steps.keys());
     }
+    /**
+     * Get the state of a specific step. If no steps have been defined, an error is thrown
+     *
+     * @param step Step to get the state of
+     */
     getStepState(step) {
         if (this._steps == null) {
             throw `Not steps defined. Cannot get step state`;
@@ -4906,6 +4963,21 @@ class ApiResponse {
             this._callbacks.set(status, []);
         }
         this._callbacks.get(status).push(func); // TS doesn't see the .set() above making this not undefined
+    }
+    promise() {
+        return new Promise((resolve, reject) => {
+            this.always(() => {
+                if (this.status == 200) {
+                    resolve({ code: 200, data: this.data });
+                }
+                else if (this.status == 500) {
+                    resolve({ code: 500, data: this.data });
+                }
+                else {
+                    reject(`Unchecked status ${this.status}`);
+                }
+            });
+        });
     }
     /**
      * Add a new callback that is always executed
@@ -6620,17 +6692,20 @@ Object.defineProperty(exports, "BaseStatus", { enumerable: true, get: function (
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.FightReportGenerator = exports.FightReportPlayer = exports.FightReportEntry = exports.FightReport = exports.FightReportParameters = void 0;
+exports.FightReportGenerator = exports.FightReportPlayer = exports.FightReportEntry = exports.FightReportEncounter = exports.FightReport = exports.FightReportParameters = void 0;
 const ApiWrapper_1 = __webpack_require__(/*! ../census/ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
 const PsEvent_1 = __webpack_require__(/*! ../PsEvent */ "../topt-core/build/core/PsEvent.js");
 const EventReporter_1 = __webpack_require__(/*! ../EventReporter */ "../topt-core/build/core/EventReporter.js");
 const InvididualGenerator_1 = __webpack_require__(/*! ../InvididualGenerator */ "../topt-core/build/core/InvididualGenerator.js");
 const FacilityAPI_1 = __webpack_require__(/*! ../census/FacilityAPI */ "../topt-core/build/core/census/FacilityAPI.js");
+const StatMap_1 = __webpack_require__(/*! ../StatMap */ "../topt-core/build/core/StatMap.js");
 const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
 const log = Loggers_1.Logger.getLogger("FightReport");
-log.enableAll();
 class FightReportParameters {
     constructor() {
+        /**
+         * Events used to generate the report
+         */
         this.events = [];
         /**
          * Map of players that will be part of the report <Character ID, TrackedPlayer>
@@ -6656,6 +6731,13 @@ class FightReport {
     }
 }
 exports.FightReport = FightReport;
+class FightReportEncounter {
+    constructor() {
+        this.charID = "";
+        this.timestamps = [];
+    }
+}
+exports.FightReportEncounter = FightReportEncounter;
 class FightReportEntry {
     constructor() {
         /**
@@ -6690,6 +6772,14 @@ class FightReportEntry {
          * Events that occured during the fight
          */
         this.events = [];
+        /**
+         * Char IDs of all the allies found at the fight
+         */
+        this.allies = new Map();
+        /**
+         * Char IDs of all enemies found at the fight
+         */
+        this.enemies = new Map();
         this.count = {
             score: 0,
             kills: 0,
@@ -6778,8 +6868,6 @@ class FightReportGenerator {
         }
         report.startTime = new Date(parameters.events[0].timestamp);
         report.endTime = new Date(parameters.events[parameters.events.length - 1].timestamp);
-        let inFight = false;
-        let entry = new FightReportEntry();
         const playerIDs = [];
         parameters.players.forEach((player, charID) => {
             playerIDs.push(charID);
@@ -6788,9 +6876,22 @@ class FightReportGenerator {
         const facilityIDs = parameters.events.filter(iter => iter.type == "capture" || iter.type == "defend")
             .map(iter => iter.facilityID)
             .filter((v, i, a) => a.indexOf(v) == i);
+        // These events will contain the char ID of someone who is allied to the source,
+        //      which is useful in determining which base a fight took place at
+        const allyEventIDs = [
+            PsEvent_1.PsEvent.heal, PsEvent_1.PsEvent.squadHeal,
+            PsEvent_1.PsEvent.revive, PsEvent_1.PsEvent.squadRevive,
+            PsEvent_1.PsEvent.resupply, PsEvent_1.PsEvent.squadResupply,
+            PsEvent_1.PsEvent.maxRepair, PsEvent_1.PsEvent.squadMaxRepair,
+            PsEvent_1.PsEvent.shieldRepair, PsEvent_1.PsEvent.squadShieldRepair,
+        ];
         FacilityAPI_1.FacilityAPI.getByIDs(facilityIDs).ok((facilities) => {
             var _a, _b;
             log.debug(`Loaded ${facilities.length} from ${facilityIDs.length} IDs`);
+            let inFight = false;
+            let entry = new FightReportEntry();
+            let alliesFound = new Map();
+            let enemiesFound = new Map();
             for (let i = 0; i < parameters.events.length; ++i) {
                 const event = parameters.events[i];
                 // Check if this is a fight start marker
@@ -6805,10 +6906,13 @@ class FightReportGenerator {
                     }
                     else if (event.mark == "battle-end") {
                         if (inFight == true) {
-                            log.debug(`Current fight ended, saving`);
+                            log.debug(`Current fight ended at ${event.timestamp} (from ${entry.startTime.getTime()}), saving`);
                             entry.endTime = new Date(event.timestamp);
                             entry.duration = (event.timestamp - entry.startTime.getTime()) / 1000; // ms to seconds
-                            report.entries.push(this.finalizeEntry(entry, parameters));
+                            entry.allies = alliesFound;
+                            entry.enemies = enemiesFound;
+                            log.info(`#Allies: ${entry.allies.size}, #Enemies: ${entry.enemies.size}`);
+                            report.entries.push(this.finalizeEntry(entry, parameters, facilities));
                             entry = new FightReportEntry();
                         }
                         inFight = false;
@@ -6822,9 +6926,13 @@ class FightReportGenerator {
                 // Handle the event based on it's type
                 if (event.type == "kill") {
                     ++entry.count.kills;
+                    enemiesFound.set(event.targetID, event.timestamp);
                 }
-                else if (event.type == "death" && event.revived == false) {
-                    ++entry.count.deaths;
+                else if (event.type == "death") {
+                    if (event.revived == false) {
+                        ++entry.count.deaths;
+                    }
+                    enemiesFound.set(event.targetID, event.timestamp);
                 }
                 else if (event.type == "exp") {
                     if (event.expID == PsEvent_1.PsEvent.heal || event.expID == PsEvent_1.PsEvent.squadHeal) {
@@ -6836,12 +6944,16 @@ class FightReportGenerator {
                     else if (event.expID == PsEvent_1.PsEvent.squadSpawn || ["201", "233", "355", "1410"].indexOf(event.expID) > -1) {
                         ++entry.count.spawns;
                     }
+                    if (allyEventIDs.indexOf(event.expID) > -1) {
+                        alliesFound.set(event.targetID, event.timestamp);
+                    }
                 }
                 else if (event.type == "capture") {
                     if (playerIDs.indexOf(event.sourceID) > -1) {
                         if (entry.facilityID == null) {
                             const fac = facilities.find(iter => iter.ID == event.facilityID);
-                            entry.name = `Capture of ${(_a = fac === null || fac === void 0 ? void 0 : fac.name) !== null && _a !== void 0 ? _a : `bad ID ${event.facilityID}`}`;
+                            entry.name = `Successful capture of ${(_a = fac === null || fac === void 0 ? void 0 : fac.name) !== null && _a !== void 0 ? _a : `bad ID ${event.facilityID}`}`;
+                            entry.facilityID = event.facilityID;
                         }
                         else if (entry.facilityID != event.facilityID) {
                             log.warn(`Fight already has a name: ${entry.name}`);
@@ -6854,7 +6966,8 @@ class FightReportGenerator {
                 else if (event.type == "defend" && playerIDs.indexOf(event.sourceID) > -1) {
                     if (entry.facilityID == null) {
                         const fac = facilities.find(iter => iter.ID == event.facilityID);
-                        entry.name = `Defense of ${(_b = fac === null || fac === void 0 ? void 0 : fac.name) !== null && _b !== void 0 ? _b : `bad ID ${event.facilityID}`}`;
+                        entry.name = `Successful defense of ${(_b = fac === null || fac === void 0 ? void 0 : fac.name) !== null && _b !== void 0 ? _b : `bad ID ${event.facilityID}`}`;
+                        entry.facilityID = event.facilityID;
                     }
                     else if (entry.facilityID != event.facilityID) {
                         log.warn(`Fight already has a name: ${entry.name}`);
@@ -6872,7 +6985,7 @@ class FightReportGenerator {
      *
      * @returns |entry|
      */
-    static finalizeEntry(entry, parameters) {
+    static finalizeEntry(entry, parameters, facilities) {
         // Get all the participants during a fight
         for (const event of entry.events) {
             const player = parameters.players.get(event.sourceID);
@@ -6913,11 +7026,14 @@ class FightReportGenerator {
                     ++part.spawns;
                 }
             }
+            if (event.timestamp < entry.startTime.getTime() || event.timestamp > entry.endTime.getTime()) {
+                log.warn(`Event at ${event.timestamp} occured outside fight period (${entry.startTime.getTime()} to ${entry.endTime.getTime()}): ${JSON.stringify(event)}`);
+            }
         }
         const classBreakdown = new EventReporter_1.BreakdownArray();
         const classArray = [
             { display: "Infiltrator", sortField: "", amount: 0, color: undefined },
-            { display: "LA", sortField: "", amount: 0, color: undefined },
+            { display: "Light Assault", sortField: "", amount: 0, color: undefined },
             { display: "Medic", sortField: "", amount: 0, color: undefined },
             { display: "Engineer", sortField: "", amount: 0, color: undefined },
             { display: "Heavy", sortField: "", amount: 0, color: undefined },
@@ -6969,6 +7085,8 @@ class FightReportGenerator {
         let kpmTime = entry.events[0].timestamp;
         const kpmInterval = 10;
         const encountered = [];
+        // More stat getting, it's in a separate loop to make things logically easier to understand
+        //      with the huge downside of going thru all the events multiple times
         for (const event of entry.events) {
             if (event.type == "kill") {
                 killCount += 1;
@@ -7031,6 +7149,71 @@ class FightReportGenerator {
                 }
             }
         }
+        if (entry.facilityID == null) {
+            log.debug(`No name for fight yet, finding`);
+            log.debug(`Allies: ${entry.allies.size}`);
+            log.debug(`Enemies: ${entry.enemies.size}`);
+            let successCaps = new StatMap_1.default();
+            let failedCaps = new StatMap_1.default();
+            let successDef = new StatMap_1.default();
+            let failedDef = new StatMap_1.default();
+            for (const event of entry.events) {
+                if (event.type == "capture") {
+                    log.debug(`Capture event: ${JSON.stringify(event)}`);
+                    if (entry.allies.has(event.sourceID)) {
+                        const value = entry.allies.get(event.sourceID);
+                        const diff = value - entry.startTime.getTime();
+                        log.debug(`Have a ${diff}ms diff between when ${event.sourceID} was seen and a good cap`);
+                        successCaps.increment(event.facilityID, diff);
+                    }
+                    if (entry.enemies.has(event.sourceID)) {
+                        const value = entry.enemies.get(event.sourceID);
+                        const diff = value - entry.startTime.getTime();
+                        log.debug(`Have a ${diff}ms diff between when ${event.sourceID} was seen and a bad def`);
+                        failedDef.increment(event.facilityID, diff);
+                    }
+                }
+                else if (event.type == "defend") {
+                    log.debug(`Defend event: ${JSON.stringify(event)}`);
+                    if (entry.allies.has(event.sourceID)) {
+                        const value = entry.allies.get(event.sourceID);
+                        const diff = value - entry.startTime.getTime();
+                        log.debug(`Have a ${diff}ms diff between when ${event.sourceID} was seen and a good def`);
+                        successDef.increment(event.facilityID, diff);
+                    }
+                    if (entry.enemies.has(event.sourceID)) {
+                        const value = entry.enemies.get(event.sourceID);
+                        const diff = value - entry.startTime.getTime();
+                        log.debug(`Have a ${diff}ms diff between when ${event.sourceID} was seen and a good def`);
+                        failedCaps.increment(event.facilityID, diff);
+                    }
+                }
+            }
+            log.info(`Cap/Def info:\n #SuccessCaps: ${successCaps.size()}\n #FailedCaps: ${failedCaps.size()}\n #SuccessDefs: ${successDef.size()}\n #FailedDefs: ${failedDef.size()}`);
+            log.debug(`${successCaps}`);
+            log.debug(`${failedCaps}`);
+            log.debug(`${successDef}`);
+            log.debug(`${failedDef}`);
+            let confidence = 0;
+            let name = `Unknown fight`;
+            const updateWeight = (map, context) => {
+                map.getMap().forEach((weight, facID) => {
+                    var _a;
+                    log.debug(`Checking if ${weight} from '${context}' at ${facID} is greater than ${confidence}`);
+                    if (weight > confidence) {
+                        const facility = facilities.find(iter => iter.ID == facID);
+                        name = `${context} of ${(_a = facility === null || facility === void 0 ? void 0 : facility.name) !== null && _a !== void 0 ? _a : `unknown facility ID ${facID}`}`;
+                        confidence = weight;
+                        entry.facilityID = facID;
+                    }
+                });
+            };
+            updateWeight(successCaps, "Successful capture");
+            updateWeight(failedCaps, "Failed capture");
+            updateWeight(successDef, "Successful defense");
+            updateWeight(failedDef, "Failed defense");
+            entry.name = name;
+        }
         return entry;
     }
 }
@@ -7060,7 +7243,6 @@ const Squad_1 = __webpack_require__(/*! ../squad/Squad */ "../topt-core/build/co
 const FacilityAPI_1 = __webpack_require__(/*! ../census/FacilityAPI */ "../topt-core/build/core/census/FacilityAPI.js");
 const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
 const log = Loggers_1.Logger.getLogger("OutfitReport");
-log.enableAll();
 class OutfitReportSettings {
     constructor() {
         /**
@@ -71070,7 +71252,6 @@ window.Quartile = Quartile;
 
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.StorageHelper = exports.StorageMetadata = void 0;
-const tcore_1 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
 class StorageMetadata {
     constructor(data) {
         this.tag = "";
@@ -71094,56 +71275,44 @@ class StorageHelper {
         }
         return this._enabled;
     }
-    static getSettings() {
-        if (this._settings == undefined) {
-            if (this.isEnabled() == false) {
-                return null;
-            }
-            let item = {
-                tag: "settings",
-                data: new tcore_1.CoreSettings()
-            };
-            const itemStr = localStorage.getItem(this.KEY_SETTINGS);
-            if (itemStr == null) {
-                return null;
-            }
-            else {
-                item = JSON.parse(itemStr);
-            }
-            if (item.tag == undefined || item.tag != "settings") {
-                console.warn(`Cannot get settings: localStorage item ${this.KEY_SETTINGS} contained the wrong tag: ${item.tag}`);
-                return null;
-            }
-            // Make sure a valid value is loaded even when that field isn't present
-            if (item.data.debug == undefined) {
-                item.data.debug = false;
-            }
-            this._settings = item.data;
-        }
-        return this._settings;
-    }
-    static setSettings(settings) {
+    static get(key) {
         if (this.isEnabled() == false) {
-            return console.warn(`Cannot save settings: localStorage is not enabled`);
+            return null;
         }
-        if (settings == null) {
-            localStorage.removeItem(this.KEY_SETTINGS);
+        let item;
+        const itemStr = localStorage.getItem(key);
+        if (itemStr == null) {
+            return null;
+        }
+        item = JSON.parse(itemStr);
+        if (item.tag != undefined) {
+            console.log(`Found old stored data under ${key}`);
+            item = item.data;
+        }
+        return item;
+    }
+    static set(key, item) {
+        if (this.isEnabled() == false) {
+            return;
+        }
+        if (item == null) {
+            localStorage.removeItem(key);
         }
         else {
-            let item = {
-                tag: "settings",
-                data: settings
-            };
-            localStorage.setItem(this.KEY_SETTINGS, JSON.stringify(item));
+            localStorage.setItem(key, JSON.stringify(item));
         }
     }
+    static getSettings() { return this.get(this.KEY_SETTINGS); }
+    static setSettings(settings) { this.set(this.KEY_SETTINGS, settings); }
+    static getLoggers() { return this.get(this.KEY_LOGGER_SETTINGS); }
+    static setLoggers(loggers) { this.set(this.KEY_LOGGER_SETTINGS, loggers); }
 }
 exports.StorageHelper = StorageHelper;
 StorageHelper._enabled = undefined;
-StorageHelper._settings = undefined;
 StorageHelper.KEY_TREND = "topt.trends";
 StorageHelper.KEY_SESSION = "topt.session";
 StorageHelper.KEY_SETTINGS = "topt.settings";
+StorageHelper.KEY_LOGGER_SETTINGS = "topt.loggers";
 window.StorageHelper = StorageHelper;
 
 
@@ -71245,23 +71414,11 @@ __webpack_require__(/*! popper.js */ "./node_modules/popper.js/dist/esm/popper.j
 __webpack_require__(/*! bootstrap */ "./node_modules/bootstrap/dist/js/bootstrap.js");
 __webpack_require__(/*! bootstrap/dist/css/bootstrap.min.css */ "./node_modules/bootstrap/dist/css/bootstrap.min.css");
 const vue_1 = __webpack_require__(/*! vue */ "./node_modules/vue/dist/vue.esm.js");
-const tcore_1 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
 const Loadable_1 = __webpack_require__(/*! Loadable */ "./src/Loadable.ts");
 const moment = __webpack_require__(/*! moment */ "./node_modules/moment/moment.js");
 const $ = __webpack_require__(/*! jquery */ "./node_modules/jquery/dist/jquery.js");
 const JSZip = __webpack_require__(/*! jszip */ "./node_modules/jszip/dist/jszip.min.js");
-window.moment = moment;
 const axios = __webpack_require__(/*! axios */ "./node_modules/axios/index.js");
-const tcore_2 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
-const tcore_3 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
-const tcore_4 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
-window.PsEvent = tcore_4.PsEvent;
-const tcore_5 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
-const tcore_6 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
-const tcore_7 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
-const PersonalReportGenerator_1 = __webpack_require__(/*! PersonalReportGenerator */ "./src/PersonalReportGenerator.ts");
-const tcore_8 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
-window.Logger = tcore_8.Logger;
 // @ts-ignore
 const FileSaver = __webpack_require__(/*! ../node_modules/file-saver/dist/FileSaver.js */ "./node_modules/file-saver/dist/FileSaver.js");
 const chart_js_1 = __webpack_require__(/*! chart.js */ "./node_modules/chart.js/dist/Chart.js");
@@ -71278,16 +71435,15 @@ __webpack_require__(/*! BreakdownBar */ "./src/BreakdownBar.ts");
 __webpack_require__(/*! MomentFilter */ "./src/MomentFilter.ts");
 __webpack_require__(/*! KillfeedSquad */ "./src/KillfeedSquad.ts");
 __webpack_require__(/*! FightReportTop */ "./src/FightReportTop.ts");
-const tcore_9 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
-const tcore_10 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
-const tcore_11 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
-const tcore_12 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
-const tcore_13 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
+const tcore_1 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
+const PersonalReportGenerator_1 = __webpack_require__(/*! PersonalReportGenerator */ "./src/PersonalReportGenerator.ts");
 const SquadAddon_1 = __webpack_require__(/*! addons/SquadAddon */ "./src/addons/SquadAddon.ts");
 const Storage_1 = __webpack_require__(/*! Storage */ "./src/Storage.ts");
-const tcore_14 = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
-window.CharacterAPI = tcore_14.CharacterAPI;
-window.Playback = tcore_13.Playback;
+window.CharacterAPI = tcore_1.CharacterAPI;
+window.Playback = tcore_1.Playback;
+window.Logger = tcore_1.Logger;
+window.PsEvent = tcore_1.PsEvent;
+window.moment = moment;
 window.$ = $;
 exports.vm = new vue_1.default({
     el: "#app",
@@ -71337,15 +71493,16 @@ exports.vm = new vue_1.default({
         ],
         winter: {
             report: Loadable_1.Loadable.idle(),
-            settings: new tcore_11.WinterReportSettings(),
+            settings: new tcore_1.WinterReportSettings(),
             ignoredPlayers: ""
         },
-        battleReport: new tcore_7.FightReport(),
-        outfitReport: new tcore_6.OutfitReport(),
-        opsReportSettings: new tcore_6.OutfitReportSettings(),
+        battleReport: new tcore_1.FightReport(),
+        outfitReport: new tcore_1.OutfitReport(),
+        opsReportSettings: new tcore_1.OutfitReportSettings(),
         outfitReportResponse: null,
         refreshIntervalID: -1,
         loadingOutfit: false,
+        loggers: [],
         showFrog: false,
         display: [] // The currently displayed stats
     },
@@ -71354,11 +71511,11 @@ exports.vm = new vue_1.default({
         this.storage.enabled = Storage_1.StorageHelper.isEnabled();
         new tcore_1.ApiResponse(axios.default.get(`/data/weapons.json`)).ok((data) => {
             console.log(`Loaded ${data.length} weapons`);
-            tcore_2.WeaponAPI.setCache(data);
+            tcore_1.WeaponAPI.setCache(data);
         });
         new tcore_1.ApiResponse(axios.default.get(`/data/bases.json`)).ok((data) => {
             console.log(`Loaded ${data.length} facilities`);
-            tcore_3.FacilityAPI.setCache(data);
+            tcore_1.FacilityAPI.setCache(data);
         });
         this.settings.fromStorage = false;
         if (this.storage.enabled == true) {
@@ -71370,6 +71527,20 @@ exports.vm = new vue_1.default({
                 this.settings.debug = settings.debug;
                 this.settings.fromStorage = true;
                 this.connect();
+            }
+            const loggerMeta = Storage_1.StorageHelper.getLoggers();
+            if (loggerMeta != null) {
+                const existingLoggers = tcore_1.Logger.getLoggerNames();
+                for (const meta of loggerMeta) {
+                    if (existingLoggers.indexOf(meta.name) > -1) {
+                        tcore_1.Logger.getLogger(meta.name).setLevel(meta.level);
+                        console.log(`Loaded logger ${meta.name} to ${meta.level}`);
+                    }
+                    else {
+                        console.warn(`Logger ${meta.name} does not exist`);
+                    }
+                }
+                this.updateLoggers();
             }
         }
     },
@@ -71389,7 +71560,7 @@ exports.vm = new vue_1.default({
                 this.coreObject.disconnect();
                 this.coreObject = null;
             }
-            this.coreObject = new tcore_9.default(this.settings.serviceToken, this.settings.serverID);
+            this.coreObject = new tcore_1.default(this.settings.serviceToken, this.settings.serverID);
             this.coreObject.connect().ok(() => {
                 this.view = "realtime";
             });
@@ -71444,9 +71615,9 @@ exports.vm = new vue_1.default({
                 return console.warn(`Cannot import data, no file selected`);
             }
             const file = input.files[0];
-            tcore_13.Playback.setCore(this.core);
-            tcore_13.Playback.loadFile(file).ok(() => {
-                tcore_13.Playback.start({ speed: 0.0 });
+            tcore_1.Playback.setCore(this.core);
+            tcore_1.Playback.loadFile(file).ok(() => {
+                tcore_1.Playback.start({ speed: 0.0 });
             });
         },
         exportData: function () {
@@ -71488,15 +71659,15 @@ exports.vm = new vue_1.default({
         debugLoadfile: function (reportType) {
             const response = new tcore_1.ApiResponse(axios.default.get(`/test-data/2020-12-12-T1DE.json`)).ok((data) => {
                 const type = typeof (data);
-                tcore_13.Playback.setCore(this.core);
+                tcore_1.Playback.setCore(this.core);
                 if (type == "string") {
-                    tcore_13.Playback.loadFile(data).ok(() => {
-                        tcore_13.Playback.start({ speed: 0 });
+                    tcore_1.Playback.loadFile(data).ok(() => {
+                        tcore_1.Playback.start({ speed: 0 });
                     });
                 }
                 else if (type == "object") {
-                    tcore_13.Playback.loadFile(JSON.stringify(data)).ok(() => {
-                        tcore_13.Playback.start({ speed: 0 });
+                    tcore_1.Playback.loadFile(JSON.stringify(data)).ok(() => {
+                        tcore_1.Playback.start({ speed: 0 });
                         if (reportType != undefined) {
                             this.parameters.report = reportType;
                             this.generateReport();
@@ -71532,7 +71703,7 @@ exports.vm = new vue_1.default({
                 if (char.stats.size() == 0) {
                     return;
                 }
-                const collection = new tcore_12.TrackedPlayer();
+                const collection = new tcore_1.TrackedPlayer();
                 collection.name = char.name;
                 collection.outfitTag = char.outfitTag;
                 collection.characterID = char.characterID;
@@ -71544,7 +71715,7 @@ exports.vm = new vue_1.default({
                 }
                 let containsType = false;
                 char.stats.getMap().forEach((value, key) => {
-                    const psEvent = tcore_4.PsEvents.get(key) || tcore_4.PsEvent.default;
+                    const psEvent = tcore_1.PsEvents.get(key) || tcore_1.PsEvent.default;
                     // Is this stat one of the ones being displayed?
                     if (psEvent.types.indexOf(this.settings.eventType) > -1) {
                         //console.log(`Needed ${this.settings.eventType} to display ${char.name}, found from ${key}`);
@@ -71647,7 +71818,7 @@ exports.vm = new vue_1.default({
             });
             events.push(...this.core.miscEvents);
             events = events.sort((a, b) => a.timestamp - b.timestamp);
-            const outfitResponse = tcore_6.OutfitReportGenerator.generate({
+            const outfitResponse = tcore_1.OutfitReportGenerator.generate({
                 settings: {
                     zoneID: null,
                     showSquadStats: this.opsReportSettings.showSquadStats
@@ -71674,7 +71845,7 @@ exports.vm = new vue_1.default({
             return response;
         },
         generateBattleReport: function () {
-            const params = new tcore_7.FightReportParameters();
+            const params = new tcore_1.FightReportParameters();
             this.core.stats.forEach((player, charID) => {
                 if (player.events.length == 0) {
                     return;
@@ -71683,10 +71854,9 @@ exports.vm = new vue_1.default({
             });
             params.events.push(...this.core.miscEvents);
             params.events.push(...this.core.playerCaptures);
-            //params.events.push(...this.core.captures)
             params.events = params.events.sort((a, b) => a.timestamp - b.timestamp);
             params.players = this.core.stats;
-            tcore_7.FightReportGenerator.generate(params).ok((data) => {
+            tcore_1.FightReportGenerator.generate(params).ok((data) => {
                 this.battleReport = data;
                 this.view = "battle";
             });
@@ -71697,7 +71867,7 @@ exports.vm = new vue_1.default({
             const players = Array.from(this.core.stats.values())
                 .filter(iter => playerNames.indexOf(iter.name.toLowerCase()) == -1);
             console.log(`Making a winter report with: ${players.map(iter => iter.name).join(", ")}`);
-            const params = new tcore_11.WinterReportParameters();
+            const params = new tcore_1.WinterReportParameters();
             params.players = players;
             params.timeTracking = this.core.tracking;
             params.settings = this.winter.settings;
@@ -71711,7 +71881,7 @@ exports.vm = new vue_1.default({
                 params.events.push(...player.events);
             });
             this.winter.report = Loadable_1.Loadable.loading();
-            tcore_10.WinterReportGenerator.generate(params).ok((data) => {
+            tcore_1.WinterReportGenerator.generate(params).ok((data) => {
                 this.winter.report = Loadable_1.Loadable.loaded(data);
                 this.view = "winter";
             });
@@ -71719,7 +71889,7 @@ exports.vm = new vue_1.default({
         generatePersonalReport: function (charID) {
             let opsLeft = 2;
             let html = "";
-            let report = new tcore_5.Report();
+            let report = new tcore_1.Report();
             const personalTemplate = PersonalReportGenerator_1.PersonalReportGenerator.getTemplate().ok((type) => {
                 html = type;
                 if (--opsLeft == 0) {
@@ -71770,7 +71940,7 @@ exports.vm = new vue_1.default({
                     tracking: Object.assign({}, this.core.tracking),
                     routers: [...this.core.routerTracking.routers]
                 };
-                tcore_5.IndividualReporter.generatePersonalReport(parameters).ok(data => {
+                tcore_1.IndividualReporter.generatePersonalReport(parameters).ok(data => {
                     response.resolveOk(data);
                 });
             }
@@ -71891,8 +72061,48 @@ exports.vm = new vue_1.default({
             }
             this.core.addPlayer(this.parameters.playerName);
         },
+        updateLoggers: function () {
+            const loggers = tcore_1.Logger.getLoggerNames();
+            const levelLookup = new Map([
+                [0, "TRACE"],
+                [1, "DEBUG"],
+                [2, "INFO"],
+                [3, "WARN"],
+                [4, "ERROR"],
+                [5, "SILENT"]
+            ]);
+            this.loggers = [];
+            for (const loggerName of loggers) {
+                const logger = tcore_1.Logger.getLogger(loggerName);
+                this.loggers.push({
+                    name: loggerName,
+                    level: levelLookup.get(logger.getLevel())
+                });
+            }
+            this.loggers.sort((a, b) => a.name.localeCompare(b.name));
+            Storage_1.StorageHelper.setLoggers(this.loggers);
+        },
+        openLoggerModal: function () {
+            this.updateLoggers();
+            $("#logger-modal").modal("show");
+        },
+        updateLogger: function (name, mod) {
+            const logger = tcore_1.Logger.getLogger(name);
+            mod(logger);
+            this.updateLoggers();
+        },
+        insertBattleStartMarker: function () {
+            if (this.core.tracking.running == true) {
+                this.core.addMarker("battle-start");
+            }
+        },
+        insertBattleEndMarker: function () {
+            if (this.core.tracking.running == true) {
+                this.core.addMarker("battle-end");
+            }
+        },
         exportWeaponData: function () {
-            const weapons = tcore_2.WeaponAPI.getEntires();
+            const weapons = tcore_1.WeaponAPI.getEntires();
             const lines = weapons.map((iter) => {
                 return {
                     item_id: iter.ID,

@@ -1,3 +1,4 @@
+import { LoggerMetadata } from "LoggerMetadata";
 import { CoreSettings } from "tcore";
 
 export class StorageMetadata<T> {
@@ -12,11 +13,12 @@ export class StorageMetadata<T> {
 export class StorageHelper {
 
     private static _enabled: boolean | undefined = undefined;
-    private static _settings: CoreSettings | undefined = undefined;
 
     public static KEY_TREND: string = "topt.trends";
     public static KEY_SESSION: string = "topt.session";
     public static KEY_SETTINGS: string = "topt.settings";
+
+    public static KEY_LOGGER_SETTINGS: string = "topt.loggers";
 
     public static isEnabled(): boolean {
         if (this._enabled == undefined) {
@@ -36,56 +38,45 @@ export class StorageHelper {
         return this._enabled;
     }
 
-    public static getSettings(): CoreSettings | null {
-        if (this._settings == undefined) {
-            if (this.isEnabled() == false) {
-                return null;
-            }
-
-            let item: StorageMetadata<CoreSettings> = {
-                tag: "settings",
-                data: new CoreSettings() as CoreSettings
-            };
-
-            const itemStr: string | null = localStorage.getItem(this.KEY_SETTINGS);
-            if (itemStr == null) {
-                return null;
-            } else {
-                item = JSON.parse(itemStr);
-            }
-
-            if (item.tag == undefined || item.tag != "settings") {
-                console.warn(`Cannot get settings: localStorage item ${this.KEY_SETTINGS} contained the wrong tag: ${item.tag}`);
-                return null;
-            }
-
-            // Make sure a valid value is loaded even when that field isn't present
-            if (item.data.debug == undefined) {
-                item.data.debug = false;
-            }
-
-            this._settings = item.data;
-        }
-
-        return this._settings;
-    }
-
-    public static setSettings(settings: CoreSettings | null): void {
+    public static get<T>(key: string): T | null {
         if (this.isEnabled() == false) {
-            return console.warn(`Cannot save settings: localStorage is not enabled`);
+            return null;
         }
 
-        if (settings == null) {
-            localStorage.removeItem(this.KEY_SETTINGS);
-        } else {
-            let item: StorageMetadata<CoreSettings> = {
-                tag: "settings",
-                data: settings
-            };
+        let item: T;
 
-            localStorage.setItem(this.KEY_SETTINGS, JSON.stringify(item));
+        const itemStr: string | null = localStorage.getItem(key);
+        if (itemStr == null) {
+            return null;
+        }
+
+        item = JSON.parse(itemStr);
+
+        if ((item as any).tag != undefined) {
+            console.log(`Found old stored data under ${key}`);
+            item = (item as any).data;
+        }
+
+        return item;
+    }
+
+    public static set<T>(key: string, item: T | null): void {
+        if (this.isEnabled() == false) {
+            return;
+        }
+
+        if (item == null) {
+            localStorage.removeItem(key);
+        } else {
+            localStorage.setItem(key, JSON.stringify(item));
         }
     }
+
+    public static getSettings(): CoreSettings | null { return this.get(this.KEY_SETTINGS); }
+    public static setSettings(settings: CoreSettings | null): void { this.set(this.KEY_SETTINGS, settings); }
+
+    public static getLoggers(): LoggerMetadata[] | null { return this.get(this.KEY_LOGGER_SETTINGS); }
+    public static setLoggers(loggers: LoggerMetadata[]): void { this.set(this.KEY_LOGGER_SETTINGS, loggers); }
 
 }
 (window as any).StorageHelper = StorageHelper;

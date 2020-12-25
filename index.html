@@ -345,6 +345,18 @@
                             Load ops report test
                         </button>
 
+                        <button class="btn btn-primary" @click="openLoggerModal()">
+                            Loggers
+                        </button>
+
+                        <div class="btn-group">
+                            <button class="btn btn-success" @click="insertBattleStartMarker()">
+                                Start
+                            </button>
+                            <button class="btn btn-danger" @click="insertBattleEndMarker()">
+                                End
+                            </button>
+                        </div>
                     </template>
 
                     <hr/>
@@ -1938,7 +1950,80 @@
             </div>
         </div>
 
-        <div class="modal" id="outfit-report-modal">
+        <div class="modal" id="logger-modal">
+            <div class="modal-dialog modal-xl">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Loggers</h5>
+
+                        <button type="button" class="close" data-dismiss="modal">
+                            &times;
+                        </button>
+                    </div>
+
+                    <div class="modal-body">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Logger</th>
+                                    <th>Level</th>
+                                    <th>Set level</th>
+                                    <th>Enable</th>
+                                    <th>Disable</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                <tr v-for="logger in loggers">
+                                    <td>{{logger.name}}</td>
+                                    <td>{{logger.level}}</td>
+                                    <td>
+                                        <div class="btn-group">
+                                            <button type="button" class="btn btn-info"
+                                                @click="updateLogger(logger.name, l => l.setLevel(0))">
+                                                Trace
+                                            </button>
+                                            <button type="button" class="btn btn-info"
+                                                @click="updateLogger(logger.name, l => l.setLevel(1))">
+                                                Debug
+                                            </button>
+                                            <button type="button" class="btn btn-info"
+                                                @click="updateLogger(logger.name, l => l.setLevel(2))">
+                                                Info
+                                            </button>
+                                            <button type="button" class="btn btn-info"
+                                                @click="updateLogger(logger.name, l => l.setLevel(3))">
+                                                Warn
+                                            </button>
+                                            <button type="button" class="btn btn-info"
+                                                @click="updateLogger(logger.name, l => l.setLevel(4))">
+                                                Error
+                                            </button>
+                                            <button type="button" class="btn btn-info"
+                                                @click="updateLogger(logger.name, l => l.setLevel(5))">
+                                                Silent
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <button type="button" class="btn btn-success"
+                                            @click="updateLogger(logger.name, l => l.enableAll())">
+                                            Enable
+                                        </button>
+                                    </td>
+                                    <td>
+                                        <button type="button" class="btn btn-success"
+                                            @click="updateLogger(logger.name, l => l.disableAll())">
+                                            Disable
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                    </div>
+                </div>
+            </div>
 
         </div>
 
