@@ -87,9 +87,9 @@
 /******/ ({
 
 /***/ "../topt-core/build/core/Core.js":
-/*!*********************************!*\
-  !*** .-core/build/core/Core.js ***!
-  \*********************************/
+/*!***************************************!*\
+  !*** ../topt-core/build/core/Core.js ***!
+  \***************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -127,7 +127,8 @@ class Core {
             logistics: null,
             logins: null,
             facility: null,
-            debug: null
+            debug: null,
+            added: null
         };
         /**
          * Collection of variables used to track router placements
@@ -206,7 +207,8 @@ class Core {
             vehicle: [],
             login: [],
             logout: [],
-            marker: []
+            marker: [],
+            base: []
         };
         this.serviceID = serviceID;
         this.serverID = serverID;
@@ -260,6 +262,9 @@ class Core {
             case "marker":
                 this.handlers.marker.push(handler);
                 break;
+            case "base":
+                this.handlers.base.push(handler);
+                break;
             default: throw `Unchecked event type ${type}`;
         }
     }
@@ -280,6 +285,7 @@ class Core {
             this.handlers.login.length = 0;
             this.handlers.logout.length = 0;
             this.handlers.marker.length = 0;
+            this.handlers.base.length = 0;
         }
         else {
             this.handlers[type].length = 0;
@@ -430,6 +436,38 @@ class Core {
         this.miscEvents.push(ev);
         this.emit(ev);
     }
+    subscribe(options) {
+        let obj = {
+            action: "subscribe",
+            service: "event"
+        };
+        if (options.characters && options.characters.length > 0) {
+            obj.characters = options.characters;
+        }
+        if (options.worlds && options.worlds.length > 0) {
+            obj.worlds = options.worlds;
+        }
+        if (options.events && options.events.length > 0) {
+            obj.eventNames = options.events;
+        }
+        if (options.charactersWorldAnd == true) {
+            obj.logicalAndCharactersWithWorlds = true;
+        }
+        const json = JSON.stringify(obj);
+        log.debug(`Sending on ${options.socket}: ${json}`);
+        if (options.socket == undefined || options.socket == "added") {
+            this.sockets.added.send(json);
+        }
+        else if (options.socket == "login") {
+            this.sockets.logins.send(json);
+        }
+        else if (options.socket == "tracked") {
+            this.sockets.tracked.send(json);
+        }
+        else {
+            throw `Unknown socket to subscribe: ${options.socket}`;
+        }
+    }
     promiseTest() {
         const t = new ApiWrapper_1.ApiResponse();
         const p = t.promise();
@@ -528,9 +566,9 @@ exports.Core = Core;
 /***/ }),
 
 /***/ "../topt-core/build/core/CoreConnection.js":
-/*!*******************************************!*\
-  !*** .-core/build/core/CoreConnection.js ***!
-  \*******************************************/
+/*!*************************************************!*\
+  !*** ../topt-core/build/core/CoreConnection.js ***!
+  \*************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -558,11 +596,12 @@ Core_1.Core.prototype.connect = function () {
             response.resolveOk();
         }
     };
-    setupTrackerSocket(self).always(() => { handler(); });
-    setupLoginSocket(self).always(() => { handler(); });
-    setupLogisticsSocket(self).always(() => { handler(); });
-    setupFacilitySocket(self).always(() => { handler(); });
-    setupDebugSocket(self).always(() => { handler(); });
+    setupTrackerSocket(self).always(() => handler());
+    setupLoginSocket(self).always(() => handler());
+    setupLogisticsSocket(self).always(() => handler());
+    setupFacilitySocket(self).always(() => handler());
+    setupDebugSocket(self).always(() => handler());
+    setupAddedSocket(self).always(() => handler());
     return response;
 };
 Core_1.Core.prototype.disconnect = function () {
@@ -586,6 +625,10 @@ Core_1.Core.prototype.disconnect = function () {
     if (self.sockets.debug != null) {
         self.sockets.debug.close();
         self.sockets.debug = null;
+    }
+    if (self.sockets.added != null) {
+        self.sockets.added.close();
+        self.sockets.added = null;
     }
     self.connected = false;
 };
@@ -620,6 +663,16 @@ function setupDebugSocket(core) {
         };
         response.resolveOk();
     };
+    return response;
+}
+function setupAddedSocket(core) {
+    const response = new ApiWrapper_1.ApiResponse();
+    core.sockets.added = new websocket_1.w3cwebsocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${core.serviceID}`);
+    core.sockets.added.onopen = () => { response.resolveOk(); };
+    core.sockets.added.onerror = () => {
+        response.resolve({ code: 500, data: `` });
+    };
+    core.sockets.added.onmessage = core.onmessage.bind(core);
     return response;
 }
 function setupLogisticsSocket(core) {
@@ -711,9 +764,9 @@ function setupFacilitySocket(core) {
 /***/ }),
 
 /***/ "../topt-core/build/core/CoreDebugHelper.js":
-/*!********************************************!*\
-  !*** .-core/build/core/CoreDebugHelper.js ***!
-  \********************************************/
+/*!**************************************************!*\
+  !*** ../topt-core/build/core/CoreDebugHelper.js ***!
+  \**************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -787,9 +840,9 @@ Core_1.Core.prototype.subscribeToItemAdded = function () {
 /***/ }),
 
 /***/ "../topt-core/build/core/CoreProcessing.js":
-/*!*******************************************!*\
-  !*** .-core/build/core/CoreProcessing.js ***!
-  \*******************************************/
+/*!*************************************************!*\
+  !*** ../topt-core/build/core/CoreProcessing.js ***!
+  \*************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -1031,7 +1084,6 @@ Core_1.Core.prototype.processMessage = function (input, override = false) {
             let player = self.stats.get(playerID);
             if (player != undefined) {
                 log.debug(`Tracked player ${player.name} got a capture on ${ev.facilityID}`);
-                console.log(`Tracked player ${player.name} got a capture on ${ev.facilityID}`);
                 player.stats.increment(PsEvent_1.PsEvent.baseCapture);
                 player.events.push(ev);
             }
@@ -1071,7 +1123,7 @@ Core_1.Core.prototype.processMessage = function (input, override = false) {
         else if (event == "FacilityControl") {
             const outfitID = msg.payload.outfit_id;
             const facilityID = msg.payload.facility_id;
-            self.captures.push({
+            const capture = {
                 facilityID: facilityID,
                 zoneID: zoneID,
                 timestamp: new Date(timestamp),
@@ -1079,8 +1131,22 @@ Core_1.Core.prototype.processMessage = function (input, override = false) {
                 factionID: msg.payload.new_faction_id,
                 outfitID: outfitID,
                 previousFaction: msg.payload.old_faction_id,
-            });
+            };
+            self.captures.push(capture);
             save = true;
+            const ev = {
+                type: "base",
+                sourceID: "7153",
+                facilityID: capture.facilityID,
+                timestamp: timestamp,
+                zoneID: zoneID,
+                outfitID: capture.outfitID,
+                factionID: capture.factionID,
+                previousFactionID: capture.previousFaction,
+                timeHeld: capture.timeHeld,
+                worldID: msg.payload.world_id
+            };
+            self.emit(ev);
         }
         else if (event == "ItemAdded") {
             const itemID = msg.payload.item_id;
@@ -1212,9 +1278,9 @@ Core_1.Core.prototype.processMessage = function (input, override = false) {
 /***/ }),
 
 /***/ "../topt-core/build/core/CoreSettings.js":
-/*!*****************************************!*\
-  !*** .-core/build/core/CoreSettings.js ***!
-  \*****************************************/
+/*!***********************************************!*\
+  !*** ../topt-core/build/core/CoreSettings.js ***!
+  \***********************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -1251,9 +1317,9 @@ exports.CoreSettings = CoreSettings;
 /***/ }),
 
 /***/ "../topt-core/build/core/CoreSquad.js":
-/*!**************************************!*\
-  !*** .-core/build/core/CoreSquad.js ***!
-  \**************************************/
+/*!********************************************!*\
+  !*** ../topt-core/build/core/CoreSquad.js ***!
+  \********************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -1745,9 +1811,9 @@ Core_1.Core.prototype.printSquadInfo = function () {
 /***/ }),
 
 /***/ "../topt-core/build/core/EventReporter.js":
-/*!******************************************!*\
-  !*** .-core/build/core/EventReporter.js ***!
-  \******************************************/
+/*!************************************************!*\
+  !*** ../topt-core/build/core/EventReporter.js ***!
+  \************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -2781,9 +2847,9 @@ exports.default = EventReporter;
 /***/ }),
 
 /***/ "../topt-core/build/core/InvididualGenerator.js":
-/*!************************************************!*\
-  !*** .-core/build/core/InvididualGenerator.js ***!
-  \************************************************/
+/*!******************************************************!*\
+  !*** ../topt-core/build/core/InvididualGenerator.js ***!
+  \******************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -3613,7 +3679,7 @@ class IndividualReporter {
         usage.characterID = parameters.player.characterID;
         usage.secondsOnline = (finalTimestamp - lastTimestamp) / 1000;
         parameters.player.events.forEach((event) => {
-            if (event.type == "capture" || event.type == "defend" || event.type == "login" || event.type == "logout" || event.type == "marker") {
+            if (event.type == "capture" || event.type == "defend" || event.type == "login" || event.type == "logout" || event.type == "marker" || event.type == "base") {
                 return;
             }
             lastLoadout = PsLoadout_1.PsLoadouts.get(event.loadoutID);
@@ -3905,9 +3971,9 @@ exports.IndividualReporter = IndividualReporter;
 /***/ }),
 
 /***/ "../topt-core/build/core/Loggers.js":
-/*!************************************!*\
-  !*** .-core/build/core/Loggers.js ***!
-  \************************************/
+/*!******************************************!*\
+  !*** ../topt-core/build/core/Loggers.js ***!
+  \******************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -3951,9 +4017,9 @@ Logger.loggers = new Map();
 /***/ }),
 
 /***/ "../topt-core/build/core/Playback.js":
-/*!*************************************!*\
-  !*** .-core/build/core/Playback.js ***!
-  \*************************************/
+/*!*******************************************!*\
+  !*** ../topt-core/build/core/Playback.js ***!
+  \*******************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -4123,9 +4189,9 @@ Playback._parsed = [];
 /***/ }),
 
 /***/ "../topt-core/build/core/PsEvent.js":
-/*!************************************!*\
-  !*** .-core/build/core/PsEvent.js ***!
-  \************************************/
+/*!******************************************!*\
+  !*** ../topt-core/build/core/PsEvent.js ***!
+  \******************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -4570,9 +4636,9 @@ exports.PsEvents = new Map([
 /***/ }),
 
 /***/ "../topt-core/build/core/StatMap.js":
-/*!************************************!*\
-  !*** .-core/build/core/StatMap.js ***!
-  \************************************/
+/*!******************************************!*\
+  !*** ../topt-core/build/core/StatMap.js ***!
+  \******************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -4614,9 +4680,9 @@ exports.default = StatMap;
 /***/ }),
 
 /***/ "../topt-core/build/core/census/AchievementAPI.js":
-/*!**************************************************!*\
-  !*** .-core/build/core/census/AchievementAPI.js ***!
-  \**************************************************/
+/*!********************************************************!*\
+  !*** ../topt-core/build/core/census/AchievementAPI.js ***!
+  \********************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -4728,9 +4794,9 @@ AchievementAPI.unknown = {
 /***/ }),
 
 /***/ "../topt-core/build/core/census/ApiWrapper.js":
-/*!**********************************************!*\
-  !*** .-core/build/core/census/ApiWrapper.js ***!
-  \**********************************************/
+/*!****************************************************!*\
+  !*** ../topt-core/build/core/census/ApiWrapper.js ***!
+  \****************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -5256,9 +5322,9 @@ exports.APIWrapper = APIWrapper;
 /***/ }),
 
 /***/ "../topt-core/build/core/census/CensusAPI.js":
-/*!*********************************************!*\
-  !*** .-core/build/core/census/CensusAPI.js ***!
-  \*********************************************/
+/*!***************************************************!*\
+  !*** ../topt-core/build/core/census/CensusAPI.js ***!
+  \***************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -5304,9 +5370,9 @@ CensusAPI.requestCount = 0;
 /***/ }),
 
 /***/ "../topt-core/build/core/census/CharacterAPI.js":
-/*!************************************************!*\
-  !*** .-core/build/core/census/CharacterAPI.js ***!
-  \************************************************/
+/*!******************************************************!*\
+  !*** ../topt-core/build/core/census/CharacterAPI.js ***!
+  \******************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -5468,9 +5534,9 @@ CharacterAPI._pendingResolveID = 0;
 /***/ }),
 
 /***/ "../topt-core/build/core/census/EventAPI.js":
-/*!********************************************!*\
-  !*** .-core/build/core/census/EventAPI.js ***!
-  \********************************************/
+/*!**************************************************!*\
+  !*** ../topt-core/build/core/census/EventAPI.js ***!
+  \**************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -5490,9 +5556,9 @@ exports.EventAPI = EventAPI;
 /***/ }),
 
 /***/ "../topt-core/build/core/census/FacilityAPI.js":
-/*!***********************************************!*\
-  !*** .-core/build/core/census/FacilityAPI.js ***!
-  \***********************************************/
+/*!*****************************************************!*\
+  !*** ../topt-core/build/core/census/FacilityAPI.js ***!
+  \*****************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -5648,9 +5714,9 @@ FacilityAPI._timeoutID = -1;
 /***/ }),
 
 /***/ "../topt-core/build/core/census/OutfitAPI.js":
-/*!*********************************************!*\
-  !*** .-core/build/core/census/OutfitAPI.js ***!
-  \*********************************************/
+/*!***************************************************!*\
+  !*** ../topt-core/build/core/census/OutfitAPI.js ***!
+  \***************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -5780,9 +5846,9 @@ exports.OutfitAPI = OutfitAPI;
 /***/ }),
 
 /***/ "../topt-core/build/core/census/PsLoadout.js":
-/*!*********************************************!*\
-  !*** .-core/build/core/census/PsLoadout.js ***!
-  \*********************************************/
+/*!***************************************************!*\
+  !*** ../topt-core/build/core/census/PsLoadout.js ***!
+  \***************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -6035,9 +6101,9 @@ exports.PsLoadouts = new Map([
 /***/ }),
 
 /***/ "../topt-core/build/core/census/VehicleAPI.js":
-/*!**********************************************!*\
-  !*** .-core/build/core/census/VehicleAPI.js ***!
-  \**********************************************/
+/*!****************************************************!*\
+  !*** ../topt-core/build/core/census/VehicleAPI.js ***!
+  \****************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -6135,9 +6201,9 @@ VehicleAPI._cache = null;
 /***/ }),
 
 /***/ "../topt-core/build/core/census/WeaponAPI.js":
-/*!*********************************************!*\
-  !*** .-core/build/core/census/WeaponAPI.js ***!
-  \*********************************************/
+/*!***************************************************!*\
+  !*** ../topt-core/build/core/census/WeaponAPI.js ***!
+  \***************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -6299,9 +6365,9 @@ WeaponAPI._pendingRequests = new Map();
 /***/ }),
 
 /***/ "../topt-core/build/core/events/index.js":
-/*!*****************************************!*\
-  !*** .-core/build/core/events/index.js ***!
-  \*****************************************/
+/*!***********************************************!*\
+  !*** ../topt-core/build/core/events/index.js ***!
+  \***********************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -6313,9 +6379,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 /***/ }),
 
 /***/ "../topt-core/build/core/index.js":
-/*!**********************************!*\
-  !*** .-core/build/core/index.js ***!
-  \**********************************/
+/*!****************************************!*\
+  !*** ../topt-core/build/core/index.js ***!
+  \****************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -6367,9 +6433,9 @@ __exportStar(__webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Logge
 /***/ }),
 
 /***/ "../topt-core/build/core/objects/BaseExchange.js":
-/*!*************************************************!*\
-  !*** .-core/build/core/objects/BaseExchange.js ***!
-  \*************************************************/
+/*!*******************************************************!*\
+  !*** ../topt-core/build/core/objects/BaseExchange.js ***!
+  \*******************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -6415,9 +6481,9 @@ exports.BaseExchange = BaseExchange;
 /***/ }),
 
 /***/ "../topt-core/build/core/objects/BaseFightEncounter.js":
-/*!*******************************************************!*\
-  !*** .-core/build/core/objects/BaseFightEncounter.js ***!
-  \*******************************************************/
+/*!*************************************************************!*\
+  !*** ../topt-core/build/core/objects/BaseFightEncounter.js ***!
+  \*************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -6442,9 +6508,9 @@ exports.BaseFightEncounter = BaseFightEncounter;
 /***/ }),
 
 /***/ "../topt-core/build/core/objects/BaseFightEntry.js":
-/*!***************************************************!*\
-  !*** .-core/build/core/objects/BaseFightEntry.js ***!
-  \***************************************************/
+/*!*********************************************************!*\
+  !*** ../topt-core/build/core/objects/BaseFightEntry.js ***!
+  \*********************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -6468,9 +6534,9 @@ exports.BaseFightEntry = BaseFightEntry;
 /***/ }),
 
 /***/ "../topt-core/build/core/objects/BaseOverview.js":
-/*!*************************************************!*\
-  !*** .-core/build/core/objects/BaseOverview.js ***!
-  \*************************************************/
+/*!*******************************************************!*\
+  !*** ../topt-core/build/core/objects/BaseOverview.js ***!
+  \*******************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -6502,9 +6568,9 @@ exports.BaseOverview = BaseOverview;
 /***/ }),
 
 /***/ "../topt-core/build/core/objects/BaseStatus.js":
-/*!***********************************************!*\
-  !*** .-core/build/core/objects/BaseStatus.js ***!
-  \***********************************************/
+/*!*****************************************************!*\
+  !*** ../topt-core/build/core/objects/BaseStatus.js ***!
+  \*****************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -6526,9 +6592,9 @@ exports.BaseStatus = BaseStatus;
 /***/ }),
 
 /***/ "../topt-core/build/core/objects/SquadStat.js":
-/*!**********************************************!*\
-  !*** .-core/build/core/objects/SquadStat.js ***!
-  \**********************************************/
+/*!****************************************************!*\
+  !*** ../topt-core/build/core/objects/SquadStat.js ***!
+  \****************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -6582,9 +6648,9 @@ exports.SquadStat = SquadStat;
 /***/ }),
 
 /***/ "../topt-core/build/core/objects/TrackedPlayer.js":
-/*!**************************************************!*\
-  !*** .-core/build/core/objects/TrackedPlayer.js ***!
-  \**************************************************/
+/*!********************************************************!*\
+  !*** ../topt-core/build/core/objects/TrackedPlayer.js ***!
+  \********************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -6654,9 +6720,9 @@ exports.TrackedPlayer = TrackedPlayer;
 /***/ }),
 
 /***/ "../topt-core/build/core/objects/index.js":
-/*!******************************************!*\
-  !*** .-core/build/core/objects/index.js ***!
-  \******************************************/
+/*!************************************************!*\
+  !*** ../topt-core/build/core/objects/index.js ***!
+  \************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -6683,9 +6749,9 @@ Object.defineProperty(exports, "BaseStatus", { enumerable: true, get: function (
 /***/ }),
 
 /***/ "../topt-core/build/core/reports/FightReport.js":
-/*!************************************************!*\
-  !*** .-core/build/core/reports/FightReport.js ***!
-  \************************************************/
+/*!******************************************************!*\
+  !*** ../topt-core/build/core/reports/FightReport.js ***!
+  \******************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -7223,9 +7289,9 @@ exports.FightReportGenerator = FightReportGenerator;
 /***/ }),
 
 /***/ "../topt-core/build/core/reports/OutfitReport.js":
-/*!*************************************************!*\
-  !*** .-core/build/core/reports/OutfitReport.js ***!
-  \*************************************************/
+/*!*******************************************************!*\
+  !*** ../topt-core/build/core/reports/OutfitReport.js ***!
+  \*******************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -7794,9 +7860,9 @@ exports.OutfitReportGenerator = OutfitReportGenerator;
 /***/ }),
 
 /***/ "../topt-core/build/core/squad/Squad.js":
-/*!****************************************!*\
-  !*** .-core/build/core/squad/Squad.js ***!
-  \****************************************/
+/*!**********************************************!*\
+  !*** ../topt-core/build/core/squad/Squad.js ***!
+  \**********************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -7843,9 +7909,9 @@ Squad._previousID = 0;
 /***/ }),
 
 /***/ "../topt-core/build/core/squad/SquadMember.js":
-/*!**********************************************!*\
-  !*** .-core/build/core/squad/SquadMember.js ***!
-  \**********************************************/
+/*!****************************************************!*\
+  !*** ../topt-core/build/core/squad/SquadMember.js ***!
+  \****************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -7903,9 +7969,9 @@ exports.SquadMember = SquadMember;
 /***/ }),
 
 /***/ "../topt-core/build/core/winter/WinterMetric.js":
-/*!************************************************!*\
-  !*** .-core/build/core/winter/WinterMetric.js ***!
-  \************************************************/
+/*!******************************************************!*\
+  !*** ../topt-core/build/core/winter/WinterMetric.js ***!
+  \******************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -7936,9 +8002,9 @@ exports.WinterMetricEntry = WinterMetricEntry;
 /***/ }),
 
 /***/ "../topt-core/build/core/winter/WinterReport.js":
-/*!************************************************!*\
-  !*** .-core/build/core/winter/WinterReport.js ***!
-  \************************************************/
+/*!******************************************************!*\
+  !*** ../topt-core/build/core/winter/WinterReport.js ***!
+  \******************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -7961,9 +8027,9 @@ exports.WinterReport = WinterReport;
 /***/ }),
 
 /***/ "../topt-core/build/core/winter/WinterReportGenerator.js":
-/*!*********************************************************!*\
-  !*** .-core/build/core/winter/WinterReportGenerator.js ***!
-  \*********************************************************/
+/*!***************************************************************!*\
+  !*** ../topt-core/build/core/winter/WinterReportGenerator.js ***!
+  \***************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -8621,9 +8687,9 @@ exports.WinterReportGenerator = WinterReportGenerator;
 /***/ }),
 
 /***/ "../topt-core/build/core/winter/WinterReportParameters.js":
-/*!**********************************************************!*\
-  !*** .-core/build/core/winter/WinterReportParameters.js ***!
-  \**********************************************************/
+/*!****************************************************************!*\
+  !*** ../topt-core/build/core/winter/WinterReportParameters.js ***!
+  \****************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -8670,9 +8736,9 @@ exports.WinterReportSettings = WinterReportSettings;
 /***/ }),
 
 /***/ "../topt-core/build/core/winter/index.js":
-/*!*****************************************!*\
-  !*** .-core/build/core/winter/index.js ***!
-  \*****************************************/
+/*!***********************************************!*\
+  !*** ../topt-core/build/core/winter/index.js ***!
+  \***********************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -8692,9 +8758,9 @@ Object.defineProperty(exports, "WinterReportSettings", { enumerable: true, get: 
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/index.js":
-/*!******************************************!*\
-  !*** .-core/node_modules/axios/index.js ***!
-  \******************************************/
+/*!************************************************!*\
+  !*** ../topt-core/node_modules/axios/index.js ***!
+  \************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -8703,9 +8769,9 @@ module.exports = __webpack_require__(/*! ./lib/axios */ "../topt-core/node_modul
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/adapters/xhr.js":
-/*!*****************************************************!*\
-  !*** .-core/node_modules/axios/lib/adapters/xhr.js ***!
-  \*****************************************************/
+/*!***********************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/adapters/xhr.js ***!
+  \***********************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -8894,9 +8960,9 @@ module.exports = function xhrAdapter(config) {
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/axios.js":
-/*!**********************************************!*\
-  !*** .-core/node_modules/axios/lib/axios.js ***!
-  \**********************************************/
+/*!****************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/axios.js ***!
+  \****************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -8959,9 +9025,9 @@ module.exports.default = axios;
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/cancel/Cancel.js":
-/*!******************************************************!*\
-  !*** .-core/node_modules/axios/lib/cancel/Cancel.js ***!
-  \******************************************************/
+/*!************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/cancel/Cancel.js ***!
+  \************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -8990,9 +9056,9 @@ module.exports = Cancel;
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/cancel/CancelToken.js":
-/*!***********************************************************!*\
-  !*** .-core/node_modules/axios/lib/cancel/CancelToken.js ***!
-  \***********************************************************/
+/*!*****************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/cancel/CancelToken.js ***!
+  \*****************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -9059,9 +9125,9 @@ module.exports = CancelToken;
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/cancel/isCancel.js":
-/*!********************************************************!*\
-  !*** .-core/node_modules/axios/lib/cancel/isCancel.js ***!
-  \********************************************************/
+/*!**************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/cancel/isCancel.js ***!
+  \**************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -9076,9 +9142,9 @@ module.exports = function isCancel(value) {
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/core/Axios.js":
-/*!***************************************************!*\
-  !*** .-core/node_modules/axios/lib/core/Axios.js ***!
-  \***************************************************/
+/*!*********************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/core/Axios.js ***!
+  \*********************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -9183,9 +9249,9 @@ module.exports = Axios;
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/core/InterceptorManager.js":
-/*!****************************************************************!*\
-  !*** .-core/node_modules/axios/lib/core/InterceptorManager.js ***!
-  \****************************************************************/
+/*!**********************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/core/InterceptorManager.js ***!
+  \**********************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -9247,9 +9313,9 @@ module.exports = InterceptorManager;
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/core/buildFullPath.js":
-/*!***********************************************************!*\
-  !*** .-core/node_modules/axios/lib/core/buildFullPath.js ***!
-  \***********************************************************/
+/*!*****************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/core/buildFullPath.js ***!
+  \*****************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -9279,9 +9345,9 @@ module.exports = function buildFullPath(baseURL, requestedURL) {
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/core/createError.js":
-/*!*********************************************************!*\
-  !*** .-core/node_modules/axios/lib/core/createError.js ***!
-  \*********************************************************/
+/*!***************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/core/createError.js ***!
+  \***************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -9309,9 +9375,9 @@ module.exports = function createError(message, config, code, request, response) 
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/core/dispatchRequest.js":
-/*!*************************************************************!*\
-  !*** .-core/node_modules/axios/lib/core/dispatchRequest.js ***!
-  \*************************************************************/
+/*!*******************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/core/dispatchRequest.js ***!
+  \*******************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -9400,9 +9466,9 @@ module.exports = function dispatchRequest(config) {
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/core/enhanceError.js":
-/*!**********************************************************!*\
-  !*** .-core/node_modules/axios/lib/core/enhanceError.js ***!
-  \**********************************************************/
+/*!****************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/core/enhanceError.js ***!
+  \****************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -9454,9 +9520,9 @@ module.exports = function enhanceError(error, config, code, request, response) {
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/core/mergeConfig.js":
-/*!*********************************************************!*\
-  !*** .-core/node_modules/axios/lib/core/mergeConfig.js ***!
-  \*********************************************************/
+/*!***************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/core/mergeConfig.js ***!
+  \***************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -9553,9 +9619,9 @@ module.exports = function mergeConfig(config1, config2) {
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/core/settle.js":
-/*!****************************************************!*\
-  !*** .-core/node_modules/axios/lib/core/settle.js ***!
-  \****************************************************/
+/*!**********************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/core/settle.js ***!
+  \**********************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -9590,9 +9656,9 @@ module.exports = function settle(resolve, reject, response) {
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/core/transformData.js":
-/*!***********************************************************!*\
-  !*** .-core/node_modules/axios/lib/core/transformData.js ***!
-  \***********************************************************/
+/*!*****************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/core/transformData.js ***!
+  \*****************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -9622,9 +9688,9 @@ module.exports = function transformData(data, headers, fns) {
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/defaults.js":
-/*!*************************************************!*\
-  !*** .-core/node_modules/axios/lib/defaults.js ***!
-  \*************************************************/
+/*!*******************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/defaults.js ***!
+  \*******************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -9728,14 +9794,14 @@ utils.forEach(['post', 'put', 'patch'], function forEachMethodWithData(method) {
 
 module.exports = defaults;
 
-/* WEBPACK VAR INJECTION */}.call(this, __webpack_require__(/*! ./../../../../topt/node_modules/process/browser.js */ "./node_modules/process/browser.js")))
+/* WEBPACK VAR INJECTION */}.call(this, __webpack_require__(/*! ./../../../../TOPT/node_modules/process/browser.js */ "./node_modules/process/browser.js")))
 
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/helpers/bind.js":
-/*!*****************************************************!*\
-  !*** .-core/node_modules/axios/lib/helpers/bind.js ***!
-  \*****************************************************/
+/*!***********************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/helpers/bind.js ***!
+  \***********************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -9756,9 +9822,9 @@ module.exports = function bind(fn, thisArg) {
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/helpers/buildURL.js":
-/*!*********************************************************!*\
-  !*** .-core/node_modules/axios/lib/helpers/buildURL.js ***!
-  \*********************************************************/
+/*!***************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/helpers/buildURL.js ***!
+  \***************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -9838,9 +9904,9 @@ module.exports = function buildURL(url, params, paramsSerializer) {
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/helpers/combineURLs.js":
-/*!************************************************************!*\
-  !*** .-core/node_modules/axios/lib/helpers/combineURLs.js ***!
-  \************************************************************/
+/*!******************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/helpers/combineURLs.js ***!
+  \******************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -9864,9 +9930,9 @@ module.exports = function combineURLs(baseURL, relativeURL) {
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/helpers/cookies.js":
-/*!********************************************************!*\
-  !*** .-core/node_modules/axios/lib/helpers/cookies.js ***!
-  \********************************************************/
+/*!**************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/helpers/cookies.js ***!
+  \**************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -9929,9 +9995,9 @@ module.exports = (
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/helpers/isAbsoluteURL.js":
-/*!**************************************************************!*\
-  !*** .-core/node_modules/axios/lib/helpers/isAbsoluteURL.js ***!
-  \**************************************************************/
+/*!********************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/helpers/isAbsoluteURL.js ***!
+  \********************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -9955,9 +10021,9 @@ module.exports = function isAbsoluteURL(url) {
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/helpers/isURLSameOrigin.js":
-/*!****************************************************************!*\
-  !*** .-core/node_modules/axios/lib/helpers/isURLSameOrigin.js ***!
-  \****************************************************************/
+/*!**********************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/helpers/isURLSameOrigin.js ***!
+  \**********************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -10035,9 +10101,9 @@ module.exports = (
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/helpers/normalizeHeaderName.js":
-/*!********************************************************************!*\
-  !*** .-core/node_modules/axios/lib/helpers/normalizeHeaderName.js ***!
-  \********************************************************************/
+/*!**************************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/helpers/normalizeHeaderName.js ***!
+  \**************************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -10059,9 +10125,9 @@ module.exports = function normalizeHeaderName(headers, normalizedName) {
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/helpers/parseHeaders.js":
-/*!*************************************************************!*\
-  !*** .-core/node_modules/axios/lib/helpers/parseHeaders.js ***!
-  \*************************************************************/
+/*!*******************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/helpers/parseHeaders.js ***!
+  \*******************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -10124,9 +10190,9 @@ module.exports = function parseHeaders(headers) {
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/helpers/spread.js":
-/*!*******************************************************!*\
-  !*** .-core/node_modules/axios/lib/helpers/spread.js ***!
-  \*******************************************************/
+/*!*************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/helpers/spread.js ***!
+  \*************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -10163,9 +10229,9 @@ module.exports = function spread(callback) {
 /***/ }),
 
 /***/ "../topt-core/node_modules/axios/lib/utils.js":
-/*!**********************************************!*\
-  !*** .-core/node_modules/axios/lib/utils.js ***!
-  \**********************************************/
+/*!****************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/utils.js ***!
+  \****************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -10526,9 +10592,9 @@ module.exports = {
 /***/ }),
 
 /***/ "../topt-core/node_modules/es5-ext/global.js":
-/*!*********************************************!*\
-  !*** .-core/node_modules/es5-ext/global.js ***!
-  \*********************************************/
+/*!***************************************************!*\
+  !*** ../topt-core/node_modules/es5-ext/global.js ***!
+  \***************************************************/
 /*! no static exports found */
 /***/ (function(module, exports) {
 
@@ -10572,9 +10638,9 @@ module.exports = (function () {
 /***/ }),
 
 /***/ "../topt-core/node_modules/loglevel-plugin-prefix/lib/loglevel-plugin-prefix.js":
-/*!********************************************************************************!*\
-  !*** .-core/node_modules/loglevel-plugin-prefix/lib/loglevel-plugin-prefix.js ***!
-  \********************************************************************************/
+/*!**************************************************************************************!*\
+  !*** ../topt-core/node_modules/loglevel-plugin-prefix/lib/loglevel-plugin-prefix.js ***!
+  \**************************************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -10732,9 +10798,9 @@ var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_RESULT__;(function (roo
 /***/ }),
 
 /***/ "../topt-core/node_modules/loglevel/lib/loglevel.js":
-/*!****************************************************!*\
-  !*** .-core/node_modules/loglevel/lib/loglevel.js ***!
-  \****************************************************/
+/*!**********************************************************!*\
+  !*** ../topt-core/node_modules/loglevel/lib/loglevel.js ***!
+  \**********************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -11017,9 +11083,9 @@ var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_RESULT__;/*
 /***/ }),
 
 /***/ "../topt-core/node_modules/websocket/lib/browser.js":
-/*!****************************************************!*\
-  !*** .-core/node_modules/websocket/lib/browser.js ***!
-  \****************************************************/
+/*!**********************************************************!*\
+  !*** ../topt-core/node_modules/websocket/lib/browser.js ***!
+  \**********************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -11078,9 +11144,9 @@ module.exports = {
 /***/ }),
 
 /***/ "../topt-core/node_modules/websocket/lib/version.js":
-/*!****************************************************!*\
-  !*** .-core/node_modules/websocket/lib/version.js ***!
-  \****************************************************/
+/*!**********************************************************!*\
+  !*** ../topt-core/node_modules/websocket/lib/version.js ***!
+  \**********************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -11090,13 +11156,13 @@ module.exports = __webpack_require__(/*! ../package.json */ "../topt-core/node_m
 /***/ }),
 
 /***/ "../topt-core/node_modules/websocket/package.json":
-/*!**************************************************!*\
-  !*** .-core/node_modules/websocket/package.json ***!
-  \**************************************************/
-/*! exports provided: _args, _from, _id, _inBundle, _integrity, _location, _phantomChildren, _requested, _requiredBy, _resolved, _spec, _where, author, browser, bugs, config, contributors, dependencies, description, devDependencies, directories, engines, homepage, keywords, license, main, name, repository, scripts, version, default */
+/*!********************************************************!*\
+  !*** ../topt-core/node_modules/websocket/package.json ***!
+  \********************************************************/
+/*! exports provided: _from, _id, _inBundle, _integrity, _location, _phantomChildren, _requested, _requiredBy, _resolved, _shasum, _spec, _where, author, browser, bugs, bundleDependencies, config, contributors, dependencies, deprecated, description, devDependencies, directories, engines, homepage, keywords, license, main, name, repository, scripts, version, default */
 /***/ (function(module) {
 
-module.exports = JSON.parse("{\"_args\":[[\"websocket@1.0.32\",\"/home/hdt/code/topt-core\"]],\"_from\":\"websocket@1.0.32\",\"_id\":\"websocket@1.0.32\",\"_inBundle\":false,\"_integrity\":\"sha512-i4yhcllSP4wrpoPMU2N0TQ/q0O94LRG/eUQjEAamRltjQ1oT1PFFKOG4i877OlJgCG8rw6LrrowJp+TYCEWF7Q==\",\"_location\":\"/websocket\",\"_phantomChildren\":{},\"_requested\":{\"type\":\"version\",\"registry\":true,\"raw\":\"websocket@1.0.32\",\"name\":\"websocket\",\"escapedName\":\"websocket\",\"rawSpec\":\"1.0.32\",\"saveSpec\":null,\"fetchSpec\":\"1.0.32\"},\"_requiredBy\":[\"/\"],\"_resolved\":\"https://registry.npmjs.org/websocket/-/websocket-1.0.32.tgz\",\"_spec\":\"1.0.32\",\"_where\":\"/home/hdt/code/topt-core\",\"author\":{\"name\":\"Brian McKelvey\",\"email\":\"theturtle32@gmail.com\",\"url\":\"https://github.com/theturtle32\"},\"browser\":\"lib/browser.js\",\"bugs\":{\"url\":\"https://github.com/theturtle32/WebSocket-Node/issues\"},\"config\":{\"verbose\":false},\"contributors\":[{\"name\":\"Iñaki Baz Castillo\",\"email\":\"ibc@aliax.net\",\"url\":\"http://dev.sipdoc.net\"}],\"dependencies\":{\"bufferutil\":\"^4.0.1\",\"debug\":\"^2.2.0\",\"es5-ext\":\"^0.10.50\",\"typedarray-to-buffer\":\"^3.1.5\",\"utf-8-validate\":\"^5.0.2\",\"yaeti\":\"^0.0.6\"},\"description\":\"Websocket Client & Server Library implementing the WebSocket protocol as specified in RFC 6455.\",\"devDependencies\":{\"buffer-equal\":\"^1.0.0\",\"gulp\":\"^4.0.2\",\"gulp-jshint\":\"^2.0.4\",\"jshint\":\"^2.0.0\",\"jshint-stylish\":\"^2.2.1\",\"tape\":\"^4.9.1\"},\"directories\":{\"lib\":\"./lib\"},\"engines\":{\"node\":\">=4.0.0\"},\"homepage\":\"https://github.com/theturtle32/WebSocket-Node\",\"keywords\":[\"websocket\",\"websockets\",\"socket\",\"networking\",\"comet\",\"push\",\"RFC-6455\",\"realtime\",\"server\",\"client\"],\"license\":\"Apache-2.0\",\"main\":\"index\",\"name\":\"websocket\",\"repository\":{\"type\":\"git\",\"url\":\"git+https://github.com/theturtle32/WebSocket-Node.git\"},\"scripts\":{\"gulp\":\"gulp\",\"test\":\"tape test/unit/*.js\"},\"version\":\"1.0.32\"}");
+module.exports = JSON.parse("{\"_from\":\"websocket\",\"_id\":\"websocket@1.0.32\",\"_inBundle\":false,\"_integrity\":\"sha512-i4yhcllSP4wrpoPMU2N0TQ/q0O94LRG/eUQjEAamRltjQ1oT1PFFKOG4i877OlJgCG8rw6LrrowJp+TYCEWF7Q==\",\"_location\":\"/websocket\",\"_phantomChildren\":{},\"_requested\":{\"type\":\"tag\",\"registry\":true,\"raw\":\"websocket\",\"name\":\"websocket\",\"escapedName\":\"websocket\",\"rawSpec\":\"\",\"saveSpec\":null,\"fetchSpec\":\"latest\"},\"_requiredBy\":[\"#USER\",\"/\"],\"_resolved\":\"https://registry.npmjs.org/websocket/-/websocket-1.0.32.tgz\",\"_shasum\":\"1f16ddab3a21a2d929dec1687ab21cfdc6d3dbb1\",\"_spec\":\"websocket\",\"_where\":\"C:\\\\Users\\\\Hdt\\\\Programming\\\\topt-core\",\"author\":{\"name\":\"Brian McKelvey\",\"email\":\"theturtle32@gmail.com\",\"url\":\"https://github.com/theturtle32\"},\"browser\":\"lib/browser.js\",\"bugs\":{\"url\":\"https://github.com/theturtle32/WebSocket-Node/issues\"},\"bundleDependencies\":false,\"config\":{\"verbose\":false},\"contributors\":[{\"name\":\"Iñaki Baz Castillo\",\"email\":\"ibc@aliax.net\",\"url\":\"http://dev.sipdoc.net\"}],\"dependencies\":{\"bufferutil\":\"^4.0.1\",\"debug\":\"^2.2.0\",\"es5-ext\":\"^0.10.50\",\"typedarray-to-buffer\":\"^3.1.5\",\"utf-8-validate\":\"^5.0.2\",\"yaeti\":\"^0.0.6\"},\"deprecated\":false,\"description\":\"Websocket Client & Server Library implementing the WebSocket protocol as specified in RFC 6455.\",\"devDependencies\":{\"buffer-equal\":\"^1.0.0\",\"gulp\":\"^4.0.2\",\"gulp-jshint\":\"^2.0.4\",\"jshint\":\"^2.0.0\",\"jshint-stylish\":\"^2.2.1\",\"tape\":\"^4.9.1\"},\"directories\":{\"lib\":\"./lib\"},\"engines\":{\"node\":\">=4.0.0\"},\"homepage\":\"https://github.com/theturtle32/WebSocket-Node\",\"keywords\":[\"websocket\",\"websockets\",\"socket\",\"networking\",\"comet\",\"push\",\"RFC-6455\",\"realtime\",\"server\",\"client\"],\"license\":\"Apache-2.0\",\"main\":\"index\",\"name\":\"websocket\",\"repository\":{\"type\":\"git\",\"url\":\"git+https://github.com/theturtle32/WebSocket-Node.git\"},\"scripts\":{\"gulp\":\"gulp\",\"test\":\"tape test/unit/*.js\"},\"version\":\"1.0.32\"}");
 
 /***/ }),
 
@@ -70894,6 +70960,28 @@ exports.Loadable = Loadable;
 
 /***/ }),
 
+/***/ "./src/LoggerMetadata.ts":
+/*!*******************************!*\
+  !*** ./src/LoggerMetadata.ts ***!
+  \*******************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.LoggerMetadata = void 0;
+class LoggerMetadata {
+    constructor() {
+        this.name = "";
+        this.level = "SILENT";
+    }
+}
+exports.LoggerMetadata = LoggerMetadata;
+
+
+/***/ }),
+
 /***/ "./src/MomentFilter.ts":
 /*!*****************************!*\
   !*** ./src/MomentFilter.ts ***!
@@ -71614,11 +71702,13 @@ exports.vm = new vue_1.default({
             if (input.files.length == 0) {
                 return console.warn(`Cannot import data, no file selected`);
             }
-            const file = input.files[0];
             tcore_1.Playback.setCore(this.core);
-            tcore_1.Playback.loadFile(file).ok(() => {
-                tcore_1.Playback.start({ speed: 0.0 });
-            });
+            for (let i = 0; i < input.files.length; ++i) {
+                const file = input.files[i];
+                tcore_1.Playback.loadFile(file).ok(() => {
+                    tcore_1.Playback.start({ speed: 0.0 });
+                });
+            }
         },
         exportData: function () {
             const json = {
@@ -72147,9 +72237,9 @@ window.vm = exports.vm;
 /***/ }),
 
 /***/ 0:
-/*!*****************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
-  !*** multi ./src/addons/SquadAddon.ts ./src/app/App.ts ./src/app/AppRealtime.ts ./src/BreakdownBar.ts ./src/BreakdownBox.ts ./src/BreakdownChart.ts ./src/BreakdownInterval.ts ./src/BreakdownList.ts ./src/ColorHelper.ts ./src/FightReportTop.ts ./src/index.ts ./src/KillfeedSquad.ts ./src/Loadable.ts ./src/MomentFilter.ts ./src/OutfitTrends.ts ./src/PersonalReportGenerator.ts ./src/Quartile.ts ./src/Storage.ts ***!
-  \*****************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+/*!*****************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** multi ./src/addons/SquadAddon.ts ./src/app/App.ts ./src/app/AppRealtime.ts ./src/BreakdownBar.ts ./src/BreakdownBox.ts ./src/BreakdownChart.ts ./src/BreakdownInterval.ts ./src/BreakdownList.ts ./src/ColorHelper.ts ./src/FightReportTop.ts ./src/index.ts ./src/KillfeedSquad.ts ./src/Loadable.ts ./src/LoggerMetadata.ts ./src/MomentFilter.ts ./src/OutfitTrends.ts ./src/PersonalReportGenerator.ts ./src/Quartile.ts ./src/Storage.ts ***!
+  \*****************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -72166,6 +72256,7 @@ __webpack_require__(/*! ./src/FightReportTop.ts */"./src/FightReportTop.ts");
 __webpack_require__(/*! ./src/index.ts */"./src/index.ts");
 __webpack_require__(/*! ./src/KillfeedSquad.ts */"./src/KillfeedSquad.ts");
 __webpack_require__(/*! ./src/Loadable.ts */"./src/Loadable.ts");
+__webpack_require__(/*! ./src/LoggerMetadata.ts */"./src/LoggerMetadata.ts");
 __webpack_require__(/*! ./src/MomentFilter.ts */"./src/MomentFilter.ts");
 __webpack_require__(/*! ./src/OutfitTrends.ts */"./src/OutfitTrends.ts");
 __webpack_require__(/*! ./src/PersonalReportGenerator.ts */"./src/PersonalReportGenerator.ts");

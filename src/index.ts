@@ -283,12 +283,14 @@ export const vm = new Vue({
                 return console.warn(`Cannot import data, no file selected`);
             }
 
-            const file: File = input.files[0];
-
             Playback.setCore(this.core);
-            Playback.loadFile(file).ok(() => {
-                Playback.start({ speed: 0.0 });
-            });
+
+            for (let i = 0; i < input.files.length; ++ i) {
+                const file = input.files[i];
+                Playback.loadFile(file).ok(() => {
+                    Playback.start({ speed: 0.0 });
+                });
+            }
         },
 
         exportData: function(): void {
