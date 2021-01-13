@@ -1,6 +1,5 @@
 import Vue from "vue";
 import { BreakdownTimeslot } from "tcore";
-import { ColorHelper } from "ColorHelper";
 
 import { Chart } from "chart.js";
 
@@ -53,7 +52,7 @@ Vue.component("breakdown-interval", {
     methods: {
         setup: function(): void {
 
-            this.darkMode = ColorHelper.usingDarkTheme();
+            this.darkMode = window.getComputedStyle(document.body).getPropertyValue("background-color") == "rgb(34, 34, 34)";
 
             this.data = [...this.src] as BreakdownTimeslot[];
             this.chart.data = this.data.map(iter => { return { t: new Date(iter.startTime), y: iter.value }; });
@@ -119,7 +118,7 @@ Vue.component("breakdown-interval", {
                         labels: this.chart.labels,
                         datasets: [{
                             data: this.chart.data,
-                            backgroundColor: ColorHelper.usingDarkTheme() == true ? "#e7e7e7" : "",
+                            backgroundColor: this.darkMode == true ? "#e7e7e7" : "",
                         }]
                     },
                     options: this.chart.options

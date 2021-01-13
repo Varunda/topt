@@ -616,7 +616,7 @@ export const vm = new Vue({
 
             this.generatePlayerReport(charID).ok((data: Report) => {
                 report = data;
-                console.log(`Made report: ${JSON.stringify(report.playerVersus)}`);
+                console.log(`Made report`, report);
                 if (--opsLeft == 0) {
                     done(); 
                 } else {

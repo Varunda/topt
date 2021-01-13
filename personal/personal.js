@@ -24,7 +24,6 @@ setTimeout(() => {
                     return console.warn(`Cannot view versus: charID is null`);
                 }
 
-                debugger;
                 const entry = this.report.playerVersus.find(iter => iter.charID == this.versusCharID)
                 if (entry != undefined) {
                     this.versusSelected = entry;

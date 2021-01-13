@@ -194,6 +194,7 @@ class Core {
          * If core is corrently connected to Census or not
          */
         this.connected = false;
+        this.markerCount = 0;
         /**
          * Event handlers that can be added onto
          */
@@ -421,7 +422,7 @@ class Core {
             type: "marker",
             sourceID: "7103",
             timestamp: new Date().getTime(),
-            mark: mark
+            mark: mark,
         };
         this.rawData.push(JSON.stringify({
             payload: {
@@ -1261,7 +1262,7 @@ Core_1.Core.prototype.processMessage = function (input, override = false) {
             type: "marker",
             mark: msg.payload.mark,
             sourceID: msg.payload.sourceID,
-            timestamp: Number.parseInt(msg.payload.timestamp)
+            timestamp: Number.parseInt(msg.payload.timestamp),
         };
         self.miscEvents.push(ev);
         save = true;
@@ -2407,6 +2408,40 @@ class EventReporter {
         }
         return statMapToBreakdown(wepKills, WeaponAPI_1.WeaponAPI.getByIDs, (elem, ID) => elem.ID == ID, defaultWeaponMapper);
     }
+    static weaponHeadshot(events) {
+        const total = new StatMap_1.default();
+        const hs = new StatMap_1.default();
+        const weapons = new Set();
+        for (const ev of events) {
+            if (ev.type == "kill") {
+                if (ev.isHeadshot == true) {
+                    hs.increment(ev.weaponID);
+                }
+                total.increment(ev.weaponID);
+                weapons.add(ev.weaponID);
+            }
+        }
+        const response = new ApiWrapper_1.ApiResponse();
+        const arr = new BreakdownArray();
+        WeaponAPI_1.WeaponAPI.getByIDs(Array.from(weapons.values())).ok((data) => {
+            total.getMap().forEach((kills, weaponID) => {
+                var _a;
+                const hsKills = hs.get(weaponID, 0);
+                const hsr = hsKills / kills;
+                const weapon = data.find(iter => iter.ID == weaponID);
+                const entry = {
+                    amount: kills,
+                    display: `${(_a = weapon === null || weapon === void 0 ? void 0 : weapon.name) !== null && _a !== void 0 ? _a : `Weapon ${weaponID}`} ${hsKills}/${kills} (${(hsr * 100).toFixed(2)}%)`,
+                    color: undefined,
+                    sortField: `${kills}`
+                };
+                arr.data.push(entry);
+            });
+            arr.total = 1;
+            response.resolveOk(arr);
+        });
+        return response;
+    }
     static weaponTeamkills(events) {
         const wepKills = new StatMap_1.default();
         for (const ev of events) {
@@ -3007,6 +3042,7 @@ class Report {
         this.breakdowns = [];
         this.weaponKillBreakdown = new EventReporter_1.BreakdownArray();
         this.weaponKillTypeBreakdown = new EventReporter_1.BreakdownArray();
+        this.weaponHeadshotBreakdown = new EventReporter_1.BreakdownArray();
         this.weaponDeathBreakdown = new EventReporter_1.BreakdownArray();
         this.weaponDeathTypeBreakdown = new EventReporter_1.BreakdownArray();
         this.playerVersus = [];
@@ -3119,6 +3155,7 @@ class IndividualReporter {
             + 1 // Medic breakdown
             + 1 // Engineer breakdown
             + 1 // Player versus
+            + 1 // Weapon HS breakdown
         ;
         const totalOps = opsLeft;
         const firstPlayerEvent = parameters.player.events[0];
@@ -3155,6 +3192,8 @@ class IndividualReporter {
             .ok(data => report.collections.push(data)).always(callback("Supported by"));
         IndividualReporter.miscCollection(parameters)
             .ok(data => report.collections.push(data)).always(callback("Misc coll"));
+        EventReporter_1.default.weaponHeadshot(parameters.player.events)
+            .ok(data => report.weaponHeadshotBreakdown = data).always(callback("Weapon headshots"));
         EventReporter_1.default.weaponKills(parameters.player.events)
             .ok(data => report.weaponKillBreakdown = data).always(callback("Weapon kills"));
         EventReporter_1.default.weaponTypeKills(parameters.player.events)
@@ -5703,6 +5742,19 @@ class FacilityAPI {
         }
         return response;
     }
+    static getAll() {
+        const response = new ApiWrapper_1.ApiResponse();
+        const facilities = [];
+        const request = CensusAPI_1.default.get(`/map_region?&c:limit=10000`);
+        request.ok((data) => {
+            for (const datum of data.map_region_list) {
+                const fac = FacilityAPI.parse(datum);
+                facilities.push(fac);
+            }
+            response.resolveOk(facilities);
+        });
+        return response;
+    }
 }
 exports.FacilityAPI = FacilityAPI;
 FacilityAPI._cache = new Map();
@@ -6968,6 +7020,11 @@ class FightReportGenerator {
                             log.debug(`New fight started at ${event.timestamp}`);
                             entry.startTime = new Date(event.timestamp);
                         }
+                        else {
+                            log.debug(`battle-start found without a battle-end, discarding previous fight`);
+                            entry = new FightReportEntry();
+                            entry.startTime = new Date(event.timestamp);
+                        }
                         inFight = true;
                     }
                     else if (event.mark == "battle-end") {
@@ -8057,6 +8114,7 @@ WinterMetricIndex.REVIVES = 2;
 WinterMetricIndex.HEALS = 3;
 WinterMetricIndex.RESUPPLIES = 4;
 WinterMetricIndex.REPAIRS = 5;
+WinterMetricIndex.SHIELDS = 6;
 class WinterReportGenerator {
     static generate(parameters) {
         const response = new ApiWrapper_1.ApiResponse();
@@ -8065,13 +8123,15 @@ class WinterReportGenerator {
         report.start = new Date(parameters.events[0].timestamp);
         report.end = new Date(parameters.events[parameters.events.length - 1].timestamp);
         report.players = [...parameters.players.filter(iter => iter.events.length > 0)];
-        report.essential.length = 6;
+        report.essential.length = 7;
         report.essential[WinterMetricIndex.KILLS] = this.kills(parameters);
         report.essential[WinterMetricIndex.KD] = this.kds(parameters);
         report.essential[WinterMetricIndex.HEALS] = this.heals(parameters);
         report.essential[WinterMetricIndex.REVIVES] = this.revives(parameters);
         report.essential[WinterMetricIndex.REPAIRS] = this.repairs(parameters);
         report.essential[WinterMetricIndex.RESUPPLIES] = this.resupplies(parameters);
+        report.essential[WinterMetricIndex.SHIELDS] = this.shieldRepairs(parameters);
+        log.debug(`Loaded ${report.essential.length} essential metrics`);
         report.fun.push(this.mostRevived(parameters));
         report.fun.push(this.mostTransportAssists(parameters));
         report.fun.push(this.mostReconAssists(parameters));
@@ -8115,6 +8175,7 @@ class WinterReportGenerator {
                     }
                     report.fun = report.fun.slice(0, parameters.settings.funMetricCount);
                 }
+                log.debug(`Loaded ${report.fun.length} fun metrics`);
                 response.resolveOk(report);
             }
         };
@@ -8160,6 +8221,14 @@ class WinterReportGenerator {
             name: "Kills",
             funName: "Kills",
             description: "Most kills",
+            entries: []
+        });
+    }
+    static shieldRepairs(parameters) {
+        return this.metric(parameters, [PsEvent_1.PsEvent.shieldRepair, PsEvent_1.PsEvent.squadShieldRepair], {
+            name: "Shield Repairs",
+            funName: "Shield Battery",
+            description: "Most shield repairs",
             entries: []
         });
     }
@@ -9015,6 +9084,9 @@ axios.all = function all(promises) {
   return Promise.all(promises);
 };
 axios.spread = __webpack_require__(/*! ./helpers/spread */ "../topt-core/node_modules/axios/lib/helpers/spread.js");
+
+// Expose isAxiosError
+axios.isAxiosError = __webpack_require__(/*! ./helpers/isAxiosError */ "../topt-core/node_modules/axios/lib/helpers/isAxiosError.js");
 
 module.exports = axios;
 
@@ -10015,6 +10087,29 @@ module.exports = function isAbsoluteURL(url) {
   // RFC 3986 defines scheme name as a sequence of characters beginning with a letter and followed
   // by any combination of letters, digits, plus, period, or hyphen.
   return /^([a-z][a-z\d\+\-\.]*:)?\/\//i.test(url);
+};
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/axios/lib/helpers/isAxiosError.js":
+/*!*******************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/helpers/isAxiosError.js ***!
+  \*******************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+/**
+ * Determines whether the payload is an error thrown by Axios
+ *
+ * @param {*} payload The value to test
+ * @returns {boolean} True if the payload is an error thrown by Axios, otherwise false
+ */
+module.exports = function isAxiosError(payload) {
+  return (typeof payload === 'object') && (payload.isAxiosError === true);
 };
 
 
@@ -11425,6 +11520,9 @@ axios.all = function all(promises) {
 };
 axios.spread = __webpack_require__(/*! ./helpers/spread */ "./node_modules/axios/lib/helpers/spread.js");
 
+// Expose isAxiosError
+axios.isAxiosError = __webpack_require__(/*! ./helpers/isAxiosError */ "./node_modules/axios/lib/helpers/isAxiosError.js");
+
 module.exports = axios;
 
 // Allow use of default import syntax in TypeScript
@@ -12424,6 +12522,29 @@ module.exports = function isAbsoluteURL(url) {
   // RFC 3986 defines scheme name as a sequence of characters beginning with a letter and followed
   // by any combination of letters, digits, plus, period, or hyphen.
   return /^([a-z][a-z\d\+\-\.]*:)?\/\//i.test(url);
+};
+
+
+/***/ }),
+
+/***/ "./node_modules/axios/lib/helpers/isAxiosError.js":
+/*!********************************************************!*\
+  !*** ./node_modules/axios/lib/helpers/isAxiosError.js ***!
+  \********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+/**
+ * Determines whether the payload is an error thrown by Axios
+ *
+ * @param {*} payload The value to test
+ * @returns {boolean} True if the payload is an error thrown by Axios, otherwise false
+ */
+module.exports = function isAxiosError(payload) {
+  return (typeof payload === 'object') && (payload.isAxiosError === true);
 };
 
 
@@ -70045,7 +70166,71 @@ vue_1.default.component("breakdown-bar", {
 Object.defineProperty(exports, "__esModule", { value: true });
 const vue_1 = __webpack_require__(/*! vue */ "./node_modules/vue/dist/vue.esm.js");
 const chart_js_1 = __webpack_require__(/*! chart.js */ "./node_modules/chart.js/dist/Chart.js");
-const Quartile_1 = __webpack_require__(/*! Quartile */ "./src/Quartile.ts");
+//import { Quartile } from "Quartile";
+class Quartile {
+    constructor() {
+        this.min = 0;
+        this.q1 = 0;
+        this.median = 0;
+        this.q3 = 0;
+        this.max = 0;
+    }
+    static get(data) {
+        const quart = new Quartile();
+        if (data.length == 0) {
+            return quart;
+        }
+        if (data.length == 1) {
+            quart.min = data[0];
+            quart.q1 = data[0];
+            quart.median = data[0];
+            quart.q3 = data[0];
+            quart.max = data[0];
+            return quart;
+        }
+        quart.q1 = this.quartile(data, 0.25);
+        quart.median = this.quartile(data, 0.5);
+        quart.q3 = this.quartile(data, 0.75);
+        /*
+        const stdDev: number = this.standardDeviation(data);
+        for (let i = data.length - 1; i >= 0; --i) {
+            if (data[i] <= quart.q3 + stdDev) {
+                quart.max = data[i];
+                break;
+            }
+        }
+        for (let i = 0; i < data.length; ++i) {
+            if (data[i] >= quart.q1 - stdDev) {
+                quart.min = data[i];
+                break;
+            }
+        }
+        */
+        quart.max = quart.max == 0 ? data[data.length - 1] : quart.max;
+        quart.min = quart.min == 0 ? data[0] : quart.min;
+        return quart;
+    }
+    static sum(data) {
+        return data.reduce((a, b) => a + b, 0);
+    }
+    static standardDeviation(data) {
+        const mean = this.sum(data) / data.length;
+        const diff = data.map(a => Math.pow((a - mean), 2));
+        return Math.sqrt(this.sum(diff) / (data.length - 1));
+    }
+    static quartile(data, q) {
+        const sorted = data.sort((a, b) => a - b);
+        const pos = (sorted.length - 1) * q;
+        const base = Math.floor(pos);
+        const rest = pos - base;
+        if (sorted[base + 1] !== undefined) {
+            return sorted[base] + rest * (sorted[base + 1] - sorted[base]);
+        }
+        else {
+            return sorted[base];
+        }
+    }
+}
 vue_1.default.component("breakdown-box", {
     props: {
         src: { type: Array, required: true },
@@ -70077,11 +70262,11 @@ vue_1.default.component("breakdown-box", {
         return {
             ID: Math.round(Math.random() * 100000),
             array: [],
-            quartile: new Quartile_1.Quartile(),
+            quartile: new Quartile(),
             quartiles: {
-                current: new Quartile_1.Quartile(),
-                recent: new Quartile_1.Quartile(),
-                allTime: new Quartile_1.Quartile(),
+                current: new Quartile(),
+                recent: new Quartile(),
+                allTime: new Quartile(),
             },
             chart: {
                 instance: {},
@@ -70102,7 +70287,7 @@ vue_1.default.component("breakdown-box", {
         setup: function () {
             this.array = this.src;
             this.chart.data = this.array;
-            this.quartiles.current = Quartile_1.Quartile.get(this.array);
+            this.quartiles.current = Quartile.get(this.array);
         },
         draw: function () {
             this.$nextTick(() => {
@@ -70399,7 +70584,6 @@ window.randomColor = randomColor;
 
 Object.defineProperty(exports, "__esModule", { value: true });
 const vue_1 = __webpack_require__(/*! vue */ "./node_modules/vue/dist/vue.esm.js");
-const ColorHelper_1 = __webpack_require__(/*! ColorHelper */ "./src/ColorHelper.ts");
 const chart_js_1 = __webpack_require__(/*! chart.js */ "./node_modules/chart.js/dist/Chart.js");
 // @ts-ignore
 const chartjs_plugin_datalabels_js_1 = __webpack_require__(/*! ../node_modules/chartjs-plugin-datalabels/dist/chartjs-plugin-datalabels.js */ "./node_modules/chartjs-plugin-datalabels/dist/chartjs-plugin-datalabels.js");
@@ -70440,7 +70624,7 @@ vue_1.default.component("breakdown-interval", {
     },
     methods: {
         setup: function () {
-            this.darkMode = ColorHelper_1.ColorHelper.usingDarkTheme();
+            this.darkMode = window.getComputedStyle(document.body).getPropertyValue("background-color") == "rgb(34, 34, 34)";
             this.data = [...this.src];
             this.chart.data = this.data.map(iter => { return { t: new Date(iter.startTime), y: iter.value }; });
             this.chart.options = {
@@ -70502,7 +70686,7 @@ vue_1.default.component("breakdown-interval", {
                         labels: this.chart.labels,
                         datasets: [{
                                 data: this.chart.data,
-                                backgroundColor: ColorHelper_1.ColorHelper.usingDarkTheme() == true ? "#e7e7e7" : "",
+                                backgroundColor: this.darkMode == true ? "#e7e7e7" : "",
                             }]
                     },
                     options: this.chart.options
@@ -71993,7 +72177,7 @@ exports.vm = new vue_1.default({
             });
             this.generatePlayerReport(charID).ok((data) => {
                 report = data;
-                console.log(`Made report: ${JSON.stringify(report.playerVersus)}`);
+                console.log(`Made report`, report);
                 if (--opsLeft == 0) {
                     done();
                 }
