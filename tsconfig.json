@@ -1,12 +1,13 @@
 {
 	"compileOnSave": true,
     "compilerOptions": {
-        "module": "commonjs",
+        "module": "esnext",
+        //"module": "commonjs",
         "target": "es6",
         "lib": [ "es2015", "dom" ],
         "outDir": "build",
         "sourceMap": false,
-        "moduleResolution": "node",
+        //"moduleResolution": "node",
         "experimentalDecorators": true,
         "emitDecoratorMetadata": true,
 
@@ -17,6 +18,8 @@
             "chartjs": [ "../node_modules/@types/chart.js/index" ],
             "jszip": [ "../node_modules/jszip/index" ],
             "tcore": [ "../node_modules/topt-core/build/core/index" ],
+            "axios": [ "../node_modules/axios/index" ],
+            "loglevel": [ "../node_modules/loglevel/index" ],
             "*": [ "./*" ],
         },
 

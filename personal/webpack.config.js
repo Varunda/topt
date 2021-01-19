@@ -58,6 +58,10 @@ module.exports = {
         ignored: /node_modules/
     },
 
+    resolve: {
+        symlinks: true
+    },
+
     module: {
         rules: [
             {

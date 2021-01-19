@@ -303,7 +303,9 @@
                         </tbody>
                     </table>
 
-                    <h5>Class kills</h5>
+                    <h5 class="d-inline">Class kills</h5>
+                    <h6 class="ml-2 d-inline text-muted">Kills and deaths against each class</h6>
+
                     <table class="table table-sm table-striped">
                         <thead class="table-secondary">
                             <tr>
@@ -452,6 +454,12 @@
                             <breakdown-chart :src="report.weaponKillTypeBreakdown"
                                 :show-percent="true">
                             </breakdown-chart>
+                        </div>
+
+                        <div class="col-6 mt-4">
+                            <breakdown :data="report.weaponHeadshotBreakdown" :show-all="true"
+                                left-title="Weapon headshots" right-title="" :show-percent="false" :show-total="false">
+                            </breakdown>
                         </div>
                     </div>
 
