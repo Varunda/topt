@@ -86,6 +86,11186 @@
 /************************************************************************/
 /******/ ({
 
+/***/ "../topt-core/build/core/Core.js":
+/*!***************************************!*\
+  !*** ../topt-core/build/core/Core.js ***!
+  \***************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.Core = void 0;
+const ApiWrapper_1 = __webpack_require__(/*! ./census/ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
+const CensusAPI_1 = __webpack_require__(/*! ./census/CensusAPI */ "../topt-core/build/core/census/CensusAPI.js");
+const OutfitAPI_1 = __webpack_require__(/*! ./census/OutfitAPI */ "../topt-core/build/core/census/OutfitAPI.js");
+const CharacterAPI_1 = __webpack_require__(/*! ./census/CharacterAPI */ "../topt-core/build/core/census/CharacterAPI.js");
+const index_1 = __webpack_require__(/*! ./objects/index */ "../topt-core/build/core/objects/index.js");
+const InvididualGenerator_1 = __webpack_require__(/*! ./InvididualGenerator */ "../topt-core/build/core/InvididualGenerator.js");
+const Loggers_1 = __webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("Core");
+/**
+ * Core class that manages all tracking, sockets, event processing, etc.
+ */
+class Core {
+    constructor(serviceID, serverID) {
+        /**
+         * Collection of sockets used for tracking
+         */
+        this.sockets = {
+            tracked: null,
+            logistics: null,
+            logins: null,
+            facility: null,
+            debug: null,
+            added: null
+        };
+        /**
+         * Collection of variables used to track router placements
+         */
+        this.routerTracking = {
+            // key - Who placed the router
+            // value - Lastest npc ID that gave them a router spawn tick
+            routerNpcs: new Map(),
+            routers: [] // All routers that have been placed
+        };
+        /**
+         * Collection of squad related vars
+         */
+        this.squad = {
+            debug: false,
+            autoadd: false,
+            perm: [],
+            guesses: [],
+            members: new Map(),
+        };
+        /**
+         * Queue of messages to prevent duplicate messages from being processed
+         */
+        this.socketMessageQueue = [];
+        /**
+         * All messages collected in the debug socket
+         */
+        this.debugSocketMessages = [];
+        /**
+         * Collection of players who are being tracked, with the key being the character ID,
+         *      and value being where player specific stats are stored
+         */
+        this.stats = new Map();
+        /**
+         * List of outfits being tracked
+         */
+        this.outfits = [];
+        /**
+         * List of characters being tracked
+         */
+        this.characters = [];
+        /**
+         * Misc events that are needed for processing, but are not attached to a single player, such as a FacilityCapture
+         */
+        this.miscEvents = [];
+        /**
+         * List of PlayerFacilityCapture and PlayerFacilityDefend events, including those who are not tracked
+         */
+        this.playerCaptures = [];
+        /**
+         * List of all base captures that have occure
+         */
+        this.captures = [];
+        /**
+         * List of all events in raw unprocessed form, used to export data
+         */
+        this.rawData = [];
+        /**
+         * Tracking tracking
+         */
+        this.tracking = new InvididualGenerator_1.TimeTracking();
+        /**
+         * If core is corrently connected to Census or not
+         */
+        this.connected = false;
+        this.markerCount = 0;
+        /**
+         * Event handlers that can be added onto
+         */
+        this.handlers = {
+            exp: [],
+            kill: [],
+            death: [],
+            teamkill: [],
+            capture: [],
+            defend: [],
+            vehicle: [],
+            login: [],
+            logout: [],
+            marker: [],
+            base: []
+        };
+        this.serviceID = serviceID;
+        this.serverID = serverID;
+        this.socketMessageQueue.length = 5;
+        CensusAPI_1.default.init(this.serviceID);
+        this.squadInit();
+    }
+    /**
+     * Emit an event and execute all handlers on it
+     *
+     * @param event Event being emitted to all handlers
+     */
+    emit(event) {
+        this.handlers[event.type].forEach((callback) => { callback(event); });
+    }
+    /**
+     * Add an event handler that will occur when a specific event is created from the core
+     *
+     * @param type      Event to attach the handler to
+     * @param handler   Handler that will be executed when that event is emitted
+     */
+    on(type, handler) {
+        switch (type) {
+            case "exp":
+                this.handlers.exp.push(handler);
+                break;
+            case "kill":
+                this.handlers.kill.push(handler);
+                break;
+            case "death":
+                this.handlers.death.push(handler);
+                break;
+            case "teamkill":
+                this.handlers.death.push(handler);
+                break;
+            case "capture":
+                this.handlers.capture.push(handler);
+                break;
+            case "defend":
+                this.handlers.defend.push(handler);
+                break;
+            case "vehicle":
+                this.handlers.vehicle.push(handler);
+                break;
+            case "login":
+                this.handlers.login.push(handler);
+                break;
+            case "logout":
+                this.handlers.logout.push(handler);
+                break;
+            case "marker":
+                this.handlers.marker.push(handler);
+                break;
+            case "base":
+                this.handlers.base.push(handler);
+                break;
+            default: throw `Unchecked event type ${type}`;
+        }
+    }
+    /**
+     * Remove handlers and no longer emit events to them
+     *
+     * @param type Optional type of handler to clear. If not given, all handlers are cleared
+     */
+    clearHandlers(type) {
+        if (type == undefined) {
+            this.handlers.exp.length = 0;
+            this.handlers.kill.length = 0;
+            this.handlers.death.length = 0;
+            this.handlers.teamkill.length = 0;
+            this.handlers.capture.length = 0;
+            this.handlers.defend.length = 0;
+            this.handlers.vehicle.length = 0;
+            this.handlers.login.length = 0;
+            this.handlers.logout.length = 0;
+            this.handlers.marker.length = 0;
+            this.handlers.base.length = 0;
+        }
+        else {
+            this.handlers[type].length = 0;
+        }
+    }
+    /**
+     * Start the tracking and begin saving events, the core must be connected for this to work
+     */
+    start() {
+        if (this.connected == false) {
+            throw `Cannot start TOPT: core is not connected`;
+        }
+        this.tracking.running = true;
+        const nowMs = new Date().getTime();
+        this.tracking.startTime = nowMs;
+        this.stats.forEach((char, charID) => {
+            char.joinTime = nowMs;
+        });
+        log.info(`Started core`);
+    }
+    /**
+     * Stop running the tracker
+     */
+    stop() {
+        if (this.tracking.running == true) {
+            const nowMs = new Date().getTime();
+            this.tracking.endTime = nowMs;
+        }
+        this.tracking.running = false;
+        this.stats.forEach((char, charID) => {
+            if (char.events.length > 0) {
+                const first = char.events[0];
+                const last = char.events[char.events.length - 1];
+                char.joinTime = first.timestamp;
+                char.secondsOnline = (last.timestamp - first.timestamp) / 1000;
+                const character = this.characters.find(iter => iter.ID == char.characterID);
+                if (character != undefined) {
+                    character.secondsPlayed = char.secondsOnline;
+                    if (character.secondsPlayed > 0) {
+                        character.online = true;
+                    }
+                }
+            }
+            else {
+                char.secondsOnline = 0;
+            }
+        });
+    }
+    /**
+     * Begin tracking all members of an outfit. The core must be connected before this is called
+     *
+     * @param tag Tag of the outfit to track. Case-insensitive
+     *
+     * @returns An ApiResponse that will resolve when the outfit has been loaded
+     */
+    addOutfit(tag) {
+        if (this.connected == false) {
+            throw `Cannot track outfit ${tag}: Core is not connected`;
+        }
+        const response = new ApiWrapper_1.ApiResponse();
+        if (tag.trim().length == 0) {
+            response.resolveOk();
+            return response;
+        }
+        OutfitAPI_1.OutfitAPI.getByTag(tag).ok((data) => {
+            this.outfits.push(data);
+        });
+        OutfitAPI_1.OutfitAPI.getCharactersByTag(tag).ok((data) => {
+            this.subscribeToEvents(data);
+            response.resolveOk();
+        });
+        return response;
+    }
+    /**
+     * Begin tracking a new player. The core must be connected before calling
+     *
+     * @param name Name of the player to track. Case-insensitive
+     *
+     * @returns An ApiResponse that will resolve when the character has been loaded and tracked
+     */
+    addPlayer(name) {
+        if (this.connected == false) {
+            throw `Cannot track character ${name}: Core is not connected`;
+        }
+        const response = new ApiWrapper_1.ApiResponse();
+        if (name.trim().length == 0) {
+            response.resolveOk();
+        }
+        else {
+            CharacterAPI_1.CharacterAPI.getByName(name).ok((data) => {
+                this.subscribeToEvents([data]);
+                response.resolveOk();
+            });
+        }
+        return response;
+    }
+    /**
+     * Being tracking a character by the character ID. Core must be connected before calling
+     *
+     * @param charID Character ID of the player to begin tracking
+     *
+     * @returns An ApiResponse that will resolve when the character has been loaded and tracked
+     */
+    addPlayerByID(charID) {
+        if (this.connected == false) {
+            throw `Cannot tracker character ${charID}: Core is not connected`;
+        }
+        const response = new ApiWrapper_1.ApiResponse();
+        if (charID.trim().length == 0) {
+            response.resolveOk();
+        }
+        else {
+            CharacterAPI_1.CharacterAPI.getByID(charID).ok((data) => {
+                this.subscribeToEvents([data]);
+                response.resolveOk();
+            }).notFound((err) => {
+                response.resolve({ code: 500, data: `Character ID ${charID} does not exist` });
+            });
+        }
+        return response;
+    }
+    /**
+     * Insert a new marker event at the current time. Calling this while the tracker is not running can be dangerous as it
+     *      modifies the event collection
+     *
+     * @param mark Mark to be made
+     */
+    addMarker(mark) {
+        if (this.tracking.running == false) {
+            log.warn(`A new marker for ${mark} is being added, adding a marker while not running is not recommended`);
+        }
+        const ev = {
+            type: "marker",
+            sourceID: "7103",
+            timestamp: new Date().getTime(),
+            mark: mark,
+        };
+        this.rawData.push(JSON.stringify({
+            payload: {
+                type: ev.type,
+                sourceID: ev.sourceID,
+                timestamp: ev.timestamp.toString(),
+                mark: mark
+            },
+            service: "event",
+            type: "toptMarker"
+        }));
+        this.miscEvents.push(ev);
+        this.emit(ev);
+    }
+    subscribe(options) {
+        let obj = {
+            action: "subscribe",
+            service: "event"
+        };
+        if (options.characters && options.characters.length > 0) {
+            obj.characters = options.characters;
+        }
+        if (options.worlds && options.worlds.length > 0) {
+            obj.worlds = options.worlds;
+        }
+        if (options.events && options.events.length > 0) {
+            obj.eventNames = options.events;
+        }
+        if (options.charactersWorldAnd == true) {
+            obj.logicalAndCharactersWithWorlds = true;
+        }
+        const json = JSON.stringify(obj);
+        log.debug(`Sending on ${options.socket}: ${json}`);
+        if (options.socket == undefined || options.socket == "added") {
+            this.sockets.added.send(json);
+        }
+        else if (options.socket == "login") {
+            this.sockets.logins.send(json);
+        }
+        else if (options.socket == "tracked") {
+            this.sockets.tracked.send(json);
+        }
+        else {
+            throw `Unknown socket to subscribe: ${options.socket}`;
+        }
+    }
+    promiseTest() {
+        const t = new ApiWrapper_1.ApiResponse();
+        const p = t.promise();
+        setTimeout(() => __awaiter(this, void 0, void 0, function* () {
+            const contents = yield p;
+            if (contents.code == 200) {
+                console.log(`200: ${contents.data}`);
+            }
+            else if (contents.code == 500) {
+                console.error(`500: ${contents.data}`);
+            }
+        }));
+        setTimeout(() => {
+            t.resolve({ code: 200, data: `Hello from the other side` });
+        }, 3000);
+    }
+    /**
+     * Subscribe to the events in the event stream and begin tracking them in the squad tracker
+     *
+     * @param chars Characters to subscribe to
+     */
+    subscribeToEvents(chars) {
+        if (this.sockets.tracked == null) {
+            log.warn(`Cannot subscribe to events, tracked socket is null`);
+            return;
+        }
+        // No duplicates
+        chars = chars.filter((char) => {
+            return this.characters.map((c) => c.ID).indexOf(char.ID) == -1;
+        });
+        if (chars.length == 0) {
+            return;
+        }
+        this.characters = this.characters.concat(chars).sort((a, b) => {
+            return a.name.localeCompare(b.name);
+        });
+        chars.forEach((character) => {
+            const player = new index_1.TrackedPlayer();
+            player.characterID = character.ID;
+            player.faction = character.faction;
+            player.outfitTag = character.outfitTag;
+            player.name = character.name;
+            if (character.online == true) { // Begin squad tracking if they're online
+                player.joinTime = new Date().getTime();
+                this.addMember({ ID: player.characterID, name: player.name, outfitTag: character.outfitTag });
+            }
+            this.stats.set(character.ID, player);
+        });
+        // Large outfits like SKL really stress the websockets out if you try to subscribe to 12k members
+        //      at once, instead breaking them into chunks works nicely
+        const subscribeSetSize = 200;
+        for (let i = 0; i < chars.length; i += subscribeSetSize) {
+            //log.trace(`Slice: ${chars.slice(i, i + subscribeSetSize).map(iter => iter.ID).join(", ")}`);
+            const subscribeExp = {
+                "action": "subscribe",
+                "characters": [
+                    ...(chars.slice(i, i + subscribeSetSize).map(iter => iter.ID))
+                ],
+                "eventNames": [
+                    "GainExperience",
+                    "AchievementEarned",
+                    "Death",
+                    "FacilityControl",
+                    "ItemAdded",
+                    "VehicleDestroy"
+                ],
+                "service": "event"
+            };
+            this.sockets.tracked.send(JSON.stringify(subscribeExp));
+        }
+    }
+    /**
+     * Method called when a socket receives a new message
+     *
+     * @param ev Event from a websocket
+     */
+    onmessage(ev) {
+        for (const message of this.socketMessageQueue) {
+            if (ev.data == message) {
+                //log.warn(`Duplicate message found: ${ev.data}`);
+                return;
+            }
+        }
+        if (typeof (ev.data) != "string") {
+            log.error(`Invalid type received from socket: ${typeof (ev.data)}`);
+            return;
+        }
+        this.socketMessageQueue.push(ev.data);
+        this.socketMessageQueue.shift();
+        this.processMessage(ev.data, false);
+    }
+}
+exports.Core = Core;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/CoreConnection.js":
+/*!*************************************************!*\
+  !*** ../topt-core/build/core/CoreConnection.js ***!
+  \*************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+const Core_1 = __webpack_require__(/*! ./Core */ "../topt-core/build/core/Core.js");
+const ApiWrapper_1 = __webpack_require__(/*! ./census/ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
+const websocket_1 = __webpack_require__(/*! websocket */ "../topt-core/node_modules/websocket/lib/browser.js");
+const Loggers_1 = __webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("Core:Connection");
+Core_1.Core.prototype.connect = function () {
+    const self = this;
+    const response = new ApiWrapper_1.ApiResponse();
+    self.disconnect();
+    let opsLeft = +1 // Tracker
+        + 1 // Logins
+        + 1 // Logistics
+        + 1 // Facilities
+        + 1; // Debug
+    // Common handler used when all sockets have connected
+    const handler = () => {
+        if (--opsLeft == 0) {
+            self.connected = true;
+            response.resolveOk();
+        }
+    };
+    setupTrackerSocket(self).always(() => handler());
+    setupLoginSocket(self).always(() => handler());
+    setupLogisticsSocket(self).always(() => handler());
+    setupFacilitySocket(self).always(() => handler());
+    setupDebugSocket(self).always(() => handler());
+    setupAddedSocket(self).always(() => handler());
+    return response;
+};
+Core_1.Core.prototype.disconnect = function () {
+    const self = this;
+    if (self.sockets.tracked != null) {
+        self.sockets.tracked.close();
+        self.sockets.tracked = null;
+    }
+    if (self.sockets.logins != null) {
+        self.sockets.logins.close();
+        self.sockets.logins = null;
+    }
+    if (self.sockets.logistics != null) {
+        self.sockets.logistics.close();
+        self.sockets.logistics = null;
+    }
+    if (self.sockets.facility != null) {
+        self.sockets.facility.close();
+        self.sockets.facility = null;
+    }
+    if (self.sockets.debug != null) {
+        self.sockets.debug.close();
+        self.sockets.debug = null;
+    }
+    if (self.sockets.added != null) {
+        self.sockets.added.close();
+        self.sockets.added = null;
+    }
+    self.connected = false;
+};
+Core_1.Core.prototype.onSocketError = function (socketName, ev) {
+    log.error(`Error on socket: ${socketName}> ${JSON.stringify(ev)}`);
+};
+function setupTrackerSocket(core) {
+    const response = new ApiWrapper_1.ApiResponse();
+    core.sockets.tracked = new websocket_1.w3cwebsocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${core.serviceID}`);
+    core.sockets.tracked.onopen = () => { };
+    core.sockets.tracked.onerror = () => {
+        response.resolve({ code: 500, data: `` });
+    };
+    core.sockets.tracked.onmessage = () => {
+        log.debug(`tracker socket connected`);
+        core.sockets.tracked.onmessage = core.onmessage.bind(core);
+        response.resolveOk();
+    };
+    return response;
+}
+function setupDebugSocket(core) {
+    const response = new ApiWrapper_1.ApiResponse();
+    core.sockets.debug = new websocket_1.w3cwebsocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${core.serviceID}`);
+    core.sockets.debug.onopen = () => { };
+    core.sockets.debug.onerror = () => {
+        response.resolve({ code: 500, data: `` });
+    };
+    core.sockets.debug.onmessage = () => {
+        log.debug(`debug socket connected`);
+        core.sockets.debug.onmessage = (ev) => {
+            core.debugSocketMessages.push(JSON.parse(ev.data));
+        };
+        response.resolveOk();
+    };
+    return response;
+}
+function setupAddedSocket(core) {
+    const response = new ApiWrapper_1.ApiResponse();
+    core.sockets.added = new websocket_1.w3cwebsocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${core.serviceID}`);
+    core.sockets.added.onopen = () => { response.resolveOk(); };
+    core.sockets.added.onerror = () => {
+        response.resolve({ code: 500, data: `` });
+    };
+    core.sockets.added.onmessage = core.onmessage.bind(core);
+    return response;
+}
+function setupLogisticsSocket(core) {
+    const response = new ApiWrapper_1.ApiResponse();
+    core.sockets.logistics = new websocket_1.w3cwebsocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${core.serviceID}`);
+    core.sockets.logistics.onopen = () => {
+        if (core.sockets.logistics == null) {
+            throw `Expected sockets.logistics to not be null`;
+        }
+        const msg = {
+            service: "event",
+            action: "subscribe",
+            characters: ["all"],
+            worlds: [
+                core.serverID
+            ],
+            eventNames: [
+                "GainExperience_experience_id_1409",
+            ],
+            logicalAndCharactersWithWorlds: true
+        };
+        core.sockets.logistics.send(JSON.stringify(msg));
+        log.debug(`logistics socket connected`);
+        response.resolveOk();
+    };
+    core.sockets.logistics.onerror = (ev) => core.onSocketError("logistics", ev);
+    core.sockets.logistics.onmessage = core.onmessage.bind(core);
+    return response;
+}
+function setupLoginSocket(core) {
+    const response = new ApiWrapper_1.ApiResponse();
+    core.sockets.logins = new websocket_1.w3cwebsocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${core.serviceID}`);
+    core.sockets.logins.onopen = () => {
+        if (core.sockets.logins == null) {
+            throw `Expected sockets.login to not be null`;
+        }
+        const msg = {
+            service: "event",
+            action: "subscribe",
+            characters: ["all"],
+            worlds: [
+                core.serverID
+            ],
+            eventNames: [
+                "PlayerLogin",
+                "PlayerLogout"
+            ],
+            logicalAndCharactersWithWorlds: true
+        };
+        core.sockets.logins.send(JSON.stringify(msg));
+        log.debug(`login socket connected`);
+        response.resolveOk();
+    };
+    core.sockets.logins.onerror = (ev) => core.onSocketError("login", ev);
+    core.sockets.logins.onmessage = core.onmessage.bind(core);
+    return response;
+}
+function setupFacilitySocket(core) {
+    const response = new ApiWrapper_1.ApiResponse();
+    core.sockets.facility = new websocket_1.w3cwebsocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${core.serviceID}`);
+    core.sockets.facility.onopen = () => {
+        if (core.sockets.facility == null) {
+            throw `sockets.facility is null`;
+        }
+        const msg = {
+            service: "event",
+            action: "subscribe",
+            characters: ["all"],
+            worlds: [
+                core.serverID
+            ],
+            eventNames: [
+                "PlayerFacilityCapture",
+                "PlayerFacilityDefend",
+                "FacilityControl"
+            ],
+            logicalAndCharactersWithWorlds: true
+        };
+        core.sockets.facility.send(JSON.stringify(msg));
+        log.debug(`facility socket connected`);
+        response.resolveOk();
+    };
+    core.sockets.facility.onmessage = core.onmessage.bind(core);
+    core.sockets.facility.onerror = (ev) => core.onSocketError("facility", ev);
+    return response;
+}
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/CoreDebugHelper.js":
+/*!**************************************************!*\
+  !*** ../topt-core/build/core/CoreDebugHelper.js ***!
+  \**************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+const Core_1 = __webpack_require__(/*! ./Core */ "../topt-core/build/core/Core.js");
+const Loggers_1 = __webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("Core.Debug");
+Core_1.Core.prototype.printExpEvent = function (expID) {
+    const self = this;
+    const events = Array.from(self.stats.values())
+        .map(iter => iter.events)
+        .reduce((acc, cur) => { acc.push(...cur); return acc; }, [])
+        .filter(iter => iter.type == "exp" && iter.expID == expID);
+    log.debug(events);
+};
+Core_1.Core.prototype.subscribeToEvent = function (...expID) {
+    if (this.sockets.debug == null) {
+        return log.error(`Cannot globally subscribe to ${expID}: debug socket is null`);
+    }
+    const msg = {
+        service: "event",
+        action: "subscribe",
+        characters: ["all"],
+        worlds: [
+            this.serverID
+        ],
+        eventNames: [
+            ...expID.map(iter => `GainExperience_experience_id_${iter}`)
+        ],
+        logicalAndCharactersWithWorlds: true
+    };
+    this.sockets.debug.send(JSON.stringify(msg));
+};
+Core_1.Core.prototype.subscribeToAllEvent = function (...expID) {
+    if (this.sockets.debug == null) {
+        return log.error(`Cannot globally subscribe to ${expID}: debug socket is null`);
+    }
+    const msg = {
+        service: "event",
+        action: "subscribe",
+        characters: ["all"],
+        worlds: ["all"],
+        eventNames: [
+            ...expID.map(iter => `GainExperience_experience_id_${iter}`)
+        ]
+    };
+    this.sockets.debug.send(JSON.stringify(msg));
+};
+Core_1.Core.prototype.subscribeToItemAdded = function () {
+    if (this.sockets.debug == null) {
+        return log.error(`Cannot subscribe to ItemAdded events: debug socket is null`);
+    }
+    const msg = {
+        service: "event",
+        action: "subscribe",
+        characters: ["all"],
+        worlds: [
+            this.serverID
+        ],
+        eventNames: [
+            "ItemAdded"
+        ],
+        logicalAndCharactersWithWorlds: true
+    };
+    this.sockets.debug.send(JSON.stringify(msg));
+};
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/CoreProcessing.js":
+/*!*************************************************!*\
+  !*** ../topt-core/build/core/CoreProcessing.js ***!
+  \*************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+const Core_1 = __webpack_require__(/*! ./Core */ "../topt-core/build/core/Core.js");
+const PsEvent_1 = __webpack_require__(/*! ./PsEvent */ "../topt-core/build/core/PsEvent.js");
+const PsLoadout_1 = __webpack_require__(/*! ./census/PsLoadout */ "../topt-core/build/core/census/PsLoadout.js");
+const WeaponAPI_1 = __webpack_require__(/*! ./census/WeaponAPI */ "../topt-core/build/core/census/WeaponAPI.js");
+const CharacterAPI_1 = __webpack_require__(/*! ./census/CharacterAPI */ "../topt-core/build/core/census/CharacterAPI.js");
+const Loggers_1 = __webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("Core.Processing");
+Core_1.Core.prototype.processMessage = function (input, override = false) {
+    const self = this;
+    if (self.tracking.running == false && override == false) {
+        return;
+    }
+    let save = false;
+    const msg = JSON.parse(input);
+    if (msg.type == "serviceMessage") {
+        const event = msg.payload.event_name;
+        const timestamp = Number.parseInt(msg.payload.timestamp) * 1000;
+        const zoneID = msg.payload.zone_id;
+        if (event == "GainExperience") {
+            const eventID = msg.payload.experience_id;
+            const charID = msg.payload.character_id;
+            const targetID = msg.payload.other_id;
+            const amount = Number.parseInt(msg.payload.amount);
+            const event = PsEvent_1.PsEvents.get(eventID);
+            if (eventID == "1410") {
+                if (self.stats.get(charID) != undefined) {
+                    if (self.routerTracking.routerNpcs.has(charID)) {
+                        //log.debug(`${charID} router npc check for ${targetID}`);
+                        const router = self.routerTracking.routerNpcs.get(charID);
+                        if (router.ID != targetID) {
+                            //log.warn(`New router placed by ${charID}, missed ItemAdded event: removing old one and replacing with ${targetID}`);
+                            router.destroyed = timestamp;
+                            self.routerTracking.routers.push(Object.assign({}, router));
+                            self.routerTracking.routerNpcs.set(charID, {
+                                ID: targetID,
+                                owner: charID,
+                                pulledAt: timestamp,
+                                firstSpawn: timestamp,
+                                destroyed: undefined,
+                                count: 1,
+                                type: "router"
+                            });
+                        }
+                        else {
+                            //log.debug(`Same router, incrementing count`);
+                            if (router.ID == "") {
+                                router.ID = targetID;
+                            }
+                            if (router.firstSpawn == undefined) {
+                                router.firstSpawn = timestamp;
+                            }
+                            ++router.count;
+                        }
+                    }
+                    else {
+                        //log.debug(`${charID} has new router ${targetID} placed/used`);
+                        self.routerTracking.routerNpcs.set(charID, {
+                            ID: targetID,
+                            owner: charID,
+                            pulledAt: timestamp,
+                            firstSpawn: timestamp,
+                            destroyed: undefined,
+                            count: 1,
+                            type: "router"
+                        });
+                    }
+                    save = true;
+                }
+            }
+            else if (eventID == "1409") {
+                const trackedNpcs = Array.from(self.routerTracking.routerNpcs.values());
+                const ids = trackedNpcs.map(iter => iter.ID);
+                if (ids.indexOf(targetID) > -1) {
+                    const router = trackedNpcs.find(iter => iter.ID == targetID);
+                    //log.debug(`Router ${router.ID} placed by ${router.owner} destroyed, saving`);
+                    router.destroyed = timestamp;
+                    self.routerTracking.routers.push(Object.assign({}, router));
+                    self.routerTracking.routerNpcs.delete(router.owner);
+                    save = true;
+                }
+            }
+            const ev = {
+                type: "exp",
+                amount: amount,
+                expID: eventID,
+                zoneID: zoneID,
+                trueExpID: eventID,
+                loadoutID: msg.payload.loadout_id,
+                sourceID: charID,
+                targetID: targetID,
+                timestamp: timestamp
+            };
+            // Undefined means was the target of the event, not the source
+            const player = self.stats.get(charID);
+            if (player != undefined) {
+                if (Number.isNaN(amount)) {
+                    log.warn(`NaN amount from event: ${JSON.stringify(msg)}`);
+                }
+                else {
+                    player.score += amount;
+                }
+                if (event != undefined) {
+                    if (event.track == true) {
+                        player.stats.increment(eventID);
+                        if (event.alsoIncrement != undefined) {
+                            const alsoEvent = PsEvent_1.PsEvents.get(event.alsoIncrement);
+                            if (alsoEvent.track == true) {
+                                player.stats.increment(event.alsoIncrement);
+                            }
+                            ev.expID = event.alsoIncrement;
+                        }
+                    }
+                }
+                player.events.push(ev);
+            }
+            else {
+                self.miscEvents.push(ev);
+            }
+            self.processExperienceEvent(ev);
+            self.emit(ev);
+            if (eventID == PsEvent_1.PsEvent.revive || eventID == PsEvent_1.PsEvent.squadRevive) {
+                const target = self.stats.get(targetID);
+                if (target != undefined) {
+                    if (target.recentDeath != null) {
+                        target.recentDeath.revived = true;
+                        target.recentDeath.revivedEvent = ev;
+                        //log.debug(`${targetID} died but was revived by ${charID}`);
+                    }
+                    target.stats.decrement(PsEvent_1.PsEvent.death);
+                    target.stats.increment(PsEvent_1.PsEvent.revived);
+                }
+            }
+            save = true;
+        }
+        else if (event == "Death") {
+            const targetID = msg.payload.character_id;
+            const sourceID = msg.payload.attacker_character_id;
+            const isHeadshot = msg.payload.is_headshot == "1";
+            const targetLoadoutID = msg.payload.character_loadout_id;
+            const sourceLoadoutID = msg.payload.attacker_loadout_id;
+            if (self.tracking.running == true) {
+                CharacterAPI_1.CharacterAPI.cache(targetID);
+                CharacterAPI_1.CharacterAPI.cache(sourceID);
+            }
+            const targetLoadout = PsLoadout_1.PsLoadouts.get(targetLoadoutID);
+            if (targetLoadout == undefined) {
+                return log.warn(`Unknown target loadout ID: ${targetLoadoutID}`);
+            }
+            const sourceLoadout = PsLoadout_1.PsLoadouts.get(sourceLoadoutID);
+            if (sourceLoadout == undefined) {
+                return log.warn(`Unknown source loadout ID: ${sourceLoadoutID}`);
+            }
+            let targetTicks = self.stats.get(targetID);
+            if (targetTicks != undefined && targetLoadout.faction != sourceLoadout.faction) {
+                targetTicks.stats.increment(PsEvent_1.PsEvent.death);
+                const ev = {
+                    type: "death",
+                    isHeadshot: isHeadshot,
+                    sourceID: targetID,
+                    targetID: sourceID,
+                    loadoutID: targetLoadoutID,
+                    targetLoadoutID: sourceLoadoutID,
+                    weaponID: msg.payload.attacker_weapon_id,
+                    revived: false,
+                    revivedEvent: null,
+                    timestamp: timestamp,
+                    zoneID: zoneID
+                };
+                targetTicks.events.push(ev);
+                targetTicks.recentDeath = ev;
+                if (self.tracking.running == true) {
+                    WeaponAPI_1.WeaponAPI.precache(ev.weaponID);
+                }
+                self.emit(ev);
+                self.processKillDeathEvent(ev);
+                save = true;
+            }
+            let sourceTicks = self.stats.get(sourceID);
+            if (sourceTicks != undefined) {
+                if (targetLoadout.faction == sourceLoadout.faction) {
+                    sourceTicks.stats.increment(PsEvent_1.PsEvent.teamkill);
+                    targetTicks === null || targetTicks === void 0 ? void 0 : targetTicks.stats.increment(PsEvent_1.PsEvent.teamkilled);
+                    const ev = {
+                        type: "teamkill",
+                        sourceID: sourceID,
+                        loadoutID: sourceLoadoutID,
+                        targetID: targetID,
+                        targetLoadoutID: targetLoadoutID,
+                        weaponID: msg.payload.attacker_weapon_id,
+                        zoneID: zoneID,
+                        timestamp: timestamp
+                    };
+                    sourceTicks.events.push(ev);
+                    self.emit(ev);
+                }
+                else {
+                    sourceTicks.stats.increment(PsEvent_1.PsEvent.kill);
+                    if (isHeadshot == true) {
+                        sourceTicks.stats.increment(PsEvent_1.PsEvent.headshot);
+                    }
+                    const ev = {
+                        type: "kill",
+                        isHeadshot: isHeadshot,
+                        sourceID: sourceID,
+                        targetID: targetID,
+                        loadoutID: sourceLoadoutID,
+                        targetLoadoutID: targetLoadoutID,
+                        weaponID: msg.payload.attacker_weapon_id,
+                        timestamp: timestamp,
+                        zoneID: zoneID
+                    };
+                    sourceTicks.events.push(ev);
+                    WeaponAPI_1.WeaponAPI.precache(ev.weaponID);
+                    self.emit(ev);
+                    self.processKillDeathEvent(ev);
+                }
+                save = true;
+            }
+        }
+        else if (event == "PlayerFacilityCapture") {
+            const playerID = msg.payload.character_id;
+            const outfitID = msg.payload.outfit_id;
+            const facilityID = msg.payload.facility_id;
+            const ev = {
+                type: "capture",
+                sourceID: playerID,
+                outfitID: outfitID,
+                facilityID: facilityID,
+                timestamp: timestamp,
+                zoneID: zoneID
+            };
+            self.playerCaptures.push(ev);
+            let player = self.stats.get(playerID);
+            if (player != undefined) {
+                log.debug(`Tracked player ${player.name} got a capture on ${ev.facilityID}`);
+                player.stats.increment(PsEvent_1.PsEvent.baseCapture);
+                player.events.push(ev);
+            }
+            self.emit(ev);
+            save = true;
+        }
+        else if (event == "PlayerFacilityDefend") {
+            const playerID = msg.payload.character_id;
+            const outfitID = msg.payload.outfit_id;
+            const facilityID = msg.payload.facility_id;
+            const ev = {
+                type: "defend",
+                sourceID: playerID,
+                outfitID: outfitID,
+                facilityID: facilityID,
+                timestamp: timestamp,
+                zoneID: zoneID,
+            };
+            self.playerCaptures.push(ev);
+            let player = self.stats.get(playerID);
+            if (player != undefined) {
+                player.stats.increment(PsEvent_1.PsEvent.baseDefense);
+                player.events.push(ev);
+            }
+            self.emit(ev);
+            save = true;
+        }
+        else if (event == "AchievementEarned") {
+            const charID = msg.payload.character_id;
+            const achivID = msg.payload.achievement_id;
+            const char = self.stats.get(charID);
+            if (char != undefined) {
+                char.ribbons.increment(achivID);
+                save = true;
+            }
+        }
+        else if (event == "FacilityControl") {
+            const outfitID = msg.payload.outfit_id;
+            const facilityID = msg.payload.facility_id;
+            const capture = {
+                facilityID: facilityID,
+                zoneID: zoneID,
+                timestamp: new Date(timestamp),
+                timeHeld: Number.parseInt(msg.payload.duration_held),
+                factionID: msg.payload.new_faction_id,
+                outfitID: outfitID,
+                previousFaction: msg.payload.old_faction_id,
+            };
+            self.captures.push(capture);
+            save = true;
+            const ev = {
+                type: "base",
+                sourceID: "7153",
+                facilityID: capture.facilityID,
+                timestamp: timestamp,
+                zoneID: zoneID,
+                outfitID: capture.outfitID,
+                factionID: capture.factionID,
+                previousFactionID: capture.previousFaction,
+                timeHeld: capture.timeHeld,
+                worldID: msg.payload.world_id
+            };
+            self.emit(ev);
+        }
+        else if (event == "ItemAdded") {
+            const itemID = msg.payload.item_id;
+            const charID = msg.payload.character_id;
+            if (itemID == "6003551") {
+                if (self.stats.get(charID) != undefined) {
+                    //log.debug(`${charID} pulled a new router`);
+                    if (self.routerTracking.routerNpcs.has(charID)) {
+                        const router = self.routerTracking.routerNpcs.get(charID);
+                        //log.debug(`${charID} pulled a new router, saving old one`);
+                        router.destroyed = timestamp;
+                        self.routerTracking.routers.push(Object.assign({}, router));
+                    }
+                    const router = {
+                        ID: "",
+                        owner: charID,
+                        count: 0,
+                        destroyed: undefined,
+                        firstSpawn: undefined,
+                        pulledAt: timestamp,
+                        type: "router"
+                    };
+                    self.routerTracking.routerNpcs.set(charID, router);
+                    save = true;
+                }
+            }
+        }
+        else if (event == "VehicleDestroy") {
+            const killerID = msg.payload.attacker_character_id;
+            const killerLoadoutID = msg.payload.attacker_loadout_id;
+            const killerWeaponID = msg.payload.attacker_weapon_id;
+            const vehicleID = msg.payload.vehicle_id;
+            const player = self.stats.get(killerID);
+            if (player != undefined) {
+                const ev = {
+                    type: "vehicle",
+                    sourceID: killerID,
+                    loadoutID: killerLoadoutID,
+                    weaponID: killerWeaponID,
+                    targetID: msg.payload.character_id,
+                    vehicleID: vehicleID,
+                    timestamp: timestamp,
+                    zoneID: zoneID
+                };
+                player.events.push(ev);
+                save = true;
+                self.emit(ev);
+            }
+        }
+        else if (event == "PlayerLogin") {
+            const charID = msg.payload.character_id;
+            if (this.stats.has(charID)) {
+                const char = this.stats.get(charID);
+                char.online = true;
+                if (this.tracking.running == true) {
+                    char.joinTime = new Date().getTime();
+                }
+                const ev = {
+                    type: "login",
+                    sourceID: charID,
+                    timestamp: timestamp
+                };
+                char.events.push(ev);
+                self.emit(ev);
+                self.addMember({
+                    ID: char.characterID,
+                    name: char.name,
+                    outfitTag: char.outfitTag
+                });
+            }
+        }
+        else if (event == "PlayerLogout") {
+            const charID = msg.payload.character_id;
+            if (this.stats.has(charID)) {
+                const char = this.stats.get(charID);
+                char.online = false;
+                if (this.tracking.running == true) {
+                    const diff = new Date().getTime() - char.joinTime;
+                    char.secondsOnline += (diff / 1000);
+                }
+                const ev = {
+                    type: "logout",
+                    sourceID: charID,
+                    timestamp: timestamp
+                };
+                char.events.push(ev);
+                self.emit(ev);
+                self.removeMember(charID);
+            }
+        }
+        else {
+            log.warn(`Unknown event type: ${event}\n${JSON.stringify(msg)}`);
+        }
+    }
+    else if (msg.type == "heartbeat") {
+        //log.debug(`Heartbeat ${new Date().toISOString()}`);
+    }
+    else if (msg.type == "serviceStateChanged") {
+        log.trace(`serviceStateChanged event`);
+    }
+    else if (msg.type == "connectionStateChanged") {
+        log.trace(`connectionStateChanged event`);
+    }
+    else if (msg.type == undefined) {
+        // Occurs in response to subscribing to new events
+    }
+    else if (msg.type == "toptMarker") {
+        // These events are special because they will only be encountered during playback, not during
+        //      traacking, as these are manually added by an outside source
+        log.info(`Processed a toptMarker event: ${JSON.stringify(msg)}`);
+        const ev = {
+            type: "marker",
+            mark: msg.payload.mark,
+            sourceID: msg.payload.sourceID,
+            timestamp: Number.parseInt(msg.payload.timestamp),
+        };
+        self.miscEvents.push(ev);
+        save = true;
+    }
+    else {
+        log.warn(`Unchecked message type: '${msg.type}'`);
+    }
+    if (save == true) {
+        self.rawData.push(JSON.stringify(msg));
+    }
+};
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/CoreSettings.js":
+/*!***********************************************!*\
+  !*** ../topt-core/build/core/CoreSettings.js ***!
+  \***********************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.CoreSettings = void 0;
+/**
+ * Collection of settings used in core
+ */
+class CoreSettings {
+    constructor() {
+        /**
+         * Service ID used to connect to the event stream
+         */
+        this.serviceID = "";
+        /**
+         * If the dark mode CSS will be added
+         */
+        this.darkMode = false;
+        /**
+         * ID of the server to listen to login/logout and facility events
+         */
+        this.serverID = "1";
+        /**
+         * If debug options will be shown
+         */
+        this.debug = false;
+    }
+}
+exports.CoreSettings = CoreSettings;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/CoreSquad.js":
+/*!********************************************!*\
+  !*** ../topt-core/build/core/CoreSquad.js ***!
+  \********************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+const Core_1 = __webpack_require__(/*! ./Core */ "../topt-core/build/core/Core.js");
+const PsLoadout_1 = __webpack_require__(/*! ./census/PsLoadout */ "../topt-core/build/core/census/PsLoadout.js");
+const PsEvent_1 = __webpack_require__(/*! ./PsEvent */ "../topt-core/build/core/PsEvent.js");
+const Squad_1 = __webpack_require__(/*! ./squad/Squad */ "../topt-core/build/core/squad/Squad.js");
+const Loggers_1 = __webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("Core.Squad");
+const squadEvents = [
+    PsEvent_1.PsEvent.squadResupply,
+    PsEvent_1.PsEvent.squadHeal,
+    PsEvent_1.PsEvent.squadMaxRepair,
+    PsEvent_1.PsEvent.squadMotionDetect,
+    PsEvent_1.PsEvent.squadRadarDetect,
+    PsEvent_1.PsEvent.squadRevive,
+    PsEvent_1.PsEvent.squadShieldRepair,
+    //PsEvent.squadSpawn, // Other ID isn't a char ID
+    PsEvent_1.PsEvent.squadSpotKill
+];
+const nonSquadEvents = [
+    PsEvent_1.PsEvent.heal,
+    PsEvent_1.PsEvent.revive,
+    PsEvent_1.PsEvent.resupply,
+    PsEvent_1.PsEvent.shieldRepair,
+    PsEvent_1.PsEvent.motionDetect,
+    PsEvent_1.PsEvent.radarDetect,
+    PsEvent_1.PsEvent.spotKill,
+];
+Core_1.Core.prototype.squadInit = function () {
+    // Make the four default squads
+    this.createPermSquad();
+    this.createPermSquad();
+    this.createPermSquad();
+    this.createPermSquad();
+    // Every second update the death timer and beacon cooldown if needed
+    setInterval(() => {
+        const time = new Date().getTime();
+        this.squad.members.forEach((member, charID) => {
+            // If they've died update their dying timer
+            if (member.state == "dying" && member.whenDied != null) {
+                member.timeDead = (time - member.whenDied) / 1000; // ms to seconds
+                if (member.timeDead > 29) {
+                    member.state = "dead"; // They've been dead too long
+                }
+            }
+            // If they've placed a beacon update the timer
+            if (member.whenBeacon) {
+                member.beaconCooldown = (time - member.whenBeacon) / 1000;
+                if (member.beaconCooldown > 299) {
+                    member.whenBeacon = null;
+                    member.beaconCooldown = 0;
+                }
+            }
+        });
+    }, 1000);
+};
+/**
+ * Sort the names in a squad, by online status, then name
+ *
+ * @param squad Squad to sort the members of
+ */
+function sortSquad(squad) {
+    squad.members.sort((a, b) => {
+        if (b.online == false && a.online == false) {
+            return a.name.localeCompare(b.name);
+        }
+        if (b.online == false && a.online == true) {
+            return -1;
+        }
+        if (b.online == true && a.online == false) {
+            return 1;
+        }
+        return a.name.localeCompare(b.name);
+    });
+}
+Core_1.Core.prototype.addMember = function (char) {
+    if (this.squad.members.has(char.ID)) {
+        this.squad.members.get(char.ID).online = true;
+        log.debug(`${char.name}/${char.ID} was online before, setting online again`);
+        return;
+    }
+    this.squad.members.set(char.ID, {
+        name: char.name,
+        charID: char.ID,
+        outfitTag: char.outfitTag,
+        class: "",
+        state: "alive",
+        timeDead: 0,
+        whenDied: null,
+        whenBeacon: null,
+        beaconCooldown: 0,
+        online: true
+    });
+    const member = this.squad.members.get(char.ID);
+    member.online = true;
+    log.debug(`Started squad tracking ${char.name}/${char.ID}`);
+    const squad = this.createGuessSquad();
+    squad.members.push(member);
+    sortSquad(squad);
+};
+Core_1.Core.prototype.processKillDeathEvent = function (event) {
+    var _a, _b;
+    if (event.type == "kill") {
+        if (this.squad.members.has(event.sourceID)) {
+            const member = this.squad.members.get(event.sourceID);
+            member.state = "alive";
+            member.timeDead = 0;
+            member.whenDied = null;
+            const loadout = (_a = PsLoadout_1.PsLoadouts.get(event.loadoutID)) !== null && _a !== void 0 ? _a : PsLoadout_1.PsLoadout.default;
+            switch (loadout.type) {
+                case "infil":
+                    member.class = "I";
+                    break;
+                case "lightAssault":
+                    member.class = "L";
+                    break;
+                case "medic":
+                    member.class = "M";
+                    break;
+                case "engineer":
+                    member.class = "E";
+                    break;
+                case "heavy":
+                    member.class = "H";
+                    break;
+                case "max":
+                    member.class = "W";
+                    break;
+                case "unknown":
+                    member.class = "";
+                    break;
+            }
+        }
+    }
+    else if (event.type == "death") {
+        if (this.squad.members.has(event.sourceID)) {
+            const member = this.squad.members.get(event.sourceID);
+            member.state = "dying";
+            member.whenDied = new Date().getTime();
+            member.timeDead = 0;
+            const loadout = (_b = PsLoadout_1.PsLoadouts.get(event.loadoutID)) !== null && _b !== void 0 ? _b : PsLoadout_1.PsLoadout.default;
+            switch (loadout.type) {
+                case "infil":
+                    member.class = "I";
+                    break;
+                case "lightAssault":
+                    member.class = "L";
+                    break;
+                case "medic":
+                    member.class = "M";
+                    break;
+                case "engineer":
+                    member.class = "E";
+                    break;
+                case "heavy":
+                    member.class = "H";
+                    break;
+                case "max":
+                    member.class = "W";
+                    break;
+                case "unknown":
+                    member.class = "";
+                    break;
+            }
+        }
+    }
+};
+const validRespawnEvent = (ev, whenDied) => {
+    // These events can happen whenever and aren't useful for knowing if someone is alive or not
+    if (ev.expID == PsEvent_1.PsEvent.resupply || ev.expID == PsEvent_1.PsEvent.squadResupply
+        || ev.expID == PsEvent_1.PsEvent.shieldRepair || ev.expID == PsEvent_1.PsEvent.squadShieldRepair
+        || ev.expID == PsEvent_1.PsEvent.killAssist
+        || ev.expID == PsEvent_1.PsEvent.ribbon
+        || ev.expID == PsEvent_1.PsEvent.motionDetect || ev.expID == PsEvent_1.PsEvent.squadMotionDetect
+        || ev.expID == PsEvent_1.PsEvent.squadSpawn
+        || ev.expID == PsEvent_1.PsEvent.drawfire
+    //|| ev.expID == PsEvent.heal || ev.expID == PsEvent.squadHeal // People rarely run mending field to make this an issue
+    ) {
+        return false;
+    }
+    // These events might be useful, depending on how long ago the player died, for example if they get a revive
+    //      within 1 second of death it might be a revive nade, but if it's after 8 seconds we know they had to respawn
+    //      in some other way as a revive nade takes 2.5 seconds to prime
+    /*
+    if (whenDied != null) {
+        log.log(`It's been ${ev.timestamp - whenDied} ms since death`);
+        if (((ev.expID == PsEvent.revive || ev.expID == PsEvent.squadRevive) && (ev.timestamp - whenDied <= 5)) // Revive nades take 2.5 seconds to prime
+            || ((ev.expID == PsEvent.heal || ev.expID == PsEvent.squadHeal) && (ev.timestamp - whenDied <= 15)) // Heal nades last for 10? seconds
+        ) {
+            return false;
+        }
+    }
+    */
+    return true;
+};
+Core_1.Core.prototype.processExperienceEvent = function (event) {
+    var _a;
+    if (event.expID == PsEvent_1.PsEvent.revive || event.expID == PsEvent_1.PsEvent.squadRevive) {
+        if (this.squad.members.has(event.targetID)) {
+            const member = this.squad.members.get(event.targetID);
+            member.state = "alive";
+            member.timeDead = 0;
+            member.whenDied = null;
+        }
+    }
+    if (event.expID == PsEvent_1.PsEvent.squadSpawn) {
+        if (this.squad.members.has(event.sourceID)) {
+            const member = this.squad.members.get(event.sourceID);
+            if (member.whenBeacon == null) {
+                log.debug(`${member.name} placed a beacon`);
+                member.beaconCooldown = 300;
+                member.whenBeacon = new Date().getTime();
+            }
+        }
+    }
+    if (this.squad.members.has(event.sourceID)) {
+        const member = this.squad.members.get(event.sourceID);
+        if (member.state != "alive") {
+            if (validRespawnEvent(event, member.whenDied) == true) {
+                member.state = "alive";
+                member.whenDied = null;
+                member.timeDead = 0;
+                //debug(`${member.name} was revived from ${event}`);
+            }
+        }
+        const loadout = (_a = PsLoadout_1.PsLoadouts.get(event.loadoutID)) !== null && _a !== void 0 ? _a : PsLoadout_1.PsLoadout.default;
+        switch (loadout.type) {
+            case "infil":
+                member.class = "I";
+                break;
+            case "lightAssault":
+                member.class = "L";
+                break;
+            case "medic":
+                member.class = "M";
+                break;
+            case "engineer":
+                member.class = "E";
+                break;
+            case "heavy":
+                member.class = "H";
+                break;
+            case "max":
+                member.class = "W";
+                break;
+            case "unknown":
+                log.warn(`Unknown class from event: ${event}`);
+                member.class = "";
+                break;
+        }
+    }
+    const sourceMember = this.squad.members.get(event.sourceID);
+    const targetMember = this.squad.members.get(event.targetID);
+    // There are events that happen where no one is tracked
+    if (sourceMember == undefined && targetMember == undefined) {
+        return;
+    }
+    if (this.squad.autoadd == false && (sourceMember == undefined || targetMember == undefined)) {
+        return;
+    }
+    if (this.squad.autoadd == true) {
+        if (squadEvents.indexOf(event.trueExpID) > -1) {
+            if (sourceMember == undefined && targetMember != undefined) {
+                log.info(`${event.sourceID} is not tracked, adding them to the tracker from ${JSON.stringify(event)}`);
+                this.addPlayerByID(event.sourceID).ok(() => {
+                    this.processExperienceEvent(event);
+                });
+            }
+            if (sourceMember != undefined && targetMember == undefined) {
+                log.info(`${event.targetID} is not tracked, adding them to the tracker from ${JSON.stringify(event)}`);
+                this.addPlayerByID(event.targetID).ok(() => {
+                    this.processExperienceEvent(event);
+                });
+            }
+            return;
+        }
+    }
+    if (this.squad.autoadd == true && (sourceMember == undefined || targetMember == undefined)) {
+        log.warn(`Not sure how we got here`);
+        return;
+    }
+    if (sourceMember == undefined || targetMember == undefined) {
+        throw `Bad logic above ^^^`;
+    }
+    let sourceSquad = this.getSquadOfMember(event.sourceID);
+    let targetSquad = this.getSquadOfMember(event.targetID);
+    if (sourceSquad == null) {
+        sourceSquad = this.createGuessSquad();
+        sourceSquad.members.push(sourceMember);
+    }
+    if (targetSquad == null) {
+        targetSquad = this.createGuessSquad();
+        targetSquad.members.push(targetMember);
+    }
+    // Check if the squads need to be merged into one another if this was a squad exp source
+    if (squadEvents.indexOf(event.trueExpID) > -1) {
+        if (sourceSquad.ID == targetSquad.ID) {
+            //log.log(`${sourceMember.name} // ${targetMember.name} are already in a squad`);
+        }
+        else {
+            const ev = PsEvent_1.PsEvents.get(event.expID);
+            // 3 cases:
+            //      1. Both squads are guesses => Merge squads
+            //      2. One squad isn't a guess => Move guess squad into non-guess squad
+            //      3. Neither squad is a guess => Move member who performed action into other squad
+            if (targetSquad.guess == true && sourceSquad.guess == true) {
+                log.debug(`Both guesses, merging ${sourceMember.name} (${sourceSquad}) into ${targetMember.name} (${targetSquad}) from ${ev === null || ev === void 0 ? void 0 : ev.name}`);
+                this.mergeSquads(sourceSquad, targetSquad);
+            }
+            else if (targetSquad.guess == false && sourceSquad.guess == true) {
+                log.debug(`Target is not a guess, merging ${sourceMember.name} (${sourceSquad}) into ${targetMember.name} (${targetSquad}) from ${ev === null || ev === void 0 ? void 0 : ev.name}`);
+                this.mergeSquads(targetSquad, sourceSquad);
+            }
+            else if (targetSquad.guess == true && sourceSquad.guess == false) {
+                log.debug(`Source is not a guess, merging ${targetMember.name} (${targetSquad}) into ${sourceMember.name} (${sourceSquad}) from ${ev === null || ev === void 0 ? void 0 : ev.name}`);
+                this.mergeSquads(sourceSquad, targetSquad);
+            }
+            else if (targetSquad.guess == false && sourceSquad.guess == false) {
+                log.debug(`Neither squad is a guess, moving ${targetMember.name} into ${sourceMember} (${sourceSquad}) from ${ev === null || ev === void 0 ? void 0 : ev.name}`);
+                sourceSquad.members.push(targetMember);
+                targetSquad.members = targetSquad.members.filter(iter => iter.charID != targetMember.charID);
+            }
+            sortSquad(sourceSquad);
+            sortSquad(targetSquad);
+        }
+    }
+    // Check if the squad is no longer valid and needs to be removed, i.e. moved squads
+    if (nonSquadEvents.indexOf(event.trueExpID) > -1) {
+        //log.log(`Non squad event: ${event.trueExpID}`);
+        if (sourceSquad.ID == targetSquad.ID) {
+            log.debug(`${sourceMember.name} was in squad with ${targetMember.name}, but didn't get an expect squad exp event`);
+            targetSquad.members = targetSquad.members.filter(iter => iter.charID != sourceMember.charID);
+            const squad = this.createGuessSquad();
+            squad.members.push(sourceMember);
+            sortSquad(squad);
+            sortSquad(targetSquad);
+            sortSquad(sourceSquad);
+        }
+    }
+};
+Core_1.Core.prototype.getSquad = function (squadName) {
+    let squad = this.squad.perm.find(iter => iter.name == squadName) || null;
+    if (squad != null) {
+        return squad;
+    }
+    return this.squad.guesses.find(iter => iter.name == squadName) || null;
+};
+Core_1.Core.prototype.getSquadByID = function (squadID) {
+    let squad = this.squad.perm.find(iter => iter.ID == squadID) || null;
+    if (squad != null) {
+        return squad;
+    }
+    return this.squad.guesses.find(iter => iter.ID == squadID) || null;
+};
+Core_1.Core.prototype.addMemberToSquad = function (charID, squadRef) {
+    const member = this.squad.members.get(charID);
+    if (member == undefined) {
+        return log.warn(`Cannot move ${charID} to ${squadRef}: ${charID} is not a squad member`);
+    }
+    const squad = (typeof (squadRef) == "string") ? this.getSquad(squadRef) : this.getSquadByID(squadRef);
+    if (squad == null) {
+        return log.warn(`Cannot move ${charID} to ${squadRef}: squad ${squadRef} does not exist`);
+    }
+    if (squad.members.find(iter => iter.charID == charID) != null) {
+        return log.debug(`${charID} is already part of squad ${squadRef}, no need to move`);
+    }
+    const oldSquad = this.getSquadOfMember(charID);
+    if (oldSquad != null) {
+        log.debug(`${charID} is currently in ${oldSquad.name}, moving out of it`);
+        oldSquad.members = oldSquad.members.filter(iter => iter.charID != charID);
+        if (oldSquad.members.length == 0 && oldSquad.guess == true) {
+            this.squad.guesses = this.squad.guesses.filter(iter => iter.ID != oldSquad.ID);
+        }
+    }
+    squad.members.push(member);
+    sortSquad(squad);
+};
+Core_1.Core.prototype.getSquadOfMember = function (charID) {
+    const check = (squad) => {
+        return squad.members.find(iter => iter.charID == charID) != null;
+    };
+    for (const squad of this.squad.perm) {
+        if (check(squad) == true) {
+            return squad;
+        }
+    }
+    for (const squad of this.squad.guesses) {
+        if (check(squad) == true) {
+            return squad;
+        }
+    }
+    log.debug(`Failed to find a squad for ${charID}`);
+    return null;
+};
+Core_1.Core.prototype.mergeSquads = function (into, from) {
+    into.members.push(...from.members);
+    from.members = [];
+    if (from.guess == true) {
+        log.debug(`${from.name} is a guess, removing from list`);
+        this.squad.guesses = this.squad.guesses.filter(iter => iter.ID != from.ID);
+    }
+};
+let squadNameIndex = 0;
+let squadNames = [
+    "q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "a", "s", "d",
+    "f", "g", "h", "j", "k", "l", "z", "x", "c", "v", "b", "n", "m"
+];
+let permSquadNames = [
+    "Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf", "Hotel"
+];
+Core_1.Core.prototype.createGuessSquad = function () {
+    const squad = new Squad_1.Squad();
+    squad.name = squadNames[(squadNameIndex++) % 26];
+    squad.guess = true;
+    log.debug(`Created new guess squad ${squad.name}`);
+    this.squad.guesses.push(squad);
+    return squad;
+};
+Core_1.Core.prototype.createPermSquad = function () {
+    const squad = new Squad_1.Squad();
+    squad.name = `${this.squad.perm.length + 1}`;
+    squad.guess = false;
+    squad.display = permSquadNames[(this.squad.perm.length % permSquadNames.length)];
+    log.debug(`Created new perm squad ${squad.name}/${squad.display}`);
+    this.squad.perm.push(squad);
+    return squad;
+};
+Core_1.Core.prototype.removePermSquad = function (squadName) {
+    for (const squad of this.squad.perm) {
+        if (squad.name == squadName && squad.members.length > 0) {
+            const newSquad = this.createGuessSquad();
+            for (const member of squad.members) {
+                newSquad.members.push(member);
+            }
+            sortSquad(newSquad);
+            squad.members = [];
+        }
+    }
+    this.squad.perm = this.squad.perm.filter(iter => iter.name != squadName);
+};
+Core_1.Core.prototype.removeMemberFromSquad = function (charID) {
+    log.debug(`Remove ${charID} from their current squad into a new one`);
+    const member = this.squad.members.get(charID);
+    if (member == undefined) {
+        log.warn(`Cannot remove ${charID} from their current squad, they are not tracked`);
+        return;
+    }
+    const squad = this.getSquadOfMember(charID);
+    if (squad == null) {
+        log.warn(`Failed to find the squad that ${charID} is in`);
+        return;
+    }
+    const newSquad = this.createGuessSquad();
+    this.addMemberToSquad(charID, newSquad.ID);
+};
+Core_1.Core.prototype.removeMember = function (charID) {
+    log.debug(`${charID} went offline`);
+    if (this.squad.members.has(charID)) {
+        const char = this.squad.members.get(charID);
+        char.online = false;
+        char.state = "alive";
+        char.whenDied = null;
+        char.timeDead = 0;
+    }
+};
+Core_1.Core.prototype.printSquadInfo = function () {
+    log.info(`Perm squads:`);
+    for (const squad of this.squad.perm) {
+        log.info(`\t${squad}`);
+    }
+    log.info(`Guess squads:`);
+    for (const squad of this.squad.guesses) {
+        log.info(`\t${squad}`);
+    }
+    log.info(`Members:`);
+    for (const entry of this.squad.members) {
+        const charID = entry[0];
+        const member = entry[1];
+        const squad = this.getSquadOfMember(charID);
+        log.info(`\t${member.name}/${member.charID} is in ${squad === null || squad === void 0 ? void 0 : squad.name}/${squad === null || squad === void 0 ? void 0 : squad.ID} ${squad == null ? "Missing squad" : ""}`);
+    }
+};
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/EventReporter.js":
+/*!************************************************!*\
+  !*** ../topt-core/build/core/EventReporter.js ***!
+  \************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.defaultVehicleMapper = exports.defaultWeaponMapper = exports.defaultCharacterSortField = exports.defaultCharacterMapper = exports.statMapToBreakdown = exports.Streak = exports.BaseCapture = exports.BaseCaptureOutfit = exports.classCollectionNumber = exports.BreakdownWeaponType = exports.OutfitVersusBreakdown = exports.BreakdownTrend = exports.BreakdownTimeslot = exports.Breakdown = exports.BreakdownArray = void 0;
+const ApiWrapper_1 = __webpack_require__(/*! ./census/ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
+const CharacterAPI_1 = __webpack_require__(/*! ./census/CharacterAPI */ "../topt-core/build/core/census/CharacterAPI.js");
+const WeaponAPI_1 = __webpack_require__(/*! ./census/WeaponAPI */ "../topt-core/build/core/census/WeaponAPI.js");
+const StatMap_1 = __webpack_require__(/*! ./StatMap */ "../topt-core/build/core/StatMap.js");
+const PsLoadout_1 = __webpack_require__(/*! ./census/PsLoadout */ "../topt-core/build/core/census/PsLoadout.js");
+const VehicleAPI_1 = __webpack_require__(/*! ./census/VehicleAPI */ "../topt-core/build/core/census/VehicleAPI.js");
+const PsEvent_1 = __webpack_require__(/*! ./PsEvent */ "../topt-core/build/core/PsEvent.js");
+const InvididualGenerator_1 = __webpack_require__(/*! ./InvididualGenerator */ "../topt-core/build/core/InvididualGenerator.js");
+const OutfitAPI_1 = __webpack_require__(/*! ./census/OutfitAPI */ "../topt-core/build/core/census/OutfitAPI.js");
+const Loggers_1 = __webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("EventReporter");
+class BreakdownArray {
+    constructor() {
+        this.data = [];
+        this.total = 0;
+        this.display = null;
+    }
+}
+exports.BreakdownArray = BreakdownArray;
+class Breakdown {
+    constructor() {
+        this.display = "";
+        this.sortField = "";
+        this.amount = 0;
+        this.color = undefined;
+    }
+}
+exports.Breakdown = Breakdown;
+class BreakdownTimeslot {
+    constructor() {
+        this.startTime = 0;
+        this.endTime = 0;
+        this.value = 0;
+    }
+}
+exports.BreakdownTimeslot = BreakdownTimeslot;
+class BreakdownTrend {
+    constructor() {
+        this.timestamp = new Date();
+        this.values = [];
+    }
+}
+exports.BreakdownTrend = BreakdownTrend;
+;
+class OutfitVersusBreakdown {
+    constructor() {
+        this.tag = "";
+        this.name = "";
+        this.faction = "";
+        this.kills = 0;
+        this.deaths = 0;
+        this.revived = 0;
+        this.players = 0;
+        this.classKills = classCollectionNumber();
+        this.classDeaths = classCollectionNumber();
+        this.classRevived = classCollectionNumber();
+    }
+}
+exports.OutfitVersusBreakdown = OutfitVersusBreakdown;
+class BreakdownWeaponType {
+    constructor() {
+        this.type = "";
+        this.deaths = 0;
+        this.revived = 0;
+        this.unrevived = 0;
+        this.headshots = 0;
+        this.mostUsed = "";
+        this.mostUsedDeaths = 0;
+    }
+}
+exports.BreakdownWeaponType = BreakdownWeaponType;
+function classCollectionNumber() {
+    return {
+        total: 0,
+        infil: 0,
+        lightAssault: 0,
+        medic: 0,
+        engineer: 0,
+        heavy: 0,
+        max: 0
+    };
+}
+exports.classCollectionNumber = classCollectionNumber;
+class BaseCaptureOutfit {
+    constructor() {
+        this.ID = "";
+        this.name = "";
+        this.tag = "";
+        this.amount = 0;
+    }
+}
+exports.BaseCaptureOutfit = BaseCaptureOutfit;
+class BaseCapture {
+    constructor() {
+        this.name = "";
+        this.faction = "";
+        this.timestamp = 0;
+        this.outfits = new BreakdownArray();
+    }
+}
+exports.BaseCapture = BaseCapture;
+class Streak {
+    constructor() {
+        /**
+         * How many instances of the event were in a streak
+         */
+        this.amount = 0;
+        /**
+         * When the streak started in ms
+         */
+        this.start = 0;
+    }
+}
+exports.Streak = Streak;
+function statMapToBreakdown(map, source, matcher, mapper, sortField = undefined) {
+    const breakdown = new ApiWrapper_1.ApiResponse();
+    const arr = new BreakdownArray();
+    if (map.size() > 0) {
+        const IDs = Array.from(map.getMap().keys());
+        source(IDs).ok((data) => {
+            map.getMap().forEach((amount, ID) => {
+                const datum = data.find(elem => matcher(elem, ID));
+                const breakdown = {
+                    display: mapper(datum, ID),
+                    sortField: (sortField != undefined) ? sortField(datum, ID) : mapper(datum, ID),
+                    amount: amount,
+                    color: undefined
+                };
+                arr.total += amount;
+                arr.data.push(breakdown);
+            });
+            arr.data.sort((a, b) => {
+                const diff = b.amount - a.amount;
+                return diff || b.sortField.localeCompare(a.sortField);
+            });
+            breakdown.resolveOk(arr);
+        });
+    }
+    else {
+        breakdown.resolveOk(arr);
+    }
+    return breakdown;
+}
+exports.statMapToBreakdown = statMapToBreakdown;
+function defaultCharacterMapper(elem, ID) {
+    return `${(elem === null || elem === void 0 ? void 0 : elem.outfitTag) ? `[${elem.outfitTag}] ` : ``}${(elem) ? elem.name : `Unknown ${ID}`}`;
+}
+exports.defaultCharacterMapper = defaultCharacterMapper;
+function defaultCharacterSortField(elem, ID) {
+    var _a;
+    return (_a = elem === null || elem === void 0 ? void 0 : elem.name) !== null && _a !== void 0 ? _a : `Unknown ${ID}}`;
+}
+exports.defaultCharacterSortField = defaultCharacterSortField;
+function defaultWeaponMapper(elem, ID) {
+    var _a;
+    return (_a = elem === null || elem === void 0 ? void 0 : elem.name) !== null && _a !== void 0 ? _a : `Unknown ${ID}`;
+}
+exports.defaultWeaponMapper = defaultWeaponMapper;
+function defaultVehicleMapper(elem, ID) {
+    var _a;
+    return (_a = elem === null || elem === void 0 ? void 0 : elem.name) !== null && _a !== void 0 ? _a : `Unknown ${ID}`;
+}
+exports.defaultVehicleMapper = defaultVehicleMapper;
+class EventReporter {
+    static medicHealStreaks(events, charID) {
+        let current = new Streak();
+        const streaks = [];
+        // Have 2453 1/3 (rounded to 2500) units of juice, decays at 0.32 per ms (320/sec), revive gives 750
+        const maxJuice = 2500;
+        const decayRate = 0.32; // per ms
+        const reviveJuice = 750;
+        let juice = 2500;
+        let prevRevive = 0;
+        for (const ev of events) {
+            if (ev.sourceID != charID) {
+                continue;
+            }
+            if (ev.type == "exp" || ev.type == "kill") {
+                if (ev.type == "exp" && (ev.expID == PsEvent_1.PsEvent.heal || ev.expID == PsEvent_1.PsEvent.squadHeal)) {
+                    if (current.start == 0) {
+                        current.start = ev.timestamp;
+                        log.debug(`${charID} streak started at ${ev.timestamp}`);
+                    }
+                    if (prevRevive == 0) {
+                        prevRevive = ev.timestamp;
+                    }
+                }
+                else if (PsLoadout_1.PsLoadout.getLoadoutType(ev.loadoutID) == "medic"
+                    && (ev.type == "kill" || ev.expID == PsEvent_1.PsEvent.revive || ev.expID == PsEvent_1.PsEvent.squadRevive)) {
+                    if (current.start == 0) {
+                        current.start = ev.timestamp;
+                        log.debug(`${charID} streak started at ${ev.timestamp}`);
+                    }
+                    if (prevRevive == 0) {
+                        prevRevive = ev.timestamp;
+                    }
+                    juice += reviveJuice;
+                    if (juice > maxJuice) {
+                        juice = maxJuice;
+                    }
+                }
+                if (current.start != 0) {
+                    const diff = ev.timestamp - prevRevive;
+                    const juiceLost = diff * decayRate;
+                    prevRevive = ev.timestamp;
+                    log.debug(`${charID} lost ${juiceLost} juice over ${diff}ms (${ev.timestamp} - ${prevRevive}). Had ${juice}, now have ${juice - juiceLost}`);
+                    juice = juice - juiceLost;
+                    if (juice <= 0) {
+                        const overtime = (ev.timestamp - current.start) / 1000;
+                        const otherJuice = juice / (decayRate * 1000);
+                        current.amount = overtime + otherJuice;
+                        streaks.push(current);
+                        log.debug(`${charID} streak ended, overtime: ${overtime}, otherJuice: ${otherJuice} went from ${current.start} to ${ev.timestamp} and lasted ${current.amount}ms`);
+                        prevRevive = 0;
+                        current = new Streak();
+                        current.start = 0; //ev.timestamp;
+                        current.amount = 0;
+                        juice = maxJuice;
+                    }
+                }
+            }
+        }
+        return streaks;
+    }
+    static facilityCaptures(data) {
+        const response = new ApiWrapper_1.ApiResponse();
+        const baseCaptures = [];
+        const captures = data.captures;
+        const players = data.players;
+        log.debug(`Have ${data.captures.length} captures`);
+        const outfitIDs = players.map(iter => iter.outfitID)
+            .filter((value, index, arr) => arr.indexOf(value) == index);
+        log.debug(`Getting these outfits: [${outfitIDs.join(", ")}]`);
+        OutfitAPI_1.OutfitAPI.getByIDs(outfitIDs).ok((data) => {
+            var _a, _b;
+            log.debug(`Loaded ${data.length}/${outfitIDs.length}. Processing ${captures.length} captures`);
+            for (const capture of captures) {
+                // Same faction caps are boring
+                log.debug(`processing ${JSON.stringify(capture)}`);
+                if (capture.factionID == capture.previousFaction) {
+                    log.debug(`Skipping capture: ${JSON.stringify(capture)}`);
+                    continue;
+                }
+                const entry = new BaseCapture();
+                entry.timestamp = capture.timestamp.getTime();
+                entry.name = capture.name;
+                entry.faction = capture.previousFaction;
+                const outfitID = capture.outfitID;
+                const outfit = data.find(iter => iter.ID == outfitID);
+                if (outfit == undefined) {
+                    log.warn(`Missing outfit ${outfitID}`);
+                    continue;
+                }
+                const helpers = players.filter(iter => iter.timestamp == capture.timestamp.getTime());
+                const outfits = [{ name: "No outfit", ID: "-1", amount: 0, tag: "" }];
+                for (const helper of helpers) {
+                    let outfitEntry = undefined;
+                    if (helper.outfitID == "0" || helper.outfitID.length == 0) {
+                        outfitEntry = outfits[0];
+                    }
+                    else {
+                        outfitEntry = outfits.find(iter => iter.ID == helper.outfitID);
+                        if (outfitEntry == undefined) {
+                            const outfitDatum = data.find(iter => iter.ID == helper.outfitID);
+                            outfitEntry = {
+                                ID: helper.outfitID,
+                                name: (_a = outfitDatum === null || outfitDatum === void 0 ? void 0 : outfitDatum.name) !== null && _a !== void 0 ? _a : `Unknown ${helper.outfitID}`,
+                                amount: 0,
+                                tag: (_b = outfitDatum === null || outfitDatum === void 0 ? void 0 : outfitDatum.tag) !== null && _b !== void 0 ? _b : ``,
+                            };
+                            outfits.push(outfitEntry);
+                        }
+                    }
+                    ++outfitEntry.amount;
+                }
+                const breakdown = {
+                    data: outfits.sort((a, b) => b.amount - a.amount).map(iter => {
+                        return {
+                            display: iter.name,
+                            amount: iter.amount,
+                            color: undefined,
+                            sortField: `${iter.amount}`
+                        };
+                    }),
+                    total: outfits.reduce(((acc, iter) => acc += iter.amount), 0),
+                    display: null
+                };
+                entry.outfits = breakdown;
+                baseCaptures.push(entry);
+            }
+            response.resolveOk(baseCaptures);
+        });
+        return response;
+    }
+    static experience(expID, events) {
+        const exp = new StatMap_1.default();
+        for (const event of events) {
+            if (event.type == "exp" && (event.expID == expID || event.trueExpID == expID)) {
+                exp.increment(event.targetID);
+            }
+        }
+        return statMapToBreakdown(exp, CharacterAPI_1.CharacterAPI.getByIDs, (elem, charID) => elem.ID == charID, defaultCharacterMapper, defaultCharacterSortField);
+    }
+    static experienceSource(ids, targetID, events) {
+        const exp = new StatMap_1.default();
+        for (const event of events) {
+            if (event.type == "exp" && event.targetID == targetID && ids.indexOf(event.expID) > -1) {
+                exp.increment(event.sourceID);
+            }
+        }
+        if (exp.size() == 0) {
+            return ApiWrapper_1.ApiResponse.resolve({ code: 204, data: null });
+        }
+        log.debug(`charIDs: [${Array.from(exp.getMap().keys()).join(", ")}]`);
+        return statMapToBreakdown(exp, CharacterAPI_1.CharacterAPI.getByIDs, (elem, charID) => elem.ID == charID, defaultCharacterMapper, defaultCharacterSortField);
+    }
+    static outfitVersusBreakdown(events) {
+        const response = new ApiWrapper_1.ApiResponse();
+        const outfitBreakdowns = new Map();
+        const outfitPlayers = new Map();
+        const killCount = events.filter(iter => iter.type == "kill").length;
+        const deathCount = events.filter(iter => iter.type == "death" && iter.revived == false).length;
+        const charIDs = events.filter((iter) => iter.type == "kill" || (iter.type == "death" && iter.revived == false))
+            .map((iter) => {
+            if (iter.type == "kill") {
+                return iter.targetID;
+            }
+            else if (iter.type == "death" && iter.revived == false) {
+                return iter.targetID;
+            }
+            throw `Invalid event type '${iter.type}'`;
+        });
+        CharacterAPI_1.CharacterAPI.getByIDs(charIDs).ok((data) => {
+            for (const ev of events) {
+                if (ev.type == "kill" || ev.type == "death") {
+                    const killedChar = data.find(iter => iter.ID == ev.targetID);
+                    if (killedChar == undefined) {
+                        log.warn(`Missing ${ev.type} targetID ${ev.targetID}`);
+                    }
+                    else {
+                        const outfitID = killedChar.outfitID;
+                        if (outfitBreakdowns.has(outfitID) == false) {
+                            const breakdown = new OutfitVersusBreakdown();
+                            breakdown.tag = killedChar.outfitTag;
+                            breakdown.name = killedChar.outfitName || "<No outfit>";
+                            breakdown.faction = killedChar.faction;
+                            outfitBreakdowns.set(outfitID, breakdown);
+                            outfitPlayers.set(outfitID, []);
+                        }
+                        const breakdown = outfitBreakdowns.get(outfitID);
+                        if (ev.type == "kill") {
+                            ++breakdown.kills;
+                        }
+                        else if (ev.type == "death") {
+                            if (ev.revived == true) {
+                                ++breakdown.revived;
+                            }
+                            else {
+                                ++breakdown.deaths;
+                            }
+                        }
+                        const loadout = PsLoadout_1.PsLoadouts.get(ev.loadoutID);
+                        const coll = ev.type == "kill" ? breakdown.classKills
+                            : ev.type == "death" && ev.revived == false ? breakdown.classDeaths
+                                : breakdown.classRevived;
+                        if (loadout != undefined) {
+                            if (loadout.type == "infil") {
+                                ++coll.infil;
+                            }
+                            else if (loadout.type == "lightAssault") {
+                                ++coll.lightAssault;
+                            }
+                            else if (loadout.type == "medic") {
+                                ++coll.medic;
+                            }
+                            else if (loadout.type == "engineer") {
+                                ++coll.engineer;
+                            }
+                            else if (loadout.type == "heavy") {
+                                ++coll.heavy;
+                            }
+                            else if (loadout.type == "max") {
+                                ++coll.max;
+                            }
+                        }
+                        const players = outfitPlayers.get(outfitID);
+                        if (players.indexOf(ev.targetID) == -1) {
+                            ++breakdown.players;
+                            players.push(ev.targetID);
+                        }
+                    }
+                }
+            }
+            // Only include the outfit if they were > 1% of the kills or deaths
+            const breakdowns = Array.from(outfitBreakdowns.values())
+                .filter(iter => iter.kills > (killCount / 100) || iter.deaths > (deathCount / 100));
+            breakdowns.sort((a, b) => {
+                return b.deaths - a.deaths
+                    || b.kills - a.kills
+                    || b.revived - a.revived
+                    || b.tag.localeCompare(a.tag);
+            });
+            response.resolveOk(breakdowns);
+        });
+        return response;
+    }
+    static kpmBoxplot(players, tracking, loadout) {
+        let kpms = [];
+        for (const player of players) {
+            if (player.secondsOnline <= 0) {
+                continue;
+            }
+            let secondsOnline = player.secondsOnline;
+            if (loadout != undefined) {
+                const playtime = InvididualGenerator_1.IndividualReporter.classUsage({ player: player, tracking: tracking, routers: [], events: [] });
+                if (loadout == "infil") {
+                    secondsOnline = playtime.infil.secondsAs;
+                }
+                else if (loadout == "lightAssault") {
+                    secondsOnline = playtime.lightAssault.secondsAs;
+                }
+                else if (loadout == "medic") {
+                    secondsOnline = playtime.medic.secondsAs;
+                }
+                else if (loadout == "engineer") {
+                    secondsOnline = playtime.engineer.secondsAs;
+                }
+                else if (loadout == "heavy") {
+                    secondsOnline = playtime.heavy.secondsAs;
+                }
+                else if (loadout == "max") {
+                    secondsOnline = playtime.max.secondsAs;
+                }
+                if (secondsOnline == 0) {
+                    continue;
+                }
+            }
+            let count = 0;
+            const kills = player.events.filter(iter => iter.type == "kill");
+            for (const kill of kills) {
+                const psloadout = PsLoadout_1.PsLoadouts.get(kill.loadoutID);
+                if (loadout == undefined || (psloadout != undefined && psloadout.type == loadout)) {
+                    ++count;
+                }
+            }
+            if (count == 0) {
+                continue;
+            }
+            const minutesOnline = secondsOnline / 60;
+            const kpm = Number.parseFloat((count / minutesOnline).toFixed(2));
+            log.debug(`${player.name} got ${count} kills on ${loadout} in ${minutesOnline} minutes (${kpm})`);
+            kpms.push(kpm);
+        }
+        kpms.sort((a, b) => b - a);
+        return kpms;
+    }
+    static kdBoxplot(players, tracking, loadout) {
+        let kds = [];
+        for (const player of players) {
+            if (player.secondsOnline <= 0) {
+                continue;
+            }
+            let killCount = 0;
+            const kills = player.events.filter(iter => iter.type == "kill");
+            for (const kill of kills) {
+                const psloadout = PsLoadout_1.PsLoadouts.get(kill.loadoutID);
+                if (loadout == undefined || (psloadout != undefined && psloadout.type == loadout)) {
+                    ++killCount;
+                }
+            }
+            let deathCount = 0;
+            const deaths = player.events.filter(iter => iter.type == "death" && iter.revived == false);
+            for (const death of deaths) {
+                const psloadout = PsLoadout_1.PsLoadouts.get(death.loadoutID);
+                if (loadout == undefined || (psloadout != undefined && psloadout.type == loadout)) {
+                    ++deathCount;
+                }
+            }
+            if (killCount == 0 || deathCount == 0) {
+                continue;
+            }
+            const kd = Number.parseFloat((killCount / deathCount).toFixed(2));
+            kds.push(kd);
+        }
+        kds.sort((a, b) => b - a);
+        return kds;
+    }
+    static weaponDeathBreakdown(events) {
+        const response = new ApiWrapper_1.ApiResponse();
+        const weapons = events.filter((ev) => ev.type == "death")
+            .map((ev) => ev.weaponID)
+            .filter((ID, index, arr) => arr.indexOf(ID) == index);
+        let types = [];
+        // <weapon type, <weapon, count>>
+        const used = new Map();
+        const missingWeapons = new Set();
+        WeaponAPI_1.WeaponAPI.getByIDs(weapons).ok((data) => {
+            var _a, _b;
+            const deaths = events.filter(ev => ev.type == "death");
+            for (const death of deaths) {
+                const weapon = data.find(iter => iter.ID == death.weaponID);
+                if (weapon == undefined) {
+                    missingWeapons.add(death.weaponID);
+                }
+                const typeName = (_a = weapon === null || weapon === void 0 ? void 0 : weapon.type) !== null && _a !== void 0 ? _a : "Other";
+                let type = types.find(iter => iter.type == typeName);
+                if (type == undefined) {
+                    type = {
+                        type: typeName,
+                        deaths: 0,
+                        headshots: 0,
+                        revived: 0,
+                        unrevived: 0,
+                        mostUsed: "",
+                        mostUsedDeaths: 0
+                    };
+                    types.push(type);
+                }
+                if (weapon != undefined) {
+                    if (!used.has(weapon.type)) {
+                        used.set(weapon.type, new Map());
+                    }
+                    const set = used.get(weapon.type);
+                    set.set(weapon.name, ((_b = set.get(weapon.name)) !== null && _b !== void 0 ? _b : 0) + 1);
+                    used.set(weapon.type, set);
+                }
+                ++type.deaths;
+                if (death.revived == false) {
+                    ++type.unrevived;
+                }
+                else {
+                    ++type.revived;
+                }
+                if (death.isHeadshot == true) {
+                    ++type.headshots;
+                }
+            }
+            used.forEach((weapons, type) => {
+                const breakdown = types.find(iter => iter.type == type);
+                weapons.forEach((deaths, weapon) => {
+                    if (deaths > breakdown.mostUsedDeaths) {
+                        breakdown.mostUsedDeaths = deaths;
+                        breakdown.mostUsed = weapon;
+                    }
+                });
+            });
+            types = types.filter((iter) => {
+                return iter.deaths / deaths.length > 0.0025;
+            });
+            types.sort((a, b) => {
+                return b.deaths - a.deaths
+                    || b.headshots - a.headshots
+                    || b.type.localeCompare(a.type);
+            });
+            log.info(`Missing weapons:`, missingWeapons);
+            response.resolveOk(types);
+        });
+        return response;
+    }
+    static vehicleKills(events) {
+        const vehKills = new StatMap_1.default();
+        for (const event of events) {
+            if (event.type == "vehicle" && VehicleAPI_1.VehicleTypes.tracked.indexOf(event.vehicleID) > -1) {
+                vehKills.increment(event.vehicleID);
+            }
+        }
+        return statMapToBreakdown(vehKills, VehicleAPI_1.VehicleAPI.getAll, (elem, ID) => elem.ID == ID, defaultVehicleMapper);
+    }
+    static vehicleWeaponKills(events) {
+        const vehKills = new StatMap_1.default();
+        for (const event of events) {
+            if (event.type == "vehicle" && event.weaponID != "0") {
+                vehKills.increment(event.weaponID);
+            }
+        }
+        return statMapToBreakdown(vehKills, WeaponAPI_1.WeaponAPI.getByIDs, (elem, ID) => elem.ID == ID, defaultWeaponMapper);
+    }
+    static weaponKills(events) {
+        const wepKills = new StatMap_1.default();
+        for (const event of events) {
+            if (event.type == "kill") {
+                wepKills.increment(event.weaponID);
+            }
+        }
+        return statMapToBreakdown(wepKills, WeaponAPI_1.WeaponAPI.getByIDs, (elem, ID) => elem.ID == ID, defaultWeaponMapper);
+    }
+    static weaponHeadshot(events) {
+        const total = new StatMap_1.default();
+        const hs = new StatMap_1.default();
+        const weapons = new Set();
+        for (const ev of events) {
+            if (ev.type == "kill") {
+                if (ev.isHeadshot == true) {
+                    hs.increment(ev.weaponID);
+                }
+                total.increment(ev.weaponID);
+                weapons.add(ev.weaponID);
+            }
+        }
+        const response = new ApiWrapper_1.ApiResponse();
+        const arr = new BreakdownArray();
+        WeaponAPI_1.WeaponAPI.getByIDs(Array.from(weapons.values())).ok((data) => {
+            total.getMap().forEach((kills, weaponID) => {
+                var _a;
+                const hsKills = hs.get(weaponID, 0);
+                const hsr = hsKills / kills;
+                const weapon = data.find(iter => iter.ID == weaponID);
+                const entry = {
+                    amount: kills,
+                    display: `${(_a = weapon === null || weapon === void 0 ? void 0 : weapon.name) !== null && _a !== void 0 ? _a : `Weapon ${weaponID}`} ${hsKills}/${kills} (${(hsr * 100).toFixed(2)}%)`,
+                    color: undefined,
+                    sortField: `${kills}`
+                };
+                arr.data.push(entry);
+            });
+            arr.total = 1;
+            response.resolveOk(arr);
+        });
+        return response;
+    }
+    static weaponTeamkills(events) {
+        const wepKills = new StatMap_1.default();
+        for (const ev of events) {
+            if (ev.type == "teamkill") {
+                wepKills.increment(ev.weaponID);
+            }
+        }
+        return statMapToBreakdown(wepKills, WeaponAPI_1.WeaponAPI.getByIDs, (elem, ID) => elem.ID == ID, defaultWeaponMapper);
+    }
+    static weaponDeaths(events, revived = undefined) {
+        const amounts = new StatMap_1.default();
+        for (const event of events) {
+            if (event.type == "death" && (revived == undefined || revived == event.revived)) {
+                amounts.increment(event.weaponID);
+            }
+        }
+        return statMapToBreakdown(amounts, WeaponAPI_1.WeaponAPI.getByIDs, (elem, ID) => elem.ID == ID, defaultWeaponMapper);
+    }
+    static weaponTypeKills(events) {
+        const amounts = new StatMap_1.default();
+        const response = new ApiWrapper_1.ApiResponse();
+        const weaponIDs = [];
+        for (const event of events) {
+            if (event.type == "kill") {
+                weaponIDs.push(event.weaponID);
+            }
+        }
+        const arr = new BreakdownArray();
+        WeaponAPI_1.WeaponAPI.getByIDs(weaponIDs).ok((data) => {
+            for (const event of events) {
+                if (event.type == "kill") {
+                    const weapon = data.find(iter => iter.ID == event.weaponID);
+                    if (weapon == undefined) {
+                        amounts.increment("Unknown");
+                    }
+                    else {
+                        amounts.increment(weapon.type);
+                    }
+                    ++arr.total;
+                }
+            }
+            amounts.getMap().forEach((count, wepType) => {
+                arr.data.push({
+                    display: wepType,
+                    amount: count,
+                    sortField: wepType,
+                    color: undefined
+                });
+            });
+            arr.data.sort((a, b) => {
+                const diff = b.amount - a.amount;
+                if (diff == 0) {
+                    return b.display.localeCompare(a.display);
+                }
+                return diff;
+            });
+            response.resolveOk(arr);
+        });
+        return response;
+    }
+    static weaponTypeDeaths(events, revived = undefined) {
+        const amounts = new StatMap_1.default();
+        const response = new ApiWrapper_1.ApiResponse();
+        const weaponIDs = [];
+        for (const event of events) {
+            if (event.type == "death" && (revived == undefined || event.revived == revived)) {
+                weaponIDs.push(event.weaponID);
+            }
+        }
+        const arr = new BreakdownArray();
+        WeaponAPI_1.WeaponAPI.getByIDs(weaponIDs).ok((data) => {
+            for (const event of events) {
+                if (event.type == "death" && (revived == undefined || event.revived == revived)) {
+                    const weapon = data.find(iter => iter.ID == event.weaponID);
+                    if (weapon == undefined) {
+                        amounts.increment("Unknown");
+                    }
+                    else {
+                        amounts.increment(weapon.type);
+                    }
+                    ++arr.total;
+                }
+            }
+            amounts.getMap().forEach((count, wepType) => {
+                arr.data.push({
+                    display: wepType,
+                    amount: count,
+                    sortField: wepType,
+                    color: undefined
+                });
+            });
+            arr.data.sort((a, b) => {
+                const diff = b.amount - a.amount;
+                if (diff == 0) {
+                    return b.display.localeCompare(a.display);
+                }
+                return diff;
+            });
+            response.resolveOk(arr);
+        });
+        return response;
+    }
+    static classPlaytimes(times) {
+        const response = new ApiWrapper_1.ApiResponse();
+        const arr = new BreakdownArray();
+        const infil = {
+            amount: 0,
+            color: undefined,
+            display: "Infiltrator",
+            sortField: "infil"
+        };
+        const la = {
+            amount: 0,
+            color: undefined,
+            display: "Light Assault",
+            sortField: "LA"
+        };
+        const medic = {
+            amount: 0,
+            color: undefined,
+            display: "Medic playtime",
+            sortField: "medic"
+        };
+        const eng = {
+            amount: 0,
+            color: undefined,
+            display: "Engineer",
+            sortField: "engineer"
+        };
+        const heavy = {
+            amount: 0,
+            color: undefined,
+            display: "Heavy Assault",
+            sortField: "heavy"
+        };
+        const max = {
+            amount: 0,
+            color: undefined,
+            display: "MAX",
+            sortField: "max"
+        };
+        for (const time of times) {
+            infil.amount += time.infil.secondsAs;
+            la.amount += time.lightAssault.secondsAs;
+            medic.amount += time.medic.secondsAs;
+            eng.amount += time.engineer.secondsAs;
+            heavy.amount += time.heavy.secondsAs;
+            max.amount += time.max.secondsAs;
+        }
+        arr.data.push(infil, la, medic, eng, heavy, max);
+        arr.total = infil.amount + la.amount + medic.amount + eng.amount + heavy.amount + max.amount;
+        arr.display = (seconds) => {
+            const hours = Math.floor(seconds / 3600);
+            const mins = Math.floor((seconds - (3600 * hours)) / 60);
+            return `${hours.toFixed(0).padStart(2, "0")}:${mins.toFixed(0).padStart(2, "0")}:${(seconds % 60).toFixed(0).padStart(2, "0")}`;
+        };
+        response.resolveOk(arr);
+        return response;
+    }
+    static factionKills(events) {
+        const response = new ApiWrapper_1.ApiResponse();
+        const arr = new BreakdownArray();
+        const countKills = function (ev, faction) {
+            if (ev.type != "kill") {
+                return false;
+            }
+            const loadout = PsLoadout_1.PsLoadouts.get(ev.targetLoadoutID);
+            return loadout != undefined && loadout.faction == faction;
+        };
+        arr.data.push({
+            amount: events.filter(iter => countKills(iter, "VS")).length,
+            color: "#AE06B3",
+            display: "VS",
+            sortField: "VS"
+        });
+        arr.data.push({
+            amount: events.filter(iter => countKills(iter, "NC")).length,
+            color: "#1A39F9",
+            display: "NC",
+            sortField: "NC"
+        });
+        arr.data.push({
+            amount: events.filter(iter => countKills(iter, "TR")).length,
+            color: "#CE2304",
+            display: "TR",
+            sortField: "TR"
+        });
+        arr.data.push({
+            amount: events.filter(iter => countKills(iter, "NS")).length,
+            color: "#6A6A6A",
+            display: "NS",
+            sortField: "NS"
+        });
+        arr.total = events.filter(iter => iter.type == "kill").length;
+        response.resolveOk(arr);
+        return response;
+    }
+    static factionDeaths(events) {
+        const response = new ApiWrapper_1.ApiResponse();
+        const countDeaths = function (ev, faction) {
+            if (ev.type != "death" || ev.revived == true) {
+                return false;
+            }
+            const loadout = PsLoadout_1.PsLoadouts.get(ev.targetLoadoutID);
+            return loadout != undefined && loadout.faction == faction;
+        };
+        const arr = new BreakdownArray();
+        arr.data.push({
+            amount: events.filter(iter => countDeaths(iter, "VS")).length,
+            color: "#AE06B3",
+            display: "VS",
+            sortField: "VS"
+        });
+        arr.data.push({
+            amount: events.filter(iter => countDeaths(iter, "NC")).length,
+            color: "#1A39F9",
+            display: "NC",
+            sortField: "NC"
+        });
+        arr.data.push({
+            amount: events.filter(iter => countDeaths(iter, "TR")).length,
+            color: "#CE2304",
+            display: "TR",
+            sortField: "TR"
+        });
+        arr.data.push({
+            amount: events.filter(iter => countDeaths(iter, "NS")).length,
+            color: "#6A6A6A",
+            display: "NS",
+            sortField: "NS"
+        });
+        arr.total = events.filter(iter => iter.type == "death" && iter.revived == false).length;
+        response.resolveOk(arr);
+        return response;
+    }
+    static continentKills(events) {
+        const response = new ApiWrapper_1.ApiResponse();
+        const countKills = function (ev, zoneID) {
+            return ev.type == "kill" && ev.zoneID == zoneID;
+        };
+        const arr = new BreakdownArray();
+        arr.data.push({
+            amount: events.filter(iter => countKills(iter, "2")).length,
+            color: "#F4E11D",
+            display: "Indar",
+            sortField: "Indar"
+        });
+        arr.data.push({
+            amount: events.filter(iter => countKills(iter, "4")).length,
+            color: "#09B118",
+            display: "Hossin",
+            sortField: "Hossin"
+        });
+        arr.data.push({
+            amount: events.filter(iter => countKills(iter, "6")).length,
+            color: "#2DE53E",
+            display: "Amerish",
+            sortField: "Amerish"
+        });
+        arr.data.push({
+            amount: events.filter(iter => countKills(iter, "8")).length,
+            color: "#D8E9EC",
+            display: "Esamir",
+            sortField: "Esamir"
+        });
+        arr.total = events.filter(iter => iter.type == "kill").length;
+        response.resolveOk(arr);
+        return response;
+    }
+    static continentDeaths(events) {
+        const response = new ApiWrapper_1.ApiResponse();
+        const countDeaths = function (ev, zoneID) {
+            return ev.type == "death" && ev.revived == false && ev.zoneID == zoneID;
+        };
+        const arr = new BreakdownArray();
+        arr.data.push({
+            amount: events.filter(iter => countDeaths(iter, "2")).length,
+            color: "#F4E11D",
+            display: "Indar",
+            sortField: "Indar"
+        });
+        arr.data.push({
+            amount: events.filter(iter => countDeaths(iter, "4")).length,
+            color: "#09B118",
+            display: "Hossin",
+            sortField: "Hossin"
+        });
+        arr.data.push({
+            amount: events.filter(iter => countDeaths(iter, "6")).length,
+            color: "#2DE53E",
+            display: "Amerish",
+            sortField: "Amerish"
+        });
+        arr.data.push({
+            amount: events.filter(iter => countDeaths(iter, "8")).length,
+            color: "#D8E9EC",
+            display: "Esamir",
+            sortField: "Esamir"
+        });
+        arr.total = events.filter(iter => iter.type == "death" && iter.revived == false).length;
+        response.resolveOk(arr);
+        return response;
+    }
+    static characterKills(events) {
+        const amounts = new StatMap_1.default();
+        for (const event of events) {
+            if (event.type == "kill") {
+                amounts.increment(event.targetID);
+            }
+        }
+        return statMapToBreakdown(amounts, CharacterAPI_1.CharacterAPI.getByIDs, (elem, ID) => elem.ID == ID, defaultCharacterMapper);
+    }
+    static characterDeaths(events) {
+        const amounts = new StatMap_1.default();
+        for (const event of events) {
+            if (event.type == "death" && event.revived == false) {
+                amounts.increment(event.targetID);
+            }
+        }
+        return statMapToBreakdown(amounts, CharacterAPI_1.CharacterAPI.getByIDs, (elem, ID) => elem.ID == ID, defaultCharacterMapper);
+    }
+    static kpmOverTime(events, timeWidth = 300000) {
+        const kills = events.filter(iter => iter.type == "kill")
+            .sort((a, b) => a.timestamp - b.timestamp);
+        const players = new Set();
+        if (kills.length == 0) {
+            return [];
+        }
+        const slots = [];
+        const minutes = timeWidth / 60000;
+        const stop = kills[kills.length - 1].timestamp;
+        let start = events[0].timestamp;
+        let count = 0;
+        while (true) {
+            const end = start + timeWidth;
+            const section = kills.filter(iter => iter.timestamp >= start && iter.timestamp < end);
+            for (const ev of section) {
+                players.add(ev.sourceID);
+                ++count;
+            }
+            slots.push({
+                startTime: start,
+                endTime: end,
+                value: Number.parseFloat((count / (players.size || 1) / minutes).toFixed(2))
+            });
+            count = 0;
+            players.clear();
+            start += timeWidth;
+            if (start > stop) {
+                break;
+            }
+        }
+        return slots;
+    }
+    static kdOverTime(events, timeWidth = 300000) {
+        const evs = events.filter(iter => iter.type == "kill" || (iter.type == "death" && iter.revived == false));
+        if (evs.length == 0) {
+            return [];
+        }
+        const slots = [];
+        const stop = evs[evs.length - 1].timestamp;
+        let start = events[0].timestamp;
+        while (true) {
+            const end = start + timeWidth;
+            const section = evs.filter(iter => iter.timestamp >= start && iter.timestamp < end);
+            const kills = section.filter(iter => iter.type == "kill");
+            const deaths = section.filter(iter => iter.type == "death" && iter.revived == false);
+            slots.push({
+                startTime: start,
+                endTime: end,
+                value: Number.parseFloat((kills.length / (deaths.length || 1)).toFixed(2))
+            });
+            start += timeWidth;
+            if (start > stop) {
+                break;
+            }
+        }
+        return slots;
+    }
+    static kdPerUpdate(allEvents) {
+        const events = allEvents.filter(iter => iter.type == "kill" || (iter.type == "death" && iter.revived == false));
+        if (events.length == 0) {
+            return [];
+        }
+        let kills = 0;
+        let deaths = 0;
+        const slots = [];
+        for (let i = events[0].timestamp; i < events[events.length - 1].timestamp; i += 1000) {
+            const evs = events.filter(iter => iter.timestamp == i);
+            if (evs.length == 0) {
+                continue;
+            }
+            for (const ev of evs) {
+                if (ev.type == "kill") {
+                    ++kills;
+                }
+                else if (ev.type == "death") {
+                    ++deaths;
+                }
+            }
+            slots.push({
+                value: Number.parseFloat((kills / (deaths || 1)).toFixed(2)),
+                startTime: i,
+                endTime: i
+            });
+        }
+        return slots;
+    }
+    static revivesOverTime(events, timeWidth = 300000) {
+        const revives = events.filter(iter => iter.type == "exp" && (iter.expID == PsEvent_1.PsEvent.revive || iter.expID == PsEvent_1.PsEvent.squadRevive));
+        if (revives.length == 0) {
+            return [];
+        }
+        const slots = [];
+        const stop = revives[revives.length - 1].timestamp;
+        let start = events[0].timestamp;
+        while (true) {
+            const end = start + timeWidth;
+            const section = revives.filter(iter => iter.timestamp >= start && iter.timestamp < end);
+            const players = section.map(iter => iter.sourceID)
+                .filter((value, index, arr) => arr.indexOf(value) == index).length;
+            slots.push({
+                startTime: start,
+                endTime: end,
+                value: Number.parseFloat((section.length / (players || 1) / 5).toFixed(2))
+            });
+            start += timeWidth;
+            if (start > stop) {
+                break;
+            }
+        }
+        return slots;
+    }
+}
+exports.default = EventReporter;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/InvididualGenerator.js":
+/*!******************************************************!*\
+  !*** ../topt-core/build/core/InvididualGenerator.js ***!
+  \******************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.IndividualReporter = exports.ReportParameters = exports.BreakdownSingle = exports.BreakdownMeta = exports.BreakdownSection = exports.BreakdownCollection = exports.BreakdownSpawn = exports.PlayerVersus = exports.PlayerVersusEntry = exports.Report = exports.ClassUsage = exports.Playtime = exports.TrackedRouter = exports.classCollectionBreakdownTrend = exports.classKdCollection = exports.TimeTracking = exports.ExpBreakdown = exports.FacilityCapture = exports.ClassBreakdown = void 0;
+const ApiWrapper_1 = __webpack_require__(/*! ./census/ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
+const CharacterAPI_1 = __webpack_require__(/*! ./census/CharacterAPI */ "../topt-core/build/core/census/CharacterAPI.js");
+const WeaponAPI_1 = __webpack_require__(/*! ./census/WeaponAPI */ "../topt-core/build/core/census/WeaponAPI.js");
+const AchievementAPI_1 = __webpack_require__(/*! ./census/AchievementAPI */ "../topt-core/build/core/census/AchievementAPI.js");
+const PsLoadout_1 = __webpack_require__(/*! ./census/PsLoadout */ "../topt-core/build/core/census/PsLoadout.js");
+const PsEvent_1 = __webpack_require__(/*! ./PsEvent */ "../topt-core/build/core/PsEvent.js");
+const StatMap_1 = __webpack_require__(/*! ./StatMap */ "../topt-core/build/core/StatMap.js");
+const EventReporter_1 = __webpack_require__(/*! ./EventReporter */ "../topt-core/build/core/EventReporter.js");
+const TrackedPlayer_1 = __webpack_require__(/*! ./objects/TrackedPlayer */ "../topt-core/build/core/objects/TrackedPlayer.js");
+const Loggers_1 = __webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("IndividualGenerator");
+class ClassBreakdown {
+    constructor() {
+        this.secondsAs = 0;
+        this.score = 0;
+        this.kills = 0;
+        this.deaths = 0;
+    }
+}
+exports.ClassBreakdown = ClassBreakdown;
+class FacilityCapture {
+    constructor() {
+        this.facilityID = "";
+        this.name = "";
+        this.type = "";
+        this.typeID = "";
+        this.zoneID = "";
+        this.timestamp = new Date();
+        this.timeHeld = 0;
+        this.factionID = "";
+        this.outfitID = "";
+        this.previousFaction = "";
+    }
+}
+exports.FacilityCapture = FacilityCapture;
+class ExpBreakdown {
+    constructor() {
+        this.name = "";
+        this.score = 0;
+        this.amount = 0;
+    }
+}
+exports.ExpBreakdown = ExpBreakdown;
+class TimeTracking {
+    constructor() {
+        this.running = false;
+        this.startTime = 0;
+        this.endTime = 0;
+    }
+}
+exports.TimeTracking = TimeTracking;
+function classKdCollection() {
+    return {
+        infil: new ClassBreakdown(),
+        lightAssault: new ClassBreakdown(),
+        medic: new ClassBreakdown(),
+        engineer: new ClassBreakdown(),
+        heavy: new ClassBreakdown(),
+        max: new ClassBreakdown(),
+        total: new ClassBreakdown()
+    };
+}
+exports.classKdCollection = classKdCollection;
+;
+function classCollectionBreakdownTrend() {
+    return {
+        total: [],
+        infil: [],
+        lightAssault: [],
+        medic: [],
+        engineer: [],
+        heavy: [],
+        max: []
+    };
+}
+exports.classCollectionBreakdownTrend = classCollectionBreakdownTrend;
+class TrackedRouter {
+    constructor() {
+        this.ID = "";
+        this.type = "router";
+        this.owner = "";
+        this.pulledAt = 0;
+        this.firstSpawn = undefined;
+        this.destroyed = undefined;
+        this.count = 0;
+    }
+}
+exports.TrackedRouter = TrackedRouter;
+class Playtime {
+    constructor() {
+        this.characterID = "";
+        this.secondsOnline = 0;
+        this.infil = new ClassBreakdown();
+        this.lightAssault = new ClassBreakdown();
+        this.medic = new ClassBreakdown();
+        this.engineer = new ClassBreakdown();
+        this.heavy = new ClassBreakdown();
+        this.max = new ClassBreakdown();
+        this.mostPlayed = {
+            name: "",
+            secondsAs: 0,
+        };
+    }
+}
+exports.Playtime = Playtime;
+class ClassUsage {
+    constructor() {
+        this.mostPlayed = {
+            name: "",
+            secondsAs: 0
+        };
+        this.infil = new ClassBreakdown();
+        this.lightAssault = new ClassBreakdown();
+        this.medic = new ClassBreakdown();
+        this.engineer = new ClassBreakdown();
+        this.heavy = new ClassBreakdown();
+        this.max = new ClassBreakdown();
+    }
+}
+exports.ClassUsage = ClassUsage;
+class Report {
+    constructor() {
+        this.opened = false;
+        this.player = null;
+        this.stats = new Map();
+        this.classBreakdown = new ClassUsage();
+        this.classKd = classKdCollection();
+        this.logistics = {
+            show: false,
+            routers: [],
+            metas: []
+        };
+        this.overtime = {
+            kpm: [],
+            kd: [],
+            rpm: []
+        };
+        this.perUpdate = {
+            kpm: [],
+            kd: [],
+            rpm: []
+        };
+        this.collections = [];
+        this.vehicleBreakdown = new EventReporter_1.BreakdownArray();
+        this.scoreBreakdown = [];
+        this.ribbons = [];
+        this.ribbonCount = 0;
+        this.breakdowns = [];
+        this.weaponKillBreakdown = new EventReporter_1.BreakdownArray();
+        this.weaponKillTypeBreakdown = new EventReporter_1.BreakdownArray();
+        this.weaponHeadshotBreakdown = new EventReporter_1.BreakdownArray();
+        this.weaponDeathBreakdown = new EventReporter_1.BreakdownArray();
+        this.weaponDeathTypeBreakdown = new EventReporter_1.BreakdownArray();
+        this.playerVersus = [];
+    }
+}
+exports.Report = Report;
+class PlayerVersusEntry {
+    constructor() {
+        this.timestamp = 0;
+        this.type = "unknown";
+        this.weaponName = "";
+        this.headshot = false;
+    }
+}
+exports.PlayerVersusEntry = PlayerVersusEntry;
+class PlayerVersus {
+    constructor() {
+        this.charID = "";
+        this.name = "";
+        this.kills = 0;
+        this.deaths = 0;
+        this.revives = 0;
+        this.weaponKills = new EventReporter_1.BreakdownArray();
+        this.weaponDeaths = new EventReporter_1.BreakdownArray();
+        this.encounters = [];
+    }
+}
+exports.PlayerVersus = PlayerVersus;
+class BreakdownSpawn {
+    constructor() {
+        this.npcID = "";
+        this.count = 0;
+        this.firstSeen = new Date();
+    }
+}
+exports.BreakdownSpawn = BreakdownSpawn;
+class BreakdownCollection {
+    constructor() {
+        this.title = "";
+        this.sections = [];
+    }
+}
+exports.BreakdownCollection = BreakdownCollection;
+class BreakdownSection {
+    constructor() {
+        this.title = "";
+        this.left = null;
+        this.right = null;
+        this.showPercent = true;
+        this.showTotal = true;
+    }
+}
+exports.BreakdownSection = BreakdownSection;
+class BreakdownMeta {
+    constructor() {
+        this.title = "";
+        this.altTitle = "Count";
+        this.data = new EventReporter_1.BreakdownArray();
+    }
+}
+exports.BreakdownMeta = BreakdownMeta;
+class BreakdownSingle {
+    constructor() {
+        this.title = "";
+        this.altTitle = "";
+        this.data = new EventReporter_1.BreakdownArray();
+        this.showPercent = true;
+        this.showTotal = true;
+    }
+}
+exports.BreakdownSingle = BreakdownSingle;
+class ReportParameters {
+    constructor() {
+        /**
+         * Player the report is being generated for
+         */
+        this.player = new TrackedPlayer_1.TrackedPlayer();
+        /**
+         * Contains all events collected during tracking. If you need just the player's events, use player
+         */
+        this.events = [];
+        /**
+         * Tracking information about the current state the tracker
+         */
+        this.tracking = { running: false, startTime: 0, endTime: 0 };
+        /**
+         * All routers tracked
+         */
+        this.routers = [];
+    }
+}
+exports.ReportParameters = ReportParameters;
+class IndividualReporter {
+    static generatePersonalReport(parameters) {
+        const response = new ApiWrapper_1.ApiResponse();
+        if (parameters.player.events.length == 0) {
+            response.resolve({ code: 400, data: "No events for player, cannot generate" });
+            return response;
+        }
+        const report = new Report();
+        let opsLeft = 
+        //1       // Transport assists
+        +1 // Supported by
+            + 1 // Misc collection
+            + 1 // Weapon kills
+            + 1 // Weapon type kills
+            + 1 // Weapon deaths
+            + 1 // Weapon death types
+            + 1 // Ribbons
+            + 1 // Medic breakdown
+            + 1 // Engineer breakdown
+            + 1 // Player versus
+            + 1 // Weapon HS breakdown
+        ;
+        const totalOps = opsLeft;
+        const firstPlayerEvent = parameters.player.events[0];
+        const lastPlayerEvent = parameters.player.events[parameters.player.events.length - 1];
+        report.player = Object.assign({}, parameters.player);
+        report.player.events = [];
+        report.player.secondsOnline = (lastPlayerEvent.timestamp - firstPlayerEvent.timestamp) / 1000;
+        report.classBreakdown = IndividualReporter.classUsage(parameters);
+        report.classKd = IndividualReporter.classVersusKd(parameters.player.events);
+        report.scoreBreakdown = IndividualReporter.scoreBreakdown(parameters);
+        report.player.stats.getMap().forEach((value, eventID) => {
+            var _a;
+            const event = PsEvent_1.PsEvents.get(eventID);
+            if (event == undefined) {
+                return;
+            }
+            report.stats.set(event.name, `${value}`);
+            (_a = report.player) === null || _a === void 0 ? void 0 : _a.stats.set(event.name, value);
+        });
+        const calculatedStats = IndividualReporter.calculatedStats(parameters, report.classBreakdown);
+        calculatedStats.forEach((value, key) => {
+            report.stats.set(key, value);
+        });
+        report.logistics.routers = IndividualReporter.routerBreakdown(parameters);
+        const callback = (step) => {
+            return () => {
+                log.debug(`Finished ${step}: Have ${opsLeft - 1} ops left outta ${totalOps}`);
+                if (--opsLeft == 0) {
+                    response.resolveOk(report);
+                }
+            };
+        };
+        IndividualReporter.supportedBy(parameters)
+            .ok(data => report.collections.push(data)).always(callback("Supported by"));
+        IndividualReporter.miscCollection(parameters)
+            .ok(data => report.collections.push(data)).always(callback("Misc coll"));
+        EventReporter_1.default.weaponHeadshot(parameters.player.events)
+            .ok(data => report.weaponHeadshotBreakdown = data).always(callback("Weapon headshots"));
+        EventReporter_1.default.weaponKills(parameters.player.events)
+            .ok(data => report.weaponKillBreakdown = data).always(callback("Weapon kills"));
+        EventReporter_1.default.weaponTypeKills(parameters.player.events)
+            .ok(data => report.weaponKillTypeBreakdown = data).always(callback("Weapon type kills"));
+        EventReporter_1.default.weaponDeaths(parameters.player.events)
+            .ok(data => report.weaponDeathBreakdown = data).always(callback("Weapon deaths"));
+        EventReporter_1.default.weaponTypeDeaths(parameters.player.events)
+            .ok(data => report.weaponDeathTypeBreakdown = data).always(callback("Weapon type deaths"));
+        IndividualReporter.playerVersus(parameters).ok(data => report.playerVersus = data).always(callback("Player versus"));
+        report.overtime.kd = EventReporter_1.default.kdOverTime(parameters.player.events);
+        report.overtime.kpm = EventReporter_1.default.kpmOverTime(parameters.player.events);
+        if (parameters.player.events.find(iter => iter.type == "exp" && (iter.expID == PsEvent_1.PsEvent.revive || iter.expID == PsEvent_1.PsEvent.squadRevive)) != undefined) {
+            report.overtime.rpm = EventReporter_1.default.revivesOverTime(parameters.player.events);
+        }
+        report.perUpdate.kd = EventReporter_1.default.kdPerUpdate(parameters.player.events);
+        const ribbonIDs = Array.from(parameters.player.ribbons.getMap().keys());
+        if (ribbonIDs.length > 0) {
+            AchievementAPI_1.AchievementAPI.getByIDs(ribbonIDs).ok((data) => {
+                var _a;
+                (_a = report.player) === null || _a === void 0 ? void 0 : _a.ribbons.getMap().forEach((amount, achivID) => {
+                    const achiv = data.find((iter) => iter.ID == achivID) || AchievementAPI_1.AchievementAPI.unknown;
+                    const entry = Object.assign(Object.assign({}, achiv), { amount: amount });
+                    report.ribbonCount += amount;
+                    report.ribbons.push(entry);
+                });
+                report.ribbons.sort((a, b) => {
+                    return (b.amount - a.amount) || b.name.localeCompare(a.name);
+                });
+            }).always(() => {
+                callback("Ribbons")();
+            });
+        }
+        else {
+            callback("Ribbons")();
+        }
+        if (report.classBreakdown.medic.secondsAs > 10) {
+            IndividualReporter.medicBreakdown(parameters)
+                .ok(data => report.breakdowns.push(data)).always(callback("Medic breakdown"));
+        }
+        else {
+            callback("Medic breakdown")();
+        }
+        if (report.classBreakdown.engineer.secondsAs > 10) {
+            IndividualReporter.engineerBreakdown(parameters)
+                .ok(data => report.breakdowns.push(data)).always(callback("Eng breakdown"));
+        }
+        else {
+            callback("Eng breakdown")();
+        }
+        return response;
+    }
+    static playerVersus(parameters) {
+        const response = new ApiWrapper_1.ApiResponse();
+        const versus = [];
+        const charIDs = [];
+        const wepIDs = [];
+        for (const ev of parameters.player.events) {
+            if (ev.sourceID != parameters.player.characterID) {
+                continue;
+            }
+            if (ev.type != "kill" && ev.type != "death") {
+                continue;
+            }
+            charIDs.push(ev.targetID);
+            wepIDs.push(ev.weaponID);
+        }
+        let characters = [];
+        let weapons = [];
+        let opsLeft = 2;
+        const killsMap = new Map();
+        const deathsMap = new Map();
+        const done = () => {
+            var _a, _b, _c, _d, _e, _f;
+            for (const ev of parameters.player.events) {
+                if (ev.sourceID != parameters.player.characterID) {
+                    continue;
+                }
+                if (ev.type != "kill" && ev.type != "death") {
+                    continue;
+                }
+                let entry = versus.find(iter => iter.charID == ev.targetID);
+                if (entry == undefined) {
+                    entry = new PlayerVersus();
+                    entry.charID = ev.targetID;
+                    entry.name = (_b = (_a = characters.find(iter => iter.ID == ev.targetID)) === null || _a === void 0 ? void 0 : _a.name) !== null && _b !== void 0 ? _b : `Unknown ${ev.targetID}`;
+                    killsMap.set(ev.targetID, new StatMap_1.default());
+                    deathsMap.set(ev.targetID, new StatMap_1.default());
+                    versus.push(entry);
+                }
+                const weaponName = (_d = (_c = weapons.find(iter => iter.ID == ev.weaponID)) === null || _c === void 0 ? void 0 : _c.name) !== null && _d !== void 0 ? _d : `Unknown ${ev.weaponID}`;
+                let type = "unknown";
+                if (ev.type == "kill") {
+                    ++entry.kills;
+                    type = "kill";
+                    killsMap.get(ev.targetID).increment(weaponName);
+                }
+                else if (ev.type == "death") {
+                    if (ev.revived == true) {
+                        ++entry.revives;
+                        type = "revived";
+                    }
+                    else {
+                        ++entry.deaths;
+                        type = "death";
+                        deathsMap.get(ev.targetID).increment(weaponName);
+                    }
+                }
+                else {
+                    log.error(`Unchecked event type: '${ev}'`);
+                }
+                const encounter = {
+                    timestamp: ev.timestamp,
+                    headshot: ev.isHeadshot,
+                    type: type,
+                    weaponName: (_f = (_e = weapons.find(iter => iter.ID == ev.weaponID)) === null || _e === void 0 ? void 0 : _e.name) !== null && _f !== void 0 ? _f : `Unknown ${ev.weaponID}`
+                };
+                entry.encounters.push(encounter);
+            }
+            for (const entry of versus) {
+                if (killsMap.has(entry.charID) == false) {
+                    log.error(`Missing killsMap entry for ${entry.name}`);
+                    continue;
+                }
+                if (deathsMap.has(entry.charID) == false) {
+                    log.error(`Missing deathsMap entry for ${entry.name}`);
+                    continue;
+                }
+                const killMap = killsMap.get(entry.charID);
+                const deathMap = deathsMap.get(entry.charID);
+                const killBreakdown = new EventReporter_1.BreakdownArray();
+                killMap.getMap().forEach((amount, weapon) => {
+                    killBreakdown.data.push({
+                        display: weapon,
+                        amount: amount,
+                        sortField: weapon,
+                        color: undefined
+                    });
+                    killBreakdown.total += amount;
+                });
+                entry.weaponKills = killBreakdown;
+                const deathBreakdown = new EventReporter_1.BreakdownArray();
+                deathMap.getMap().forEach((amount, weapon) => {
+                    deathBreakdown.data.push({
+                        display: weapon,
+                        amount: amount,
+                        sortField: weapon,
+                        color: undefined
+                    });
+                    deathBreakdown.total += amount;
+                });
+                entry.weaponDeaths = deathBreakdown;
+            }
+            response.resolveOk(versus);
+        };
+        CharacterAPI_1.CharacterAPI.getByIDs(charIDs).ok((data) => {
+            characters = data;
+            if (--opsLeft == 0) {
+                done();
+            }
+        });
+        WeaponAPI_1.WeaponAPI.getByIDs(wepIDs).ok((data) => {
+            weapons = data;
+            if (--opsLeft == 0) {
+                done();
+            }
+        });
+        return response;
+    }
+    static medicBreakdown(parameters) {
+        const response = new ApiWrapper_1.ApiResponse();
+        const medicCollection = new BreakdownCollection();
+        medicCollection.title = "Medic";
+        let opsLeft = 1 // Heals
+            + 1 // Revives
+            + 1; // Shield repair
+        const add = (data) => {
+            medicCollection.sections.push(data);
+        };
+        const callback = () => {
+            if (--opsLeft == 0) {
+                response.resolveOk(medicCollection);
+            }
+        };
+        IndividualReporter.breakdownSection(parameters, "Heal ticks", PsEvent_1.PsEvent.heal, PsEvent_1.PsEvent.squadHeal).ok(add).always(callback);
+        IndividualReporter.breakdownSection(parameters, "Revives", PsEvent_1.PsEvent.revive, PsEvent_1.PsEvent.squadRevive).ok(add).always(callback);
+        IndividualReporter.breakdownSection(parameters, "Shield repair ticks", PsEvent_1.PsEvent.shieldRepair, PsEvent_1.PsEvent.squadShieldRepair).ok(add).always(callback);
+        return response;
+    }
+    static engineerBreakdown(parameters) {
+        const response = new ApiWrapper_1.ApiResponse();
+        const engCollection = new BreakdownCollection();
+        engCollection.title = "Engineer";
+        let opsLeft = 1 // Resupply
+            + 1; // Repair MAX
+        const add = (data) => {
+            engCollection.sections.push(data);
+        };
+        const callback = () => {
+            if (--opsLeft == 0) {
+                response.resolveOk(engCollection);
+            }
+        };
+        IndividualReporter.breakdownSection(parameters, "Resupply ticks", PsEvent_1.PsEvent.resupply, PsEvent_1.PsEvent.squadResupply).ok(add).always(callback);
+        IndividualReporter.breakdownSection(parameters, "MAX repair ticks", PsEvent_1.PsEvent.maxRepair, PsEvent_1.PsEvent.squadMaxRepair).ok(add).always(callback);
+        return response;
+    }
+    static breakdownSection(parameters, name, expID, squadExpID) {
+        const response = new ApiWrapper_1.ApiResponse();
+        const ticks = parameters.player.events.filter(iter => iter.type == "exp" && iter.expID == expID);
+        if (ticks.length > 0) {
+            const section = new BreakdownSection();
+            section.title = name;
+            let opsLeft = 2;
+            const callback = () => {
+                if (--opsLeft == 0) {
+                    response.resolveOk(section);
+                }
+            };
+            section.left = new BreakdownMeta();
+            section.left.title = "All";
+            EventReporter_1.default.experience(expID, ticks).ok((data) => {
+                section.left.data = data;
+            }).always(callback);
+            section.right = new BreakdownMeta();
+            section.right.title = "Squad only";
+            EventReporter_1.default.experience(squadExpID, ticks).ok((data) => {
+                section.right.data = data;
+            }).always(callback);
+        }
+        else {
+            response.resolve({ code: 204, data: null });
+        }
+        return response;
+    }
+    static miscCollection(parameters) {
+        const response = new ApiWrapper_1.ApiResponse();
+        const coll = {
+            header: "Misc",
+            metas: []
+        };
+        let opsLeft = 1; // Deployabled destroyed
+        const dep = IndividualReporter.deployableDestroyedBreakdown(parameters);
+        if (dep != null) {
+            coll.metas.push(dep);
+        }
+        if (coll.metas.length > 0) {
+            response.resolveOk(coll);
+        }
+        else {
+            response.resolve({ code: 204, data: null });
+        }
+        return response;
+    }
+    static supportedBy(parameters) {
+        const response = new ApiWrapper_1.ApiResponse();
+        const coll = {
+            header: "Supported by",
+            metas: []
+        };
+        let opsLeft = 1 // Healed by
+            + 1 // Revived by
+            + 1 // Shield repaired by
+            + 1 // Resupplied by
+            + 1; // Repaired by
+        const add = (data) => {
+            coll.metas.push(data);
+        };
+        const callback = () => {
+            if (--opsLeft == 0) {
+                response.resolveOk(coll);
+            }
+        };
+        IndividualReporter.singleSupportedBy(parameters, "Healed by", [PsEvent_1.PsEvent.heal, PsEvent_1.PsEvent.squadHeal]).ok(add).always(callback);
+        IndividualReporter.singleSupportedBy(parameters, "Revived by", [PsEvent_1.PsEvent.revive, PsEvent_1.PsEvent.squadRevive]).ok(add).always(callback);
+        IndividualReporter.singleSupportedBy(parameters, "Shield repaired by", [PsEvent_1.PsEvent.shieldRepair, PsEvent_1.PsEvent.squadShieldRepair]).ok(add).always(callback);
+        IndividualReporter.singleSupportedBy(parameters, "Resupplied by", [PsEvent_1.PsEvent.resupply, PsEvent_1.PsEvent.squadResupply]).ok(add).always(callback);
+        IndividualReporter.singleSupportedBy(parameters, "Repaired by", [PsEvent_1.PsEvent.maxRepair, PsEvent_1.PsEvent.squadMaxRepair]).ok(add).always(callback);
+        return response;
+    }
+    static singleSupportedBy(parameters, name, ids) {
+        const response = new ApiWrapper_1.ApiResponse();
+        let found = false;
+        for (const ev of parameters.events) {
+            if (ev.type == "exp" && ids.indexOf(ev.expID) > -1 && ev.targetID == parameters.player.characterID) {
+                found = true;
+                break;
+            }
+        }
+        if (found == false) {
+            response.resolve({ code: 204, data: null });
+        }
+        else {
+            const meta = new BreakdownSingle();
+            meta.title = name;
+            meta.altTitle = "Player";
+            meta.data = new EventReporter_1.BreakdownArray();
+            EventReporter_1.default.experienceSource(ids, parameters.player.characterID, parameters.events).ok((data) => {
+                meta.data = data;
+                log.trace(`Found [${data.data.map(iter => `${iter.display}:${iter.amount}`).join(", ")}] for [${ids.join(", ")}]`);
+                response.resolveOk(meta);
+            });
+        }
+        return response;
+    }
+    static deployableDestroyedBreakdown(parameters) {
+        const expIDs = [
+            "57",
+            "270",
+            "327",
+            "370",
+            "437",
+            "579",
+            "1373",
+            "1409",
+        ];
+        const ticks = parameters.player.events.filter((iter) => {
+            if (iter.type != "exp") {
+                return false;
+            }
+            return expIDs.indexOf(iter.expID) > -1;
+        });
+        if (ticks.length > 0) {
+            const meta = new BreakdownSingle();
+            meta.title = "Deployable kills";
+            meta.altTitle = "Deployable";
+            meta.data = new EventReporter_1.BreakdownArray();
+            const map = new StatMap_1.default();
+            for (const tick of ticks) {
+                let name = "unknown";
+                if (tick.expID == "57") {
+                    name = "Engineer turret";
+                }
+                else if (tick.expID == "270") {
+                    name = "Spawn beacon";
+                }
+                else if (tick.expID == "327") {
+                    name = "Tank mine";
+                }
+                else if (tick.expID == "370") {
+                    name = "Motion sensor";
+                }
+                else if (tick.expID == "437") {
+                    name = "Shield bubble";
+                }
+                else if (tick.expID == "579") {
+                    name = "Spitfire";
+                }
+                else if (tick.expID == "1373") {
+                    name = "Hardlight";
+                }
+                else if (tick.expID == "1409") {
+                    name = "Router";
+                }
+                else {
+                    name = `Unknown ${tick.expID}`;
+                }
+                map.increment(name);
+            }
+            map.getMap().forEach((amount, expName) => {
+                meta.data.total += amount;
+                meta.data.data.push({
+                    display: expName,
+                    sortField: expName,
+                    amount: amount,
+                    color: undefined
+                });
+            });
+            meta.data.data.sort((a, b) => {
+                return b.amount - a.amount || a.sortField.localeCompare(b.sortField);
+            });
+            return meta;
+        }
+        return null;
+    }
+    static routerBreakdown(parameters) {
+        const rts = parameters.routers.filter(iter => iter.owner == parameters.player.characterID);
+        return rts;
+    }
+    static calculatedStats(parameters, classKd) {
+        const map = new Map();
+        const stats = parameters.player.stats;
+        map.set("KPM", (stats.get("Kill") / (parameters.player.secondsOnline / 60)).toFixed(2));
+        // K/D = Kills / Deaths
+        map.set("K/D", (stats.get("Kill") / stats.get("Death", 1)).toFixed(2));
+        // KA/D = Kills + Assits / Deaths
+        map.set("KA/D", ((stats.get("Kill") + stats.get("Kill assist")) / stats.get("Death", 1)).toFixed(2));
+        // HSR = Headshots / Kills
+        map.set("HSR", `${(stats.get("Headshot") / stats.get("Kill") * 100).toFixed(2)}%`);
+        // KR/D  = Kills + Revives / Deaths
+        map.set("KR/D", ((classKd.medic.kills + stats.get("Revive"))
+            / (classKd.medic.deaths || 1)).toFixed(2));
+        // R/D = Revives / Death
+        map.set("R/D", (stats.get("Revive") / (classKd.medic.deaths || 1)).toFixed(2));
+        // RPM = Revives / minutes online
+        map.set("RPM", (stats.get("Revive") / (classKd.medic.secondsAs / 60)).toFixed(2));
+        return map;
+    }
+    static scoreBreakdown(parameters) {
+        const breakdown = new Map();
+        for (const event of parameters.player.events) {
+            if (event.type == "exp") {
+                const exp = PsEvent_1.PsEvents.get(event.expID) || PsEvent_1.PsEvent.other;
+                if (!breakdown.has(exp.name)) {
+                    breakdown.set(exp.name, new ExpBreakdown());
+                }
+                const score = breakdown.get(exp.name);
+                score.name = exp.name;
+                score.score += event.amount;
+                score.amount += 1;
+                if (exp == PsEvent_1.PsEvent.other) {
+                    //log.log(`Other: ${JSON.stringify(event)}`);
+                }
+            }
+        }
+        // Sort all the entries by score, followed by amount, then lastly name
+        return [...breakdown.entries()].sort((a, b) => {
+            return b[1].score - a[1].score
+                || b[1].amount - a[1].amount
+                || a[0].localeCompare(b[0]);
+        }).map((a) => a[1]); // Transform the tuple into the ExpBreakdown
+    }
+    static classVersusKd(events, classLimit) {
+        const kds = classKdCollection();
+        events.forEach((event) => {
+            if (event.type == "kill" || event.type == "death") {
+                const sourceLoadoutID = event.loadoutID;
+                const sourceLoadout = PsLoadout_1.PsLoadouts.get(sourceLoadoutID);
+                if (sourceLoadout == undefined) {
+                    return;
+                }
+                const targetLoadoutID = event.targetLoadoutID;
+                const targetLoadout = PsLoadout_1.PsLoadouts.get(targetLoadoutID);
+                if (targetLoadout == undefined) {
+                    return;
+                }
+                if (classLimit != undefined) {
+                    if (sourceLoadout.type != classLimit) {
+                        return; // Continue to next iteration
+                    }
+                }
+                if (event.type == "kill") {
+                    switch (targetLoadout.type) {
+                        case "infil":
+                            kds.infil.kills += 1;
+                            break;
+                        case "lightAssault":
+                            kds.lightAssault.kills += 1;
+                            break;
+                        case "medic":
+                            kds.medic.kills += 1;
+                            break;
+                        case "engineer":
+                            kds.engineer.kills += 1;
+                            break;
+                        case "heavy":
+                            kds.heavy.kills += 1;
+                            break;
+                        case "max":
+                            kds.max.kills += 1;
+                            break;
+                        default: log.warn(`Unknown type`);
+                    }
+                }
+                if (event.type == "death" && event.revived == false) {
+                    switch (targetLoadout.type) {
+                        case "infil":
+                            kds.infil.deaths += 1;
+                            break;
+                        case "lightAssault":
+                            kds.lightAssault.deaths += 1;
+                            break;
+                        case "medic":
+                            kds.medic.deaths += 1;
+                            break;
+                        case "engineer":
+                            kds.engineer.deaths += 1;
+                            break;
+                        case "heavy":
+                            kds.heavy.deaths += 1;
+                            break;
+                        case "max":
+                            kds.max.deaths += 1;
+                            break;
+                        default: log.warn(`Unknown type`);
+                    }
+                }
+                if (event.type == "death" && event.revived == true) {
+                    switch (targetLoadout.type) {
+                        case "infil":
+                            kds.infil.score += 1;
+                            break;
+                        case "lightAssault":
+                            kds.lightAssault.score += 1;
+                            break;
+                        case "medic":
+                            kds.medic.score += 1;
+                            break;
+                        case "engineer":
+                            kds.engineer.score += 1;
+                            break;
+                        case "heavy":
+                            kds.heavy.score += 1;
+                            break;
+                        case "max":
+                            kds.max.score += 1;
+                            break;
+                        default: log.warn(`Unknown type`);
+                    }
+                }
+            }
+        });
+        return kds;
+    }
+    static classUsage(parameters) {
+        const usage = new Playtime();
+        if (parameters.player.events.length == 0) {
+            return usage;
+        }
+        let lastLoadout = undefined;
+        let lastTimestamp = parameters.player.events[0].timestamp;
+        const finalTimestamp = parameters.player.events[parameters.player.events.length - 1].timestamp;
+        usage.characterID = parameters.player.characterID;
+        usage.secondsOnline = (finalTimestamp - lastTimestamp) / 1000;
+        parameters.player.events.forEach((event) => {
+            if (event.type == "capture" || event.type == "defend" || event.type == "login" || event.type == "logout" || event.type == "marker" || event.type == "base") {
+                return;
+            }
+            lastLoadout = PsLoadout_1.PsLoadouts.get(event.loadoutID);
+            if (lastLoadout == undefined) {
+                return log.warn(`Unknown loadout ID: ${event.loadoutID}`);
+            }
+            if (event.type == "exp") {
+                const diff = (event.timestamp - lastTimestamp) / 1000;
+                lastTimestamp = event.timestamp;
+                switch (lastLoadout.type) {
+                    case "infil":
+                        usage.infil.secondsAs += diff;
+                        break;
+                    case "lightAssault":
+                        usage.lightAssault.secondsAs += diff;
+                        break;
+                    case "medic":
+                        usage.medic.secondsAs += diff;
+                        break;
+                    case "engineer":
+                        usage.engineer.secondsAs += diff;
+                        break;
+                    case "heavy":
+                        usage.heavy.secondsAs += diff;
+                        break;
+                    case "max":
+                        usage.max.secondsAs += diff;
+                        break;
+                    default: log.warn(`Unknown type`);
+                }
+            }
+            if (event.type == "exp") {
+                switch (lastLoadout.type) {
+                    case "infil":
+                        usage.infil.score += event.amount;
+                        break;
+                    case "lightAssault":
+                        usage.lightAssault.score += event.amount;
+                        break;
+                    case "medic":
+                        usage.medic.score += event.amount;
+                        break;
+                    case "engineer":
+                        usage.engineer.score += event.amount;
+                        break;
+                    case "heavy":
+                        usage.heavy.score += event.amount;
+                        break;
+                    case "max":
+                        usage.max.score += event.amount;
+                        break;
+                    default: log.warn(`Unknown type`);
+                }
+            }
+            else if (event.type == "kill") {
+                switch (lastLoadout.type) {
+                    case "infil":
+                        usage.infil.kills += 1;
+                        break;
+                    case "lightAssault":
+                        usage.lightAssault.kills += 1;
+                        break;
+                    case "medic":
+                        usage.medic.kills += 1;
+                        break;
+                    case "engineer":
+                        usage.engineer.kills += 1;
+                        break;
+                    case "heavy":
+                        usage.heavy.kills += 1;
+                        break;
+                    case "max":
+                        usage.max.kills += 1;
+                        break;
+                    default: log.warn(`Unknown type`);
+                }
+            }
+            else if (event.type == "death" && event.revived == false) {
+                switch (lastLoadout.type) {
+                    case "infil":
+                        usage.infil.deaths += 1;
+                        break;
+                    case "lightAssault":
+                        usage.lightAssault.deaths += 1;
+                        break;
+                    case "medic":
+                        usage.medic.deaths += 1;
+                        break;
+                    case "engineer":
+                        usage.engineer.deaths += 1;
+                        break;
+                    case "heavy":
+                        usage.heavy.deaths += 1;
+                        break;
+                    case "max":
+                        usage.max.deaths += 1;
+                        break;
+                    default: log.warn(`Unknown type`);
+                }
+            }
+        });
+        let maxTime = 0;
+        if (usage.infil.secondsAs > maxTime) {
+            maxTime = usage.infil.secondsAs;
+            usage.mostPlayed.name = "Infiltrator";
+        }
+        if (usage.lightAssault.secondsAs > maxTime) {
+            maxTime = usage.lightAssault.secondsAs;
+            usage.mostPlayed.name = "Light Assault";
+        }
+        if (usage.medic.secondsAs > maxTime) {
+            maxTime = usage.medic.secondsAs;
+            usage.mostPlayed.name = "Medic";
+        }
+        if (usage.engineer.secondsAs > maxTime) {
+            maxTime = usage.engineer.secondsAs;
+            usage.mostPlayed.name = "Engineer";
+        }
+        if (usage.heavy.secondsAs > maxTime) {
+            maxTime = usage.heavy.secondsAs;
+            usage.mostPlayed.name = "Heavy";
+        }
+        if (usage.max.secondsAs > maxTime) {
+            maxTime = usage.max.secondsAs;
+            usage.mostPlayed.name = "MAX";
+        }
+        usage.mostPlayed.secondsAs = maxTime;
+        return usage;
+    }
+    static unrevivedTime(events) {
+        const array = [];
+        for (const ev of events) {
+            if (ev.type != "death") {
+                continue;
+            }
+            if (ev.revivedEvent != null) {
+                const diff = (ev.revivedEvent.timestamp - ev.timestamp) / 1000;
+                if (diff > 40) {
+                    continue; // Somehow death events are missed and a revive event is linked to the wrong death
+                }
+                array.push(diff);
+            }
+        }
+        return array.sort((a, b) => b - a);
+    }
+    static reviveLifeExpectance(events) {
+        const array = [];
+        for (const ev of events) {
+            if (ev.type != "death" || ev.revivedEvent == null) {
+                continue;
+            }
+            const charEvents = events.filter(iter => iter.sourceID == ev.sourceID);
+            const index = charEvents.findIndex(iter => {
+                return iter.type == "death" && iter.timestamp == ev.timestamp && iter.targetID == ev.targetID;
+            });
+            if (index == -1) {
+                log.error(`Failed to find a death for ${ev.sourceID} at ${ev.timestamp} but wasn't found in charEvents`);
+                continue;
+            }
+            let nextDeath = null;
+            for (let i = index + 1; i < charEvents.length; ++i) {
+                if (charEvents[i].type == "death") {
+                    nextDeath = charEvents[i];
+                    break;
+                }
+            }
+            if (nextDeath == null) {
+                log.error(`Failed to find the next death for ${ev.sourceID} at ${ev.timestamp}`);
+                continue;
+            }
+            const diff = (nextDeath.timestamp - ev.revivedEvent.timestamp) / 1000;
+            if (diff <= 20) {
+                array.push(diff);
+            }
+        }
+        return array.sort((a, b) => b - a);
+    }
+    static lifeExpectanceRate(events) {
+        const array = [];
+        for (const ev of events) {
+            if (ev.type != "death" || ev.revivedEvent == null) {
+                continue;
+            }
+            const charEvents = events.filter(iter => iter.sourceID == ev.sourceID);
+            const index = charEvents.findIndex(iter => {
+                return iter.type == "death" && iter.timestamp == ev.timestamp && iter.targetID == ev.targetID;
+            });
+            if (index == -1) {
+                log.error(`Failed to find a death for ${ev.sourceID} at ${ev.timestamp} but wasn't found in charEvents`);
+                continue;
+            }
+            let nextDeath = null;
+            for (let i = index + 1; i < charEvents.length; ++i) {
+                if (charEvents[i].type == "death") {
+                    nextDeath = charEvents[i];
+                    break;
+                }
+            }
+            if (nextDeath == null) {
+                log.error(`Failed to find the next death for ${ev.sourceID} at ${ev.timestamp}`);
+                continue;
+            }
+            const diff = (nextDeath.timestamp - ev.revivedEvent.timestamp) / 1000;
+            array.push(diff);
+        }
+        const probs = this.kaplanMeier(array, 20);
+        return probs;
+    }
+    static timeUntilReviveRate(events) {
+        const array = [];
+        for (const ev of events) {
+            if (ev.type != "death") {
+                continue;
+            }
+            if (ev.revivedEvent != null) {
+                const diff = (ev.revivedEvent.timestamp - ev.timestamp) / 1000;
+                if (diff > 40) {
+                    continue; // Somehow death events are missed and a revive event is linked to the wrong death
+                }
+                array.push(diff);
+            }
+        }
+        const probs = this.kaplanMeier(array);
+        return probs;
+    }
+    static kaplanMeier(data, max) {
+        const ticks = [...Array(max !== null && max !== void 0 ? max : Math.max(...data)).keys()];
+        const probs = [];
+        let cur_pop = [...Array(data.length).keys()];
+        for (const tick of ticks) {
+            const survived = data.filter(iter => iter > tick).length;
+            probs.push(survived / cur_pop.length);
+            cur_pop = data.filter(iter => iter > tick);
+        }
+        let cumul = 1;
+        for (let i = 0; i < probs.length; ++i) {
+            probs[i] = cumul * probs[i];
+            cumul = probs[i];
+        }
+        return probs;
+    }
+    static generateContinentPlayedOn(events) {
+        let indar = 0;
+        let esamir = 0;
+        let amerish = 0;
+        let hossin = 0;
+        for (const ev of events) {
+            if (ev.type == "kill" || ev.type == "death") {
+                switch (ev.zoneID) {
+                    case "2":
+                        ++indar;
+                        break;
+                    case "4":
+                        ++hossin;
+                        break;
+                    case "6":
+                        ++amerish;
+                        break;
+                    case "8":
+                        ++esamir;
+                        break;
+                }
+            }
+        }
+        let count = 0;
+        let cont = "Default";
+        if (indar > count) {
+            cont = "Indar";
+            count = indar;
+        }
+        if (esamir > count) {
+            cont = "Esamir";
+            count = esamir;
+        }
+        if (amerish > count) {
+            cont = "Amerish";
+            count = amerish;
+        }
+        if (hossin > count) {
+            cont = "Hossin";
+            count = hossin;
+        }
+        return cont;
+    }
+}
+exports.IndividualReporter = IndividualReporter;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/Loggers.js":
+/*!******************************************!*\
+  !*** ../topt-core/build/core/Loggers.js ***!
+  \******************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.Logger = void 0;
+const log = __webpack_require__(/*! loglevel */ "../topt-core/node_modules/loglevel/lib/loglevel.js");
+const prefix = __webpack_require__(/*! loglevel-plugin-prefix */ "../topt-core/node_modules/loglevel-plugin-prefix/lib/loglevel-plugin-prefix.js");
+prefix.reg(log);
+class Logger {
+    /**
+     * Get a logger by it's name, creating a new one in the process if needed
+     *
+     * @param name Name of the logger to get
+     */
+    static getLogger(name) {
+        if (this.loggers.has(name) == false) {
+            const logger = log.getLogger(name);
+            logger.setLevel("info");
+            prefix.apply(logger, {
+                format(level, name, timestamp) {
+                    return `[${level}] ${name}>`;
+                }
+            });
+            this.loggers.set(name, logger);
+        }
+        return this.loggers.get(name);
+    }
+    /**
+     * Get the names of all loggers used
+     */
+    static getLoggerNames() {
+        return Array.from(this.loggers.keys());
+    }
+}
+exports.Logger = Logger;
+Logger.loggers = new Map();
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/Playback.js":
+/*!*******************************************!*\
+  !*** ../topt-core/build/core/Playback.js ***!
+  \*******************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.Playback = exports.PlaybackOptions = void 0;
+const OutfitAPI_1 = __webpack_require__(/*! ./census/OutfitAPI */ "../topt-core/build/core/census/OutfitAPI.js");
+const ApiWrapper_1 = __webpack_require__(/*! ./census/ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
+const Loggers_1 = __webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("Playback");
+class PlaybackOptions {
+    constructor() {
+        this.speed = 0;
+    }
+}
+exports.PlaybackOptions = PlaybackOptions;
+class Playback {
+    static setCore(core) {
+        Playback._core = core;
+    }
+    static loadFile(file) {
+        if (Playback._core == null) {
+            throw `Cannot load file: Core has not been set. Did you forget to use Playback.setCore()?`;
+        }
+        const response = new ApiWrapper_1.ApiResponse();
+        if (typeof (file) == "string") {
+            log.debug(`using a string`);
+            this.process(file).ok(() => {
+                response.resolveOk();
+            });
+        }
+        else {
+            log.debug(`using a file`);
+            const reader = new FileReader();
+            reader.onload = ((ev) => {
+                this.process(reader.result).ok(() => {
+                    response.resolveOk();
+                });
+            });
+            reader.readAsText(file);
+        }
+        return response;
+    }
+    static process(str) {
+        const response = new ApiWrapper_1.ApiResponse();
+        const data = JSON.parse(str);
+        if (!data.version) {
+            log.error(`Missing version from import`);
+            throw `Missing version from import`;
+        }
+        else if (data.version == "1") {
+            const nowMs = new Date().getTime();
+            log.debug(`Exported data uses version 1`);
+            const chars = data.players;
+            const outfits = data.outfits;
+            const events = data.events;
+            // Force online for squad tracking
+            this._core.subscribeToEvents(chars.map(iter => { iter.online = iter.secondsPlayed > 0; return iter; }));
+            if (events != undefined && events.length != 0) {
+                Playback._events = events;
+                const parsedData = events.map(iter => JSON.parse(iter));
+                Playback._parsed = parsedData;
+            }
+            if (outfits.length > 0) {
+                const item = outfits[0];
+                let outfitIDs = [];
+                if (typeof (item) == "string") {
+                    outfitIDs = outfits;
+                }
+                else {
+                    outfitIDs = outfits.map(iter => iter.ID);
+                }
+                OutfitAPI_1.OutfitAPI.getByIDs(outfitIDs).ok((data) => {
+                    this._core.outfits = data;
+                    log.info(`From [${outfitIDs.join(", ")}] loaded: ${JSON.stringify(data)}`);
+                }).always(() => {
+                    log.debug(`Took ${new Date().getTime() - nowMs}ms to import data`);
+                    response.resolveOk();
+                });
+            }
+            else {
+                log.debug(`Took ${new Date().getTime() - nowMs}ms to import data`);
+                response.resolveOk();
+            }
+        }
+        else {
+            log.error(`Unchecked version: ${data.version}`);
+            response.resolve({ code: 400, data: `` });
+        }
+        return response;
+    }
+    static start(parameters) {
+        if (this._core == null) {
+            throw `Cannot start playback, core is null. Did you forget to call Playback.setCore()?`;
+        }
+        // Instant playback
+        if (parameters.speed <= 0) {
+            log.debug(`Doing instant playback`);
+            const nowMs = new Date().getTime();
+            const timestamps = Playback._parsed.map((iter) => {
+                const ts = iter.payload.timestamp;
+                if (typeof (ts) == "number") { // An old bugged version of expo uses numbers not strings
+                    return ts;
+                }
+                if (ts.length == 10) {
+                    return Number.parseInt(ts) * 1000;
+                }
+                else if (ts.length == 13) { // Expo exports with the MS part, Census does not
+                    return Number.parseInt(ts);
+                }
+                else {
+                    log.warn(`Unchecked length of timestamp: ${ts.length} '${ts}'`);
+                    throw ``;
+                }
+            });
+            this._core.tracking.startTime = Math.min(...timestamps);
+            this._core.tracking.endTime = Math.max(...timestamps);
+            for (const ev of Playback._events) {
+                this._core.processMessage(ev, true);
+            }
+            this._core.stop();
+            log.debug(`Took ${new Date().getTime() - nowMs}ms to process data`);
+        }
+        else {
+            const start = Math.min(...Playback._parsed.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
+            const end = Math.max(...Playback._parsed.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
+            this._core.tracking.startTime = start;
+            const slots = new Map();
+            for (const ev of Playback._parsed) {
+                const time = Number.parseInt(ev.payload.timestamp) * 1000;
+                if (Number.isNaN(time)) {
+                    log.warn(`Failed to get a timestamp from ${ev}`);
+                }
+                const diff = time - start;
+                if (!slots.has(diff)) {
+                    slots.set(diff, []);
+                }
+                slots.get(diff).push(ev);
+            }
+            let index = 0;
+            const intervalID = setInterval(() => {
+                if (!slots.has(index)) {
+                    log.debug(`Index ${index} has no events, skipping`);
+                }
+                else {
+                    const events = slots.get(index);
+                    for (const ev of events) {
+                        this._core.processMessage(JSON.stringify(ev), true);
+                    }
+                }
+                index += 1000;
+                if (index > end) {
+                    log.debug(`Ended on index ${index}`);
+                    clearInterval(intervalID);
+                }
+            }, 1000 * parameters.speed);
+        }
+    }
+}
+exports.Playback = Playback;
+Playback._core = null;
+Playback._events = [];
+Playback._parsed = [];
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/PsEvent.js":
+/*!******************************************!*\
+  !*** ../topt-core/build/core/PsEvent.js ***!
+  \******************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.PsEvents = exports.PsEvent = void 0;
+class PsEvent {
+    constructor() {
+        // Display friendly name
+        this.name = "";
+        // What type of event is this?
+        this.types = [];
+        // Is this an event that will be kept track of in the map?
+        this.track = true;
+        this.alsoIncrement = undefined;
+    }
+}
+exports.PsEvent = PsEvent;
+PsEvent.default = {
+    name: "Default",
+    types: [],
+    track: false
+};
+PsEvent.other = {
+    name: "Other",
+    types: [],
+    track: false
+};
+// General events
+PsEvent.kill = "1";
+PsEvent.killAssist = "2";
+PsEvent.headshot = "37";
+PsEvent.teamkill = "-2";
+PsEvent.teamkilled = "-7";
+PsEvent.death = "-1";
+PsEvent.revived = "-6";
+PsEvent.baseCapture = "-3";
+PsEvent.baseDefense = "-4";
+PsEvent.spotkill = "37";
+PsEvent.squadSpawn = "56";
+PsEvent.capturePoint = "272";
+// Medic events
+PsEvent.heal = "4";
+PsEvent.healAssist = "5";
+PsEvent.revive = "7";
+PsEvent.squadRevive = "53";
+PsEvent.squadHeal = "51";
+PsEvent.shieldRepair = "438";
+PsEvent.squadShieldRepair = "439";
+// Engineer events
+PsEvent.maxRepair = "6";
+PsEvent.vehicleRepair = "90";
+PsEvent.resupply = "34";
+PsEvent.squadResupply = "55";
+PsEvent.squadMaxRepair = "142";
+PsEvent.drawfire = "1393";
+// Recon events
+PsEvent.spotKill = "36";
+PsEvent.squadSpotKill = "54";
+PsEvent.motionDetect = "293";
+PsEvent.squadMotionDetect = "294";
+PsEvent.radarDetect = "353";
+PsEvent.squadRadarDetect = "354";
+PsEvent.roadkill = "26";
+PsEvent.transportAssists = "30";
+PsEvent.galaxySpawn = "201";
+PsEvent.concAssist = "550";
+PsEvent.squadConcAssist = "551";
+PsEvent.empAssist = "552";
+PsEvent.squadEmpAssist = "553";
+PsEvent.flashAssist = "554";
+PsEvent.squadFlashAssist = "555";
+PsEvent.savior = "335";
+PsEvent.ribbon = "291";
+PsEvent.routerKill = "1409";
+PsEvent.beaconKill = "270";
+PsEvent.controlPointAttack = "16";
+PsEvent.controlPointDefend = "15";
+const remap = (expID, toID) => {
+    return [expID, { name: "", types: [], track: true, alsoIncrement: toID }];
+};
+// All of the events to be tracked, updating this will change what events are subscribed as well
+exports.PsEvents = new Map([
+    [PsEvent.baseCapture, {
+            name: "Base capture",
+            types: ["general", "objective"],
+            track: false
+        }],
+    [PsEvent.baseDefense, {
+            name: "Base defense",
+            types: ["general", "objective"],
+            track: false
+        }],
+    [PsEvent.teamkill, {
+            name: "Teamkill",
+            types: ["versus"],
+            track: false
+        }],
+    [PsEvent.teamkilled, {
+            name: "Teamkilled",
+            types: ["versus"],
+            track: false
+        }],
+    [PsEvent.death, {
+            name: "Death",
+            types: ["general", "versus"],
+            track: false
+        }],
+    [PsEvent.revived, {
+            name: "Revived",
+            types: [],
+            track: false
+        }],
+    [PsEvent.kill, {
+            name: "Kill",
+            types: ["general", "versus"],
+            track: false
+        }],
+    [PsEvent.killAssist, {
+            name: "Kill assist",
+            types: ["versus"],
+            track: true,
+        }],
+    [PsEvent.heal, {
+            name: "Heal",
+            types: ["medic"],
+            track: true,
+        }],
+    [PsEvent.healAssist, {
+            name: "Heal assist",
+            types: [],
+            track: true,
+        }],
+    [PsEvent.maxRepair, {
+            name: "MAX repair",
+            types: ["engineer"],
+            track: true,
+        }],
+    [PsEvent.revive, {
+            name: "Revive",
+            types: ["medic"],
+            track: true,
+            alsoIncrement: undefined
+        }],
+    ["15", {
+            name: "Control point defend",
+            types: ["objective"],
+            track: true,
+            alsoIncrement: undefined
+        }],
+    ["16", {
+            name: "Control point attack",
+            types: ["objective"],
+            track: true,
+            alsoIncrement: undefined
+        }],
+    ["19", {
+            name: "Base capture",
+            types: ["objective"],
+            track: true,
+            alsoIncrement: undefined
+        }],
+    [PsEvent.roadkill, {
+            name: "Roadkill",
+            types: [],
+            track: true,
+            alsoIncrement: undefined
+        }],
+    ["29", {
+            name: "MAX kill",
+            types: ["versus"],
+            track: true,
+            alsoIncrement: PsEvent.kill
+        }],
+    [PsEvent.transportAssists, {
+            name: "Transport assist",
+            types: ["logistics"],
+            track: true,
+            alsoIncrement: undefined
+        }],
+    [PsEvent.resupply, {
+            name: "Resupply",
+            types: ["engineer"],
+            track: true,
+            alsoIncrement: undefined
+        }],
+    [PsEvent.spotKill, {
+            name: "Spot kill",
+            types: ["recon"],
+            track: true,
+            alsoIncrement: undefined
+        }],
+    [PsEvent.squadHeal, {
+            name: "Squad heal",
+            types: ["medic"],
+            track: true,
+            alsoIncrement: PsEvent.heal
+        }],
+    [PsEvent.squadRevive, {
+            name: "Squad revive",
+            types: ["medic"],
+            track: true,
+            alsoIncrement: PsEvent.revive
+        }],
+    [PsEvent.squadSpotKill, {
+            name: "Squad spot kill",
+            types: ["recon"],
+            track: true,
+            alsoIncrement: PsEvent.spotKill
+        }],
+    [PsEvent.squadResupply, {
+            name: "Squad resupply",
+            types: ["engineer"],
+            track: true,
+            alsoIncrement: PsEvent.resupply
+        }],
+    ["99", {
+            name: "Sundy repair",
+            types: ["engineer"],
+            track: true,
+            alsoIncrement: undefined
+        }],
+    remap("140", "99"),
+    [PsEvent.vehicleRepair, {
+            name: "Vehicle repair",
+            types: ["engineer"],
+            track: true,
+            alsoIncrement: undefined
+        }],
+    [PsEvent.headshot, {
+            name: "Headshot",
+            types: ["versus"],
+            track: false,
+            alsoIncrement: undefined
+        }],
+    [PsEvent.squadSpawn, {
+            name: "Squad spawn",
+            types: ["logistics"],
+            track: true,
+            alsoIncrement: undefined
+        }],
+    [PsEvent.squadMaxRepair, {
+            name: "Squad MAX repair",
+            types: ["engineer"],
+            track: true,
+            alsoIncrement: PsEvent.maxRepair
+        }],
+    [PsEvent.galaxySpawn, {
+            name: "Galaxy spawn bonus",
+            types: ["logistics"],
+            track: true,
+            alsoIncrement: PsEvent.squadSpawn
+        }],
+    ["233", {
+            name: "Sundy spawn",
+            types: ["logistics"],
+            track: true,
+            alsoIncrement: undefined
+        }],
+    ["236", {
+            name: "Facility terminal hack",
+            types: [],
+            track: true,
+            alsoIncrement: undefined
+        }],
+    ["270", {
+            name: "Beacon kill",
+            types: ["logistics"],
+            track: true,
+            alsoIncrement: undefined
+        }],
+    [PsEvent.capturePoint, {
+            name: "Capture point",
+            types: ["objective"],
+            track: true,
+            alsoIncrement: undefined
+        }],
+    [PsEvent.ribbon, {
+            name: "Ribbon",
+            types: [],
+            track: false,
+            alsoIncrement: undefined
+        }],
+    [PsEvent.motionDetect, {
+            name: "Motion detect",
+            types: ["recon"],
+            track: true,
+            alsoIncrement: undefined
+        }],
+    [PsEvent.squadMotionDetect, {
+            name: "Squad motion detect",
+            types: ["recon"],
+            track: true,
+            alsoIncrement: PsEvent.motionDetect
+        }],
+    [PsEvent.radarDetect, {
+            name: "Radar detect",
+            types: ["recon"],
+            track: true,
+            alsoIncrement: undefined
+        }],
+    [PsEvent.squadRadarDetect, {
+            name: "Squad radar detect",
+            types: ["recon"],
+            track: true,
+            alsoIncrement: PsEvent.radarDetect
+        }],
+    [PsEvent.savior, {
+            name: "Savior kill",
+            types: [],
+            track: true,
+            alsoIncrement: undefined
+        }],
+    ["355", {
+            name: "Squad vehicle spawn",
+            types: ["logistics"],
+            track: true,
+            alsoIncrement: undefined
+        }],
+    [PsEvent.shieldRepair, {
+            name: "Shield repair",
+            types: ["medic"],
+            track: true,
+            alsoIncrement: undefined
+        }],
+    [PsEvent.squadShieldRepair, {
+            name: "Squad shield repair",
+            types: ["medic"],
+            track: true,
+            alsoIncrement: PsEvent.shieldRepair
+        }],
+    [PsEvent.concAssist, {
+            name: "Conc assist",
+            types: ["versus"],
+            track: true,
+            alsoIncrement: undefined
+        }],
+    [PsEvent.squadConcAssist, {
+            name: "Squad conc assist",
+            types: ["versus"],
+            track: true,
+            alsoIncrement: "550" // Conc assist
+        }],
+    [PsEvent.empAssist, {
+            name: "EMP assist",
+            types: ["versus"],
+            track: true,
+            alsoIncrement: undefined
+        }],
+    [PsEvent.squadEmpAssist, {
+            name: "Squad EMP assist",
+            types: ["versus"],
+            track: true,
+            alsoIncrement: "552" // EMP assist
+        }],
+    [PsEvent.flashAssist, {
+            name: "Flash assist",
+            types: ["versus"],
+            track: true,
+            alsoIncrement: undefined
+        }],
+    [PsEvent.squadFlashAssist, {
+            name: "Squad flash assist",
+            types: ["versus"],
+            track: true,
+            alsoIncrement: "554" // Flash assist
+        }],
+    ["556", {
+            name: "Defend point pulse",
+            types: [],
+            track: true,
+            alsoIncrement: PsEvent.capturePoint
+        }],
+    ["557", {
+            name: "Capture point pulse",
+            types: [],
+            track: true,
+            alsoIncrement: PsEvent.capturePoint
+        }],
+    ["674", {
+            name: "Cortium harvest",
+            types: ["logistics"],
+            track: true
+        }],
+    ["675", {
+            name: "Cortium deposit",
+            types: ["logistics"],
+            track: true
+        }],
+    ["1393", {
+            name: "Hardlight cover",
+            types: ["engineer"],
+            track: true,
+            alsoIncrement: undefined
+        }],
+    ["1394", {
+            name: "Draw fire",
+            types: ["engineer"],
+            track: true,
+            alsoIncrement: "1393"
+        }],
+    ["1409", {
+            name: "Router kill",
+            types: ["logistics"],
+            track: true,
+            alsoIncrement: undefined
+        }],
+    ["1410", {
+            name: "Router spawn",
+            types: ["logistics"],
+            track: true,
+            alsoIncrement: undefined
+        }],
+    // Remap kills
+    remap("8", PsEvent.kill),
+    remap("10", PsEvent.kill),
+    remap("11", PsEvent.kill),
+    remap("25", PsEvent.kill),
+    remap("32", PsEvent.kill),
+    remap("38", PsEvent.kill),
+    remap("277", PsEvent.kill),
+    remap("278", PsEvent.kill),
+    remap("279", PsEvent.kill),
+    remap("335", PsEvent.kill),
+    remap("592", PsEvent.kill),
+    remap("593", PsEvent.kill),
+    remap("593", PsEvent.kill),
+    remap("595", PsEvent.kill),
+    remap("673", PsEvent.kill),
+    ...[
+        "3", "371", "372"
+    ].map((expID) => remap(expID, PsEvent.killAssist)),
+    // Remap vehicle repairs
+    ...[
+        "88", "89", "91", "92", "93", "94", "95", "96", "97", "98", "100", "303", "503", "581", "653", "1375",
+        "129", "130", "131", "132", "133", "134", "135", "136", "137", "138", "139", "141", "302", "505", "584", "656", "1378" // Squad
+    ].map((expID) => remap(expID, PsEvent.vehicleRepair))
+]);
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/StatMap.js":
+/*!******************************************!*\
+  !*** ../topt-core/build/core/StatMap.js ***!
+  \******************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+class StatMap {
+    constructor() {
+        this._stats = new Map();
+    }
+    get(statName, fallback = 0) {
+        return this._stats.get(statName) || fallback;
+    }
+    increment(statName, amount = 1) {
+        this._stats.set(statName, (this._stats.get(statName) || 0) + amount);
+    }
+    decrement(statName, amount = 1) {
+        const cur = this.get(statName);
+        if (cur < amount) {
+            this.set(statName, 0);
+        }
+        else {
+            this.set(statName, cur - amount);
+        }
+    }
+    set(statName, amount) {
+        this._stats.set(statName, amount);
+    }
+    size() { return this._stats.size; }
+    getMap() { return this._stats; }
+    clear() { this._stats.clear(); }
+    toString() {
+        return JSON.stringify(Array.from(this._stats.entries()));
+    }
+}
+exports.default = StatMap;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/census/AchievementAPI.js":
+/*!********************************************************!*\
+  !*** ../topt-core/build/core/census/AchievementAPI.js ***!
+  \********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.AchievementAPI = exports.Achievement = void 0;
+const CensusAPI_1 = __webpack_require__(/*! ./CensusAPI */ "../topt-core/build/core/census/CensusAPI.js");
+const ApiWrapper_1 = __webpack_require__(/*! ./ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
+const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("AchievementAPI");
+class Achievement {
+    constructor() {
+        this.ID = "";
+        this.name = "";
+        this.imageUrl = "";
+        this.description = "";
+    }
+}
+exports.Achievement = Achievement;
+class AchievementAPI {
+    static parseCharacter(elem) {
+        var _a, _b;
+        return {
+            ID: elem.achievement_id,
+            name: elem.name.en,
+            description: (_b = (_a = elem.description) === null || _a === void 0 ? void 0 : _a.en) !== null && _b !== void 0 ? _b : "",
+            imageUrl: elem.image_path
+        };
+    }
+    static getByID(achivID) {
+        const response = new ApiWrapper_1.ApiResponse();
+        if (AchievementAPI._cache.has(achivID)) {
+            response.resolveOk(AchievementAPI._cache.get(achivID));
+        }
+        else {
+            const request = CensusAPI_1.default.get(`achievement?item_id=${achivID}`);
+            request.ok((data) => {
+                if (data.returned != 1) {
+                    response.resolve({ code: 404, data: `No or multiple weapons returned from ${name}` });
+                }
+                else {
+                    const wep = AchievementAPI.parseCharacter(data.item_list[0]);
+                    if (!AchievementAPI._cache.has(wep.ID)) {
+                        AchievementAPI._cache.set(wep.ID, wep);
+                        log.trace(`Cached ${wep.ID}: ${JSON.stringify(wep)}`);
+                    }
+                    response.resolveOk(wep);
+                }
+            });
+        }
+        return response;
+    }
+    static getByIDs(weaponIDs) {
+        const response = new ApiWrapper_1.ApiResponse();
+        if (weaponIDs.length == 0) {
+            response.resolveOk([]);
+            return response;
+        }
+        const weapons = [];
+        const requestIDs = [];
+        for (const weaponID of weaponIDs) {
+            if (AchievementAPI._cache.has(weaponID)) {
+                const wep = AchievementAPI._cache.get(weaponID);
+                weapons.push(wep);
+            }
+            else {
+                requestIDs.push(weaponID);
+            }
+        }
+        if (requestIDs.length > 0) {
+            const request = CensusAPI_1.default.get(`achievement?achievement_id=${requestIDs.join(",")}`);
+            request.ok((data) => {
+                if (data.returned == 0) {
+                    if (weapons.length == 0) {
+                        response.resolve({ code: 404, data: `No or multiple weapons returned from ${name}` });
+                    }
+                    else {
+                        response.resolveOk(weapons);
+                    }
+                }
+                else {
+                    for (const datum of data.achievement_list) {
+                        const wep = AchievementAPI.parseCharacter(datum);
+                        weapons.push(wep);
+                        AchievementAPI._cache.set(wep.ID, wep);
+                        log.trace(`Cached ${wep.ID}`);
+                    }
+                    response.resolveOk(weapons);
+                }
+            });
+        }
+        else {
+            response.resolveOk(weapons);
+        }
+        return response;
+    }
+}
+exports.AchievementAPI = AchievementAPI;
+AchievementAPI._cache = new Map([["0", null]]);
+AchievementAPI.unknown = {
+    ID: "-1",
+    name: "Unknown",
+    imageUrl: "",
+    description: "Unknown achievement"
+};
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/census/ApiWrapper.js":
+/*!****************************************************!*\
+  !*** ../topt-core/build/core/census/ApiWrapper.js ***!
+  \****************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.APIWrapper = exports.ApiResponse = void 0;
+const axios = __webpack_require__(/*! axios */ "../topt-core/node_modules/axios/index.js");
+const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("ApiWrapper");
+// Default to void as undefined is assignable to void. Would prefer to use never, but there is
+// no default value for never, and never cannot be assigned
+/**
+ * Promise-ish class that is returned from an API request. Use the callback functions .ok(), etc. to handle
+ * the result of the request. Unhandles responses will throw an exception
+ */
+class ApiResponse {
+    /**
+     * Constructor for an ApiResponse
+     *
+     * @param responseData  Request that is being performed, and will produce a response
+     * @param reader        Function that will read the data from a successful request into the type param T
+     */
+    constructor(responseData = null, reader = null) {
+        /**
+         * Status code returned from the API endpoint
+         */
+        this.status = 0;
+        /**
+         * Data returned from the API endpoint
+         */
+        this.data = null;
+        /**
+         * Callbacks to call when specific status code response is resolved from the API call.
+         * If no callbacks are defined for a status code an exception is thrown
+         */
+        this._callbacks = new Map([]);
+        /**
+         * Has this API response already been resolved? If so, any additional callbacks added after the
+         * constructor is called (due to the late timeout) will immediately be ran
+         */
+        this._resolved = false;
+        this._steps = null;
+        if (responseData == null) {
+            return;
+        }
+        responseData.then((data) => {
+            let localStatus = data.status;
+            let localData = data.data;
+            // Handle errors from the API, which aren't request errors
+            if (localStatus == 200 && reader != null) {
+                if (localData.error != undefined || localData.errorCode != undefined || localData == "") {
+                    localStatus = 500;
+                }
+            }
+            // TODO: Get rid of this any
+            // I need to figure out a way to remove this any. Because the type of each element in codes is
+            //      a ResponseCode, not a number, and localStatus is a number, TS assumes that this can't be possible,
+            //      when in fact it is
+            if (ApiResponse.codes.indexOf(localStatus) == -1) {
+                throw `Unhandle status code: ${localStatus}`;
+            }
+            // TODO: AHHHH, it's an any!
+            // I need to find a better way to do this. Because the type of data is not known, Typescript rightly
+            //      assumes that code could be 204 and data is a string, which doesn't meet the requirements of a
+            //      ResponseContent. Maybe use a switch on localStatus?
+            this.resolve({ code: localStatus, data: localData });
+        }).catch((error) => {
+            throw `Don't expect this: ${error}`;
+        });
+    }
+    isResolved() { return this._resolved; }
+    /**
+     * Statically resolve an ApiResponse, similar to how Promise.resolve works. This is useful when creating
+     *      an ApiResponse from data that already exists
+     *
+     * @param status    Status code to resolve the response with
+     * @param data      Data to resolve the response with
+     *
+     * @returns An ApiResponse that has been resolved with the parameters passed
+     */
+    static resolve(content) {
+        const response = new ApiResponse(null, null);
+        response.resolve(content);
+        return response;
+    }
+    /**
+     * Resolve ApiResponse with specific data, calling the callback setup and setting it as resolved
+     *
+     * @param status    Status code the response will be resolved with
+     * @param data      Data the response will be resolved with
+     */
+    resolve(content) {
+        if (this._resolved == true) {
+            throw `This response has already been resolved`;
+        }
+        this.status = content.code;
+        this.data = content.data;
+        let callbacks = this._callbacks.get(this.status) || [];
+        for (const callback of callbacks) {
+            callback(content.data);
+        }
+        this._resolved = true;
+    }
+    /**
+     * Resolving with an Ok is done a lot, this just saves some typing
+     *
+     * @param data Data to resolve this response with
+     */
+    resolveOk(data) {
+        if (this._steps != null) {
+            const steps = this.getSteps();
+            let notDone = [];
+            for (const step of steps) {
+                if (this.getStepState(step) != "done") {
+                    notDone.push(step);
+                }
+            }
+            if (notDone.length > 0) {
+                log.warn(`The following steps are not done: [${notDone.join(", ")}]`);
+            }
+        }
+        this.resolve({ code: 200, data: data });
+    }
+    /**
+     * Add a new step to be tracked
+     *
+     * @param step Step being completed
+     */
+    addStep(step) {
+        if (this._steps == null) {
+            this._steps = new Map();
+        }
+        if (this._steps.has(step)) {
+            log.warn(`Duplicate step '${step}' in ApiResponse. Current steps: ${Array.from(this._steps.keys()).join(", ")}`);
+        }
+        this._steps.set(step, "working");
+        return this;
+    }
+    /**
+     * Update the state a step has
+     *
+     * @param step  Step to update
+     * @param state New state of the step being updated
+     */
+    updateStep(step, state) {
+        if (this._steps == null) {
+            log.warn(`Cannot update setp '${step}' to ${state}: No steps have been created`);
+            return;
+        }
+        if (!this._steps.has(step)) {
+            log.warn(`Cannot update step '${step}' to ${state}: Step not found`);
+        }
+        this._steps.set(step, state);
+    }
+    /**
+     * Shortcut method to mark a step as done
+     *
+     * @param step Step to mark as done
+     */
+    finishStep(step) {
+        this.updateStep(step, "done");
+    }
+    /**
+     * Get the steps in this ApiResponse
+     */
+    getSteps() {
+        if (this._steps == null) {
+            throw `No steps defined. Cannot get steps`;
+        }
+        return Array.from(this._steps.keys());
+    }
+    /**
+     * Get the state of a specific step. If no steps have been defined, an error is thrown
+     *
+     * @param step Step to get the state of
+     */
+    getStepState(step) {
+        if (this._steps == null) {
+            throw `Not steps defined. Cannot get step state`;
+        }
+        return this._steps.get(step) || null;
+    }
+    /**
+     * Forward the resolution of a response to a different ApiResponse. If a callback for the status code has already
+     *      been set, an error will be thrown
+     *
+     * @param code      Status code that will be forwarded to response
+     * @param response  ApiResponse that will be resolved instead of this ApiResponse
+     *
+     * @returns The F-bounded polymorphic this
+     */
+    forward(code, response) {
+        if (this._callbacks.has(code)) {
+            throw `Cannot forward ${code}, a callback has already been set`;
+        }
+        this.addCallback(code, (data) => {
+            // This any cast is safe, there is no way that an ApiResponse can be resolved with the wrong type thanks to TS
+            response.resolve({ code: code, data: data });
+        });
+        return this;
+    }
+    /**
+     * Forward all callbacks that haven't been set to a different response
+     *
+     * @param response ApiResponse to forward all callbacks to
+     */
+    forwardUnset(response) {
+        for (const code of ApiResponse.codes) {
+            if (!this._callbacks.has(code)) {
+                this.forward(code, response);
+            }
+        }
+    }
+    /**
+     * Remove all callbacks for resolution. Useful for when an ApiResponse is cached
+     */
+    resetCallbacks() {
+        this._callbacks.clear();
+        return this;
+    }
+    /**
+     * Add a new callback when the API request has resolved
+     *
+     * @param status    Status code to call parameter func for
+     * @param func      Callback to execut when the API request has resolved
+     */
+    addCallback(status, func) {
+        if (!this._callbacks.has(status)) {
+            this._callbacks.set(status, []);
+        }
+        this._callbacks.get(status).push(func); // TS doesn't see the .set() above making this not undefined
+    }
+    promise() {
+        return new Promise((resolve, reject) => {
+            this.always(() => {
+                if (this.status == 200) {
+                    resolve({ code: 200, data: this.data });
+                }
+                else if (this.status == 500) {
+                    resolve({ code: 500, data: this.data });
+                }
+                else {
+                    reject(`Unchecked status ${this.status}`);
+                }
+            });
+        });
+    }
+    /**
+     * Add a new callback that is always executed
+     *
+     * @param func Callback to call
+     *
+     * @returns The F-bounded polymorphic this
+     */
+    always(func) {
+        if (this._resolved == true) {
+            func();
+        }
+        for (const code of ApiResponse.codes) {
+            this.addCallback(code, func);
+        }
+        return this;
+    }
+    /**
+     * Add a new callback when the API request resolves with a 200 OK
+     *
+     * @param func Callback to call. Will take in the the parameter passed
+     *
+     * @returns The F-bounded polymorphic this
+     */
+    ok(func) {
+        if (this._resolved == true && this.status == 200) {
+            func(this.data);
+        }
+        this.addCallback(200, func);
+        return this;
+    }
+    /**
+     * Add a new callback when the API request resolves with a 201 created
+     *
+     * @param func Callback to call. Will take in the ID returned from the API endpoint
+     *
+     * @returns The F-bounded polymorphic this
+     */
+    created(func) {
+        if (this._resolved == true && this.status == 201) {
+            func(this.data);
+        }
+        this.addCallback(201, func);
+        return this;
+    }
+    /**
+     * Add a new callback when the API request resolves with a 204 No content
+     *
+     * @param func Callback to call. Takes in no parameters
+     *
+     * @returns The F-bounded polymorphic this
+     */
+    noContent(func) {
+        if (this._resolved == true && this.status == 204) {
+            func();
+        }
+        this.addCallback(204, func);
+        return this;
+    }
+    /**
+     * Add a new callback when the API request resolves with a 400 Bad request
+     *
+     * @param func Callback to call. Takes in a string representing the bad request's error
+     *
+     * @returns The F-bounded polymorphic this
+     */
+    badRequest(func) {
+        if (this._resolved == true && this.status == 400) {
+            func(this.data);
+        }
+        this.addCallback(400, func);
+        return this;
+    }
+    /**
+     * Add a new callback when the API request resolves with a 403 Forbidden
+     *
+     * @param func Callback to call. Takes in a string respresenting the string returned from the API
+     *
+     * @returns The F-bounded polymorphic this
+     */
+    forbidden(func) {
+        if (this._resolved == true && this.status == 403) {
+            func(this.data);
+        }
+        this.addCallback(403, func);
+        return this;
+    }
+    /**
+     * Add a new callback when the API request resolves with a 404 Not found. Different from noContent,
+     * as noContent is usually when a GET request does not find the object, where notFound is returned
+     * during validation errors (typically validation object IDs not found)
+     *
+     * @param func Callback to call. Takes in the resource ID that was not found
+     *
+     * @returns The F-bounded polymorphic this
+     */
+    notFound(func) {
+        if (this._resolved == true && this.status == 404) {
+            func(this.data);
+        }
+        this.addCallback(404, func);
+        return this;
+    }
+    /**
+     * Add a new callback when the API request resolves with a 500 Internal server error
+     *
+     * @param func Callback to call. Takes in the error returned from the server
+     *
+     * @returns The F-bounded polymorphic this
+     */
+    internalError(func) {
+        if (this._resolved == true && this.status == 500) {
+            func(this.data);
+        }
+        this.addCallback(500, func);
+        return this;
+    }
+}
+exports.ApiResponse = ApiResponse;
+/**
+ * Array of possible status codes from a request
+ */
+ApiResponse.codes = [200, 201, 204, 400, 401, 403, 404, 413, 500, 501];
+/**
+ * Abstract wrapper class used by API wrappers
+ */
+class APIWrapper {
+    /**
+     * Read an array of objects from the endpoint into an array of the wrapped object
+     *
+     * @param elem An array of elements from an API endpoint
+     *
+     * @returns An array of type T
+     */
+    readList(elem) {
+        let result = [];
+        if (Array.isArray(elem)) {
+            elem.forEach((item) => {
+                result.push(this.readEntry(item));
+            });
+        }
+        return result;
+    }
+    /**
+     * Get an array of data from an API endpoint
+     *
+     * @param url   URL the API endpoint is located at
+     * @param data  Optional data to pass to the API endpoint
+     *
+     * @returns The ApiResponse that is being performed. Add callbacks using .ok(), etc.
+     */
+    get(url, data) {
+        if (data != undefined) {
+            for (const name in data) {
+                const val = data[name];
+                // Convert dates into ISO strings, which is what c# uses for DateTime binding
+                if (val instanceof Date) {
+                    data[name] = val.toISOString();
+                }
+            }
+        }
+        const promise = axios.default.request({
+            url: url,
+            data: JSON.stringify(data),
+            validateStatus: null,
+            method: "GET"
+        });
+        // Bind this to ensure that .readEntry by binding the inherited class instead of
+        // the base class APIWrapper
+        let result = new ApiResponse(promise, this.readList.bind(this));
+        return result;
+    }
+    /**
+     * Read a single entry from the API endpoint. If multiple entries are returned, only the first
+     * entry will be returned. A 404 does not return null, instead it will throw. For a null to
+     * be returned, the response must reply 204NoContent
+     *
+     * @param url   URL the API endpoint is located at
+     * @param data  Optional data to pass to the API endpoint
+     *
+     * @returns The ApiResponse that is being performed. Add callbacks using .ok(), etc.
+     */
+    single(url, data) {
+        const promise = axios.default.request({
+            url: url,
+            data: JSON.stringify(data),
+            validateStatus: null,
+            method: "GET"
+        });
+        let result = new ApiResponse(promise, this.readEntry);
+        return result;
+    }
+    /**
+     * Perform a post request. Typically used for inserting new data, or other operations that are
+     * not idempotent
+     *
+     * @param url   URL to perform the post request on
+     * @param data  Data to be passed when performing the post request. This data is JSONified before sent
+     *
+     * @returns The ApiResponse that is being performed. Add callbacks using .ok(), etc.
+     */
+    post(url, data) {
+        const promise = axios.default.request({
+            url: url,
+            responseType: "json",
+            data: JSON.stringify(data),
+            validateStatus: null,
+            method: "POST"
+        });
+        let result = new ApiResponse(promise, null);
+        return result;
+    }
+    /**
+     * Post a message which expects a reply from the API
+     *
+     * @param url   URL to perform the POST request on
+     * @param data  Data to be passed to the POST request. this data is JSONified before being sent in the body
+     *
+     * @returns The ApiResponse that is being performed. Add callbacks using .ok(), etc.
+     */
+    postReply(url, data) {
+        const promise = axios.default.request({
+            url: url,
+            data: JSON.stringify(data),
+            validateStatus: null,
+            method: "POST"
+        });
+        let result = new ApiResponse(promise, null);
+        return result;
+    }
+    /**
+     * Perform a PUT request. Operations perform with this method should be idempotent, which means this request
+     * can be repeated as many times as the client needs to (if say the network is botched and the client isn't
+     * sure if the request was successfully completed). This means it is not appropriate for creating objects
+     * (which is why creating is done through POSTing), but could also not be appropriate for updating certain
+     * objects
+     *
+     * @param url   URL to PUT to
+     * @param data  Option data to be passed when performing the PUT request
+     *
+     * @returns The ApiResponse that is being performed. Add callbacks using .ok(), etc.
+     */
+    put(url, data) {
+        const promise = axios.default.request({
+            url: url,
+            data: JSON.stringify(data),
+            validateStatus: null,
+            method: "PUT"
+        });
+        let result = new ApiResponse(promise, null);
+        return result;
+    }
+    /**
+     * Perform a DELETE request. Typically DELETE endpoints just take in a single value, which is the
+     * ID of the resource to delete
+     *
+     * @param url   URL to DELETE to
+     * @param data  Data to pass to the API endpoint. This data will be JSONified in the body when passed
+     *
+     * @returns The ApiResponse that is being performed. Add callbacks using .ok(), etc.
+     */
+    delete(url, data) {
+        const promise = axios.default.request({
+            url: url,
+            data: JSON.stringify(data),
+            validateStatus: null,
+            method: "DELETE"
+        });
+        let result = new ApiResponse(promise, null);
+        return result;
+    }
+}
+exports.APIWrapper = APIWrapper;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/census/CensusAPI.js":
+/*!***************************************************!*\
+  !*** ../topt-core/build/core/census/CensusAPI.js ***!
+  \***************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+const ApiWrapper_1 = __webpack_require__(/*! ./ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
+const axios = __webpack_require__(/*! axios */ "../topt-core/node_modules/axios/index.js");
+const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("CensusAPI");
+class CensusAPI {
+    static baseUrl() {
+        return `https://census.daybreakgames.com/s:${CensusAPI.serviceID}/get/ps2:v2`;
+    }
+    static init(serviceID) {
+        CensusAPI.serviceID = serviceID;
+        log.debug(`Initalizied CensusAPI with serviceID`);
+    }
+    static getType(url, reader) {
+        if (url.charAt(0) != "/") {
+            url = `/${url}`;
+        }
+        if (CensusAPI.serviceID.length == 0) {
+            throw `serviceID not given`;
+        }
+        return new ApiWrapper_1.ApiResponse(axios.default.get(`https://census.daybreakgames.com/s:${CensusAPI.serviceID}/get/ps2:v2${url}`), reader);
+    }
+    static get(url) {
+        if (url.charAt(0) != "/") {
+            url = `/${url}`;
+        }
+        if (CensusAPI.serviceID.length == 0) {
+            throw `serviceID not given`;
+        }
+        return new ApiWrapper_1.ApiResponse(axios.default.get(`https://census.daybreakgames.com/s:${CensusAPI.serviceID}/get/ps2:v2${url}`), ((elem) => elem));
+    }
+}
+exports.default = CensusAPI;
+CensusAPI.serviceID = "";
+CensusAPI.requestCount = 0;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/census/CharacterAPI.js":
+/*!******************************************************!*\
+  !*** ../topt-core/build/core/census/CharacterAPI.js ***!
+  \******************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.CharacterAPI = exports.Character = void 0;
+const CensusAPI_1 = __webpack_require__(/*! ./CensusAPI */ "../topt-core/build/core/census/CensusAPI.js");
+const ApiWrapper_1 = __webpack_require__(/*! ./ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
+const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("CharacterAPI");
+class Character {
+    constructor() {
+        this.ID = "";
+        this.name = "";
+        this.faction = "";
+        this.outfitID = "";
+        this.outfitTag = "";
+        this.outfitName = "";
+        this.online = false;
+        this.joinTime = 0;
+        this.secondsPlayed = 0;
+    }
+}
+exports.Character = Character;
+class CharacterAPI {
+    static parseCharacter(elem) {
+        const char = {
+            ID: elem.character_id,
+            name: elem.name.first,
+            faction: elem.faction_id,
+            outfitID: (elem.outfit != undefined) ? elem.outfit.outfit_id : "",
+            outfitTag: (elem.outfit != undefined) ? elem.outfit.alias : "",
+            outfitName: (elem.outfit != undefined) ? elem.outfit.name : "",
+            online: elem.online_status != "0",
+            joinTime: (new Date()).getTime(),
+            secondsPlayed: 0
+        };
+        CharacterAPI._cache.set(char.ID, char);
+        return char;
+    }
+    static getByID(charID) {
+        if (CharacterAPI._pending.has(charID)) {
+            return CharacterAPI._pending.get(charID);
+        }
+        const response = new ApiWrapper_1.ApiResponse();
+        CharacterAPI._pending.set(charID, response);
+        if (CharacterAPI._cache.has(charID)) {
+            response.resolveOk(CharacterAPI._cache.get(charID));
+        }
+        else {
+            const request = CensusAPI_1.default.get(`/character/?character_id=${charID}&c:resolve=outfit,online_status`);
+            request.ok((data) => {
+                if (data.returned != 1) {
+                    response.resolve({ code: 404, data: `No or multiple characters returned from ${name}` });
+                }
+                else {
+                    response.resolveOk(CharacterAPI.parseCharacter(data.character_list[0]));
+                }
+            }).always(() => {
+                CharacterAPI._pending.delete(charID);
+            });
+        }
+        return response;
+    }
+    static cache(charID) {
+        if (CharacterAPI._cache.has(charID)) {
+            return;
+        }
+        clearTimeout(CharacterAPI._pendingResolveID);
+        CharacterAPI._pendingIDs.push(charID);
+        if (CharacterAPI._pendingIDs.length > 9) {
+            CharacterAPI.getByIDs(CharacterAPI._pendingIDs).ok(() => { });
+            CharacterAPI._pendingIDs = [];
+        }
+        else {
+            CharacterAPI._pendingResolveID = setTimeout(() => {
+                CharacterAPI.getByIDs(CharacterAPI._pendingIDs).ok(() => { });
+            }, 5000);
+        }
+    }
+    static getByIDs(charIDs) {
+        const response = new ApiWrapper_1.ApiResponse();
+        if (charIDs.length == 0) {
+            response.resolveOk([]);
+            return response;
+        }
+        const chars = [];
+        const requestIDs = [];
+        for (const charID of charIDs) {
+            if (CharacterAPI._cache.has(charID)) {
+                const char = CharacterAPI._cache.get(charID);
+                chars.push(char);
+            }
+            else {
+                requestIDs.push(charID);
+            }
+        }
+        if (requestIDs.length > 0) {
+            const sliceSize = 50;
+            let slicesLeft = Math.ceil(requestIDs.length / sliceSize);
+            //log.log(`Have ${slicesLeft} slices to do. size of ${sliceSize}, data of ${requestIDs.length}`);
+            for (let i = 0; i < requestIDs.length; i += sliceSize) {
+                const slice = requestIDs.slice(i, i + sliceSize);
+                //log.log(`Slice ${i}: ${i} - ${i + sliceSize - 1}: [${slice.join(",")}]`);
+                const request = CensusAPI_1.default.get(`/character/?character_id=${slice.join(",")}&c:resolve=outfit,online_status`);
+                request.ok((data) => {
+                    if (data.returned == 0) {
+                        if (chars.length == 0) {
+                            response.resolve({ code: 404, data: `Missing characters: ${charIDs.join(",")}` });
+                        }
+                        else {
+                            response.resolveOk(chars);
+                        }
+                    }
+                    else {
+                        for (const datum of data.character_list) {
+                            const char = CharacterAPI.parseCharacter(datum);
+                            chars.push(char);
+                        }
+                    }
+                    --slicesLeft;
+                    if (slicesLeft == 0) {
+                        //log.log(`No more slices left, resolving`);
+                        response.resolveOk(chars);
+                    }
+                    else {
+                        //log.log(`${slicesLeft} slices left`);
+                    }
+                });
+            }
+        }
+        else {
+            response.resolveOk(chars);
+        }
+        return response;
+    }
+    static getByName(name) {
+        const response = new ApiWrapper_1.ApiResponse();
+        const request = CensusAPI_1.default.get(`/character/?name.first_lower=${name.toLowerCase()}&c:resolve=outfit,online_status`);
+        request.ok((data) => {
+            if (data.returned != 1) {
+                response.resolve({ code: 404, data: `No or multiple characters returned from ${name}` });
+            }
+            else {
+                response.resolveOk(CharacterAPI.parseCharacter(data.character_list[0]));
+            }
+        });
+        return response;
+    }
+}
+exports.CharacterAPI = CharacterAPI;
+CharacterAPI._cache = new Map();
+CharacterAPI._pending = new Map();
+CharacterAPI._pendingIDs = [];
+CharacterAPI._pendingResolveID = 0;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/census/EventAPI.js":
+/*!**************************************************!*\
+  !*** ../topt-core/build/core/census/EventAPI.js ***!
+  \**************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.EventAPI = void 0;
+//import { Event, EventKill, EventDeath } from "core/events/index";
+class EventAPI {
+    static parseEvent(elem) {
+        throw ``;
+    }
+}
+exports.EventAPI = EventAPI;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/census/FacilityAPI.js":
+/*!*****************************************************!*\
+  !*** ../topt-core/build/core/census/FacilityAPI.js ***!
+  \*****************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.FacilityAPI = exports.Facility = void 0;
+const CensusAPI_1 = __webpack_require__(/*! ./CensusAPI */ "../topt-core/build/core/census/CensusAPI.js");
+const ApiWrapper_1 = __webpack_require__(/*! ./ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
+const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("FacilityAPI");
+class Facility {
+    constructor() {
+        this.ID = "";
+        this.zoneID = "";
+        this.name = "";
+        this.typeID = "";
+        this.type = "";
+    }
+}
+exports.Facility = Facility;
+class FacilityAPI {
+    static parse(elem) {
+        return {
+            ID: elem.facility_id,
+            zoneID: elem.zone_id,
+            name: elem.facility_name,
+            typeID: elem.facility_type_id,
+            type: elem.facility_type
+        };
+    }
+    static setCache(data) {
+        for (const fac of data) {
+            FacilityAPI._cache.set(fac.ID, fac);
+        }
+    }
+    static precache(facilityID) {
+        clearTimeout(this._timeoutID);
+        this._idList.push(facilityID);
+        if (this._idList.length > 49) {
+            if (this._idList.length > 0) {
+                this.getByIDs(this._idList);
+                this._idList = [];
+            }
+        }
+        this._timeoutID = setTimeout(() => {
+            if (this._idList.length > 0) {
+                this.getByIDs(this._idList);
+                this._idList = [];
+            }
+        });
+    }
+    static getByID(facilityID) {
+        if (FacilityAPI._pending.has(facilityID)) {
+            log.trace(`${facilityID} already has a pending request, using that one instead`);
+            return FacilityAPI._pending.get(facilityID);
+        }
+        const response = new ApiWrapper_1.ApiResponse();
+        if (FacilityAPI._cache.has(facilityID)) {
+            const facility = FacilityAPI._cache.get(facilityID);
+            if (facility == null) {
+                response.resolve({ code: 204, data: null });
+            }
+            else {
+                response.resolveOk(facility);
+            }
+        }
+        else {
+            const request = CensusAPI_1.default.get(`/map_region?facility_id=${facilityID}`);
+            FacilityAPI._pending.set(facilityID, request);
+            request.ok((data) => {
+                if (data.returned == 0) {
+                    FacilityAPI._cache.set(facilityID, null);
+                    response.resolve({ code: 204, data: null });
+                }
+                else {
+                    const facility = FacilityAPI.parse(data.map_region_list[0]);
+                    FacilityAPI._cache.set(facility.ID, facility);
+                    response.resolveOk(facility);
+                }
+                FacilityAPI._pending.delete(facilityID);
+            });
+        }
+        return response;
+    }
+    static getByIDs(IDs) {
+        const response = new ApiWrapper_1.ApiResponse();
+        const facilities = [];
+        const requestIDs = [];
+        for (const facID of IDs) {
+            if (FacilityAPI._cache.has(facID)) {
+                const fac = FacilityAPI._cache.get(facID);
+                facilities.push(fac);
+            }
+            else {
+                requestIDs.push(facID);
+            }
+        }
+        if (requestIDs.length > 0) {
+            const request = CensusAPI_1.default.get(`/map_region?facility_id=${requestIDs.join(",")}&c:limit=100`);
+            request.ok((data) => {
+                if (data.returned == 0) {
+                    if (facilities.length == 0) {
+                        response.resolve({ code: 404, data: `No facilities returned from ${name}` });
+                    }
+                    else {
+                        response.resolveOk(facilities);
+                    }
+                }
+                else {
+                    const bases = [];
+                    for (const datum of data.map_region_list) {
+                        const fac = FacilityAPI.parse(datum);
+                        facilities.push(fac);
+                        bases.push(fac);
+                        FacilityAPI._cache.set(fac.ID, fac);
+                    }
+                    for (const facID of requestIDs) {
+                        const elem = bases.find(iter => iter.ID == facID);
+                        if (elem == undefined) {
+                            log.debug(`Failed to find Facility ID ${facID}, settings cache to null`);
+                            FacilityAPI._cache.set(facID, null);
+                        }
+                    }
+                    response.resolveOk(facilities);
+                }
+            }).internalError((err) => {
+                for (const wepID of requestIDs) {
+                    FacilityAPI._cache.set(wepID, null);
+                }
+                if (facilities.length > 0) {
+                    response.resolveOk(facilities);
+                }
+                else {
+                    response.resolve({ code: 500, data: "" });
+                }
+                log.error(err);
+            });
+        }
+        else {
+            response.resolveOk(facilities);
+        }
+        return response;
+    }
+    static getAll() {
+        const response = new ApiWrapper_1.ApiResponse();
+        const facilities = [];
+        const request = CensusAPI_1.default.get(`/map_region?&c:limit=10000`);
+        request.ok((data) => {
+            for (const datum of data.map_region_list) {
+                const fac = FacilityAPI.parse(datum);
+                facilities.push(fac);
+            }
+            response.resolveOk(facilities);
+        });
+        return response;
+    }
+}
+exports.FacilityAPI = FacilityAPI;
+FacilityAPI._cache = new Map();
+FacilityAPI._pending = new Map();
+FacilityAPI._idList = [];
+FacilityAPI._timeoutID = -1;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/census/OutfitAPI.js":
+/*!***************************************************!*\
+  !*** ../topt-core/build/core/census/OutfitAPI.js ***!
+  \***************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.OutfitAPI = exports.Outfit = void 0;
+const CensusAPI_1 = __webpack_require__(/*! ./CensusAPI */ "../topt-core/build/core/census/CensusAPI.js");
+const ApiWrapper_1 = __webpack_require__(/*! ./ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
+const CharacterAPI_1 = __webpack_require__(/*! ./CharacterAPI */ "../topt-core/build/core/census/CharacterAPI.js");
+const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("OutfitAPI");
+class Outfit {
+    constructor() {
+        this.ID = "";
+        this.name = "";
+        this.tag = "";
+        this.faction = "";
+    }
+}
+exports.Outfit = Outfit;
+class OutfitAPI {
+    static parse(elem) {
+        var _a, _b;
+        return {
+            ID: elem.outfit_id,
+            name: elem.name,
+            tag: elem.alias,
+            faction: (_b = (_a = elem.leader) === null || _a === void 0 ? void 0 : _a.faction_id) !== null && _b !== void 0 ? _b : "-1"
+        };
+    }
+    static getByID(ID) {
+        const response = new ApiWrapper_1.ApiResponse();
+        const request = CensusAPI_1.default.get(`/outfit/?outfit_id=${ID}&c:resolve=leader`);
+        request.ok((data) => {
+            if (data.returned != 1) {
+                response.resolve({ code: 404, data: `` });
+            }
+            else {
+                const outfit = OutfitAPI.parse(data.outfit_list[0]);
+                response.resolveOk(outfit);
+            }
+        });
+        return response;
+    }
+    static getByIDs(IDs) {
+        const response = new ApiWrapper_1.ApiResponse();
+        if (IDs.length == 0) {
+            response.resolve({ code: 204, data: null });
+            return response;
+        }
+        IDs = IDs.filter(i => i.length > 0 && i != "0");
+        log.debug(`Loading outfits: [${IDs.join(", ")}]`);
+        const outfits = [];
+        const sliceSize = 50;
+        let slicesLeft = Math.ceil(IDs.length / sliceSize);
+        log.debug(`Have ${slicesLeft} slices to do. size of ${sliceSize}, data of ${IDs.length}`);
+        for (let i = 0; i < IDs.length; i += sliceSize) {
+            const slice = IDs.slice(i, i + sliceSize);
+            log.trace(`slice: [${slice.join(", ")}]`);
+            const url = `/outfit/?outfit_id=${slice.join(",")}&c:resolve=leader`;
+            const request = CensusAPI_1.default.get(url);
+            log.trace(`made request to: '${url}'`);
+            request.ok((data) => {
+                if (data.returned == 0) {
+                }
+                else {
+                    for (const datum of data.outfit_list) {
+                        const char = OutfitAPI.parse(datum);
+                        outfits.push(char);
+                    }
+                }
+                --slicesLeft;
+                if (slicesLeft == 0) {
+                    log.debug(`No more slices left, resolving`);
+                    response.resolveOk(outfits);
+                }
+                else {
+                    log.trace(`${slicesLeft} slices left`);
+                }
+            }).always(() => {
+                log.debug(`${request.status}`);
+            });
+        }
+        return response;
+    }
+    static getByTag(outfitTag) {
+        const response = new ApiWrapper_1.ApiResponse();
+        const request = CensusAPI_1.default.get(`/outfit/?alias_lower=${outfitTag.toLocaleLowerCase()}&c:resolve=leader`);
+        request.ok((data) => {
+            if (data.returned != 1) {
+                response.resolve({ code: 404, data: `` });
+            }
+            else {
+                const outfit = OutfitAPI.parse(data.outfit_list[0]);
+                response.resolveOk(outfit);
+            }
+        });
+        return response;
+    }
+    static getCharactersByTag(outfitTag) {
+        const response = new ApiWrapper_1.ApiResponse();
+        const request = CensusAPI_1.default.get(`/outfit/?alias_lower=${outfitTag.toLowerCase()}&c:resolve=member_character,member_online_status`);
+        request.ok((data) => {
+            if (data.returned != 1) {
+                response.resolve({ code: 404, data: `${outfitTag} did not return 1 entry` });
+            }
+            else {
+                // With really big outfits (3k+ members) somehow a character that doesn't exist
+                //      shows up in the query. They don't have a name, so filter them out
+                const chars = data.outfit_list[0].members
+                    .filter((elem) => elem.name != undefined)
+                    .map((elem) => {
+                    return CharacterAPI_1.CharacterAPI.parseCharacter(Object.assign({ outfit: {
+                            alias: data.outfit_list[0].alias
+                        } }, elem));
+                });
+                response.resolveOk(chars);
+            }
+        });
+        return response;
+    }
+}
+exports.OutfitAPI = OutfitAPI;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/census/PsLoadout.js":
+/*!***************************************************!*\
+  !*** ../topt-core/build/core/census/PsLoadout.js ***!
+  \***************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.PsLoadouts = exports.PsLoadout = void 0;
+class PsLoadout {
+    constructor() {
+        this.ID = 0;
+        this.faction = "";
+        this.longName = "";
+        this.shortName = "";
+        this.singleName = "";
+        this.type = "unknown";
+    }
+    /**
+     * Get the type of loadout a loadoutID is
+     *
+     * @param loadoutID ID of the loadout to get the type of
+     */
+    static getLoadoutType(loadoutID) {
+        // NC / TR / VS / NS
+        if (loadoutID == "1" || loadoutID == "8" || loadoutID == "15" || loadoutID == "28") {
+            return "infil";
+        }
+        else if (loadoutID == "3" || loadoutID == "10" || loadoutID == "17" || loadoutID == "29") {
+            return "lightAssault";
+        }
+        else if (loadoutID == "4" || loadoutID == "11" || loadoutID == "18" || loadoutID == "30") {
+            return "medic";
+        }
+        else if (loadoutID == "5" || loadoutID == "12" || loadoutID == "19" || loadoutID == "31") {
+            return "engineer";
+        }
+        else if (loadoutID == "6" || loadoutID == "13" || loadoutID == "20" || loadoutID == "32") {
+            return "heavy";
+        }
+        else if (loadoutID == "7" || loadoutID == "14" || loadoutID == "21" || loadoutID == "33") {
+            return "medic";
+        }
+        return "unknown";
+    }
+}
+exports.PsLoadout = PsLoadout;
+PsLoadout.default = {
+    ID: -1,
+    faction: "DD",
+    longName: "Default",
+    shortName: "Def",
+    singleName: "D",
+    type: "unknown"
+};
+exports.PsLoadouts = new Map([
+    ["1", {
+            ID: 1,
+            faction: "NC",
+            longName: "Infiltrator",
+            shortName: "Infil",
+            singleName: "I",
+            type: "infil"
+        }],
+    ["3", {
+            ID: 3,
+            faction: "NC",
+            longName: "Light Assault",
+            shortName: "LA",
+            singleName: "L",
+            type: "lightAssault"
+        }],
+    ["4", {
+            ID: 4,
+            faction: "NC",
+            longName: "Medic",
+            shortName: "Medic",
+            singleName: "M",
+            type: "medic"
+        }],
+    ["5", {
+            ID: 5,
+            faction: "NC",
+            longName: "Engineer",
+            shortName: "Eng",
+            singleName: "E",
+            type: "engineer"
+        }],
+    ["6", {
+            ID: 5,
+            faction: "NC",
+            longName: "Heavy Assault",
+            shortName: "HA",
+            singleName: "H",
+            type: "heavy"
+        }],
+    ["7", {
+            ID: 7,
+            faction: "NC",
+            longName: "Max",
+            shortName: "Max",
+            singleName: "W",
+            type: "max"
+        }],
+    ["8", {
+            ID: 8,
+            faction: "TR",
+            longName: "Infiltrator",
+            shortName: "Infil",
+            singleName: "I",
+            type: "infil"
+        }],
+    ["10", {
+            ID: 10,
+            faction: "TR",
+            longName: "Light Assault",
+            shortName: "LA",
+            singleName: "L",
+            type: "lightAssault"
+        }],
+    ["11", {
+            ID: 11,
+            faction: "TR",
+            longName: "Medic",
+            shortName: "Medic",
+            singleName: "M",
+            type: "medic"
+        }],
+    ["12", {
+            ID: 12,
+            faction: "TR",
+            longName: "Engineer",
+            shortName: "Eng",
+            singleName: "E",
+            type: "engineer"
+        }],
+    ["13", {
+            ID: 13,
+            faction: "TR",
+            longName: "Heavy Assault",
+            shortName: "HA",
+            singleName: "H",
+            type: "heavy"
+        }],
+    ["14", {
+            ID: 14,
+            faction: "TR",
+            longName: "Max",
+            shortName: "Max",
+            singleName: "W",
+            type: "max"
+        }],
+    ["15", {
+            ID: 15,
+            faction: "VS",
+            longName: "Infiltrator",
+            shortName: "Infil",
+            singleName: "I",
+            type: "infil"
+        }],
+    ["17", {
+            ID: 17,
+            faction: "VS",
+            longName: "Light Assault",
+            shortName: "LA",
+            singleName: "L",
+            type: "lightAssault"
+        }],
+    ["18", {
+            ID: 18,
+            faction: "VS",
+            longName: "Medic",
+            shortName: "Medic",
+            singleName: "M",
+            type: "medic"
+        }],
+    ["19", {
+            ID: 19,
+            faction: "VS",
+            longName: "Engineer",
+            shortName: "Eng",
+            singleName: "E",
+            type: "engineer"
+        }],
+    ["20", {
+            ID: 20,
+            faction: "VS",
+            longName: "Heavy Assault",
+            shortName: "HA",
+            singleName: "H",
+            type: "heavy"
+        }],
+    ["21", {
+            ID: 21,
+            faction: "VS",
+            longName: "Max",
+            shortName: "Max",
+            singleName: "W",
+            type: "max"
+        }],
+    ["28", {
+            ID: 28,
+            faction: "NS",
+            longName: "Infiltrator",
+            shortName: "Infil",
+            singleName: "I",
+            type: "infil"
+        }],
+    ["29", {
+            ID: 29,
+            faction: "NS",
+            longName: "Light Assault",
+            shortName: "LA",
+            singleName: "L",
+            type: "lightAssault"
+        }],
+    ["30", {
+            ID: 30,
+            faction: "NS",
+            longName: "Medic",
+            shortName: "medic",
+            singleName: "M",
+            type: "medic"
+        }],
+    ["31", {
+            ID: 31,
+            faction: "NS",
+            longName: "Engineer",
+            shortName: "eng",
+            singleName: "E",
+            type: "engineer"
+        }],
+    ["32", {
+            ID: 32,
+            faction: "NS",
+            longName: "Heavy Assault",
+            shortName: "heavy",
+            singleName: "H",
+            type: "heavy"
+        }],
+    ["45", {
+            ID: 45,
+            faction: "NS",
+            longName: "MAX",
+            shortName: "max",
+            singleName: "W",
+            type: "max"
+        }],
+]);
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/census/VehicleAPI.js":
+/*!****************************************************!*\
+  !*** ../topt-core/build/core/census/VehicleAPI.js ***!
+  \****************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.VehicleAPI = exports.Vehicles = exports.VehicleTypes = exports.Vehicle = void 0;
+const CensusAPI_1 = __webpack_require__(/*! ./CensusAPI */ "../topt-core/build/core/census/CensusAPI.js");
+const ApiWrapper_1 = __webpack_require__(/*! ./ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
+const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("VehicleAPI");
+class Vehicle {
+    constructor() {
+        this.ID = "";
+        this.name = "";
+        this.typeID = "";
+    }
+}
+exports.Vehicle = Vehicle;
+class VehicleTypes {
+}
+exports.VehicleTypes = VehicleTypes;
+VehicleTypes.tracked = ["2033", "2010", "15", "14", "13", "12", "11", "10", "9", "8", "7", "6", "5", "4", "3", "2", "1"];
+VehicleTypes.ground = "5";
+VehicleTypes.magrider = "2";
+VehicleTypes.turret = "7";
+VehicleTypes.air = "1";
+VehicleTypes.spawn = "8";
+class Vehicles {
+}
+exports.Vehicles = Vehicles;
+Vehicles.flash = "1";
+Vehicles.sunderer = "2";
+Vehicles.lightning = "3";
+Vehicles.magrider = "4";
+Vehicles.vanguard = "5";
+Vehicles.prowler = "6";
+Vehicles.scythe = "7";
+Vehicles.reaver = "8";
+Vehicles.mosquito = "9";
+Vehicles.liberator = "10";
+Vehicles.galaxy = "11";
+Vehicles.harasser = "12";
+Vehicles.dropPod = "13";
+Vehicles.valkyrie = "14";
+Vehicles.ant = "15";
+Vehicles.bastionMosquite = "2122";
+Vehicles.bastionReaver = "2123";
+Vehicles.bastionScythe = "2124";
+class VehicleAPI {
+    static parse(elem) {
+        return {
+            ID: elem.vehicle_id,
+            typeID: elem.type_id,
+            name: elem.name.en,
+        };
+    }
+    static getByID(vehicleID) {
+        const response = new ApiWrapper_1.ApiResponse();
+        VehicleAPI.getAll().ok((data) => {
+            let found = false;
+            for (const veh of data) {
+                if (veh.ID == vehicleID) {
+                    response.resolveOk(veh);
+                    found = true;
+                    break;
+                }
+            }
+            if (found == false) {
+                response.resolve({ code: 204, data: null });
+            }
+        });
+        return response;
+    }
+    static getAll(ids = []) {
+        if (VehicleAPI._cache == null) {
+            VehicleAPI._cache = new ApiWrapper_1.ApiResponse();
+            const vehicles = [];
+            const response = CensusAPI_1.default.get(`vehicle?c:limit=100`);
+            response.ok((data) => {
+                for (const datum of data.vehicle_list) {
+                    vehicles.push(VehicleAPI.parse(datum));
+                }
+                VehicleAPI._cache.resolveOk(vehicles);
+                log.debug(`Cached ${vehicles.length} vehicles: [${vehicles.map(iter => iter.name).join(",")}]`);
+            });
+        }
+        return VehicleAPI._cache;
+    }
+}
+exports.VehicleAPI = VehicleAPI;
+VehicleAPI._cache = null;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/census/WeaponAPI.js":
+/*!***************************************************!*\
+  !*** ../topt-core/build/core/census/WeaponAPI.js ***!
+  \***************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.WeaponAPI = exports.Weapon = void 0;
+const CensusAPI_1 = __webpack_require__(/*! ./CensusAPI */ "../topt-core/build/core/census/CensusAPI.js");
+const ApiWrapper_1 = __webpack_require__(/*! ./ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
+const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("WeaponAPI");
+class Weapon {
+    constructor() {
+        this.ID = "";
+        this.name = "";
+        this.type = "";
+        this.factionID = "";
+        this.imageSetID = "";
+        this.imageID = "";
+    }
+}
+exports.Weapon = Weapon;
+class WeaponAPI {
+    static maxTypeFixer(name) {
+        if (name == "AI MAX (Left)" || name == "AI MAX (Right)") {
+            return "AI MAX";
+        }
+        if (name == "AV MAX (Left)" || name == "AV MAX (Right)") {
+            return "AV MAX";
+        }
+        if (name == "AA MAX (Left)" || name == "AA MAX (Right)") {
+            return "AA MAX";
+        }
+        return name;
+    }
+    static parseCharacter(elem) {
+        var _a, _b, _c, _d;
+        return {
+            ID: elem.item_id,
+            name: (_b = (_a = elem.name) === null || _a === void 0 ? void 0 : _a.en) !== null && _b !== void 0 ? _b : `Unnamed ${elem.item_id}`,
+            type: this.maxTypeFixer((_d = (_c = elem.category) === null || _c === void 0 ? void 0 : _c.name.en) !== null && _d !== void 0 ? _d : "Unknown"),
+            factionID: elem.faction_id,
+            imageSetID: elem.image_set_id,
+            imageID: elem.image_id
+        };
+    }
+    static setCache(weapons) {
+        for (const weapon of weapons) {
+            WeaponAPI._cache.set(weapon.ID, weapon);
+        }
+    }
+    static getEntires() {
+        // P sure this is safe
+        return Array.from(WeaponAPI._cache.values())
+            .filter(iter => iter != null);
+    }
+    static precache(weaponID) {
+        clearTimeout(this._pendingTimerID);
+        if (this._pendingCaches.indexOf(weaponID) == -1) {
+            this._pendingCaches.push(weaponID);
+        }
+        this._pendingTimerID = setTimeout(() => {
+            this.getByIDs(this._pendingCaches);
+        }, 100);
+    }
+    static getByID(weaponID) {
+        if (WeaponAPI._pendingRequests.has(weaponID)) {
+            return WeaponAPI._pendingRequests.get(weaponID);
+        }
+        const response = new ApiWrapper_1.ApiResponse();
+        if (WeaponAPI._cache.has(weaponID)) {
+            response.resolveOk(WeaponAPI._cache.get(weaponID));
+        }
+        else {
+            const request = CensusAPI_1.default.get(`item?item_id=${weaponID}&c:hide=description,max_stack_size,image_path&c:lang=en&c:join=item_category^inject_at:category`);
+            WeaponAPI._pendingRequests.set(weaponID, response);
+            request.ok((data) => {
+                if (data.returned != 1) {
+                    response.resolve({ code: 404, data: `No or multiple weapons returned from ${name}` });
+                }
+                else {
+                    const wep = WeaponAPI.parseCharacter(data.item_list[0]);
+                    if (!WeaponAPI._cache.has(wep.ID)) {
+                        WeaponAPI._cache.set(wep.ID, wep);
+                    }
+                    response.resolveOk(wep);
+                }
+            }).internalError((err) => {
+                WeaponAPI._cache.set(weaponID, null);
+                log.error(err);
+            }).always(() => {
+                WeaponAPI._pendingRequests.delete(weaponID);
+            });
+        }
+        return response;
+    }
+    static getByIDs(weaponIDs) {
+        const response = new ApiWrapper_1.ApiResponse();
+        // Remove duplicates
+        weaponIDs = weaponIDs.filter((v, i, a) => a.indexOf(v) == i);
+        const weapons = [];
+        const requestIDs = [];
+        for (const weaponID of weaponIDs) {
+            if (WeaponAPI._cache.has(weaponID)) {
+                const wep = WeaponAPI._cache.get(weaponID);
+                if (wep != null) {
+                    weapons.push(wep);
+                }
+            }
+            else {
+                requestIDs.push(weaponID);
+            }
+        }
+        if (requestIDs.length > 0) {
+            const request = CensusAPI_1.default.get(`item?item_id=${requestIDs.join(",")}&c:hide=description,max_stack_size,image_path&c:lang=en&c:join=item_category^inject_at:category`);
+            request.ok((data) => {
+                if (data.returned == 0) {
+                    if (weapons.length == 0) {
+                        response.resolve({ code: 404, data: `No or multiple weapons returned from ${name}` });
+                    }
+                    else {
+                        response.resolveOk(weapons);
+                    }
+                }
+                else {
+                    for (const datum of data.item_list) {
+                        const wep = WeaponAPI.parseCharacter(datum);
+                        weapons.push(wep);
+                        WeaponAPI._cache.set(wep.ID, wep);
+                    }
+                    response.resolveOk(weapons);
+                }
+            }).internalError((err) => {
+                for (const wepID of requestIDs) {
+                    WeaponAPI._cache.set(wepID, null);
+                }
+                if (weapons.length > 0) {
+                    log.error(`API call failed, but some weapons were cached, so using that`);
+                    response.resolveOk(weapons);
+                }
+                else {
+                    response.resolve({ code: 500, data: "" });
+                }
+                log.error(err);
+            });
+        }
+        else {
+            response.resolveOk(weapons);
+        }
+        return response;
+    }
+}
+exports.WeaponAPI = WeaponAPI;
+WeaponAPI._cache = new Map([["0", null]]);
+WeaponAPI._pendingCaches = [];
+WeaponAPI._pendingTimerID = -1;
+// <weapon ID, response>
+WeaponAPI._pendingRequests = new Map();
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/events/index.js":
+/*!***********************************************!*\
+  !*** ../topt-core/build/core/events/index.js ***!
+  \***********************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/index.js":
+/*!****************************************!*\
+  !*** ../topt-core/build/core/index.js ***!
+  \****************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __exportStar = (this && this.__exportStar) || function(m, exports) {
+    for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const Core_1 = __webpack_require__(/*! ./Core */ "../topt-core/build/core/Core.js");
+__webpack_require__(/*! ./CoreProcessing */ "../topt-core/build/core/CoreProcessing.js");
+__webpack_require__(/*! ./CoreConnection */ "../topt-core/build/core/CoreConnection.js");
+__webpack_require__(/*! ./CoreDebugHelper */ "../topt-core/build/core/CoreDebugHelper.js");
+__webpack_require__(/*! ./CoreSquad */ "../topt-core/build/core/CoreSquad.js");
+exports.default = Core_1.Core;
+__exportStar(__webpack_require__(/*! ./census/AchievementAPI */ "../topt-core/build/core/census/AchievementAPI.js"), exports);
+__exportStar(__webpack_require__(/*! ./census/ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js"), exports);
+__exportStar(__webpack_require__(/*! ./census/CensusAPI */ "../topt-core/build/core/census/CensusAPI.js"), exports);
+__exportStar(__webpack_require__(/*! ./census/CharacterAPI */ "../topt-core/build/core/census/CharacterAPI.js"), exports);
+__exportStar(__webpack_require__(/*! ./census/EventAPI */ "../topt-core/build/core/census/EventAPI.js"), exports);
+__exportStar(__webpack_require__(/*! ./census/FacilityAPI */ "../topt-core/build/core/census/FacilityAPI.js"), exports);
+__exportStar(__webpack_require__(/*! ./census/OutfitAPI */ "../topt-core/build/core/census/OutfitAPI.js"), exports);
+__exportStar(__webpack_require__(/*! ./census/PsLoadout */ "../topt-core/build/core/census/PsLoadout.js"), exports);
+__exportStar(__webpack_require__(/*! ./census/VehicleAPI */ "../topt-core/build/core/census/VehicleAPI.js"), exports);
+__exportStar(__webpack_require__(/*! ./census/WeaponAPI */ "../topt-core/build/core/census/WeaponAPI.js"), exports);
+__exportStar(__webpack_require__(/*! ./objects/index */ "../topt-core/build/core/objects/index.js"), exports);
+__exportStar(__webpack_require__(/*! ./Playback */ "../topt-core/build/core/Playback.js"), exports);
+__exportStar(__webpack_require__(/*! ./events/index */ "../topt-core/build/core/events/index.js"), exports);
+__exportStar(__webpack_require__(/*! ./reports/OutfitReport */ "../topt-core/build/core/reports/OutfitReport.js"), exports);
+__exportStar(__webpack_require__(/*! ./reports/FightReport */ "../topt-core/build/core/reports/FightReport.js"), exports);
+__exportStar(__webpack_require__(/*! ./squad/Squad */ "../topt-core/build/core/squad/Squad.js"), exports);
+__exportStar(__webpack_require__(/*! ./squad/SquadMember */ "../topt-core/build/core/squad/SquadMember.js"), exports);
+__exportStar(__webpack_require__(/*! ./CoreSettings */ "../topt-core/build/core/CoreSettings.js"), exports);
+__exportStar(__webpack_require__(/*! ./EventReporter */ "../topt-core/build/core/EventReporter.js"), exports);
+__exportStar(__webpack_require__(/*! ./InvididualGenerator */ "../topt-core/build/core/InvididualGenerator.js"), exports);
+__exportStar(__webpack_require__(/*! ./PsEvent */ "../topt-core/build/core/PsEvent.js"), exports);
+__exportStar(__webpack_require__(/*! ./StatMap */ "../topt-core/build/core/StatMap.js"), exports);
+__exportStar(__webpack_require__(/*! ./winter/index */ "../topt-core/build/core/winter/index.js"), exports);
+__exportStar(__webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Loggers.js"), exports);
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/objects/BaseExchange.js":
+/*!*******************************************************!*\
+  !*** ../topt-core/build/core/objects/BaseExchange.js ***!
+  \*******************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.BaseExchange = void 0;
+class BaseExchange {
+    constructor() {
+        /**
+         * ID of the facility that was captured
+         */
+        this.facilityID = "";
+        /**
+         * ID of the zone the capture took place
+         */
+        this.zoneID = "";
+        /**
+         * Timestamp of when the capture too place
+         */
+        this.timestamp = new Date();
+        /**
+         * How many ms the base was held before it was captured
+         */
+        this.timeHeld = 0;
+        /**
+         * ID of the faction that captured the base
+         */
+        this.factionID = "";
+        /**
+         * ID of the outfit that captured the base
+         */
+        this.outfitID = "";
+        /**
+         * ID of the previous faction that held the base before it was captured
+         */
+        this.previousFaction = "";
+    }
+}
+exports.BaseExchange = BaseExchange;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/objects/BaseFightEncounter.js":
+/*!*************************************************************!*\
+  !*** ../topt-core/build/core/objects/BaseFightEncounter.js ***!
+  \*************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.BaseFightEncounter = void 0;
+class BaseFightEncounter {
+    constructor() {
+        /**
+         * In milliseconds
+         */
+        this.timestamp = 0;
+        this.sourceID = "";
+        this.targetID = "";
+        this.outcome = "unknown";
+    }
+}
+exports.BaseFightEncounter = BaseFightEncounter;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/objects/BaseFightEntry.js":
+/*!*********************************************************!*\
+  !*** ../topt-core/build/core/objects/BaseFightEntry.js ***!
+  \*********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.BaseFightEntry = void 0;
+class BaseFightEntry {
+    constructor() {
+        this.charID = "";
+        this.name = "";
+        this.score = 0;
+        this.kills = [];
+        this.deaths = [];
+        this.events = [];
+    }
+}
+exports.BaseFightEntry = BaseFightEntry;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/objects/BaseOverview.js":
+/*!*******************************************************!*\
+  !*** ../topt-core/build/core/objects/BaseOverview.js ***!
+  \*******************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.BaseOverview = void 0;
+class BaseOverview {
+    constructor() {
+        this.facilityID = "";
+        this.facilityName = "";
+        this.facilityType = "";
+        this.fightDuration = 0;
+        this.participants = [];
+        this.events = [];
+        this.encounters = [];
+        this.enc = [];
+        this.top = {
+            kills: ["", 0],
+            heals: ["", 0],
+            revives: ["", 0],
+            resupplies: ["", 0],
+        };
+    }
+}
+exports.BaseOverview = BaseOverview;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/objects/BaseStatus.js":
+/*!*****************************************************!*\
+  !*** ../topt-core/build/core/objects/BaseStatus.js ***!
+  \*****************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.BaseStatus = void 0;
+class BaseStatus {
+    constructor() {
+        this.timestamp = 0;
+        this.alive = 0;
+        this.dead = 0;
+        this.total = 0;
+    }
+}
+exports.BaseStatus = BaseStatus;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/objects/SquadStat.js":
+/*!****************************************************!*\
+  !*** ../topt-core/build/core/objects/SquadStat.js ***!
+  \****************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.SquadStat = void 0;
+class SquadStat {
+    constructor() {
+        /**
+         * Name of the squad these stats are for
+         */
+        this.name = "";
+        /**
+         * Lets of members in the squad
+         */
+        this.members = [];
+        /**
+         * Number of kills people in the squad got
+         */
+        this.kills = 0;
+        /**
+         * Number of deaths people in the squad got
+         */
+        this.deaths = 0;
+        /**
+         * Number of revives the people in the squad got
+         */
+        this.revives = 0;
+        /**
+         * Number of heals people in the squad got
+         */
+        this.heals = 0;
+        /**
+         * Number of resupplies people in the squad got
+         */
+        this.resupplies = 0;
+        /**
+         * Number of repairs people in the squad got
+         */
+        this.repairs = 0;
+        /**
+         * Number of vehicle kills people in the squad got
+         */
+        this.vKills = 0;
+    }
+}
+exports.SquadStat = SquadStat;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/objects/TrackedPlayer.js":
+/*!********************************************************!*\
+  !*** ../topt-core/build/core/objects/TrackedPlayer.js ***!
+  \********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.TrackedPlayer = void 0;
+const StatMap_1 = __webpack_require__(/*! ../StatMap */ "../topt-core/build/core/StatMap.js");
+/**
+ * Represents a character that is being tracked
+ */
+class TrackedPlayer {
+    constructor() {
+        /**
+         * Unique character ID of the tracked player
+         */
+        this.characterID = "";
+        /**
+         * Tag of the outfit, if the character is in one
+         */
+        this.outfitTag = "";
+        /**
+         * Name of the character
+         */
+        this.name = "";
+        /**
+         * What faction the character is a part of
+         */
+        this.faction = "";
+        /**
+         * How much accumulated score a character has gotten during tracking
+         */
+        this.score = 0;
+        /**
+         * If this character is currently online
+         */
+        this.online = true;
+        /**
+         * What time (in MS) the character more recently joined, to a minimum of when the tracker started
+         */
+        this.joinTime = 0;
+        /**
+         * How many seconds the character has been online for
+         */
+        this.secondsOnline = 0;
+        /**
+         * How many times a character has gotten each experience event
+         */
+        this.stats = new StatMap_1.default();
+        /**
+         * How many times a character has gotten each ribbon
+         */
+        this.ribbons = new StatMap_1.default();
+        /**
+         * Reference to the most recent death event, used for tracking revives
+         */
+        this.recentDeath = null;
+        /**
+         * The events that have occured because of a player
+         */
+        this.events = [];
+    }
+}
+exports.TrackedPlayer = TrackedPlayer;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/objects/index.js":
+/*!************************************************!*\
+  !*** ../topt-core/build/core/objects/index.js ***!
+  \************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.BaseStatus = exports.BaseFightEncounter = exports.BaseFightEntry = exports.BaseOverview = exports.SquadStat = exports.TrackedPlayer = exports.BaseExchange = void 0;
+const BaseExchange_1 = __webpack_require__(/*! ./BaseExchange */ "../topt-core/build/core/objects/BaseExchange.js");
+Object.defineProperty(exports, "BaseExchange", { enumerable: true, get: function () { return BaseExchange_1.BaseExchange; } });
+const TrackedPlayer_1 = __webpack_require__(/*! ./TrackedPlayer */ "../topt-core/build/core/objects/TrackedPlayer.js");
+Object.defineProperty(exports, "TrackedPlayer", { enumerable: true, get: function () { return TrackedPlayer_1.TrackedPlayer; } });
+const SquadStat_1 = __webpack_require__(/*! ./SquadStat */ "../topt-core/build/core/objects/SquadStat.js");
+Object.defineProperty(exports, "SquadStat", { enumerable: true, get: function () { return SquadStat_1.SquadStat; } });
+const BaseOverview_1 = __webpack_require__(/*! ./BaseOverview */ "../topt-core/build/core/objects/BaseOverview.js");
+Object.defineProperty(exports, "BaseOverview", { enumerable: true, get: function () { return BaseOverview_1.BaseOverview; } });
+const BaseFightEntry_1 = __webpack_require__(/*! ./BaseFightEntry */ "../topt-core/build/core/objects/BaseFightEntry.js");
+Object.defineProperty(exports, "BaseFightEntry", { enumerable: true, get: function () { return BaseFightEntry_1.BaseFightEntry; } });
+const BaseFightEncounter_1 = __webpack_require__(/*! ./BaseFightEncounter */ "../topt-core/build/core/objects/BaseFightEncounter.js");
+Object.defineProperty(exports, "BaseFightEncounter", { enumerable: true, get: function () { return BaseFightEncounter_1.BaseFightEncounter; } });
+const BaseStatus_1 = __webpack_require__(/*! ./BaseStatus */ "../topt-core/build/core/objects/BaseStatus.js");
+Object.defineProperty(exports, "BaseStatus", { enumerable: true, get: function () { return BaseStatus_1.BaseStatus; } });
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/reports/FightReport.js":
+/*!******************************************************!*\
+  !*** ../topt-core/build/core/reports/FightReport.js ***!
+  \******************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.FightReportGenerator = exports.FightReportPlayer = exports.FightReportEntry = exports.FightReportEncounter = exports.FightReport = exports.FightReportParameters = void 0;
+const ApiWrapper_1 = __webpack_require__(/*! ../census/ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
+const PsEvent_1 = __webpack_require__(/*! ../PsEvent */ "../topt-core/build/core/PsEvent.js");
+const EventReporter_1 = __webpack_require__(/*! ../EventReporter */ "../topt-core/build/core/EventReporter.js");
+const InvididualGenerator_1 = __webpack_require__(/*! ../InvididualGenerator */ "../topt-core/build/core/InvididualGenerator.js");
+const FacilityAPI_1 = __webpack_require__(/*! ../census/FacilityAPI */ "../topt-core/build/core/census/FacilityAPI.js");
+const StatMap_1 = __webpack_require__(/*! ../StatMap */ "../topt-core/build/core/StatMap.js");
+const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("FightReport");
+class FightReportParameters {
+    constructor() {
+        /**
+         * Events used to generate the report
+         */
+        this.events = [];
+        /**
+         * Map of players that will be part of the report <Character ID, TrackedPlayer>
+         */
+        this.players = new Map();
+    }
+}
+exports.FightReportParameters = FightReportParameters;
+class FightReport {
+    constructor() {
+        /**
+         * When the first event was created
+         */
+        this.startTime = new Date();
+        /**
+         * When the last event was produced
+         */
+        this.endTime = new Date();
+        /**
+         * Each fight in the session
+         */
+        this.entries = [];
+    }
+}
+exports.FightReport = FightReport;
+class FightReportEncounter {
+    constructor() {
+        this.charID = "";
+        this.timestamps = [];
+    }
+}
+exports.FightReportEncounter = FightReportEncounter;
+class FightReportEntry {
+    constructor() {
+        /**
+         * When the fight started
+         */
+        this.startTime = new Date();
+        /**
+         * When the fight ended
+         */
+        this.endTime = new Date();
+        /**
+         * How long the fight lasted in seconds
+         */
+        this.duration = 0;
+        /**
+         * ID of the facility the fight might have taken place at
+         */
+        this.facilityID = null;
+        /**
+         * Idk what I'll use this for yet
+         */
+        this.name = "Unknown fight";
+        /**
+         * Players who were tracked for this fight
+         */
+        this.participants = [];
+        /**
+         * Breakdown of classes at the fight
+         */
+        this.classBreakdown = new EventReporter_1.BreakdownArray();
+        /**
+         * Events that occured during the fight
+         */
+        this.events = [];
+        /**
+         * Char IDs of all the allies found at the fight
+         */
+        this.allies = new Map();
+        /**
+         * Char IDs of all enemies found at the fight
+         */
+        this.enemies = new Map();
+        this.count = {
+            score: 0,
+            kills: 0,
+            deaths: 0,
+            revives: 0,
+            heals: 0,
+            spawns: 0
+        };
+        this.perPlayer = {
+            kpm: [],
+            dpm: [],
+            kd: [],
+            hpm: [],
+            rpm: []
+        };
+        this.charts = {
+            kills: [],
+            deaths: [],
+            heals: [],
+            revives: [],
+            kpm: [],
+            uniqueEnemies: []
+        };
+    }
+}
+exports.FightReportEntry = FightReportEntry;
+/**
+ * What a single player did during a single fight
+ */
+class FightReportPlayer {
+    constructor() {
+        /**
+         * ID of the player
+         */
+        this.ID = "";
+        /**
+         * Name of the player
+         */
+        this.name = "";
+        /**
+         * Outfit tag of the player
+         */
+        this.tag = "";
+        /**
+         * When the first event during a fight was
+         */
+        this.startDate = new Date();
+        /**
+         * When the last event during a fight was
+         */
+        this.endDate = new Date();
+        /**
+         * How long in seconds this player was part of the fight
+         */
+        this.duration = 0;
+        /**
+         * How many kills this player got during the fight
+         */
+        this.kills = 0;
+        /**
+         * How many times this player died during the fight
+         */
+        this.deaths = 0;
+        /**
+         * How many heals they got during this fight
+         */
+        this.heals = 0;
+        /**
+         * How many revives they got during the fight
+         */
+        this.revives = 0;
+        /**
+         * How many spawns they got during the fight
+         */
+        this.spawns = 0;
+    }
+}
+exports.FightReportPlayer = FightReportPlayer;
+class FightReportGenerator {
+    static generate(parameters) {
+        const response = new ApiWrapper_1.ApiResponse();
+        const report = new FightReport();
+        if (parameters.events.length == 0 || parameters.players.size == 0) {
+            response.resolveOk(report);
+            return response;
+        }
+        report.startTime = new Date(parameters.events[0].timestamp);
+        report.endTime = new Date(parameters.events[parameters.events.length - 1].timestamp);
+        const playerIDs = [];
+        parameters.players.forEach((player, charID) => {
+            playerIDs.push(charID);
+        });
+        log.debug(`Looking for these char IDs for capture/defend events: [${playerIDs.join(", ")}]`);
+        const facilityIDs = parameters.events.filter(iter => iter.type == "capture" || iter.type == "defend")
+            .map(iter => iter.facilityID)
+            .filter((v, i, a) => a.indexOf(v) == i);
+        // These events will contain the char ID of someone who is allied to the source,
+        //      which is useful in determining which base a fight took place at
+        const allyEventIDs = [
+            PsEvent_1.PsEvent.heal, PsEvent_1.PsEvent.squadHeal,
+            PsEvent_1.PsEvent.revive, PsEvent_1.PsEvent.squadRevive,
+            PsEvent_1.PsEvent.resupply, PsEvent_1.PsEvent.squadResupply,
+            PsEvent_1.PsEvent.maxRepair, PsEvent_1.PsEvent.squadMaxRepair,
+            PsEvent_1.PsEvent.shieldRepair, PsEvent_1.PsEvent.squadShieldRepair,
+        ];
+        FacilityAPI_1.FacilityAPI.getByIDs(facilityIDs).ok((facilities) => {
+            var _a, _b;
+            log.debug(`Loaded ${facilities.length} from ${facilityIDs.length} IDs`);
+            let inFight = false;
+            let entry = new FightReportEntry();
+            let alliesFound = new Map();
+            let enemiesFound = new Map();
+            for (let i = 0; i < parameters.events.length; ++i) {
+                const event = parameters.events[i];
+                // Check if this is a fight start marker
+                if (event.type == "marker") {
+                    // Check if we're starting a fight or not
+                    if (event.mark == "battle-start") {
+                        if (inFight == false) {
+                            log.debug(`New fight started at ${event.timestamp}`);
+                            entry.startTime = new Date(event.timestamp);
+                        }
+                        else {
+                            log.debug(`battle-start found without a battle-end, discarding previous fight`);
+                            entry = new FightReportEntry();
+                            entry.startTime = new Date(event.timestamp);
+                        }
+                        inFight = true;
+                    }
+                    else if (event.mark == "battle-end") {
+                        if (inFight == true) {
+                            log.debug(`Current fight ended at ${event.timestamp} (from ${entry.startTime.getTime()}), saving`);
+                            entry.endTime = new Date(event.timestamp);
+                            entry.duration = (event.timestamp - entry.startTime.getTime()) / 1000; // ms to seconds
+                            entry.allies = alliesFound;
+                            entry.enemies = enemiesFound;
+                            log.info(`#Allies: ${entry.allies.size}, #Enemies: ${entry.enemies.size}`);
+                            report.entries.push(this.finalizeEntry(entry, parameters, facilities));
+                            entry = new FightReportEntry();
+                        }
+                        inFight = false;
+                    }
+                }
+                // Who cares if we're not in a fight
+                if (inFight == false) {
+                    continue;
+                }
+                entry.events.push(event);
+                // Handle the event based on it's type
+                if (event.type == "kill") {
+                    ++entry.count.kills;
+                    enemiesFound.set(event.targetID, event.timestamp);
+                }
+                else if (event.type == "death") {
+                    if (event.revived == false) {
+                        ++entry.count.deaths;
+                    }
+                    enemiesFound.set(event.targetID, event.timestamp);
+                }
+                else if (event.type == "exp") {
+                    if (event.expID == PsEvent_1.PsEvent.heal || event.expID == PsEvent_1.PsEvent.squadHeal) {
+                        ++entry.count.heals;
+                    }
+                    else if (event.expID == PsEvent_1.PsEvent.revive || event.expID == PsEvent_1.PsEvent.squadRevive) {
+                        ++entry.count.revives;
+                    }
+                    else if (event.expID == PsEvent_1.PsEvent.squadSpawn || ["201", "233", "355", "1410"].indexOf(event.expID) > -1) {
+                        ++entry.count.spawns;
+                    }
+                    if (allyEventIDs.indexOf(event.expID) > -1) {
+                        alliesFound.set(event.targetID, event.timestamp);
+                    }
+                }
+                else if (event.type == "capture") {
+                    if (playerIDs.indexOf(event.sourceID) > -1) {
+                        if (entry.facilityID == null) {
+                            const fac = facilities.find(iter => iter.ID == event.facilityID);
+                            entry.name = `Successful capture of ${(_a = fac === null || fac === void 0 ? void 0 : fac.name) !== null && _a !== void 0 ? _a : `bad ID ${event.facilityID}`}`;
+                            entry.facilityID = event.facilityID;
+                        }
+                        else if (entry.facilityID != event.facilityID) {
+                            log.warn(`Fight already has a name: ${entry.name}`);
+                        }
+                    }
+                    else {
+                        //log.debug(`${event.sourceID} is not tracked, skipping`);
+                    }
+                }
+                else if (event.type == "defend" && playerIDs.indexOf(event.sourceID) > -1) {
+                    if (entry.facilityID == null) {
+                        const fac = facilities.find(iter => iter.ID == event.facilityID);
+                        entry.name = `Successful defense of ${(_b = fac === null || fac === void 0 ? void 0 : fac.name) !== null && _b !== void 0 ? _b : `bad ID ${event.facilityID}`}`;
+                        entry.facilityID = event.facilityID;
+                    }
+                    else if (entry.facilityID != event.facilityID) {
+                        log.warn(`Fight already has a name: ${entry.name}`);
+                    }
+                }
+            }
+            response.resolveOk(report);
+        });
+        return response;
+    }
+    /**
+     * Finalize the entry to be added to a report, such as getting the top contributers, kills over time, etc.
+     *
+     * @param entry Entry to finalize before inserting
+     *
+     * @returns |entry|
+     */
+    static finalizeEntry(entry, parameters, facilities) {
+        // Get all the participants during a fight
+        for (const event of entry.events) {
+            const player = parameters.players.get(event.sourceID);
+            if (player == undefined) {
+                continue;
+            }
+            let part = entry.participants.find(iter => iter.ID == event.sourceID);
+            if (part == undefined) {
+                part = {
+                    ID: player.characterID,
+                    name: player.name,
+                    tag: player.outfitTag,
+                    startDate: entry.startTime,
+                    endDate: new Date(),
+                    duration: 0,
+                    kills: 0,
+                    deaths: 0,
+                    heals: 0,
+                    revives: 0,
+                    spawns: 0
+                };
+                entry.participants.push(part);
+            }
+            if (event.type == "kill") {
+                ++part.kills;
+            }
+            else if (event.type == "death" && event.revived == false) {
+                ++part.deaths;
+            }
+            else if (event.type == "exp") {
+                if (event.expID == PsEvent_1.PsEvent.heal || event.expID == PsEvent_1.PsEvent.squadHeal) {
+                    ++part.heals;
+                }
+                else if (event.expID == PsEvent_1.PsEvent.revive || event.expID == PsEvent_1.PsEvent.squadRevive) {
+                    ++part.revives;
+                }
+                else if (event.expID == PsEvent_1.PsEvent.squadSpawn || ["201", "233", "355", "1410"].indexOf(event.expID) > -1) {
+                    ++part.spawns;
+                }
+            }
+            if (event.timestamp < entry.startTime.getTime() || event.timestamp > entry.endTime.getTime()) {
+                log.warn(`Event at ${event.timestamp} occured outside fight period (${entry.startTime.getTime()} to ${entry.endTime.getTime()}): ${JSON.stringify(event)}`);
+            }
+        }
+        const classBreakdown = new EventReporter_1.BreakdownArray();
+        const classArray = [
+            { display: "Infiltrator", sortField: "", amount: 0, color: undefined },
+            { display: "Light Assault", sortField: "", amount: 0, color: undefined },
+            { display: "Medic", sortField: "", amount: 0, color: undefined },
+            { display: "Engineer", sortField: "", amount: 0, color: undefined },
+            { display: "Heavy", sortField: "", amount: 0, color: undefined },
+            { display: "MAX", sortField: "", amount: 0, color: undefined },
+        ];
+        const reversedEvents = [...entry.events].reverse();
+        for (const part of entry.participants) {
+            part.endDate = entry.endTime;
+            //part.endDate = new Date(reversedEvents.find(iter => iter.sourceID == part.ID)!.timestamp);
+            part.duration = (part.endDate.getTime() - part.startDate.getTime()) / 1000;
+            let kpm = part.kills / (part.duration / 60);
+            entry.perPlayer.kpm.push(Number.isFinite(kpm) == false ? 0 : kpm);
+            let dpm = part.deaths / (part.duration / 60);
+            entry.perPlayer.dpm.push(Number.isFinite(dpm) == false ? 0 : dpm);
+            let hpm = part.heals / (part.duration / 60);
+            entry.perPlayer.hpm.push(Number.isFinite(hpm) == false ? 0 : hpm);
+            let rpm = part.revives / (part.duration / 60);
+            entry.perPlayer.rpm.push(Number.isFinite(rpm) == false ? 0 : rpm);
+            let kd = part.kills / (part.deaths || 1);
+            entry.perPlayer.kd.push(Number.isFinite(kd) == false ? 0 : kd);
+            const playtime = InvididualGenerator_1.IndividualReporter.classUsage({
+                events: entry.events,
+                player: parameters.players.get(part.ID),
+                routers: [],
+                tracking: { startTime: 0, endTime: 0, running: false }
+            });
+            const c = classArray.find(iter => iter.display == playtime.mostPlayed.name);
+            if (c == undefined) {
+                log.warn(`Failed to find Breakdown for class '${playtime.mostPlayed.name}'`);
+            }
+            else {
+                c.amount += 1;
+            }
+            //log.info(`${part.name} playtime: ${JSON.stringify(playtime)}`);
+        }
+        classBreakdown.data = classArray;
+        classBreakdown.total = classArray.length;
+        entry.classBreakdown = classBreakdown;
+        entry.perPlayer.kpm.sort((a, b) => a - b);
+        entry.perPlayer.dpm.sort((a, b) => a - b);
+        entry.perPlayer.hpm.sort((a, b) => a - b);
+        entry.perPlayer.rpm.sort((a, b) => a - b);
+        entry.perPlayer.kd.sort((a, b) => a - b);
+        let killCount = 0;
+        let deathCount = 0;
+        let reviveCount = 0;
+        let healCount = 0;
+        let kpm = 0;
+        let kpmTime = entry.events[0].timestamp;
+        const kpmInterval = 10;
+        const encountered = [];
+        // More stat getting, it's in a separate loop to make things logically easier to understand
+        //      with the huge downside of going thru all the events multiple times
+        for (const event of entry.events) {
+            if (event.type == "kill") {
+                killCount += 1;
+                entry.charts.kills.push({
+                    startTime: event.timestamp,
+                    endTime: event.timestamp,
+                    value: killCount
+                });
+                if (event.timestamp > (kpmTime + (kpmInterval * 1000))) {
+                    entry.charts.kpm.push({
+                        startTime: event.timestamp,
+                        endTime: event.timestamp,
+                        value: (kpm * (60 / kpmInterval)) / entry.participants.length
+                    });
+                    kpm = 0;
+                    kpmTime = event.timestamp;
+                }
+                kpm += 1;
+                if (encountered.indexOf(event.targetID) == -1) {
+                    encountered.push(event.targetID);
+                    entry.charts.uniqueEnemies.push({
+                        startTime: event.timestamp,
+                        endTime: event.timestamp,
+                        value: encountered.length
+                    });
+                }
+            }
+            else if (event.type == "death") {
+                deathCount += 1;
+                entry.charts.deaths.push({
+                    startTime: event.timestamp,
+                    endTime: event.timestamp,
+                    value: deathCount
+                });
+                if (encountered.indexOf(event.targetID) == -1) {
+                    encountered.push(event.targetID);
+                    entry.charts.uniqueEnemies.push({
+                        startTime: event.timestamp,
+                        endTime: event.timestamp,
+                        value: encountered.length
+                    });
+                }
+            }
+            else if (event.type == "exp") {
+                if (event.expID == PsEvent_1.PsEvent.heal || event.expID == PsEvent_1.PsEvent.squadHeal) {
+                    healCount += 1;
+                    entry.charts.heals.push({
+                        startTime: event.timestamp,
+                        endTime: event.timestamp,
+                        value: healCount
+                    });
+                }
+                else if (event.expID == PsEvent_1.PsEvent.revive || event.expID == PsEvent_1.PsEvent.squadRevive) {
+                    reviveCount += 1;
+                    entry.charts.revives.push({
+                        startTime: event.timestamp,
+                        endTime: event.timestamp,
+                        value: reviveCount
+                    });
+                }
+            }
+        }
+        if (entry.facilityID == null) {
+            log.debug(`No name for fight yet, finding`);
+            log.debug(`Allies: ${entry.allies.size}`);
+            log.debug(`Enemies: ${entry.enemies.size}`);
+            let successCaps = new StatMap_1.default();
+            let failedCaps = new StatMap_1.default();
+            let successDef = new StatMap_1.default();
+            let failedDef = new StatMap_1.default();
+            for (const event of entry.events) {
+                if (event.type == "capture") {
+                    log.debug(`Capture event: ${JSON.stringify(event)}`);
+                    if (entry.allies.has(event.sourceID)) {
+                        const value = entry.allies.get(event.sourceID);
+                        const diff = value - entry.startTime.getTime();
+                        log.debug(`Have a ${diff}ms diff between when ${event.sourceID} was seen and a good cap`);
+                        successCaps.increment(event.facilityID, diff);
+                    }
+                    if (entry.enemies.has(event.sourceID)) {
+                        const value = entry.enemies.get(event.sourceID);
+                        const diff = value - entry.startTime.getTime();
+                        log.debug(`Have a ${diff}ms diff between when ${event.sourceID} was seen and a bad def`);
+                        failedDef.increment(event.facilityID, diff);
+                    }
+                }
+                else if (event.type == "defend") {
+                    log.debug(`Defend event: ${JSON.stringify(event)}`);
+                    if (entry.allies.has(event.sourceID)) {
+                        const value = entry.allies.get(event.sourceID);
+                        const diff = value - entry.startTime.getTime();
+                        log.debug(`Have a ${diff}ms diff between when ${event.sourceID} was seen and a good def`);
+                        successDef.increment(event.facilityID, diff);
+                    }
+                    if (entry.enemies.has(event.sourceID)) {
+                        const value = entry.enemies.get(event.sourceID);
+                        const diff = value - entry.startTime.getTime();
+                        log.debug(`Have a ${diff}ms diff between when ${event.sourceID} was seen and a good def`);
+                        failedCaps.increment(event.facilityID, diff);
+                    }
+                }
+            }
+            log.info(`Cap/Def info:\n #SuccessCaps: ${successCaps.size()}\n #FailedCaps: ${failedCaps.size()}\n #SuccessDefs: ${successDef.size()}\n #FailedDefs: ${failedDef.size()}`);
+            log.debug(`${successCaps}`);
+            log.debug(`${failedCaps}`);
+            log.debug(`${successDef}`);
+            log.debug(`${failedDef}`);
+            let confidence = 0;
+            let name = `Unknown fight`;
+            const updateWeight = (map, context) => {
+                map.getMap().forEach((weight, facID) => {
+                    var _a;
+                    log.debug(`Checking if ${weight} from '${context}' at ${facID} is greater than ${confidence}`);
+                    if (weight > confidence) {
+                        const facility = facilities.find(iter => iter.ID == facID);
+                        name = `${context} of ${(_a = facility === null || facility === void 0 ? void 0 : facility.name) !== null && _a !== void 0 ? _a : `unknown facility ID ${facID}`}`;
+                        confidence = weight;
+                        entry.facilityID = facID;
+                    }
+                });
+            };
+            updateWeight(successCaps, "Successful capture");
+            updateWeight(failedCaps, "Failed capture");
+            updateWeight(successDef, "Successful defense");
+            updateWeight(failedDef, "Failed defense");
+            entry.name = name;
+        }
+        return entry;
+    }
+}
+exports.FightReportGenerator = FightReportGenerator;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/reports/OutfitReport.js":
+/*!*******************************************************!*\
+  !*** ../topt-core/build/core/reports/OutfitReport.js ***!
+  \*******************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.OutfitReportGenerator = exports.OutfitReport = exports.OutfitReportParameters = exports.OutfitReportSettings = void 0;
+const ApiWrapper_1 = __webpack_require__(/*! ../census/ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
+const PsLoadout_1 = __webpack_require__(/*! ../census/PsLoadout */ "../topt-core/build/core/census/PsLoadout.js");
+const PsEvent_1 = __webpack_require__(/*! ../PsEvent */ "../topt-core/build/core/PsEvent.js");
+const EventReporter_1 = __webpack_require__(/*! ../EventReporter */ "../topt-core/build/core/EventReporter.js");
+const InvididualGenerator_1 = __webpack_require__(/*! ../InvididualGenerator */ "../topt-core/build/core/InvididualGenerator.js");
+const index_1 = __webpack_require__(/*! ../objects/index */ "../topt-core/build/core/objects/index.js");
+const Squad_1 = __webpack_require__(/*! ../squad/Squad */ "../topt-core/build/core/squad/Squad.js");
+const FacilityAPI_1 = __webpack_require__(/*! ../census/FacilityAPI */ "../topt-core/build/core/census/FacilityAPI.js");
+const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("OutfitReport");
+class OutfitReportSettings {
+    constructor() {
+        /**
+         * ID of the zone to limit events to. Leaven null for all zones
+         */
+        this.zoneID = null;
+        /**
+         * If squad stats will be generated and displayed
+         */
+        this.showSquadStats = false;
+    }
+}
+exports.OutfitReportSettings = OutfitReportSettings;
+/**
+ * Parameters used to generate an outfit report
+ */
+class OutfitReportParameters {
+    constructor() {
+        /**
+         * Settings used to generate the report
+         */
+        this.settings = new OutfitReportSettings();
+        /**
+         * Facility captures that will be included in the report
+         */
+        //public captures: FacilityCapture[] = [];
+        this.captures = [];
+        /**
+         * List of all the capture events related to players that will be included in the report
+         */
+        this.playerCaptures = [];
+        /**
+         * List of events that will be included in the report
+         */
+        this.events = [];
+        /**
+         * Map of players that will be part of the report <Character ID, TrackedPlayer>
+         */
+        this.players = new Map();
+        /**
+         * Squad stats
+         */
+        this.squads = {
+            perm: [],
+            guesses: []
+        };
+        /**
+         * List of outfit IDs that will be included in the report
+         */
+        this.outfits = [];
+        /**
+         * The period of time that the report will be generated over
+         */
+        this.tracking = new InvididualGenerator_1.TimeTracking();
+    }
+}
+exports.OutfitReportParameters = OutfitReportParameters;
+/**
+ * Outfit report
+ */
+class OutfitReport {
+    constructor() {
+        /**
+         * The various stats and how many the outfit got, based on the exp events
+         */
+        this.stats = new Map();
+        /**
+         * Total score that was gained during the ops
+         */
+        this.score = 0;
+        /**
+         * The players that make the outfit report
+         */
+        this.players = [];
+        /**
+         * List of events that was generated during the outfit report
+         */
+        this.events = [];
+        /**
+         * The start and stop times that tracking was done over
+         */
+        this.tracking = new InvididualGenerator_1.TimeTracking();
+        /**
+         * The facility captures that took place
+         */
+        this.facilityCaptures = [];
+        /**
+         * Breakdown of each class and how many of each exp event each class got
+         */
+        this.classStats = new Map();
+        /**
+         * Breakdown of the score, what how many of each event and how much score
+         */
+        this.scoreBreakdown = [];
+        /**
+         * How many seconds each class is played over all members
+         */
+        this.classPlaytimes = new EventReporter_1.BreakdownArray();
+        /**
+         * Collection of stats per 5 minute blocks
+         */
+        this.overtimePer5 = {
+            kpm: [],
+            kd: [],
+            rpm: [],
+        };
+        /**
+         * Collection of stats per 1 minute blocks
+         */
+        this.overtimePer1 = {
+            kpm: [],
+            kd: [],
+            rpm: [],
+        };
+        /**
+         * Collection of stats updated everytime a relevant event is performed
+         */
+        this.perUpdate = {
+            kpm: [],
+            kd: [],
+            rpm: []
+        };
+        /**
+         * Numbers used to create the boxplot of KPMs
+         */
+        this.kpmBoxPlot = {
+            total: [],
+            infil: [],
+            lightAssault: [],
+            medic: [],
+            engineer: [],
+            heavy: [],
+            max: []
+        };
+        /**
+         * Numbers used to create the boxplot of KDs
+         */
+        this.kdBoxPlot = {
+            total: [],
+            infil: [],
+            lightAssault: [],
+            medic: [],
+            engineer: [],
+            heavy: [],
+            max: []
+        };
+        this.squadStats = {
+            data: [],
+            all: new index_1.SquadStat()
+        };
+        this.weaponKillBreakdown = new EventReporter_1.BreakdownArray();
+        this.weaponTypeKillBreakdown = new EventReporter_1.BreakdownArray();
+        this.teamkillBreakdown = new EventReporter_1.BreakdownArray();
+        this.teamkillTypeBreakdown = new EventReporter_1.BreakdownArray();
+        this.deathAllBreakdown = new EventReporter_1.BreakdownArray();
+        this.deathAllTypeBreakdown = new EventReporter_1.BreakdownArray();
+        this.deathRevivedBreakdown = new EventReporter_1.BreakdownArray();
+        this.deathRevivedTypeBreakdown = new EventReporter_1.BreakdownArray();
+        this.deathKilledBreakdown = new EventReporter_1.BreakdownArray();
+        this.deathKilledTypeBreakdown = new EventReporter_1.BreakdownArray();
+        this.outfitVersusBreakdown = [];
+        this.weaponTypeDeathBreakdown = [];
+        this.vehicleKillBreakdown = new EventReporter_1.BreakdownArray();
+        this.vehicleKillWeaponBreakdown = new EventReporter_1.BreakdownArray();
+        /**
+         * Unused
+         */
+        this.timeUnrevived = [];
+        this.revivedLifeExpectance = [];
+        this.kmLifeExpectance = [];
+        this.kmTimeDead = [];
+        this.factionKillBreakdown = new EventReporter_1.BreakdownArray();
+        this.factionDeathBreakdown = new EventReporter_1.BreakdownArray();
+        this.continentKillBreakdown = new EventReporter_1.BreakdownArray();
+        this.continentDeathBreakdown = new EventReporter_1.BreakdownArray();
+        this.baseCaptures = [];
+        /**
+         * The KD of class against all other classes, i.e. how many kills/deaths medics got against heavies
+         */
+        this.classKds = {
+            infil: InvididualGenerator_1.classKdCollection(),
+            lightAssault: InvididualGenerator_1.classKdCollection(),
+            medic: InvididualGenerator_1.classKdCollection(),
+            engineer: InvididualGenerator_1.classKdCollection(),
+            heavy: InvididualGenerator_1.classKdCollection(),
+            max: InvididualGenerator_1.classKdCollection(),
+            total: InvididualGenerator_1.classKdCollection()
+        };
+        this.classTypeKills = {
+            infil: new EventReporter_1.BreakdownArray(),
+            lightAssault: new EventReporter_1.BreakdownArray(),
+            medic: new EventReporter_1.BreakdownArray(),
+            engineer: new EventReporter_1.BreakdownArray(),
+            heavy: new EventReporter_1.BreakdownArray(),
+            max: new EventReporter_1.BreakdownArray(),
+        };
+        this.classTypeDeaths = {
+            infil: new EventReporter_1.BreakdownArray(),
+            lightAssault: new EventReporter_1.BreakdownArray(),
+            medic: new EventReporter_1.BreakdownArray(),
+            engineer: new EventReporter_1.BreakdownArray(),
+            heavy: new EventReporter_1.BreakdownArray(),
+            max: new EventReporter_1.BreakdownArray(),
+        };
+    }
+}
+exports.OutfitReport = OutfitReport;
+class OutfitReportGenerator {
+    static generate(parameters) {
+        const response = new ApiWrapper_1.ApiResponse();
+        const report = new OutfitReport();
+        report.tracking = parameters.tracking;
+        response.addStep("Facility captures")
+            .addStep("Weapon kills")
+            .addStep("Weapon type kills")
+            .addStep("Teamkills")
+            .addStep("Faction kills")
+            .addStep("Faction deaths")
+            .addStep("Continent kills")
+            .addStep("Continent deaths")
+            .addStep("All weapon deaths")
+            .addStep("Unrevived weapon deaths")
+            .addStep("Revived weapon deaths")
+            .addStep("All weapon type deaths")
+            .addStep("Unrevived weapon type deaths")
+            .addStep("Revived weapon type deaths")
+            .addStep("Weapon death breakdown")
+            .addStep("Outfit KD")
+            .addStep("Vehicle kills")
+            .addStep("Vehicle weapon kills");
+        for (const clazz of ["Infil", "LA", "Medic", "Engineer", "Heavy", "MAX"]) {
+            response.addStep(`Weapon type kills for ${clazz}`);
+            response.addStep(`Weapon type deaths for ${clazz}`);
+        }
+        let opsLeft = response.getSteps().length;
+        const totalOps = opsLeft;
+        const callback = (step) => {
+            return () => {
+                log.debug(`Finished ${step}: Have ${opsLeft - 1} ops left outta ${totalOps}`);
+                response.finishStep(step);
+                if (--opsLeft == 0) {
+                    response.resolveOk(report);
+                }
+            };
+        };
+        const facilityIDs = parameters.captures.filter(iter => parameters.outfits.indexOf(iter.outfitID) > -1)
+            .map(iter => iter.facilityID)
+            .filter((value, index, arr) => arr.indexOf(value) == index);
+        FacilityAPI_1.FacilityAPI.getByIDs(facilityIDs).ok((data) => {
+            log.debug(`Got these facilities when loaded: [${facilityIDs.join(", ")}]:\n${JSON.stringify(data)}`);
+            let missing = [];
+            for (const capture of parameters.captures) {
+                if (parameters.outfits.indexOf(capture.outfitID) == -1) {
+                    continue;
+                }
+                const facility = data.find(iter => iter.ID == capture.facilityID);
+                if (facility != undefined) {
+                    const cap = {
+                        facilityID: facility.ID,
+                        zoneID: capture.zoneID,
+                        name: facility.name,
+                        typeID: facility.typeID,
+                        type: facility.type,
+                        timestamp: capture.timestamp,
+                        timeHeld: capture.timeHeld,
+                        factionID: capture.factionID,
+                        outfitID: capture.outfitID,
+                        previousFaction: capture.previousFaction
+                    };
+                    report.facilityCaptures.push(cap);
+                }
+                else {
+                    if (missing.indexOf(capture.facilityID) == -1) {
+                        log.warn(`Failed to find facility ID ${capture.facilityID}`);
+                        missing.push(capture.facilityID);
+                    }
+                }
+            }
+            report.facilityCaptures.sort((a, b) => {
+                return a.timestamp.getTime() - b.timestamp.getTime();
+            });
+            EventReporter_1.default.facilityCaptures({
+                captures: report.facilityCaptures,
+                players: parameters.playerCaptures
+            }).ok(data => report.baseCaptures = data).always(callback("Facility captures"));
+        });
+        const chars = Array.from(parameters.players.values());
+        report.kpmBoxPlot = {
+            total: EventReporter_1.default.kpmBoxplot(chars, parameters.tracking),
+            infil: EventReporter_1.default.kpmBoxplot(chars, parameters.tracking, "infil"),
+            lightAssault: EventReporter_1.default.kpmBoxplot(chars, parameters.tracking, "lightAssault"),
+            medic: EventReporter_1.default.kpmBoxplot(chars, parameters.tracking, "medic"),
+            engineer: EventReporter_1.default.kpmBoxplot(chars, parameters.tracking, "engineer"),
+            heavy: EventReporter_1.default.kpmBoxplot(chars, parameters.tracking, "heavy"),
+            max: EventReporter_1.default.kpmBoxplot(chars, parameters.tracking, "max"),
+        };
+        report.kdBoxPlot = {
+            total: EventReporter_1.default.kdBoxplot(chars, parameters.tracking),
+            infil: EventReporter_1.default.kdBoxplot(chars, parameters.tracking, "infil"),
+            lightAssault: EventReporter_1.default.kdBoxplot(chars, parameters.tracking, "lightAssault"),
+            medic: EventReporter_1.default.kdBoxplot(chars, parameters.tracking, "medic"),
+            engineer: EventReporter_1.default.kdBoxplot(chars, parameters.tracking, "engineer"),
+            heavy: EventReporter_1.default.kdBoxplot(chars, parameters.tracking, "heavy"),
+            max: EventReporter_1.default.kdBoxplot(chars, parameters.tracking, "max")
+        };
+        parameters.players.forEach((player, charID) => {
+            player.stats.getMap().forEach((amount, expID) => {
+                var _a;
+                const event = PsEvent_1.PsEvents.get(expID);
+                if (event == undefined) {
+                    return;
+                }
+                const reportAmount = (_a = report.stats.get(event.name)) !== null && _a !== void 0 ? _a : 0;
+                report.stats.set(event.name, reportAmount + amount);
+            });
+        });
+        const playtimes = [];
+        parameters.players.forEach((player, charID) => {
+            if (player.events.length == 0) {
+                return;
+            }
+            report.score += player.score;
+            report.events.push(...player.events);
+            const playtime = InvididualGenerator_1.IndividualReporter.classUsage({
+                player: player,
+                events: [],
+                routers: [],
+                tracking: parameters.tracking
+            });
+            playtimes.push(playtime);
+            report.players.push(Object.assign({ name: `${(player.outfitTag != '' ? `[${player.outfitTag}] ` : '')}${player.name}` }, playtime));
+        });
+        EventReporter_1.default.classPlaytimes(playtimes).ok(data => report.classPlaytimes = data).always(() => callback("Class playtimes"));
+        report.events = report.events.sort((a, b) => a.timestamp - b.timestamp);
+        // Track how many headshots each class got
+        const headshots = EventReporter_1.classCollectionNumber();
+        for (const ev of report.events) {
+            if (ev.type != "kill" || ev.isHeadshot == false) {
+                continue;
+            }
+            const loadout = PsLoadout_1.PsLoadouts.get(ev.loadoutID);
+            if (loadout == undefined) {
+                continue;
+            }
+            if (loadout.type == "infil") {
+                ++headshots.infil;
+            }
+            else if (loadout.type == "lightAssault") {
+                ++headshots.lightAssault;
+            }
+            else if (loadout.type == "medic") {
+                ++headshots.medic;
+            }
+            else if (loadout.type == "engineer") {
+                ++headshots.engineer;
+            }
+            else if (loadout.type == "heavy") {
+                ++headshots.heavy;
+            }
+            else if (loadout.type == "max") {
+                ++headshots.max;
+            }
+            ++headshots.total;
+        }
+        report.classStats.set("Headshot", headshots);
+        for (const ev of report.events) {
+            let statName = "Other";
+            if (ev.type == "kill") {
+                statName = "Kill";
+            }
+            else if (ev.type == "death") {
+                statName = (ev.revived == true) ? "Revived" : "Death";
+            }
+            else if (ev.type == "exp") {
+                const event = PsEvent_1.PsEvents.get(ev.expID);
+                if (event != undefined) {
+                    if (event.track == false) {
+                        continue;
+                    }
+                    statName = event.name;
+                }
+            }
+            else {
+                continue;
+            }
+            if (!report.classStats.has(statName)) {
+                //log.debug(`Added stats for '${statName}'`);
+                report.classStats.set(statName, EventReporter_1.classCollectionNumber());
+            }
+            const classCollection = report.classStats.get(statName);
+            ++classCollection.total;
+            const loadout = PsLoadout_1.PsLoadouts.get(ev.loadoutID);
+            if (loadout == undefined) {
+                continue;
+            }
+            if (loadout.type == "infil") {
+                ++classCollection.infil;
+            }
+            else if (loadout.type == "lightAssault") {
+                ++classCollection.lightAssault;
+            }
+            else if (loadout.type == "medic") {
+                ++classCollection.medic;
+            }
+            else if (loadout.type == "engineer") {
+                ++classCollection.engineer;
+            }
+            else if (loadout.type == "heavy") {
+                ++classCollection.heavy;
+            }
+            else if (loadout.type == "max") {
+                ++classCollection.max;
+            }
+        }
+        EventReporter_1.default.weaponKills(report.events).ok(data => report.weaponKillBreakdown = data).always(callback("Weapon kills"));
+        EventReporter_1.default.weaponTypeKills(report.events).ok(data => report.weaponTypeKillBreakdown = data).always(callback("Weapon type kills"));
+        EventReporter_1.default.weaponTeamkills(report.events).ok(data => report.teamkillBreakdown = data).always(callback("Teamkills"));
+        EventReporter_1.default.factionKills(report.events).ok(data => report.factionKillBreakdown = data).always(callback("Faction kills"));
+        EventReporter_1.default.factionDeaths(report.events).ok(data => report.factionDeathBreakdown = data).always(callback("Faction deaths"));
+        EventReporter_1.default.continentKills(report.events).ok(data => report.continentKillBreakdown = data).always(callback("Continent kills"));
+        EventReporter_1.default.continentDeaths(report.events).ok(data => report.continentDeathBreakdown = data).always(callback("Continent deaths"));
+        EventReporter_1.default.weaponDeaths(report.events).ok(data => report.deathAllBreakdown = data).always(callback("All weapon deaths"));
+        EventReporter_1.default.weaponDeaths(report.events, true).ok(data => report.deathRevivedBreakdown = data).always(callback("Revived weapon deaths"));
+        EventReporter_1.default.weaponDeaths(report.events, false).ok(data => report.deathKilledBreakdown = data).always(callback("Unrevived weapon deaths"));
+        EventReporter_1.default.weaponTypeDeaths(report.events).ok(data => report.deathAllTypeBreakdown = data).always(callback("All weapon type deaths"));
+        EventReporter_1.default.weaponTypeDeaths(report.events, true).ok(data => report.deathRevivedTypeBreakdown = data).always(callback("Revived weapon type deaths"));
+        EventReporter_1.default.weaponTypeDeaths(report.events, false).ok(data => report.deathKilledTypeBreakdown = data).always(callback("Unrevived weapon type deaths"));
+        EventReporter_1.default.weaponDeathBreakdown(report.events).ok(data => report.weaponTypeDeathBreakdown = data).always(callback("Weapon death breakdown"));
+        /* Not super useful and take a long time to generate
+        report.timeUnrevived = IndividualReporter.unrevivedTime(report.events);
+        report.revivedLifeExpectance = IndividualReporter.reviveLifeExpectance(report.events);
+        report.kmLifeExpectance = IndividualReporter.lifeExpectanceRate(report.events);
+        report.kmTimeDead = IndividualReporter.timeUntilReviveRate(report.events);
+        */
+        const classFilter = (iter, type, loadouts) => {
+            if (iter.type == type) {
+                return loadouts.indexOf(iter.loadoutID) > -1;
+            }
+            return false;
+        };
+        EventReporter_1.default.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["1", "8", "15"])))
+            .ok(data => report.classTypeKills.infil = data).always(callback("Weapon type kills for Infil"));
+        EventReporter_1.default.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["3", "10", "17"])))
+            .ok(data => report.classTypeKills.lightAssault = data).always(callback("Weapon type kills for LA"));
+        EventReporter_1.default.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["4", "11", "18"])))
+            .ok(data => report.classTypeKills.medic = data).always(callback("Weapon type kills for Medic"));
+        EventReporter_1.default.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["5", "12", "19"])))
+            .ok(data => report.classTypeKills.engineer = data).always(callback("Weapon type kills for Engineer"));
+        EventReporter_1.default.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["6", "13", "20"])))
+            .ok(data => report.classTypeKills.heavy = data).always(callback("Weapon type kills for Heavy"));
+        EventReporter_1.default.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["7", "14", "21"])))
+            .ok(data => report.classTypeKills.max = data).always(callback("Weapon type kills for MAX"));
+        EventReporter_1.default.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["1", "8", "15"])))
+            .ok(data => report.classTypeDeaths.infil = data).always(callback("Weapon type deaths for Infil"));
+        EventReporter_1.default.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["3", "10", "17"])))
+            .ok(data => report.classTypeDeaths.lightAssault = data).always(callback("Weapon type deaths for LA"));
+        EventReporter_1.default.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["4", "11", "18"])))
+            .ok(data => report.classTypeDeaths.medic = data).always(callback("Weapon type deaths for Medic"));
+        EventReporter_1.default.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["5", "12", "19"])))
+            .ok(data => report.classTypeDeaths.engineer = data).always(callback("Weapon type deaths for Engineer"));
+        EventReporter_1.default.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["6", "13", "20"])))
+            .ok(data => report.classTypeDeaths.heavy = data).always(callback("Weapon type deaths for Heavy"));
+        EventReporter_1.default.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["7", "14", "21"])))
+            .ok(data => report.classTypeDeaths.max = data).always(callback("Weapon type deaths for MAX"));
+        report.classKds.infil = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events, "infil");
+        report.classKds.lightAssault = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events, "lightAssault");
+        report.classKds.medic = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events, "medic");
+        report.classKds.engineer = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events, "engineer");
+        report.classKds.heavy = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events, "heavy");
+        report.classKds.max = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events, "max");
+        report.classKds.total = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events);
+        EventReporter_1.default.outfitVersusBreakdown(report.events).ok(data => report.outfitVersusBreakdown = data).always(callback("Outfit KD"));
+        EventReporter_1.default.vehicleKills(report.events).ok(data => report.vehicleKillBreakdown = data).always(callback("Vehicle kills"));
+        EventReporter_1.default.vehicleWeaponKills(report.events).ok(data => report.vehicleKillWeaponBreakdown = data).always(callback("Vehicle weapon kills"));
+        const getSquadStats = (squad, name) => {
+            const squadIDs = squad.members.map(iter => iter.charID);
+            return {
+                name: name,
+                members: squad.members.map(iter => iter.name),
+                kills: parameters.events.filter(iter => iter.type == "kill"
+                    && squadIDs.indexOf(iter.sourceID) > -1).length,
+                deaths: parameters.events.filter(iter => iter.type == "death" && iter.revived == false
+                    && squadIDs.indexOf(iter.sourceID) > -1).length,
+                revives: parameters.events.filter(iter => iter.type == "exp"
+                    && (iter.expID == PsEvent_1.PsEvent.revive || iter.expID == PsEvent_1.PsEvent.squadRevive)
+                    && squadIDs.indexOf(iter.sourceID) > -1).length,
+                heals: parameters.events.filter(iter => iter.type == "exp"
+                    && (iter.expID == PsEvent_1.PsEvent.heal || iter.expID == PsEvent_1.PsEvent.squadHeal)
+                    && squadIDs.indexOf(iter.sourceID) > -1).length,
+                resupplies: parameters.events.filter(iter => iter.type == "exp"
+                    && (iter.expID == PsEvent_1.PsEvent.resupply || iter.expID == PsEvent_1.PsEvent.squadResupply)
+                    && squadIDs.indexOf(iter.sourceID) > -1).length,
+                repairs: parameters.events.filter(iter => iter.type == "exp"
+                    && (iter.expID == PsEvent_1.PsEvent.maxRepair || iter.expID == PsEvent_1.PsEvent.squadMaxRepair)
+                    && squadIDs.indexOf(iter.sourceID) > -1).length,
+                vKills: parameters.events.filter(iter => iter.type == "vehicle"
+                    && squadIDs.indexOf(iter.sourceID) > -1).length,
+            };
+        };
+        for (const squad of parameters.squads.perm) {
+            report.squadStats.data.push(getSquadStats(squad, squad.display || "Other"));
+        }
+        for (const squad of parameters.squads.guesses) {
+            report.squadStats.data.push(getSquadStats(squad, squad.display || "Other"));
+        }
+        const allSquad = new Squad_1.Squad();
+        for (const squad of [...parameters.squads.perm, ...parameters.squads.guesses]) {
+            allSquad.members.push(...squad.members);
+        }
+        report.squadStats.all = getSquadStats(allSquad, "All");
+        report.squadStats.data.push(report.squadStats.all);
+        let otherIDs = [];
+        const breakdown = new Map();
+        for (const event of report.events) {
+            if (event.type == "exp") {
+                const exp = PsEvent_1.PsEvents.get(event.expID) || PsEvent_1.PsEvent.other;
+                if (!breakdown.has(exp.name)) {
+                    breakdown.set(exp.name, new InvididualGenerator_1.ExpBreakdown());
+                }
+                const score = breakdown.get(exp.name);
+                score.name = exp.name;
+                score.score += event.amount;
+                score.amount += 1;
+                if (exp == PsEvent_1.PsEvent.other) {
+                    otherIDs.push(event.expID);
+                }
+            }
+        }
+        log.debug(`Untracked experience IDs: ${otherIDs.filter((v, i, a) => a.indexOf(v) == i).join(", ")}`);
+        // Sort all the entries by score, followed by amount, then lastly name
+        report.scoreBreakdown = [...breakdown.entries()].sort((a, b) => {
+            return (b[1].score - a[1].score)
+                || (b[1].amount - a[1].amount)
+                || (b[0].localeCompare(a[0]));
+        }).map((a) => a[1]); // Transform the tuple into the ExpBreakdown
+        report.overtimePer1.kpm = EventReporter_1.default.kpmOverTime(report.events, 60000);
+        report.overtimePer1.kd = EventReporter_1.default.kdOverTime(report.events, 60000);
+        report.overtimePer1.rpm = EventReporter_1.default.revivesOverTime(report.events, 60000);
+        report.overtimePer5.kpm = EventReporter_1.default.kpmOverTime(report.events);
+        report.overtimePer5.kd = EventReporter_1.default.kdOverTime(report.events);
+        report.overtimePer5.rpm = EventReporter_1.default.revivesOverTime(report.events);
+        report.perUpdate.kd = EventReporter_1.default.kdPerUpdate(report.events);
+        return response;
+    }
+}
+exports.OutfitReportGenerator = OutfitReportGenerator;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/squad/Squad.js":
+/*!**********************************************!*\
+  !*** ../topt-core/build/core/squad/Squad.js ***!
+  \**********************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.Squad = void 0;
+class Squad {
+    constructor() {
+        /**
+         * Display name of the squad
+         */
+        this.name = "";
+        /**
+         * Alternate display of a squad, such as Alpha/Bravo/etc.
+         */
+        this.display = null;
+        /**
+         * Members that are currently in the squad
+         */
+        this.members = [];
+        /**
+         * If this squad is a guess squad or not, affects how automatic merging is done
+         */
+        this.guess = true;
+        this.ID = ++Squad._previousID;
+    }
+    /**
+     * Check if a member is within this squad
+     *
+     * @param charID Character ID to check membership of
+     */
+    isMember(charID) {
+        return this.members.find(iter => iter.charID == charID) != null;
+    }
+    toString() {
+        return `Squad ${this.name}: [${this.members.map(iter => iter.name).join(", ")}]`;
+    }
+}
+exports.Squad = Squad;
+Squad._previousID = 0;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/squad/SquadMember.js":
+/*!****************************************************!*\
+  !*** ../topt-core/build/core/squad/SquadMember.js ***!
+  \****************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.SquadMember = void 0;
+class SquadMember {
+    constructor() {
+        /**
+         * Display name of the squad member
+         */
+        this.name = "";
+        /**
+         * Tag of the outfit. Empty string for no outfit
+         */
+        this.outfitTag = "";
+        /**
+         * Character ID of the squad member
+         */
+        this.charID = "";
+        /**
+         * What class the squad member currently is
+         */
+        this.class = "";
+        /**
+         * The current state of the squad member
+         */
+        this.state = "alive";
+        /**
+         * How many seconds the squad member has been dead for
+         */
+        this.timeDead = 0;
+        /**
+         * Timestamp (in MS) of when this character died
+         */
+        this.whenDied = null;
+        /**
+         * How many seconds until they can place a beacon again
+         */
+        this.beaconCooldown = 0;
+        /**
+         * Timestamp (in MS) of when this character last put a beacon down
+         */
+        this.whenBeacon = null;
+        /**
+         * Is this squad member online or not
+         */
+        this.online = true;
+    }
+}
+exports.SquadMember = SquadMember;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/winter/WinterMetric.js":
+/*!******************************************************!*\
+  !*** ../topt-core/build/core/winter/WinterMetric.js ***!
+  \******************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.WinterMetricEntry = exports.WinterMetric = void 0;
+class WinterMetric {
+    constructor() {
+        this.name = "";
+        this.funName = "";
+        this.description = "";
+        this.entries = [];
+    }
+}
+exports.WinterMetric = WinterMetric;
+class WinterMetricEntry {
+    constructor() {
+        this.name = "";
+        this.outfitTag = "";
+        this.value = 0;
+        this.display = null;
+    }
+}
+exports.WinterMetricEntry = WinterMetricEntry;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/winter/WinterReport.js":
+/*!******************************************************!*\
+  !*** ../topt-core/build/core/winter/WinterReport.js ***!
+  \******************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.WinterReport = void 0;
+class WinterReport {
+    constructor() {
+        this.start = new Date();
+        this.end = new Date();
+        this.essential = [];
+        this.fun = [];
+        this.players = [];
+    }
+}
+exports.WinterReport = WinterReport;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/winter/WinterReportGenerator.js":
+/*!***************************************************************!*\
+  !*** ../topt-core/build/core/winter/WinterReportGenerator.js ***!
+  \***************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.WinterReportGenerator = exports.WinterMetricIndex = void 0;
+const ApiWrapper_1 = __webpack_require__(/*! ../census/ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
+const WinterReport_1 = __webpack_require__(/*! ./WinterReport */ "../topt-core/build/core/winter/WinterReport.js");
+const WinterMetric_1 = __webpack_require__(/*! ./WinterMetric */ "../topt-core/build/core/winter/WinterMetric.js");
+const StatMap_1 = __webpack_require__(/*! ../StatMap */ "../topt-core/build/core/StatMap.js");
+const PsEvent_1 = __webpack_require__(/*! ../PsEvent */ "../topt-core/build/core/PsEvent.js");
+const VehicleAPI_1 = __webpack_require__(/*! ../census/VehicleAPI */ "../topt-core/build/core/census/VehicleAPI.js");
+const WeaponAPI_1 = __webpack_require__(/*! ../census/WeaponAPI */ "../topt-core/build/core/census/WeaponAPI.js");
+const PsLoadout_1 = __webpack_require__(/*! ../census/PsLoadout */ "../topt-core/build/core/census/PsLoadout.js");
+const EventReporter_1 = __webpack_require__(/*! ../EventReporter */ "../topt-core/build/core/EventReporter.js");
+const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("WinterReportGenerator");
+class WinterMetricIndex {
+}
+exports.WinterMetricIndex = WinterMetricIndex;
+WinterMetricIndex.KILLS = 0;
+WinterMetricIndex.KD = 1;
+WinterMetricIndex.REVIVES = 2;
+WinterMetricIndex.HEALS = 3;
+WinterMetricIndex.RESUPPLIES = 4;
+WinterMetricIndex.REPAIRS = 5;
+WinterMetricIndex.SHIELDS = 6;
+class WinterReportGenerator {
+    static generate(parameters) {
+        const response = new ApiWrapper_1.ApiResponse();
+        parameters.events = parameters.events.sort((a, b) => a.timestamp - b.timestamp);
+        const report = new WinterReport_1.WinterReport();
+        report.start = new Date(parameters.events[0].timestamp);
+        report.end = new Date(parameters.events[parameters.events.length - 1].timestamp);
+        report.players = [...parameters.players.filter(iter => iter.events.length > 0)];
+        report.essential.length = 7;
+        report.essential[WinterMetricIndex.KILLS] = this.kills(parameters);
+        report.essential[WinterMetricIndex.KD] = this.kds(parameters);
+        report.essential[WinterMetricIndex.HEALS] = this.heals(parameters);
+        report.essential[WinterMetricIndex.REVIVES] = this.revives(parameters);
+        report.essential[WinterMetricIndex.REPAIRS] = this.repairs(parameters);
+        report.essential[WinterMetricIndex.RESUPPLIES] = this.resupplies(parameters);
+        report.essential[WinterMetricIndex.SHIELDS] = this.shieldRepairs(parameters);
+        log.debug(`Loaded ${report.essential.length} essential metrics`);
+        report.fun.push(this.mostRevived(parameters));
+        report.fun.push(this.mostTransportAssists(parameters));
+        report.fun.push(this.mostReconAssists(parameters));
+        //report.fun.push(this.mostConcAssists(parameters));
+        //report.fun.push(this.mostEMPAssist(parameters));
+        //report.fun.push(this.mostFlashAssists(parameters));
+        report.fun.push(this.mostSaviors(parameters));
+        report.fun.push(this.mostAssists(parameters));
+        report.fun.push(this.mostUniqueRevives(parameters));
+        report.fun.push(this.longestKillStreak(parameters));
+        report.fun.push(this.highestHSR(parameters));
+        report.fun.push(this.getDifferentWeapons(parameters));
+        report.fun.push(this.mostESFSKills(parameters));
+        report.fun.push(this.mostLightningKills(parameters));
+        report.fun.push(this.mostHarasserKills(parameters));
+        report.fun.push(this.mostMBTKills(parameters));
+        report.fun.push(this.mostSunderersKilled(parameters));
+        report.fun.push(this.mostRoadkills(parameters));
+        report.fun.push(this.mostUsefulRevives(parameters));
+        report.fun.push(this.highestAverageLifeExpectance(parameters));
+        report.fun.push(this.mostC4Kills(parameters));
+        report.fun.push(this.mostPercentRevive(parameters));
+        report.fun.push(this.mostDrawfireAssists(parameters));
+        report.fun.push(this.mostRouterKills(parameters));
+        report.fun.push(this.mostBeaconKills(parameters));
+        report.fun.push(this.mostMAXKills(parameters));
+        report.fun.push(this.mostSundySpawns(parameters));
+        report.fun.push(this.mostRouterSpawns(parameters));
+        report.fun.push(this.longestHealStreak(parameters));
+        let opsLeft = +1 // Knife kills
+            + 1 // Pistol kills
+            + 1 // Grenade kills
+        ;
+        const handler = () => {
+            if (--opsLeft == 0) {
+                if (parameters.settings.funMetricCount != -1) {
+                    // Shuffle array
+                    for (let i = report.fun.length - 1; i > 0; i--) {
+                        const elem = Math.floor(Math.random() * (i + 1));
+                        [report.fun[i], report.fun[elem]] = [report.fun[elem], report.fun[i]];
+                    }
+                    report.fun = report.fun.slice(0, parameters.settings.funMetricCount);
+                }
+                log.debug(`Loaded ${report.fun.length} fun metrics`);
+                response.resolveOk(report);
+            }
+        };
+        this.mostKnifeKills(parameters).ok(data => report.fun.push(data)).always(handler);
+        this.mostGrenadeKills(parameters).ok(data => report.fun.push(data)).always(handler);
+        this.mostPistolKills(parameters).ok(data => report.fun.push(data)).always(handler);
+        return response;
+    }
+    static revives(parameters) {
+        return this.metric(parameters, [PsEvent_1.PsEvent.revive, PsEvent_1.PsEvent.squadResupply], {
+            name: "Revives",
+            funName: "Necromancer",
+            description: "Most revives",
+            entries: []
+        });
+    }
+    static heals(parameters) {
+        return this.metric(parameters, [PsEvent_1.PsEvent.heal, PsEvent_1.PsEvent.squadHeal], {
+            name: "Heals",
+            funName: "Green Wizard",
+            description: "Most heals",
+            entries: []
+        });
+    }
+    static repairs(parameters) {
+        return this.metric(parameters, [PsEvent_1.PsEvent.maxRepair, PsEvent_1.PsEvent.squadMaxRepair], {
+            name: "MAX Repairs",
+            funName: "Welder",
+            description: "Most MAX repairs",
+            entries: []
+        });
+    }
+    static resupplies(parameters) {
+        return this.metric(parameters, [PsEvent_1.PsEvent.resupply, PsEvent_1.PsEvent.squadResupply], {
+            name: "Resupply",
+            funName: "Ammo printer",
+            description: "Most resupplies",
+            entries: []
+        });
+    }
+    static kills(parameters) {
+        return this.value(parameters, (player) => player.events.filter(iter => iter.type == "kill").length, {
+            name: "Kills",
+            funName: "Kills",
+            description: "Most kills",
+            entries: []
+        });
+    }
+    static shieldRepairs(parameters) {
+        return this.metric(parameters, [PsEvent_1.PsEvent.shieldRepair, PsEvent_1.PsEvent.squadShieldRepair], {
+            name: "Shield Repairs",
+            funName: "Shield Battery",
+            description: "Most shield repairs",
+            entries: []
+        }, true);
+    }
+    static kds(parameters) {
+        return this.value(parameters, (player) => (player.stats.get(PsEvent_1.PsEvent.kill) > 24) ? player.stats.get(PsEvent_1.PsEvent.kill) / player.stats.get(PsEvent_1.PsEvent.death, 1) : 0, {
+            name: "K/D",
+            funName: "K/D",
+            description: "Highest K/D",
+            entries: []
+        }, (value) => value.toFixed(2));
+    }
+    static mostRevived(parameters) {
+        return this.value(parameters, ((player) => player.events.filter(iter => iter.type == "death" && iter.revived == true).length), {
+            name: "Revived",
+            funName: "Zombie",
+            description: "Revived the most",
+            entries: []
+        });
+    }
+    static mostTransportAssists(parameters) {
+        return this.metric(parameters, [PsEvent_1.PsEvent.transportAssists], {
+            name: "Transport assists",
+            funName: "Logistics Specialists",
+            description: "Most transport assists",
+            entries: []
+        });
+    }
+    static mostReconAssists(parameters) {
+        return this.metric(parameters, [PsEvent_1.PsEvent.motionDetect, PsEvent_1.PsEvent.squadMotionDetect], {
+            name: "Recon detections",
+            funName: "Flies on the Wall",
+            description: "Most recon detection ticks",
+            entries: []
+        });
+    }
+    static mostDrawfireAssists(parameters) {
+        return this.metric(parameters, [PsEvent_1.PsEvent.drawfire], {
+            name: "Drawfire Assists",
+            funName: "Professional Distraction",
+            description: "Most drawfire assists",
+            entries: []
+        });
+    }
+    static longestHealStreak(parameters) {
+        return this.value(parameters, ((player) => {
+            const streaks = EventReporter_1.default.medicHealStreaks(player.events, player.characterID);
+            if (streaks.length == 0) {
+                return 0;
+            }
+            let max = 0;
+            let maxStreak = streaks[0]; // Will always have one, length check above
+            for (const streak of streaks) {
+                if (streak.amount > max) {
+                    max = streak.amount;
+                    maxStreak = streak;
+                }
+            }
+            log.debug(`Longest heal streak of ${player.name} started ${maxStreak.start} for ${maxStreak.amount} seconds`);
+            return maxStreak.amount;
+        }), {
+            name: "Longest heal streak",
+            funName: "Long time healer",
+            description: "Longest theoretical time with AOE heal, assuming combat surgeon 5",
+            entries: []
+        }, ((display) => {
+            return `${display.toFixed(2)} seconds`;
+        }));
+    }
+    static mostConcAssists(parameters) {
+        return this.metric(parameters, [PsEvent_1.PsEvent.concAssist, PsEvent_1.PsEvent.squadConcAssist], {
+            name: "Conced killers",
+            funName: "Concussive Maintenance",
+            description: "Most kills on concussed players",
+            entries: []
+        });
+    }
+    static mostFlashAssists(parameters) {
+        return this.metric(parameters, [PsEvent_1.PsEvent.flashAssist, PsEvent_1.PsEvent.squadFlashAssist], {
+            name: "Flashed killers",
+            funName: "Darklight",
+            description: "Most kills on flashed players",
+            entries: []
+        });
+    }
+    static mostEMPAssist(parameters) {
+        return this.metric(parameters, [PsEvent_1.PsEvent.empAssist, PsEvent_1.PsEvent.squadEmpAssist], {
+            name: "EMPed killers",
+            funName: "Sparky Sparky Boom",
+            description: "Most kills on EMPed players",
+            entries: []
+        });
+    }
+    static mostSaviors(parameters) {
+        return this.metric(parameters, [PsEvent_1.PsEvent.savior], {
+            name: "Savior",
+            funName: "Savior",
+            description: "Most savior kills",
+            entries: []
+        });
+    }
+    static mostAssists(parameters) {
+        return this.metric(parameters, [PsEvent_1.PsEvent.killAssist], {
+            name: "Kill assists",
+            funName: "Wingmen",
+            description: "Players with the most kill assists",
+            entries: []
+        });
+    }
+    static mostRouterKills(parameters) {
+        return this.metric(parameters, [PsEvent_1.PsEvent.routerKill], {
+            name: "Router kills",
+            funName: "Connectivity Issues",
+            description: "Players with the most router kills",
+            entries: []
+        });
+    }
+    static mostBeaconKills(parameters) {
+        return this.metric(parameters, [PsEvent_1.PsEvent.beaconKill], {
+            name: "Beacon kills",
+            funName: "Bacon Fryer",
+            description: "Players with the most beacon kills",
+            entries: []
+        });
+    }
+    static mostRouterSpawns(parameters) {
+        return this.metric(parameters, ["1410"], {
+            name: "Router spawns",
+            funName: "Network Provider",
+            description: "Players with the most router spawns",
+            entries: []
+        });
+    }
+    static mostSundySpawns(parameters) {
+        return this.metric(parameters, ["233"], {
+            name: "Sundy spawns",
+            funName: "Cat herder",
+            description: "Players with the most sundy spawns",
+            entries: []
+        });
+    }
+    static mostUniqueRevives(parameters) {
+        return this.value(parameters, ((player) => {
+            const ev = player.events.filter(iter => iter.type == "exp"
+                && (iter.expID == PsEvent_1.PsEvent.revive || iter.expID == PsEvent_1.PsEvent.squadRevive));
+            return ev.map(iter => iter.targetID).filter((value, index, array) => array.indexOf(value) == index).length;
+        }), {
+            name: "Most unique revives",
+            funName: "Spread the love",
+            description: "Most unique revives",
+            entries: []
+        });
+    }
+    static mostMAXKills(parameters) {
+        return this.value(parameters, ((player) => {
+            return player.events.filter(iter => iter.type == "kill"
+                && (iter.targetLoadoutID == "7" || iter.targetLoadoutID == "14" || iter.targetLoadoutID == "21")).length;
+        }), {
+            name: "Most MAX kills",
+            funName: "Wheelchair flipper",
+            description: "Players with most MAX kills",
+            entries: []
+        });
+    }
+    static longestKillStreak(parameters) {
+        const metric = new WinterMetric_1.WinterMetric();
+        metric.name = "Kill streaks";
+        metric.funName = "Big fish";
+        metric.description = "Longest kill streak";
+        const amounts = new StatMap_1.default();
+        for (const player of parameters.players) {
+            let currentStreak = 0;
+            let longestStreak = 0;
+            for (const ev of player.events) {
+                if (ev.type != "kill" && ev.type != "death") {
+                    continue;
+                }
+                if (ev.type == "kill") {
+                    ++currentStreak;
+                }
+                else if (ev.type == "death" && ev.revivedEvent == null) {
+                    if (currentStreak > longestStreak) {
+                        longestStreak = currentStreak;
+                        amounts.set(player.name, longestStreak);
+                    }
+                    currentStreak = 0;
+                }
+            }
+        }
+        metric.entries = this.statMapToEntires(parameters, amounts);
+        return metric;
+    }
+    static highestHSR(parameters) {
+        const metric = new WinterMetric_1.WinterMetric();
+        metric.name = "HSR";
+        metric.funName = "Head poppers";
+        metric.description = "Highest headshot ratio";
+        const map = new StatMap_1.default();
+        for (const player of parameters.players) {
+            const kills = player.events.filter(iter => iter.type == "kill").length || 1;
+            const hsKills = player.events.filter(iter => iter.type == "kill" && iter.isHeadshot == true).length || 1;
+            if (player.secondsOnline < 10) {
+                continue;
+            }
+            if (kills == 1 || hsKills == 1 || kills < 25) {
+                continue;
+            }
+            map.set(player.name, hsKills / kills);
+        }
+        metric.entries = this.statMapToEntires(parameters, map, (iter) => `${(iter * 100).toFixed(2)}%`);
+        return metric;
+    }
+    static getDifferentWeapons(parameters) {
+        const metric = new WinterMetric_1.WinterMetric();
+        metric.name = "Different weapons";
+        metric.funName = "Diverse Skillset";
+        metric.description = "Most amount of unique weapons";
+        const stats = new StatMap_1.default();
+        for (const player of parameters.players) {
+            const set = new Set();
+            for (const ev of player.events) {
+                if (ev.type != "kill") {
+                    continue;
+                }
+                set.add(ev.weaponID);
+            }
+            stats.set(player.name, set.size);
+        }
+        metric.entries = this.statMapToEntires(parameters, stats);
+        return metric;
+    }
+    static mostESFSKills(parameters) {
+        return this.vehicle(parameters, [VehicleAPI_1.Vehicles.mosquito, VehicleAPI_1.Vehicles.reaver, VehicleAPI_1.Vehicles.scythe], {
+            name: "ESFs destroyed",
+            funName: "Fly Swatter",
+            description: "Most ESFs destroyed",
+            entries: []
+        });
+    }
+    static mostMBTKills(parameters) {
+        return this.vehicle(parameters, [VehicleAPI_1.Vehicles.vanguard, VehicleAPI_1.Vehicles.prowler, VehicleAPI_1.Vehicles.magrider], {
+            name: "MBTs destroyed",
+            funName: "Heavy Hitter",
+            description: "Most MBTs destroyed",
+            entries: []
+        });
+    }
+    static mostHarasserKills(parameters) {
+        return this.vehicle(parameters, [VehicleAPI_1.Vehicles.harasser], {
+            name: "Harassers destroyed",
+            funName: "Rasser Harasser",
+            description: "Most harassers destroyed",
+            entries: []
+        });
+    }
+    static mostLightningKills(parameters) {
+        return this.vehicle(parameters, [VehicleAPI_1.Vehicles.lightning], {
+            name: "Lightnings destroyed",
+            funName: "Thunder Struck",
+            description: "Most lightnings destroyed",
+            entries: []
+        });
+    }
+    static mostSunderersKilled(parameters) {
+        return this.vehicle(parameters, [VehicleAPI_1.Vehicles.sunderer], {
+            name: "Sunderers killed",
+            funName: "Bus Bully",
+            description: "Most sundies destroyed",
+            entries: []
+        });
+    }
+    static mostRoadkills(parameters) {
+        return this.metric(parameters, [PsEvent_1.PsEvent.roadkill], {
+            name: "Roadkills",
+            funName: "Road rage",
+            description: "Most roadkills",
+            entries: []
+        });
+    }
+    static mostUsefulRevives(parameters) {
+        const metric = new WinterMetric_1.WinterMetric();
+        metric.name = "Kills after revives";
+        metric.funName = "Rise of the Undead";
+        metric.description = "Most kills 10 seconds after being revived";
+        const amounts = new StatMap_1.default();
+        for (const player of parameters.players) {
+            const revives = player.events.filter(iter => iter.type == "death" && iter.revivedEvent != null);
+            for (const ev of revives) {
+                const kills = player.events.filter(iter => {
+                    return iter.type == "kill" && iter.timestamp >= ev.timestamp && iter.timestamp < ev.timestamp + 10000;
+                });
+                if (kills.length == 0) {
+                    continue;
+                }
+                amounts.increment(player.name, kills.length);
+            }
+        }
+        metric.entries = this.statMapToEntires(parameters, amounts);
+        return metric;
+    }
+    static mostPercentRevive(parameters) {
+        return this.value(parameters, (player) => {
+            const revived = player.events.filter(iter => iter.type == "death" && iter.revived == true).length;
+            const killed = player.events.filter(iter => iter.type == "death").length;
+            return revived / killed;
+        }, {
+            name: "Percent revived",
+            funName: "Makes me strong",
+            description: "Highest percentage of revived deaths to respawns",
+            entries: []
+        }, (value) => `${(value * 100).toFixed(2)}%`);
+    }
+    static highestAverageLifeExpectance(parameters) {
+        const metric = new WinterMetric_1.WinterMetric();
+        metric.name = "Longest life expectance";
+        metric.funName = "Elders";
+        metric.description = "Longest average life expectance";
+        const amounts = new StatMap_1.default();
+        for (const player of parameters.players) {
+            if (player.events.length == 0) {
+                continue;
+            }
+            const expectances = [];
+            let start = player.events[0].timestamp;
+            for (const ev of player.events) {
+                if (ev.type == "death" && ev.revived == false) {
+                    expectances.push((ev.timestamp - start) / 1000);
+                    start = ev.timestamp;
+                }
+            }
+            if (expectances.length == 0) {
+                continue;
+            }
+            const total = expectances.reduce((acc, val) => { return acc += val; }, 0);
+            const avg = total / expectances.length;
+            amounts.set(player.name, avg);
+        }
+        metric.entries = this.statMapToEntires(parameters, amounts, (value) => {
+            let mins = 0;
+            let seconds = value;
+            if (value > 60) {
+                mins = Math.floor(seconds / 60);
+                seconds = seconds % 60;
+                return `${mins.toFixed(0)} mins ${seconds.toFixed(0)} seconds`;
+            }
+            return `${value.toFixed(1)} seconds`;
+        });
+        return metric;
+    }
+    static shortestLife(parameters) {
+        const metric = new WinterMetric_1.WinterMetric();
+        metric.name = "Shortest life expectance";
+        metric.funName = "Not elders";
+        metric.description = "Shortest average life expectance";
+        const amounts = new StatMap_1.default();
+        for (const player of parameters.players) {
+            if (player.events.length == 0) {
+                continue;
+            }
+            const expectances = [];
+            let start = player.events[0].timestamp;
+            for (const ev of player.events) {
+                if (ev.type == "death" && ev.revived == false) {
+                    expectances.push((ev.timestamp - start) / 1000);
+                    start = ev.timestamp;
+                }
+            }
+            if (expectances.length == 0) {
+                continue;
+            }
+            const total = expectances.reduce((acc, val) => { return acc += val; }, 0);
+            const avg = total / expectances.length;
+            amounts.set(player.name, avg);
+        }
+        metric.entries = this.statMapToEntires(parameters, amounts, (value) => {
+            let mins = 0;
+            let seconds = value;
+            if (value > 60) {
+                mins = Math.floor(seconds / 60);
+                seconds = seconds % 60;
+                return `${mins.toFixed(0)} mins ${seconds.toFixed(0)} seconds`;
+            }
+            return `${value.toFixed(1)} seconds`;
+        });
+        return metric;
+    }
+    static mostKnifeKills(parameters) {
+        return this.weaponType(parameters, "Knife", {
+            name: "Knife kills",
+            funName: "Slasher",
+            description: "Most knife kills",
+            entries: []
+        });
+    }
+    static mostC4Kills(parameters) {
+        return this.weapon(parameters, ["432", "800623"], {
+            name: "C4 kills",
+            funName: "Explosive Tedencies",
+            description: "Most C-4 kills",
+            entries: []
+        });
+    }
+    static mostGrenadeKills(parameters) {
+        return this.weaponType(parameters, "Grenade", {
+            name: "Grenade kills",
+            funName: "Hot Potato",
+            description: "Most grenade kills",
+            entries: []
+        });
+    }
+    static mostPistolKills(parameters) {
+        return this.weaponType(parameters, "Pistol", {
+            name: "Pistol kills",
+            funName: "The Cowboy",
+            description: "Most pistol kills",
+            entries: []
+        });
+    }
+    static weaponType(parameters, type, metric) {
+        const response = new ApiWrapper_1.ApiResponse();
+        const wepIDs = new Set();
+        for (const player of parameters.players) {
+            const IDs = player.events.filter(iter => iter.type == "kill")
+                .map(iter => iter.weaponID);
+            for (const id of IDs) {
+                wepIDs.add(id);
+            }
+        }
+        const amounts = new StatMap_1.default();
+        WeaponAPI_1.WeaponAPI.getByIDs(Array.from(wepIDs.keys())).ok((data) => {
+            for (const player of parameters.players) {
+                const kills = player.events.filter(iter => iter.type == "kill");
+                for (const kill of kills) {
+                    const weapon = data.find(iter => iter.ID == kill.weaponID);
+                    if (weapon == undefined) {
+                        continue;
+                    }
+                    if (weapon.type == type) {
+                        amounts.increment(player.name);
+                    }
+                }
+            }
+            metric.entries = this.statMapToEntires(parameters, amounts);
+        });
+        response.resolveOk(metric);
+        return response;
+    }
+    static weapon(parameters, ids, metric) {
+        const amounts = new StatMap_1.default();
+        for (const player of parameters.players) {
+            for (const ev of player.events) {
+                if (ev.type == "kill") {
+                    if (ids.indexOf(ev.weaponID) > -1) {
+                        amounts.increment(player.name);
+                    }
+                }
+            }
+        }
+        metric.entries = this.statMapToEntires(parameters, amounts);
+        return metric;
+    }
+    static vehicle(parameters, vehicles, metric) {
+        const amounts = new StatMap_1.default();
+        for (const player of parameters.players) {
+            for (const ev of player.events) {
+                if (ev.type != "vehicle") {
+                    continue;
+                }
+                const loadout = PsLoadout_1.PsLoadouts.get(ev.loadoutID);
+                if (loadout != undefined) {
+                    if (loadout.faction == "VS" && (ev.vehicleID == VehicleAPI_1.Vehicles.scythe || ev.vehicleID == VehicleAPI_1.Vehicles.bastionScythe || ev.vehicleID == VehicleAPI_1.Vehicles.magrider)) {
+                        continue;
+                    }
+                    if (loadout.faction == "TR" && (ev.vehicleID == VehicleAPI_1.Vehicles.mosquito || ev.vehicleID == VehicleAPI_1.Vehicles.bastionMosquite || ev.vehicleID == VehicleAPI_1.Vehicles.prowler)) {
+                        continue;
+                    }
+                    if (loadout.faction == "NC" && (ev.vehicleID == VehicleAPI_1.Vehicles.reaver || ev.vehicleID == VehicleAPI_1.Vehicles.bastionReaver || ev.vehicleID == VehicleAPI_1.Vehicles.vanguard)) {
+                        continue;
+                    }
+                }
+                if (vehicles.indexOf(ev.vehicleID) > -1) {
+                    amounts.increment(player.name);
+                }
+            }
+        }
+        metric.entries = this.statMapToEntires(parameters, amounts);
+        return metric;
+    }
+    static metric(parameters, events, metric, debug) {
+        const amounts = new StatMap_1.default();
+        for (const player of parameters.players) {
+            const evs = player.events.filter(iter => iter.type == "exp" && events.indexOf(iter.expID) > -1);
+            if (evs.length > 0) {
+                amounts.set(player.name, evs.length);
+                if (debug == true) {
+                    log.debug(`${player.name} got ${evs.length}`);
+                }
+            }
+        }
+        metric.entries = this.statMapToEntires(parameters, amounts);
+        return metric;
+    }
+    static value(parameters, accessor, metric, display = null) {
+        const map = new StatMap_1.default();
+        for (const player of parameters.players) {
+            map.set(player.name, accessor(player));
+        }
+        metric.entries = this.statMapToEntires(parameters, map, display);
+        return metric;
+    }
+    static statMapToEntires(parameters, map, display = null) {
+        return Array.from(map.getMap().entries()).map((iter) => {
+            var _a, _b;
+            const tag = (_b = (_a = parameters.players.find(i => i.name.toLowerCase() == iter[0].toLowerCase())) === null || _a === void 0 ? void 0 : _a.outfitTag) !== null && _b !== void 0 ? _b : "";
+            return {
+                name: iter[0],
+                outfitTag: tag,
+                value: iter[1],
+                display: display != null ? display(iter[1]) : null
+            };
+        }).filter(iter => iter.value)
+            .sort((a, b) => b.value - a.value)
+            .slice(0, parameters.settings.topNPlayers == -1 ? undefined : parameters.settings.topNPlayers);
+    }
+}
+exports.WinterReportGenerator = WinterReportGenerator;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/winter/WinterReportParameters.js":
+/*!****************************************************************!*\
+  !*** ../topt-core/build/core/winter/WinterReportParameters.js ***!
+  \****************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.WinterReportSettings = exports.WinterReportParameters = void 0;
+class WinterReportParameters {
+    constructor() {
+        this.players = [];
+        this.events = [];
+        this.timeTracking = { startTime: 0, endTime: 0, running: false };
+        this.settings = new WinterReportSettings();
+    }
+}
+exports.WinterReportParameters = WinterReportParameters;
+class WinterReportSettings {
+    constructor() {
+        /**
+         * If the fun names will be used instead of descriptive names
+         */
+        this.useFunNames = false;
+        /**
+         * How many players to show for each card
+         */
+        this.topNPlayers = 5;
+        /**
+         * How many fun metrics to show. Fun being like unique revives, -1 to show all
+         */
+        this.funMetricCount = -1;
+        /**
+         * Will the outfit tag be shown?
+         */
+        this.displayOutfitTag = false;
+        /**
+         * Char IDs of players to ignore and skip if they are in the top
+         */
+        this.ignoredPlayers = [];
+    }
+}
+exports.WinterReportSettings = WinterReportSettings;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/winter/index.js":
+/*!***********************************************!*\
+  !*** ../topt-core/build/core/winter/index.js ***!
+  \***********************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.WinterReportSettings = exports.WinterReportParameters = exports.WinterReportGenerator = exports.WinterReport = void 0;
+const WinterReportGenerator_1 = __webpack_require__(/*! ./WinterReportGenerator */ "../topt-core/build/core/winter/WinterReportGenerator.js");
+Object.defineProperty(exports, "WinterReportGenerator", { enumerable: true, get: function () { return WinterReportGenerator_1.WinterReportGenerator; } });
+const WinterReport_1 = __webpack_require__(/*! ./WinterReport */ "../topt-core/build/core/winter/WinterReport.js");
+Object.defineProperty(exports, "WinterReport", { enumerable: true, get: function () { return WinterReport_1.WinterReport; } });
+const WinterReportParameters_1 = __webpack_require__(/*! ./WinterReportParameters */ "../topt-core/build/core/winter/WinterReportParameters.js");
+Object.defineProperty(exports, "WinterReportParameters", { enumerable: true, get: function () { return WinterReportParameters_1.WinterReportParameters; } });
+Object.defineProperty(exports, "WinterReportSettings", { enumerable: true, get: function () { return WinterReportParameters_1.WinterReportSettings; } });
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/axios/index.js":
+/*!************************************************!*\
+  !*** ../topt-core/node_modules/axios/index.js ***!
+  \************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+module.exports = __webpack_require__(/*! ./lib/axios */ "../topt-core/node_modules/axios/lib/axios.js");
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/axios/lib/adapters/xhr.js":
+/*!***********************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/adapters/xhr.js ***!
+  \***********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var utils = __webpack_require__(/*! ./../utils */ "../topt-core/node_modules/axios/lib/utils.js");
+var settle = __webpack_require__(/*! ./../core/settle */ "../topt-core/node_modules/axios/lib/core/settle.js");
+var cookies = __webpack_require__(/*! ./../helpers/cookies */ "../topt-core/node_modules/axios/lib/helpers/cookies.js");
+var buildURL = __webpack_require__(/*! ./../helpers/buildURL */ "../topt-core/node_modules/axios/lib/helpers/buildURL.js");
+var buildFullPath = __webpack_require__(/*! ../core/buildFullPath */ "../topt-core/node_modules/axios/lib/core/buildFullPath.js");
+var parseHeaders = __webpack_require__(/*! ./../helpers/parseHeaders */ "../topt-core/node_modules/axios/lib/helpers/parseHeaders.js");
+var isURLSameOrigin = __webpack_require__(/*! ./../helpers/isURLSameOrigin */ "../topt-core/node_modules/axios/lib/helpers/isURLSameOrigin.js");
+var createError = __webpack_require__(/*! ../core/createError */ "../topt-core/node_modules/axios/lib/core/createError.js");
+
+module.exports = function xhrAdapter(config) {
+  return new Promise(function dispatchXhrRequest(resolve, reject) {
+    var requestData = config.data;
+    var requestHeaders = config.headers;
+
+    if (utils.isFormData(requestData)) {
+      delete requestHeaders['Content-Type']; // Let the browser set it
+    }
+
+    var request = new XMLHttpRequest();
+
+    // HTTP basic authentication
+    if (config.auth) {
+      var username = config.auth.username || '';
+      var password = config.auth.password ? unescape(encodeURIComponent(config.auth.password)) : '';
+      requestHeaders.Authorization = 'Basic ' + btoa(username + ':' + password);
+    }
+
+    var fullPath = buildFullPath(config.baseURL, config.url);
+    request.open(config.method.toUpperCase(), buildURL(fullPath, config.params, config.paramsSerializer), true);
+
+    // Set the request timeout in MS
+    request.timeout = config.timeout;
+
+    // Listen for ready state
+    request.onreadystatechange = function handleLoad() {
+      if (!request || request.readyState !== 4) {
+        return;
+      }
+
+      // The request errored out and we didn't get a response, this will be
+      // handled by onerror instead
+      // With one exception: request that using file: protocol, most browsers
+      // will return status as 0 even though it's a successful request
+      if (request.status === 0 && !(request.responseURL && request.responseURL.indexOf('file:') === 0)) {
+        return;
+      }
+
+      // Prepare the response
+      var responseHeaders = 'getAllResponseHeaders' in request ? parseHeaders(request.getAllResponseHeaders()) : null;
+      var responseData = !config.responseType || config.responseType === 'text' ? request.responseText : request.response;
+      var response = {
+        data: responseData,
+        status: request.status,
+        statusText: request.statusText,
+        headers: responseHeaders,
+        config: config,
+        request: request
+      };
+
+      settle(resolve, reject, response);
+
+      // Clean up request
+      request = null;
+    };
+
+    // Handle browser request cancellation (as opposed to a manual cancellation)
+    request.onabort = function handleAbort() {
+      if (!request) {
+        return;
+      }
+
+      reject(createError('Request aborted', config, 'ECONNABORTED', request));
+
+      // Clean up request
+      request = null;
+    };
+
+    // Handle low level network errors
+    request.onerror = function handleError() {
+      // Real errors are hidden from us by the browser
+      // onerror should only fire if it's a network error
+      reject(createError('Network Error', config, null, request));
+
+      // Clean up request
+      request = null;
+    };
+
+    // Handle timeout
+    request.ontimeout = function handleTimeout() {
+      var timeoutErrorMessage = 'timeout of ' + config.timeout + 'ms exceeded';
+      if (config.timeoutErrorMessage) {
+        timeoutErrorMessage = config.timeoutErrorMessage;
+      }
+      reject(createError(timeoutErrorMessage, config, 'ECONNABORTED',
+        request));
+
+      // Clean up request
+      request = null;
+    };
+
+    // Add xsrf header
+    // This is only done if running in a standard browser environment.
+    // Specifically not if we're in a web worker, or react-native.
+    if (utils.isStandardBrowserEnv()) {
+      // Add xsrf header
+      var xsrfValue = (config.withCredentials || isURLSameOrigin(fullPath)) && config.xsrfCookieName ?
+        cookies.read(config.xsrfCookieName) :
+        undefined;
+
+      if (xsrfValue) {
+        requestHeaders[config.xsrfHeaderName] = xsrfValue;
+      }
+    }
+
+    // Add headers to the request
+    if ('setRequestHeader' in request) {
+      utils.forEach(requestHeaders, function setRequestHeader(val, key) {
+        if (typeof requestData === 'undefined' && key.toLowerCase() === 'content-type') {
+          // Remove Content-Type if data is undefined
+          delete requestHeaders[key];
+        } else {
+          // Otherwise add header to the request
+          request.setRequestHeader(key, val);
+        }
+      });
+    }
+
+    // Add withCredentials to request if needed
+    if (!utils.isUndefined(config.withCredentials)) {
+      request.withCredentials = !!config.withCredentials;
+    }
+
+    // Add responseType to request if needed
+    if (config.responseType) {
+      try {
+        request.responseType = config.responseType;
+      } catch (e) {
+        // Expected DOMException thrown by browsers not compatible XMLHttpRequest Level 2.
+        // But, this can be suppressed for 'json' type as it can be parsed by default 'transformResponse' function.
+        if (config.responseType !== 'json') {
+          throw e;
+        }
+      }
+    }
+
+    // Handle progress if needed
+    if (typeof config.onDownloadProgress === 'function') {
+      request.addEventListener('progress', config.onDownloadProgress);
+    }
+
+    // Not all browsers support upload events
+    if (typeof config.onUploadProgress === 'function' && request.upload) {
+      request.upload.addEventListener('progress', config.onUploadProgress);
+    }
+
+    if (config.cancelToken) {
+      // Handle cancellation
+      config.cancelToken.promise.then(function onCanceled(cancel) {
+        if (!request) {
+          return;
+        }
+
+        request.abort();
+        reject(cancel);
+        // Clean up request
+        request = null;
+      });
+    }
+
+    if (!requestData) {
+      requestData = null;
+    }
+
+    // Send the request
+    request.send(requestData);
+  });
+};
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/axios/lib/axios.js":
+/*!****************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/axios.js ***!
+  \****************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var utils = __webpack_require__(/*! ./utils */ "../topt-core/node_modules/axios/lib/utils.js");
+var bind = __webpack_require__(/*! ./helpers/bind */ "../topt-core/node_modules/axios/lib/helpers/bind.js");
+var Axios = __webpack_require__(/*! ./core/Axios */ "../topt-core/node_modules/axios/lib/core/Axios.js");
+var mergeConfig = __webpack_require__(/*! ./core/mergeConfig */ "../topt-core/node_modules/axios/lib/core/mergeConfig.js");
+var defaults = __webpack_require__(/*! ./defaults */ "../topt-core/node_modules/axios/lib/defaults.js");
+
+/**
+ * Create an instance of Axios
+ *
+ * @param {Object} defaultConfig The default config for the instance
+ * @return {Axios} A new instance of Axios
+ */
+function createInstance(defaultConfig) {
+  var context = new Axios(defaultConfig);
+  var instance = bind(Axios.prototype.request, context);
+
+  // Copy axios.prototype to instance
+  utils.extend(instance, Axios.prototype, context);
+
+  // Copy context to instance
+  utils.extend(instance, context);
+
+  return instance;
+}
+
+// Create the default instance to be exported
+var axios = createInstance(defaults);
+
+// Expose Axios class to allow class inheritance
+axios.Axios = Axios;
+
+// Factory for creating new instances
+axios.create = function create(instanceConfig) {
+  return createInstance(mergeConfig(axios.defaults, instanceConfig));
+};
+
+// Expose Cancel & CancelToken
+axios.Cancel = __webpack_require__(/*! ./cancel/Cancel */ "../topt-core/node_modules/axios/lib/cancel/Cancel.js");
+axios.CancelToken = __webpack_require__(/*! ./cancel/CancelToken */ "../topt-core/node_modules/axios/lib/cancel/CancelToken.js");
+axios.isCancel = __webpack_require__(/*! ./cancel/isCancel */ "../topt-core/node_modules/axios/lib/cancel/isCancel.js");
+
+// Expose all/spread
+axios.all = function all(promises) {
+  return Promise.all(promises);
+};
+axios.spread = __webpack_require__(/*! ./helpers/spread */ "../topt-core/node_modules/axios/lib/helpers/spread.js");
+
+// Expose isAxiosError
+axios.isAxiosError = __webpack_require__(/*! ./helpers/isAxiosError */ "../topt-core/node_modules/axios/lib/helpers/isAxiosError.js");
+
+module.exports = axios;
+
+// Allow use of default import syntax in TypeScript
+module.exports.default = axios;
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/axios/lib/cancel/Cancel.js":
+/*!************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/cancel/Cancel.js ***!
+  \************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+/**
+ * A `Cancel` is an object that is thrown when an operation is canceled.
+ *
+ * @class
+ * @param {string=} message The message.
+ */
+function Cancel(message) {
+  this.message = message;
+}
+
+Cancel.prototype.toString = function toString() {
+  return 'Cancel' + (this.message ? ': ' + this.message : '');
+};
+
+Cancel.prototype.__CANCEL__ = true;
+
+module.exports = Cancel;
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/axios/lib/cancel/CancelToken.js":
+/*!*****************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/cancel/CancelToken.js ***!
+  \*****************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var Cancel = __webpack_require__(/*! ./Cancel */ "../topt-core/node_modules/axios/lib/cancel/Cancel.js");
+
+/**
+ * A `CancelToken` is an object that can be used to request cancellation of an operation.
+ *
+ * @class
+ * @param {Function} executor The executor function.
+ */
+function CancelToken(executor) {
+  if (typeof executor !== 'function') {
+    throw new TypeError('executor must be a function.');
+  }
+
+  var resolvePromise;
+  this.promise = new Promise(function promiseExecutor(resolve) {
+    resolvePromise = resolve;
+  });
+
+  var token = this;
+  executor(function cancel(message) {
+    if (token.reason) {
+      // Cancellation has already been requested
+      return;
+    }
+
+    token.reason = new Cancel(message);
+    resolvePromise(token.reason);
+  });
+}
+
+/**
+ * Throws a `Cancel` if cancellation has been requested.
+ */
+CancelToken.prototype.throwIfRequested = function throwIfRequested() {
+  if (this.reason) {
+    throw this.reason;
+  }
+};
+
+/**
+ * Returns an object that contains a new `CancelToken` and a function that, when called,
+ * cancels the `CancelToken`.
+ */
+CancelToken.source = function source() {
+  var cancel;
+  var token = new CancelToken(function executor(c) {
+    cancel = c;
+  });
+  return {
+    token: token,
+    cancel: cancel
+  };
+};
+
+module.exports = CancelToken;
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/axios/lib/cancel/isCancel.js":
+/*!**************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/cancel/isCancel.js ***!
+  \**************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+module.exports = function isCancel(value) {
+  return !!(value && value.__CANCEL__);
+};
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/axios/lib/core/Axios.js":
+/*!*********************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/core/Axios.js ***!
+  \*********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var utils = __webpack_require__(/*! ./../utils */ "../topt-core/node_modules/axios/lib/utils.js");
+var buildURL = __webpack_require__(/*! ../helpers/buildURL */ "../topt-core/node_modules/axios/lib/helpers/buildURL.js");
+var InterceptorManager = __webpack_require__(/*! ./InterceptorManager */ "../topt-core/node_modules/axios/lib/core/InterceptorManager.js");
+var dispatchRequest = __webpack_require__(/*! ./dispatchRequest */ "../topt-core/node_modules/axios/lib/core/dispatchRequest.js");
+var mergeConfig = __webpack_require__(/*! ./mergeConfig */ "../topt-core/node_modules/axios/lib/core/mergeConfig.js");
+
+/**
+ * Create a new instance of Axios
+ *
+ * @param {Object} instanceConfig The default config for the instance
+ */
+function Axios(instanceConfig) {
+  this.defaults = instanceConfig;
+  this.interceptors = {
+    request: new InterceptorManager(),
+    response: new InterceptorManager()
+  };
+}
+
+/**
+ * Dispatch a request
+ *
+ * @param {Object} config The config specific for this request (merged with this.defaults)
+ */
+Axios.prototype.request = function request(config) {
+  /*eslint no-param-reassign:0*/
+  // Allow for axios('example/url'[, config]) a la fetch API
+  if (typeof config === 'string') {
+    config = arguments[1] || {};
+    config.url = arguments[0];
+  } else {
+    config = config || {};
+  }
+
+  config = mergeConfig(this.defaults, config);
+
+  // Set config.method
+  if (config.method) {
+    config.method = config.method.toLowerCase();
+  } else if (this.defaults.method) {
+    config.method = this.defaults.method.toLowerCase();
+  } else {
+    config.method = 'get';
+  }
+
+  // Hook up interceptors middleware
+  var chain = [dispatchRequest, undefined];
+  var promise = Promise.resolve(config);
+
+  this.interceptors.request.forEach(function unshiftRequestInterceptors(interceptor) {
+    chain.unshift(interceptor.fulfilled, interceptor.rejected);
+  });
+
+  this.interceptors.response.forEach(function pushResponseInterceptors(interceptor) {
+    chain.push(interceptor.fulfilled, interceptor.rejected);
+  });
+
+  while (chain.length) {
+    promise = promise.then(chain.shift(), chain.shift());
+  }
+
+  return promise;
+};
+
+Axios.prototype.getUri = function getUri(config) {
+  config = mergeConfig(this.defaults, config);
+  return buildURL(config.url, config.params, config.paramsSerializer).replace(/^\?/, '');
+};
+
+// Provide aliases for supported request methods
+utils.forEach(['delete', 'get', 'head', 'options'], function forEachMethodNoData(method) {
+  /*eslint func-names:0*/
+  Axios.prototype[method] = function(url, config) {
+    return this.request(mergeConfig(config || {}, {
+      method: method,
+      url: url,
+      data: (config || {}).data
+    }));
+  };
+});
+
+utils.forEach(['post', 'put', 'patch'], function forEachMethodWithData(method) {
+  /*eslint func-names:0*/
+  Axios.prototype[method] = function(url, data, config) {
+    return this.request(mergeConfig(config || {}, {
+      method: method,
+      url: url,
+      data: data
+    }));
+  };
+});
+
+module.exports = Axios;
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/axios/lib/core/InterceptorManager.js":
+/*!**********************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/core/InterceptorManager.js ***!
+  \**********************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var utils = __webpack_require__(/*! ./../utils */ "../topt-core/node_modules/axios/lib/utils.js");
+
+function InterceptorManager() {
+  this.handlers = [];
+}
+
+/**
+ * Add a new interceptor to the stack
+ *
+ * @param {Function} fulfilled The function to handle `then` for a `Promise`
+ * @param {Function} rejected The function to handle `reject` for a `Promise`
+ *
+ * @return {Number} An ID used to remove interceptor later
+ */
+InterceptorManager.prototype.use = function use(fulfilled, rejected) {
+  this.handlers.push({
+    fulfilled: fulfilled,
+    rejected: rejected
+  });
+  return this.handlers.length - 1;
+};
+
+/**
+ * Remove an interceptor from the stack
+ *
+ * @param {Number} id The ID that was returned by `use`
+ */
+InterceptorManager.prototype.eject = function eject(id) {
+  if (this.handlers[id]) {
+    this.handlers[id] = null;
+  }
+};
+
+/**
+ * Iterate over all the registered interceptors
+ *
+ * This method is particularly useful for skipping over any
+ * interceptors that may have become `null` calling `eject`.
+ *
+ * @param {Function} fn The function to call for each interceptor
+ */
+InterceptorManager.prototype.forEach = function forEach(fn) {
+  utils.forEach(this.handlers, function forEachHandler(h) {
+    if (h !== null) {
+      fn(h);
+    }
+  });
+};
+
+module.exports = InterceptorManager;
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/axios/lib/core/buildFullPath.js":
+/*!*****************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/core/buildFullPath.js ***!
+  \*****************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var isAbsoluteURL = __webpack_require__(/*! ../helpers/isAbsoluteURL */ "../topt-core/node_modules/axios/lib/helpers/isAbsoluteURL.js");
+var combineURLs = __webpack_require__(/*! ../helpers/combineURLs */ "../topt-core/node_modules/axios/lib/helpers/combineURLs.js");
+
+/**
+ * Creates a new URL by combining the baseURL with the requestedURL,
+ * only when the requestedURL is not already an absolute URL.
+ * If the requestURL is absolute, this function returns the requestedURL untouched.
+ *
+ * @param {string} baseURL The base URL
+ * @param {string} requestedURL Absolute or relative URL to combine
+ * @returns {string} The combined full path
+ */
+module.exports = function buildFullPath(baseURL, requestedURL) {
+  if (baseURL && !isAbsoluteURL(requestedURL)) {
+    return combineURLs(baseURL, requestedURL);
+  }
+  return requestedURL;
+};
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/axios/lib/core/createError.js":
+/*!***************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/core/createError.js ***!
+  \***************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var enhanceError = __webpack_require__(/*! ./enhanceError */ "../topt-core/node_modules/axios/lib/core/enhanceError.js");
+
+/**
+ * Create an Error with the specified message, config, error code, request and response.
+ *
+ * @param {string} message The error message.
+ * @param {Object} config The config.
+ * @param {string} [code] The error code (for example, 'ECONNABORTED').
+ * @param {Object} [request] The request.
+ * @param {Object} [response] The response.
+ * @returns {Error} The created error.
+ */
+module.exports = function createError(message, config, code, request, response) {
+  var error = new Error(message);
+  return enhanceError(error, config, code, request, response);
+};
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/axios/lib/core/dispatchRequest.js":
+/*!*******************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/core/dispatchRequest.js ***!
+  \*******************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var utils = __webpack_require__(/*! ./../utils */ "../topt-core/node_modules/axios/lib/utils.js");
+var transformData = __webpack_require__(/*! ./transformData */ "../topt-core/node_modules/axios/lib/core/transformData.js");
+var isCancel = __webpack_require__(/*! ../cancel/isCancel */ "../topt-core/node_modules/axios/lib/cancel/isCancel.js");
+var defaults = __webpack_require__(/*! ../defaults */ "../topt-core/node_modules/axios/lib/defaults.js");
+
+/**
+ * Throws a `Cancel` if cancellation has been requested.
+ */
+function throwIfCancellationRequested(config) {
+  if (config.cancelToken) {
+    config.cancelToken.throwIfRequested();
+  }
+}
+
+/**
+ * Dispatch a request to the server using the configured adapter.
+ *
+ * @param {object} config The config that is to be used for the request
+ * @returns {Promise} The Promise to be fulfilled
+ */
+module.exports = function dispatchRequest(config) {
+  throwIfCancellationRequested(config);
+
+  // Ensure headers exist
+  config.headers = config.headers || {};
+
+  // Transform request data
+  config.data = transformData(
+    config.data,
+    config.headers,
+    config.transformRequest
+  );
+
+  // Flatten headers
+  config.headers = utils.merge(
+    config.headers.common || {},
+    config.headers[config.method] || {},
+    config.headers
+  );
+
+  utils.forEach(
+    ['delete', 'get', 'head', 'post', 'put', 'patch', 'common'],
+    function cleanHeaderConfig(method) {
+      delete config.headers[method];
+    }
+  );
+
+  var adapter = config.adapter || defaults.adapter;
+
+  return adapter(config).then(function onAdapterResolution(response) {
+    throwIfCancellationRequested(config);
+
+    // Transform response data
+    response.data = transformData(
+      response.data,
+      response.headers,
+      config.transformResponse
+    );
+
+    return response;
+  }, function onAdapterRejection(reason) {
+    if (!isCancel(reason)) {
+      throwIfCancellationRequested(config);
+
+      // Transform response data
+      if (reason && reason.response) {
+        reason.response.data = transformData(
+          reason.response.data,
+          reason.response.headers,
+          config.transformResponse
+        );
+      }
+    }
+
+    return Promise.reject(reason);
+  });
+};
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/axios/lib/core/enhanceError.js":
+/*!****************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/core/enhanceError.js ***!
+  \****************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+/**
+ * Update an Error with the specified config, error code, and response.
+ *
+ * @param {Error} error The error to update.
+ * @param {Object} config The config.
+ * @param {string} [code] The error code (for example, 'ECONNABORTED').
+ * @param {Object} [request] The request.
+ * @param {Object} [response] The response.
+ * @returns {Error} The error.
+ */
+module.exports = function enhanceError(error, config, code, request, response) {
+  error.config = config;
+  if (code) {
+    error.code = code;
+  }
+
+  error.request = request;
+  error.response = response;
+  error.isAxiosError = true;
+
+  error.toJSON = function toJSON() {
+    return {
+      // Standard
+      message: this.message,
+      name: this.name,
+      // Microsoft
+      description: this.description,
+      number: this.number,
+      // Mozilla
+      fileName: this.fileName,
+      lineNumber: this.lineNumber,
+      columnNumber: this.columnNumber,
+      stack: this.stack,
+      // Axios
+      config: this.config,
+      code: this.code
+    };
+  };
+  return error;
+};
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/axios/lib/core/mergeConfig.js":
+/*!***************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/core/mergeConfig.js ***!
+  \***************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var utils = __webpack_require__(/*! ../utils */ "../topt-core/node_modules/axios/lib/utils.js");
+
+/**
+ * Config-specific merge-function which creates a new config-object
+ * by merging two configuration objects together.
+ *
+ * @param {Object} config1
+ * @param {Object} config2
+ * @returns {Object} New object resulting from merging config2 to config1
+ */
+module.exports = function mergeConfig(config1, config2) {
+  // eslint-disable-next-line no-param-reassign
+  config2 = config2 || {};
+  var config = {};
+
+  var valueFromConfig2Keys = ['url', 'method', 'data'];
+  var mergeDeepPropertiesKeys = ['headers', 'auth', 'proxy', 'params'];
+  var defaultToConfig2Keys = [
+    'baseURL', 'transformRequest', 'transformResponse', 'paramsSerializer',
+    'timeout', 'timeoutMessage', 'withCredentials', 'adapter', 'responseType', 'xsrfCookieName',
+    'xsrfHeaderName', 'onUploadProgress', 'onDownloadProgress', 'decompress',
+    'maxContentLength', 'maxBodyLength', 'maxRedirects', 'transport', 'httpAgent',
+    'httpsAgent', 'cancelToken', 'socketPath', 'responseEncoding'
+  ];
+  var directMergeKeys = ['validateStatus'];
+
+  function getMergedValue(target, source) {
+    if (utils.isPlainObject(target) && utils.isPlainObject(source)) {
+      return utils.merge(target, source);
+    } else if (utils.isPlainObject(source)) {
+      return utils.merge({}, source);
+    } else if (utils.isArray(source)) {
+      return source.slice();
+    }
+    return source;
+  }
+
+  function mergeDeepProperties(prop) {
+    if (!utils.isUndefined(config2[prop])) {
+      config[prop] = getMergedValue(config1[prop], config2[prop]);
+    } else if (!utils.isUndefined(config1[prop])) {
+      config[prop] = getMergedValue(undefined, config1[prop]);
+    }
+  }
+
+  utils.forEach(valueFromConfig2Keys, function valueFromConfig2(prop) {
+    if (!utils.isUndefined(config2[prop])) {
+      config[prop] = getMergedValue(undefined, config2[prop]);
+    }
+  });
+
+  utils.forEach(mergeDeepPropertiesKeys, mergeDeepProperties);
+
+  utils.forEach(defaultToConfig2Keys, function defaultToConfig2(prop) {
+    if (!utils.isUndefined(config2[prop])) {
+      config[prop] = getMergedValue(undefined, config2[prop]);
+    } else if (!utils.isUndefined(config1[prop])) {
+      config[prop] = getMergedValue(undefined, config1[prop]);
+    }
+  });
+
+  utils.forEach(directMergeKeys, function merge(prop) {
+    if (prop in config2) {
+      config[prop] = getMergedValue(config1[prop], config2[prop]);
+    } else if (prop in config1) {
+      config[prop] = getMergedValue(undefined, config1[prop]);
+    }
+  });
+
+  var axiosKeys = valueFromConfig2Keys
+    .concat(mergeDeepPropertiesKeys)
+    .concat(defaultToConfig2Keys)
+    .concat(directMergeKeys);
+
+  var otherKeys = Object
+    .keys(config1)
+    .concat(Object.keys(config2))
+    .filter(function filterAxiosKeys(key) {
+      return axiosKeys.indexOf(key) === -1;
+    });
+
+  utils.forEach(otherKeys, mergeDeepProperties);
+
+  return config;
+};
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/axios/lib/core/settle.js":
+/*!**********************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/core/settle.js ***!
+  \**********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var createError = __webpack_require__(/*! ./createError */ "../topt-core/node_modules/axios/lib/core/createError.js");
+
+/**
+ * Resolve or reject a Promise based on response status.
+ *
+ * @param {Function} resolve A function that resolves the promise.
+ * @param {Function} reject A function that rejects the promise.
+ * @param {object} response The response.
+ */
+module.exports = function settle(resolve, reject, response) {
+  var validateStatus = response.config.validateStatus;
+  if (!response.status || !validateStatus || validateStatus(response.status)) {
+    resolve(response);
+  } else {
+    reject(createError(
+      'Request failed with status code ' + response.status,
+      response.config,
+      null,
+      response.request,
+      response
+    ));
+  }
+};
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/axios/lib/core/transformData.js":
+/*!*****************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/core/transformData.js ***!
+  \*****************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var utils = __webpack_require__(/*! ./../utils */ "../topt-core/node_modules/axios/lib/utils.js");
+
+/**
+ * Transform the data for a request or a response
+ *
+ * @param {Object|String} data The data to be transformed
+ * @param {Array} headers The headers for the request or response
+ * @param {Array|Function} fns A single function or Array of functions
+ * @returns {*} The resulting transformed data
+ */
+module.exports = function transformData(data, headers, fns) {
+  /*eslint no-param-reassign:0*/
+  utils.forEach(fns, function transform(fn) {
+    data = fn(data, headers);
+  });
+
+  return data;
+};
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/axios/lib/defaults.js":
+/*!*******************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/defaults.js ***!
+  \*******************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+/* WEBPACK VAR INJECTION */(function(process) {
+
+var utils = __webpack_require__(/*! ./utils */ "../topt-core/node_modules/axios/lib/utils.js");
+var normalizeHeaderName = __webpack_require__(/*! ./helpers/normalizeHeaderName */ "../topt-core/node_modules/axios/lib/helpers/normalizeHeaderName.js");
+
+var DEFAULT_CONTENT_TYPE = {
+  'Content-Type': 'application/x-www-form-urlencoded'
+};
+
+function setContentTypeIfUnset(headers, value) {
+  if (!utils.isUndefined(headers) && utils.isUndefined(headers['Content-Type'])) {
+    headers['Content-Type'] = value;
+  }
+}
+
+function getDefaultAdapter() {
+  var adapter;
+  if (typeof XMLHttpRequest !== 'undefined') {
+    // For browsers use XHR adapter
+    adapter = __webpack_require__(/*! ./adapters/xhr */ "../topt-core/node_modules/axios/lib/adapters/xhr.js");
+  } else if (typeof process !== 'undefined' && Object.prototype.toString.call(process) === '[object process]') {
+    // For node use HTTP adapter
+    adapter = __webpack_require__(/*! ./adapters/http */ "../topt-core/node_modules/axios/lib/adapters/xhr.js");
+  }
+  return adapter;
+}
+
+var defaults = {
+  adapter: getDefaultAdapter(),
+
+  transformRequest: [function transformRequest(data, headers) {
+    normalizeHeaderName(headers, 'Accept');
+    normalizeHeaderName(headers, 'Content-Type');
+    if (utils.isFormData(data) ||
+      utils.isArrayBuffer(data) ||
+      utils.isBuffer(data) ||
+      utils.isStream(data) ||
+      utils.isFile(data) ||
+      utils.isBlob(data)
+    ) {
+      return data;
+    }
+    if (utils.isArrayBufferView(data)) {
+      return data.buffer;
+    }
+    if (utils.isURLSearchParams(data)) {
+      setContentTypeIfUnset(headers, 'application/x-www-form-urlencoded;charset=utf-8');
+      return data.toString();
+    }
+    if (utils.isObject(data)) {
+      setContentTypeIfUnset(headers, 'application/json;charset=utf-8');
+      return JSON.stringify(data);
+    }
+    return data;
+  }],
+
+  transformResponse: [function transformResponse(data) {
+    /*eslint no-param-reassign:0*/
+    if (typeof data === 'string') {
+      try {
+        data = JSON.parse(data);
+      } catch (e) { /* Ignore */ }
+    }
+    return data;
+  }],
+
+  /**
+   * A timeout in milliseconds to abort a request. If set to 0 (default) a
+   * timeout is not created.
+   */
+  timeout: 0,
+
+  xsrfCookieName: 'XSRF-TOKEN',
+  xsrfHeaderName: 'X-XSRF-TOKEN',
+
+  maxContentLength: -1,
+  maxBodyLength: -1,
+
+  validateStatus: function validateStatus(status) {
+    return status >= 200 && status < 300;
+  }
+};
+
+defaults.headers = {
+  common: {
+    'Accept': 'application/json, text/plain, */*'
+  }
+};
+
+utils.forEach(['delete', 'get', 'head'], function forEachMethodNoData(method) {
+  defaults.headers[method] = {};
+});
+
+utils.forEach(['post', 'put', 'patch'], function forEachMethodWithData(method) {
+  defaults.headers[method] = utils.merge(DEFAULT_CONTENT_TYPE);
+});
+
+module.exports = defaults;
+
+/* WEBPACK VAR INJECTION */}.call(this, __webpack_require__(/*! ./../../../../TOPT/node_modules/process/browser.js */ "./node_modules/process/browser.js")))
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/axios/lib/helpers/bind.js":
+/*!***********************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/helpers/bind.js ***!
+  \***********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+module.exports = function bind(fn, thisArg) {
+  return function wrap() {
+    var args = new Array(arguments.length);
+    for (var i = 0; i < args.length; i++) {
+      args[i] = arguments[i];
+    }
+    return fn.apply(thisArg, args);
+  };
+};
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/axios/lib/helpers/buildURL.js":
+/*!***************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/helpers/buildURL.js ***!
+  \***************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var utils = __webpack_require__(/*! ./../utils */ "../topt-core/node_modules/axios/lib/utils.js");
+
+function encode(val) {
+  return encodeURIComponent(val).
+    replace(/%3A/gi, ':').
+    replace(/%24/g, '$').
+    replace(/%2C/gi, ',').
+    replace(/%20/g, '+').
+    replace(/%5B/gi, '[').
+    replace(/%5D/gi, ']');
+}
+
+/**
+ * Build a URL by appending params to the end
+ *
+ * @param {string} url The base of the url (e.g., http://www.google.com)
+ * @param {object} [params] The params to be appended
+ * @returns {string} The formatted url
+ */
+module.exports = function buildURL(url, params, paramsSerializer) {
+  /*eslint no-param-reassign:0*/
+  if (!params) {
+    return url;
+  }
+
+  var serializedParams;
+  if (paramsSerializer) {
+    serializedParams = paramsSerializer(params);
+  } else if (utils.isURLSearchParams(params)) {
+    serializedParams = params.toString();
+  } else {
+    var parts = [];
+
+    utils.forEach(params, function serialize(val, key) {
+      if (val === null || typeof val === 'undefined') {
+        return;
+      }
+
+      if (utils.isArray(val)) {
+        key = key + '[]';
+      } else {
+        val = [val];
+      }
+
+      utils.forEach(val, function parseValue(v) {
+        if (utils.isDate(v)) {
+          v = v.toISOString();
+        } else if (utils.isObject(v)) {
+          v = JSON.stringify(v);
+        }
+        parts.push(encode(key) + '=' + encode(v));
+      });
+    });
+
+    serializedParams = parts.join('&');
+  }
+
+  if (serializedParams) {
+    var hashmarkIndex = url.indexOf('#');
+    if (hashmarkIndex !== -1) {
+      url = url.slice(0, hashmarkIndex);
+    }
+
+    url += (url.indexOf('?') === -1 ? '?' : '&') + serializedParams;
+  }
+
+  return url;
+};
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/axios/lib/helpers/combineURLs.js":
+/*!******************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/helpers/combineURLs.js ***!
+  \******************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+/**
+ * Creates a new URL by combining the specified URLs
+ *
+ * @param {string} baseURL The base URL
+ * @param {string} relativeURL The relative URL
+ * @returns {string} The combined URL
+ */
+module.exports = function combineURLs(baseURL, relativeURL) {
+  return relativeURL
+    ? baseURL.replace(/\/+$/, '') + '/' + relativeURL.replace(/^\/+/, '')
+    : baseURL;
+};
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/axios/lib/helpers/cookies.js":
+/*!**************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/helpers/cookies.js ***!
+  \**************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var utils = __webpack_require__(/*! ./../utils */ "../topt-core/node_modules/axios/lib/utils.js");
+
+module.exports = (
+  utils.isStandardBrowserEnv() ?
+
+  // Standard browser envs support document.cookie
+    (function standardBrowserEnv() {
+      return {
+        write: function write(name, value, expires, path, domain, secure) {
+          var cookie = [];
+          cookie.push(name + '=' + encodeURIComponent(value));
+
+          if (utils.isNumber(expires)) {
+            cookie.push('expires=' + new Date(expires).toGMTString());
+          }
+
+          if (utils.isString(path)) {
+            cookie.push('path=' + path);
+          }
+
+          if (utils.isString(domain)) {
+            cookie.push('domain=' + domain);
+          }
+
+          if (secure === true) {
+            cookie.push('secure');
+          }
+
+          document.cookie = cookie.join('; ');
+        },
+
+        read: function read(name) {
+          var match = document.cookie.match(new RegExp('(^|;\\s*)(' + name + ')=([^;]*)'));
+          return (match ? decodeURIComponent(match[3]) : null);
+        },
+
+        remove: function remove(name) {
+          this.write(name, '', Date.now() - 86400000);
+        }
+      };
+    })() :
+
+  // Non standard browser env (web workers, react-native) lack needed support.
+    (function nonStandardBrowserEnv() {
+      return {
+        write: function write() {},
+        read: function read() { return null; },
+        remove: function remove() {}
+      };
+    })()
+);
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/axios/lib/helpers/isAbsoluteURL.js":
+/*!********************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/helpers/isAbsoluteURL.js ***!
+  \********************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+/**
+ * Determines whether the specified URL is absolute
+ *
+ * @param {string} url The URL to test
+ * @returns {boolean} True if the specified URL is absolute, otherwise false
+ */
+module.exports = function isAbsoluteURL(url) {
+  // A URL is considered absolute if it begins with "<scheme>://" or "//" (protocol-relative URL).
+  // RFC 3986 defines scheme name as a sequence of characters beginning with a letter and followed
+  // by any combination of letters, digits, plus, period, or hyphen.
+  return /^([a-z][a-z\d\+\-\.]*:)?\/\//i.test(url);
+};
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/axios/lib/helpers/isAxiosError.js":
+/*!*******************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/helpers/isAxiosError.js ***!
+  \*******************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+/**
+ * Determines whether the payload is an error thrown by Axios
+ *
+ * @param {*} payload The value to test
+ * @returns {boolean} True if the payload is an error thrown by Axios, otherwise false
+ */
+module.exports = function isAxiosError(payload) {
+  return (typeof payload === 'object') && (payload.isAxiosError === true);
+};
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/axios/lib/helpers/isURLSameOrigin.js":
+/*!**********************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/helpers/isURLSameOrigin.js ***!
+  \**********************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var utils = __webpack_require__(/*! ./../utils */ "../topt-core/node_modules/axios/lib/utils.js");
+
+module.exports = (
+  utils.isStandardBrowserEnv() ?
+
+  // Standard browser envs have full support of the APIs needed to test
+  // whether the request URL is of the same origin as current location.
+    (function standardBrowserEnv() {
+      var msie = /(msie|trident)/i.test(navigator.userAgent);
+      var urlParsingNode = document.createElement('a');
+      var originURL;
+
+      /**
+    * Parse a URL to discover it's components
+    *
+    * @param {String} url The URL to be parsed
+    * @returns {Object}
+    */
+      function resolveURL(url) {
+        var href = url;
+
+        if (msie) {
+        // IE needs attribute set twice to normalize properties
+          urlParsingNode.setAttribute('href', href);
+          href = urlParsingNode.href;
+        }
+
+        urlParsingNode.setAttribute('href', href);
+
+        // urlParsingNode provides the UrlUtils interface - http://url.spec.whatwg.org/#urlutils
+        return {
+          href: urlParsingNode.href,
+          protocol: urlParsingNode.protocol ? urlParsingNode.protocol.replace(/:$/, '') : '',
+          host: urlParsingNode.host,
+          search: urlParsingNode.search ? urlParsingNode.search.replace(/^\?/, '') : '',
+          hash: urlParsingNode.hash ? urlParsingNode.hash.replace(/^#/, '') : '',
+          hostname: urlParsingNode.hostname,
+          port: urlParsingNode.port,
+          pathname: (urlParsingNode.pathname.charAt(0) === '/') ?
+            urlParsingNode.pathname :
+            '/' + urlParsingNode.pathname
+        };
+      }
+
+      originURL = resolveURL(window.location.href);
+
+      /**
+    * Determine if a URL shares the same origin as the current location
+    *
+    * @param {String} requestURL The URL to test
+    * @returns {boolean} True if URL shares the same origin, otherwise false
+    */
+      return function isURLSameOrigin(requestURL) {
+        var parsed = (utils.isString(requestURL)) ? resolveURL(requestURL) : requestURL;
+        return (parsed.protocol === originURL.protocol &&
+            parsed.host === originURL.host);
+      };
+    })() :
+
+  // Non standard browser envs (web workers, react-native) lack needed support.
+    (function nonStandardBrowserEnv() {
+      return function isURLSameOrigin() {
+        return true;
+      };
+    })()
+);
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/axios/lib/helpers/normalizeHeaderName.js":
+/*!**************************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/helpers/normalizeHeaderName.js ***!
+  \**************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var utils = __webpack_require__(/*! ../utils */ "../topt-core/node_modules/axios/lib/utils.js");
+
+module.exports = function normalizeHeaderName(headers, normalizedName) {
+  utils.forEach(headers, function processHeader(value, name) {
+    if (name !== normalizedName && name.toUpperCase() === normalizedName.toUpperCase()) {
+      headers[normalizedName] = value;
+      delete headers[name];
+    }
+  });
+};
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/axios/lib/helpers/parseHeaders.js":
+/*!*******************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/helpers/parseHeaders.js ***!
+  \*******************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var utils = __webpack_require__(/*! ./../utils */ "../topt-core/node_modules/axios/lib/utils.js");
+
+// Headers whose duplicates are ignored by node
+// c.f. https://nodejs.org/api/http.html#http_message_headers
+var ignoreDuplicateOf = [
+  'age', 'authorization', 'content-length', 'content-type', 'etag',
+  'expires', 'from', 'host', 'if-modified-since', 'if-unmodified-since',
+  'last-modified', 'location', 'max-forwards', 'proxy-authorization',
+  'referer', 'retry-after', 'user-agent'
+];
+
+/**
+ * Parse headers into an object
+ *
+ * ```
+ * Date: Wed, 27 Aug 2014 08:58:49 GMT
+ * Content-Type: application/json
+ * Connection: keep-alive
+ * Transfer-Encoding: chunked
+ * ```
+ *
+ * @param {String} headers Headers needing to be parsed
+ * @returns {Object} Headers parsed into an object
+ */
+module.exports = function parseHeaders(headers) {
+  var parsed = {};
+  var key;
+  var val;
+  var i;
+
+  if (!headers) { return parsed; }
+
+  utils.forEach(headers.split('\n'), function parser(line) {
+    i = line.indexOf(':');
+    key = utils.trim(line.substr(0, i)).toLowerCase();
+    val = utils.trim(line.substr(i + 1));
+
+    if (key) {
+      if (parsed[key] && ignoreDuplicateOf.indexOf(key) >= 0) {
+        return;
+      }
+      if (key === 'set-cookie') {
+        parsed[key] = (parsed[key] ? parsed[key] : []).concat([val]);
+      } else {
+        parsed[key] = parsed[key] ? parsed[key] + ', ' + val : val;
+      }
+    }
+  });
+
+  return parsed;
+};
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/axios/lib/helpers/spread.js":
+/*!*************************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/helpers/spread.js ***!
+  \*************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+/**
+ * Syntactic sugar for invoking a function and expanding an array for arguments.
+ *
+ * Common use case would be to use `Function.prototype.apply`.
+ *
+ *  ```js
+ *  function f(x, y, z) {}
+ *  var args = [1, 2, 3];
+ *  f.apply(null, args);
+ *  ```
+ *
+ * With `spread` this example can be re-written.
+ *
+ *  ```js
+ *  spread(function(x, y, z) {})([1, 2, 3]);
+ *  ```
+ *
+ * @param {Function} callback
+ * @returns {Function}
+ */
+module.exports = function spread(callback) {
+  return function wrap(arr) {
+    return callback.apply(null, arr);
+  };
+};
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/axios/lib/utils.js":
+/*!****************************************************!*\
+  !*** ../topt-core/node_modules/axios/lib/utils.js ***!
+  \****************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+var bind = __webpack_require__(/*! ./helpers/bind */ "../topt-core/node_modules/axios/lib/helpers/bind.js");
+
+/*global toString:true*/
+
+// utils is a library of generic helper functions non-specific to axios
+
+var toString = Object.prototype.toString;
+
+/**
+ * Determine if a value is an Array
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is an Array, otherwise false
+ */
+function isArray(val) {
+  return toString.call(val) === '[object Array]';
+}
+
+/**
+ * Determine if a value is undefined
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if the value is undefined, otherwise false
+ */
+function isUndefined(val) {
+  return typeof val === 'undefined';
+}
+
+/**
+ * Determine if a value is a Buffer
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a Buffer, otherwise false
+ */
+function isBuffer(val) {
+  return val !== null && !isUndefined(val) && val.constructor !== null && !isUndefined(val.constructor)
+    && typeof val.constructor.isBuffer === 'function' && val.constructor.isBuffer(val);
+}
+
+/**
+ * Determine if a value is an ArrayBuffer
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is an ArrayBuffer, otherwise false
+ */
+function isArrayBuffer(val) {
+  return toString.call(val) === '[object ArrayBuffer]';
+}
+
+/**
+ * Determine if a value is a FormData
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is an FormData, otherwise false
+ */
+function isFormData(val) {
+  return (typeof FormData !== 'undefined') && (val instanceof FormData);
+}
+
+/**
+ * Determine if a value is a view on an ArrayBuffer
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a view on an ArrayBuffer, otherwise false
+ */
+function isArrayBufferView(val) {
+  var result;
+  if ((typeof ArrayBuffer !== 'undefined') && (ArrayBuffer.isView)) {
+    result = ArrayBuffer.isView(val);
+  } else {
+    result = (val) && (val.buffer) && (val.buffer instanceof ArrayBuffer);
+  }
+  return result;
+}
+
+/**
+ * Determine if a value is a String
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a String, otherwise false
+ */
+function isString(val) {
+  return typeof val === 'string';
+}
+
+/**
+ * Determine if a value is a Number
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a Number, otherwise false
+ */
+function isNumber(val) {
+  return typeof val === 'number';
+}
+
+/**
+ * Determine if a value is an Object
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is an Object, otherwise false
+ */
+function isObject(val) {
+  return val !== null && typeof val === 'object';
+}
+
+/**
+ * Determine if a value is a plain Object
+ *
+ * @param {Object} val The value to test
+ * @return {boolean} True if value is a plain Object, otherwise false
+ */
+function isPlainObject(val) {
+  if (toString.call(val) !== '[object Object]') {
+    return false;
+  }
+
+  var prototype = Object.getPrototypeOf(val);
+  return prototype === null || prototype === Object.prototype;
+}
+
+/**
+ * Determine if a value is a Date
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a Date, otherwise false
+ */
+function isDate(val) {
+  return toString.call(val) === '[object Date]';
+}
+
+/**
+ * Determine if a value is a File
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a File, otherwise false
+ */
+function isFile(val) {
+  return toString.call(val) === '[object File]';
+}
+
+/**
+ * Determine if a value is a Blob
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a Blob, otherwise false
+ */
+function isBlob(val) {
+  return toString.call(val) === '[object Blob]';
+}
+
+/**
+ * Determine if a value is a Function
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a Function, otherwise false
+ */
+function isFunction(val) {
+  return toString.call(val) === '[object Function]';
+}
+
+/**
+ * Determine if a value is a Stream
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a Stream, otherwise false
+ */
+function isStream(val) {
+  return isObject(val) && isFunction(val.pipe);
+}
+
+/**
+ * Determine if a value is a URLSearchParams object
+ *
+ * @param {Object} val The value to test
+ * @returns {boolean} True if value is a URLSearchParams object, otherwise false
+ */
+function isURLSearchParams(val) {
+  return typeof URLSearchParams !== 'undefined' && val instanceof URLSearchParams;
+}
+
+/**
+ * Trim excess whitespace off the beginning and end of a string
+ *
+ * @param {String} str The String to trim
+ * @returns {String} The String freed of excess whitespace
+ */
+function trim(str) {
+  return str.replace(/^\s*/, '').replace(/\s*$/, '');
+}
+
+/**
+ * Determine if we're running in a standard browser environment
+ *
+ * This allows axios to run in a web worker, and react-native.
+ * Both environments support XMLHttpRequest, but not fully standard globals.
+ *
+ * web workers:
+ *  typeof window -> undefined
+ *  typeof document -> undefined
+ *
+ * react-native:
+ *  navigator.product -> 'ReactNative'
+ * nativescript
+ *  navigator.product -> 'NativeScript' or 'NS'
+ */
+function isStandardBrowserEnv() {
+  if (typeof navigator !== 'undefined' && (navigator.product === 'ReactNative' ||
+                                           navigator.product === 'NativeScript' ||
+                                           navigator.product === 'NS')) {
+    return false;
+  }
+  return (
+    typeof window !== 'undefined' &&
+    typeof document !== 'undefined'
+  );
+}
+
+/**
+ * Iterate over an Array or an Object invoking a function for each item.
+ *
+ * If `obj` is an Array callback will be called passing
+ * the value, index, and complete array for each item.
+ *
+ * If 'obj' is an Object callback will be called passing
+ * the value, key, and complete object for each property.
+ *
+ * @param {Object|Array} obj The object to iterate
+ * @param {Function} fn The callback to invoke for each item
+ */
+function forEach(obj, fn) {
+  // Don't bother if no value provided
+  if (obj === null || typeof obj === 'undefined') {
+    return;
+  }
+
+  // Force an array if not already something iterable
+  if (typeof obj !== 'object') {
+    /*eslint no-param-reassign:0*/
+    obj = [obj];
+  }
+
+  if (isArray(obj)) {
+    // Iterate over array values
+    for (var i = 0, l = obj.length; i < l; i++) {
+      fn.call(null, obj[i], i, obj);
+    }
+  } else {
+    // Iterate over object keys
+    for (var key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        fn.call(null, obj[key], key, obj);
+      }
+    }
+  }
+}
+
+/**
+ * Accepts varargs expecting each argument to be an object, then
+ * immutably merges the properties of each object and returns result.
+ *
+ * When multiple objects contain the same key the later object in
+ * the arguments list will take precedence.
+ *
+ * Example:
+ *
+ * ```js
+ * var result = merge({foo: 123}, {foo: 456});
+ * console.log(result.foo); // outputs 456
+ * ```
+ *
+ * @param {Object} obj1 Object to merge
+ * @returns {Object} Result of all merge properties
+ */
+function merge(/* obj1, obj2, obj3, ... */) {
+  var result = {};
+  function assignValue(val, key) {
+    if (isPlainObject(result[key]) && isPlainObject(val)) {
+      result[key] = merge(result[key], val);
+    } else if (isPlainObject(val)) {
+      result[key] = merge({}, val);
+    } else if (isArray(val)) {
+      result[key] = val.slice();
+    } else {
+      result[key] = val;
+    }
+  }
+
+  for (var i = 0, l = arguments.length; i < l; i++) {
+    forEach(arguments[i], assignValue);
+  }
+  return result;
+}
+
+/**
+ * Extends object a by mutably adding to it the properties of object b.
+ *
+ * @param {Object} a The object to be extended
+ * @param {Object} b The object to copy properties from
+ * @param {Object} thisArg The object to bind function to
+ * @return {Object} The resulting value of object a
+ */
+function extend(a, b, thisArg) {
+  forEach(b, function assignValue(val, key) {
+    if (thisArg && typeof val === 'function') {
+      a[key] = bind(val, thisArg);
+    } else {
+      a[key] = val;
+    }
+  });
+  return a;
+}
+
+/**
+ * Remove byte order marker. This catches EF BB BF (the UTF-8 BOM)
+ *
+ * @param {string} content with BOM
+ * @return {string} content value without BOM
+ */
+function stripBOM(content) {
+  if (content.charCodeAt(0) === 0xFEFF) {
+    content = content.slice(1);
+  }
+  return content;
+}
+
+module.exports = {
+  isArray: isArray,
+  isArrayBuffer: isArrayBuffer,
+  isBuffer: isBuffer,
+  isFormData: isFormData,
+  isArrayBufferView: isArrayBufferView,
+  isString: isString,
+  isNumber: isNumber,
+  isObject: isObject,
+  isPlainObject: isPlainObject,
+  isUndefined: isUndefined,
+  isDate: isDate,
+  isFile: isFile,
+  isBlob: isBlob,
+  isFunction: isFunction,
+  isStream: isStream,
+  isURLSearchParams: isURLSearchParams,
+  isStandardBrowserEnv: isStandardBrowserEnv,
+  forEach: forEach,
+  merge: merge,
+  extend: extend,
+  trim: trim,
+  stripBOM: stripBOM
+};
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/es5-ext/global.js":
+/*!***************************************************!*\
+  !*** ../topt-core/node_modules/es5-ext/global.js ***!
+  \***************************************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+var naiveFallback = function () {
+	if (typeof self === "object" && self) return self;
+	if (typeof window === "object" && window) return window;
+	throw new Error("Unable to resolve global `this`");
+};
+
+module.exports = (function () {
+	if (this) return this;
+
+	// Unexpected strict mode (may happen if e.g. bundled into ESM module)
+
+	// Fallback to standard globalThis if available
+	if (typeof globalThis === "object" && globalThis) return globalThis;
+
+	// Thanks @mathiasbynens -> https://mathiasbynens.be/notes/globalthis
+	// In all ES5+ engines global object inherits from Object.prototype
+	// (if you approached one that doesn't please report)
+	try {
+		Object.defineProperty(Object.prototype, "__global__", {
+			get: function () { return this; },
+			configurable: true
+		});
+	} catch (error) {
+		// Unfortunate case of updates to Object.prototype being restricted
+		// via preventExtensions, seal or freeze
+		return naiveFallback();
+	}
+	try {
+		// Safari case (window.__global__ works, but __global__ does not)
+		if (!__global__) return naiveFallback();
+		return __global__;
+	} finally {
+		delete Object.prototype.__global__;
+	}
+})();
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/loglevel-plugin-prefix/lib/loglevel-plugin-prefix.js":
+/*!**************************************************************************************!*\
+  !*** ../topt-core/node_modules/loglevel-plugin-prefix/lib/loglevel-plugin-prefix.js ***!
+  \**************************************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_RESULT__;(function (root, factory) {
+  if (true) {
+    !(__WEBPACK_AMD_DEFINE_FACTORY__ = (factory),
+				__WEBPACK_AMD_DEFINE_RESULT__ = (typeof __WEBPACK_AMD_DEFINE_FACTORY__ === 'function' ?
+				(__WEBPACK_AMD_DEFINE_FACTORY__.call(exports, __webpack_require__, exports, module)) :
+				__WEBPACK_AMD_DEFINE_FACTORY__),
+				__WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
+  } else {}
+}(this, function (root) {
+  'use strict';
+
+  var merge = function (target) {
+    var i = 1;
+    var length = arguments.length;
+    var key;
+    for (; i < length; i++) {
+      for (key in arguments[i]) {
+        if (Object.prototype.hasOwnProperty.call(arguments[i], key)) {
+          target[key] = arguments[i][key];
+        }
+      }
+    }
+    return target;
+  };
+
+  var defaults = {
+    template: '[%t] %l:',
+    levelFormatter: function (level) {
+      return level.toUpperCase();
+    },
+    nameFormatter: function (name) {
+      return name || 'root';
+    },
+    timestampFormatter: function (date) {
+      return date.toTimeString().replace(/.*(\d{2}:\d{2}:\d{2}).*/, '$1');
+    },
+    format: undefined
+  };
+
+  var loglevel;
+  var configs = {};
+
+  var reg = function (rootLogger) {
+    if (!rootLogger || !rootLogger.getLogger) {
+      throw new TypeError('Argument is not a root logger');
+    }
+    loglevel = rootLogger;
+  };
+
+  var apply = function (logger, config) {
+    if (!logger || !logger.setLevel) {
+      throw new TypeError('Argument is not a logger');
+    }
+
+    /* eslint-disable vars-on-top */
+    var originalFactory = logger.methodFactory;
+    var name = logger.name || '';
+    var parent = configs[name] || configs[''] || defaults;
+    /* eslint-enable vars-on-top */
+
+    function methodFactory(methodName, logLevel, loggerName) {
+      var originalMethod = originalFactory(methodName, logLevel, loggerName);
+      var options = configs[loggerName] || configs[''];
+
+      var hasTimestamp = options.template.indexOf('%t') !== -1;
+      var hasLevel = options.template.indexOf('%l') !== -1;
+      var hasName = options.template.indexOf('%n') !== -1;
+
+      return function () {
+        var content = '';
+
+        var length = arguments.length;
+        var args = Array(length);
+        var key = 0;
+        for (; key < length; key++) {
+          args[key] = arguments[key];
+        }
+
+        // skip the root method for child loggers to prevent duplicate logic
+        if (name || !configs[loggerName]) {
+          /* eslint-disable vars-on-top */
+          var timestamp = options.timestampFormatter(new Date());
+          var level = options.levelFormatter(methodName);
+          var lname = options.nameFormatter(loggerName);
+          /* eslint-enable vars-on-top */
+
+          if (options.format) {
+            content += options.format(level, lname, timestamp);
+          } else {
+            content += options.template;
+            if (hasTimestamp) {
+              content = content.replace(/%t/, timestamp);
+            }
+            if (hasLevel) content = content.replace(/%l/, level);
+            if (hasName) content = content.replace(/%n/, lname);
+          }
+
+          if (args.length && typeof args[0] === 'string') {
+            // concat prefix with first argument to support string substitutions
+            args[0] = content + ' ' + args[0];
+          } else {
+            args.unshift(content);
+          }
+        }
+
+        originalMethod.apply(undefined, args);
+      };
+    }
+
+    if (!configs[name]) {
+      logger.methodFactory = methodFactory;
+    }
+
+    // for remove inherited format option if template option preset
+    config = config || {};
+    if (config.template) config.format = undefined;
+
+    configs[name] = merge({}, parent, config);
+
+    logger.setLevel(logger.getLevel());
+
+    if (!loglevel) {
+      logger.warn(
+        'It is necessary to call the function reg() of loglevel-plugin-prefix before calling apply. From the next release, it will throw an error. See more: https://github.com/kutuluk/loglevel-plugin-prefix/blob/master/README.md'
+      );
+    }
+
+    return logger;
+  };
+
+  var api = {
+    reg: reg,
+    apply: apply
+  };
+
+  var save;
+
+  if (root) {
+    save = root.prefix;
+    api.noConflict = function () {
+      if (root.prefix === api) {
+        root.prefix = save;
+      }
+      return api;
+    };
+  }
+
+  return api;
+}));
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/loglevel/lib/loglevel.js":
+/*!**********************************************************!*\
+  !*** ../topt-core/node_modules/loglevel/lib/loglevel.js ***!
+  \**********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_RESULT__;/*
+* loglevel - https://github.com/pimterry/loglevel
+*
+* Copyright (c) 2013 Tim Perry
+* Licensed under the MIT license.
+*/
+(function (root, definition) {
+    "use strict";
+    if (true) {
+        !(__WEBPACK_AMD_DEFINE_FACTORY__ = (definition),
+				__WEBPACK_AMD_DEFINE_RESULT__ = (typeof __WEBPACK_AMD_DEFINE_FACTORY__ === 'function' ?
+				(__WEBPACK_AMD_DEFINE_FACTORY__.call(exports, __webpack_require__, exports, module)) :
+				__WEBPACK_AMD_DEFINE_FACTORY__),
+				__WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
+    } else {}
+}(this, function () {
+    "use strict";
+
+    // Slightly dubious tricks to cut down minimized file size
+    var noop = function() {};
+    var undefinedType = "undefined";
+    var isIE = (typeof window !== undefinedType) && (typeof window.navigator !== undefinedType) && (
+        /Trident\/|MSIE /.test(window.navigator.userAgent)
+    );
+
+    var logMethods = [
+        "trace",
+        "debug",
+        "info",
+        "warn",
+        "error"
+    ];
+
+    // Cross-browser bind equivalent that works at least back to IE6
+    function bindMethod(obj, methodName) {
+        var method = obj[methodName];
+        if (typeof method.bind === 'function') {
+            return method.bind(obj);
+        } else {
+            try {
+                return Function.prototype.bind.call(method, obj);
+            } catch (e) {
+                // Missing bind shim or IE8 + Modernizr, fallback to wrapping
+                return function() {
+                    return Function.prototype.apply.apply(method, [obj, arguments]);
+                };
+            }
+        }
+    }
+
+    // Trace() doesn't print the message in IE, so for that case we need to wrap it
+    function traceForIE() {
+        if (console.log) {
+            if (console.log.apply) {
+                console.log.apply(console, arguments);
+            } else {
+                // In old IE, native console methods themselves don't have apply().
+                Function.prototype.apply.apply(console.log, [console, arguments]);
+            }
+        }
+        if (console.trace) console.trace();
+    }
+
+    // Build the best logging method possible for this env
+    // Wherever possible we want to bind, not wrap, to preserve stack traces
+    function realMethod(methodName) {
+        if (methodName === 'debug') {
+            methodName = 'log';
+        }
+
+        if (typeof console === undefinedType) {
+            return false; // No method possible, for now - fixed later by enableLoggingWhenConsoleArrives
+        } else if (methodName === 'trace' && isIE) {
+            return traceForIE;
+        } else if (console[methodName] !== undefined) {
+            return bindMethod(console, methodName);
+        } else if (console.log !== undefined) {
+            return bindMethod(console, 'log');
+        } else {
+            return noop;
+        }
+    }
+
+    // These private functions always need `this` to be set properly
+
+    function replaceLoggingMethods(level, loggerName) {
+        /*jshint validthis:true */
+        for (var i = 0; i < logMethods.length; i++) {
+            var methodName = logMethods[i];
+            this[methodName] = (i < level) ?
+                noop :
+                this.methodFactory(methodName, level, loggerName);
+        }
+
+        // Define log.log as an alias for log.debug
+        this.log = this.debug;
+    }
+
+    // In old IE versions, the console isn't present until you first open it.
+    // We build realMethod() replacements here that regenerate logging methods
+    function enableLoggingWhenConsoleArrives(methodName, level, loggerName) {
+        return function () {
+            if (typeof console !== undefinedType) {
+                replaceLoggingMethods.call(this, level, loggerName);
+                this[methodName].apply(this, arguments);
+            }
+        };
+    }
+
+    // By default, we use closely bound real methods wherever possible, and
+    // otherwise we wait for a console to appear, and then try again.
+    function defaultMethodFactory(methodName, level, loggerName) {
+        /*jshint validthis:true */
+        return realMethod(methodName) ||
+               enableLoggingWhenConsoleArrives.apply(this, arguments);
+    }
+
+    function Logger(name, defaultLevel, factory) {
+      var self = this;
+      var currentLevel;
+
+      var storageKey = "loglevel";
+      if (typeof name === "string") {
+        storageKey += ":" + name;
+      } else if (typeof name === "symbol") {
+        storageKey = undefined;
+      }
+
+      function persistLevelIfPossible(levelNum) {
+          var levelName = (logMethods[levelNum] || 'silent').toUpperCase();
+
+          if (typeof window === undefinedType || !storageKey) return;
+
+          // Use localStorage if available
+          try {
+              window.localStorage[storageKey] = levelName;
+              return;
+          } catch (ignore) {}
+
+          // Use session cookie as fallback
+          try {
+              window.document.cookie =
+                encodeURIComponent(storageKey) + "=" + levelName + ";";
+          } catch (ignore) {}
+      }
+
+      function getPersistedLevel() {
+          var storedLevel;
+
+          if (typeof window === undefinedType || !storageKey) return;
+
+          try {
+              storedLevel = window.localStorage[storageKey];
+          } catch (ignore) {}
+
+          // Fallback to cookies if local storage gives us nothing
+          if (typeof storedLevel === undefinedType) {
+              try {
+                  var cookie = window.document.cookie;
+                  var location = cookie.indexOf(
+                      encodeURIComponent(storageKey) + "=");
+                  if (location !== -1) {
+                      storedLevel = /^([^;]+)/.exec(cookie.slice(location))[1];
+                  }
+              } catch (ignore) {}
+          }
+
+          // If the stored level is not valid, treat it as if nothing was stored.
+          if (self.levels[storedLevel] === undefined) {
+              storedLevel = undefined;
+          }
+
+          return storedLevel;
+      }
+
+      /*
+       *
+       * Public logger API - see https://github.com/pimterry/loglevel for details
+       *
+       */
+
+      self.name = name;
+
+      self.levels = { "TRACE": 0, "DEBUG": 1, "INFO": 2, "WARN": 3,
+          "ERROR": 4, "SILENT": 5};
+
+      self.methodFactory = factory || defaultMethodFactory;
+
+      self.getLevel = function () {
+          return currentLevel;
+      };
+
+      self.setLevel = function (level, persist) {
+          if (typeof level === "string" && self.levels[level.toUpperCase()] !== undefined) {
+              level = self.levels[level.toUpperCase()];
+          }
+          if (typeof level === "number" && level >= 0 && level <= self.levels.SILENT) {
+              currentLevel = level;
+              if (persist !== false) {  // defaults to true
+                  persistLevelIfPossible(level);
+              }
+              replaceLoggingMethods.call(self, level, name);
+              if (typeof console === undefinedType && level < self.levels.SILENT) {
+                  return "No console available for logging";
+              }
+          } else {
+              throw "log.setLevel() called with invalid level: " + level;
+          }
+      };
+
+      self.setDefaultLevel = function (level) {
+          if (!getPersistedLevel()) {
+              self.setLevel(level, false);
+          }
+      };
+
+      self.enableAll = function(persist) {
+          self.setLevel(self.levels.TRACE, persist);
+      };
+
+      self.disableAll = function(persist) {
+          self.setLevel(self.levels.SILENT, persist);
+      };
+
+      // Initialize with the right level
+      var initialLevel = getPersistedLevel();
+      if (initialLevel == null) {
+          initialLevel = defaultLevel == null ? "WARN" : defaultLevel;
+      }
+      self.setLevel(initialLevel, false);
+    }
+
+    /*
+     *
+     * Top-level API
+     *
+     */
+
+    var defaultLogger = new Logger();
+
+    var _loggersByName = {};
+    defaultLogger.getLogger = function getLogger(name) {
+        if ((typeof name !== "symbol" && typeof name !== "string") || name === "") {
+          throw new TypeError("You must supply a name when creating a logger.");
+        }
+
+        var logger = _loggersByName[name];
+        if (!logger) {
+          logger = _loggersByName[name] = new Logger(
+            name, defaultLogger.getLevel(), defaultLogger.methodFactory);
+        }
+        return logger;
+    };
+
+    // Grab the current global log variable in case of overwrite
+    var _log = (typeof window !== undefinedType) ? window.log : undefined;
+    defaultLogger.noConflict = function() {
+        if (typeof window !== undefinedType &&
+               window.log === defaultLogger) {
+            window.log = _log;
+        }
+
+        return defaultLogger;
+    };
+
+    defaultLogger.getLoggers = function getLoggers() {
+        return _loggersByName;
+    };
+
+    // ES6 default export, for compatibility
+    defaultLogger['default'] = defaultLogger;
+
+    return defaultLogger;
+}));
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/websocket/lib/browser.js":
+/*!**********************************************************!*\
+  !*** ../topt-core/node_modules/websocket/lib/browser.js ***!
+  \**********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+var _globalThis;
+try {
+	_globalThis = __webpack_require__(/*! es5-ext/global */ "../topt-core/node_modules/es5-ext/global.js");
+} catch (error) {
+} finally {
+	if (!_globalThis && typeof window !== 'undefined') { _globalThis = window; }
+	if (!_globalThis) { throw new Error('Could not determine global this'); }
+}
+
+var NativeWebSocket = _globalThis.WebSocket || _globalThis.MozWebSocket;
+var websocket_version = __webpack_require__(/*! ./version */ "../topt-core/node_modules/websocket/lib/version.js");
+
+
+/**
+ * Expose a W3C WebSocket class with just one or two arguments.
+ */
+function W3CWebSocket(uri, protocols) {
+	var native_instance;
+
+	if (protocols) {
+		native_instance = new NativeWebSocket(uri, protocols);
+	}
+	else {
+		native_instance = new NativeWebSocket(uri);
+	}
+
+	/**
+	 * 'native_instance' is an instance of nativeWebSocket (the browser's WebSocket
+	 * class). Since it is an Object it will be returned as it is when creating an
+	 * instance of W3CWebSocket via 'new W3CWebSocket()'.
+	 *
+	 * ECMAScript 5: http://bclary.com/2004/11/07/#a-13.2.2
+	 */
+	return native_instance;
+}
+if (NativeWebSocket) {
+	['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'].forEach(function(prop) {
+		Object.defineProperty(W3CWebSocket, prop, {
+			get: function() { return NativeWebSocket[prop]; }
+		});
+	});
+}
+
+/**
+ * Module exports.
+ */
+module.exports = {
+    'w3cwebsocket' : NativeWebSocket ? W3CWebSocket : null,
+    'version'      : websocket_version
+};
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/websocket/lib/version.js":
+/*!**********************************************************!*\
+  !*** ../topt-core/node_modules/websocket/lib/version.js ***!
+  \**********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+module.exports = __webpack_require__(/*! ../package.json */ "../topt-core/node_modules/websocket/package.json").version;
+
+
+/***/ }),
+
+/***/ "../topt-core/node_modules/websocket/package.json":
+/*!********************************************************!*\
+  !*** ../topt-core/node_modules/websocket/package.json ***!
+  \********************************************************/
+/*! exports provided: _from, _id, _inBundle, _integrity, _location, _phantomChildren, _requested, _requiredBy, _resolved, _shasum, _spec, _where, author, browser, bugs, bundleDependencies, config, contributors, dependencies, deprecated, description, devDependencies, directories, engines, homepage, keywords, license, main, name, repository, scripts, version, default */
+/***/ (function(module) {
+
+module.exports = JSON.parse("{\"_from\":\"websocket\",\"_id\":\"websocket@1.0.32\",\"_inBundle\":false,\"_integrity\":\"sha512-i4yhcllSP4wrpoPMU2N0TQ/q0O94LRG/eUQjEAamRltjQ1oT1PFFKOG4i877OlJgCG8rw6LrrowJp+TYCEWF7Q==\",\"_location\":\"/websocket\",\"_phantomChildren\":{},\"_requested\":{\"type\":\"tag\",\"registry\":true,\"raw\":\"websocket\",\"name\":\"websocket\",\"escapedName\":\"websocket\",\"rawSpec\":\"\",\"saveSpec\":null,\"fetchSpec\":\"latest\"},\"_requiredBy\":[\"#USER\",\"/\"],\"_resolved\":\"https://registry.npmjs.org/websocket/-/websocket-1.0.32.tgz\",\"_shasum\":\"1f16ddab3a21a2d929dec1687ab21cfdc6d3dbb1\",\"_spec\":\"websocket\",\"_where\":\"C:\\\\Users\\\\Hdt\\\\Programming\\\\topt-core\",\"author\":{\"name\":\"Brian McKelvey\",\"email\":\"theturtle32@gmail.com\",\"url\":\"https://github.com/theturtle32\"},\"browser\":\"lib/browser.js\",\"bugs\":{\"url\":\"https://github.com/theturtle32/WebSocket-Node/issues\"},\"bundleDependencies\":false,\"config\":{\"verbose\":false},\"contributors\":[{\"name\":\"Iñaki Baz Castillo\",\"email\":\"ibc@aliax.net\",\"url\":\"http://dev.sipdoc.net\"}],\"dependencies\":{\"bufferutil\":\"^4.0.1\",\"debug\":\"^2.2.0\",\"es5-ext\":\"^0.10.50\",\"typedarray-to-buffer\":\"^3.1.5\",\"utf-8-validate\":\"^5.0.2\",\"yaeti\":\"^0.0.6\"},\"deprecated\":false,\"description\":\"Websocket Client & Server Library implementing the WebSocket protocol as specified in RFC 6455.\",\"devDependencies\":{\"buffer-equal\":\"^1.0.0\",\"gulp\":\"^4.0.2\",\"gulp-jshint\":\"^2.0.4\",\"jshint\":\"^2.0.0\",\"jshint-stylish\":\"^2.2.1\",\"tape\":\"^4.9.1\"},\"directories\":{\"lib\":\"./lib\"},\"engines\":{\"node\":\">=4.0.0\"},\"homepage\":\"https://github.com/theturtle32/WebSocket-Node\",\"keywords\":[\"websocket\",\"websockets\",\"socket\",\"networking\",\"comet\",\"push\",\"RFC-6455\",\"realtime\",\"server\",\"client\"],\"license\":\"Apache-2.0\",\"main\":\"index\",\"name\":\"websocket\",\"repository\":{\"type\":\"git\",\"url\":\"git+https://github.com/theturtle32/WebSocket-Node.git\"},\"scripts\":{\"gulp\":\"gulp\",\"test\":\"tape test/unit/*.js\"},\"version\":\"1.0.32\"}");
+
+/***/ }),
+
 /***/ "./node_modules/axios/index.js":
 /*!*************************************!*\
   !*** ./node_modules/axios/index.js ***!
@@ -27628,52 +38808,6 @@ function toComment(sourceMap) {
 
 /***/ }),
 
-/***/ "./node_modules/es5-ext/global.js":
-/*!****************************************!*\
-  !*** ./node_modules/es5-ext/global.js ***!
-  \****************************************/
-/*! no static exports found */
-/***/ (function(module, exports) {
-
-var naiveFallback = function () {
-	if (typeof self === "object" && self) return self;
-	if (typeof window === "object" && window) return window;
-	throw new Error("Unable to resolve global `this`");
-};
-
-module.exports = (function () {
-	if (this) return this;
-
-	// Unexpected strict mode (may happen if e.g. bundled into ESM module)
-
-	// Fallback to standard globalThis if available
-	if (typeof globalThis === "object" && globalThis) return globalThis;
-
-	// Thanks @mathiasbynens -> https://mathiasbynens.be/notes/globalthis
-	// In all ES5+ engines global object inherits from Object.prototype
-	// (if you approached one that doesn't please report)
-	try {
-		Object.defineProperty(Object.prototype, "__global__", {
-			get: function () { return this; },
-			configurable: true
-		});
-	} catch (error) {
-		// Unfortunate case of updates to Object.prototype being restricted
-		// via preventExtensions, seal or freeze
-		return naiveFallback();
-	}
-	try {
-		// Safari case (window.__global__ works, but __global__ does not)
-		if (!__global__) return naiveFallback();
-		return __global__;
-	} finally {
-		delete Object.prototype.__global__;
-	}
-})();
-
-
-/***/ }),
-
 /***/ "./node_modules/file-saver/dist/FileSaver.js":
 /*!***************************************************!*\
   !*** ./node_modules/file-saver/dist/FileSaver.js ***!
@@ -38889,451 +50023,6 @@ https://github.com/nodeca/pako/blob/master/LICENSE
 
 /***/ }),
 
-/***/ "./node_modules/loglevel-plugin-prefix/lib/loglevel-plugin-prefix.js":
-/*!***************************************************************************!*\
-  !*** ./node_modules/loglevel-plugin-prefix/lib/loglevel-plugin-prefix.js ***!
-  \***************************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_RESULT__;(function (root, factory) {
-  if (true) {
-    !(__WEBPACK_AMD_DEFINE_FACTORY__ = (factory),
-				__WEBPACK_AMD_DEFINE_RESULT__ = (typeof __WEBPACK_AMD_DEFINE_FACTORY__ === 'function' ?
-				(__WEBPACK_AMD_DEFINE_FACTORY__.call(exports, __webpack_require__, exports, module)) :
-				__WEBPACK_AMD_DEFINE_FACTORY__),
-				__WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
-  } else {}
-}(this, function (root) {
-  'use strict';
-
-  var merge = function (target) {
-    var i = 1;
-    var length = arguments.length;
-    var key;
-    for (; i < length; i++) {
-      for (key in arguments[i]) {
-        if (Object.prototype.hasOwnProperty.call(arguments[i], key)) {
-          target[key] = arguments[i][key];
-        }
-      }
-    }
-    return target;
-  };
-
-  var defaults = {
-    template: '[%t] %l:',
-    levelFormatter: function (level) {
-      return level.toUpperCase();
-    },
-    nameFormatter: function (name) {
-      return name || 'root';
-    },
-    timestampFormatter: function (date) {
-      return date.toTimeString().replace(/.*(\d{2}:\d{2}:\d{2}).*/, '$1');
-    },
-    format: undefined
-  };
-
-  var loglevel;
-  var configs = {};
-
-  var reg = function (rootLogger) {
-    if (!rootLogger || !rootLogger.getLogger) {
-      throw new TypeError('Argument is not a root logger');
-    }
-    loglevel = rootLogger;
-  };
-
-  var apply = function (logger, config) {
-    if (!logger || !logger.setLevel) {
-      throw new TypeError('Argument is not a logger');
-    }
-
-    /* eslint-disable vars-on-top */
-    var originalFactory = logger.methodFactory;
-    var name = logger.name || '';
-    var parent = configs[name] || configs[''] || defaults;
-    /* eslint-enable vars-on-top */
-
-    function methodFactory(methodName, logLevel, loggerName) {
-      var originalMethod = originalFactory(methodName, logLevel, loggerName);
-      var options = configs[loggerName] || configs[''];
-
-      var hasTimestamp = options.template.indexOf('%t') !== -1;
-      var hasLevel = options.template.indexOf('%l') !== -1;
-      var hasName = options.template.indexOf('%n') !== -1;
-
-      return function () {
-        var content = '';
-
-        var length = arguments.length;
-        var args = Array(length);
-        var key = 0;
-        for (; key < length; key++) {
-          args[key] = arguments[key];
-        }
-
-        // skip the root method for child loggers to prevent duplicate logic
-        if (name || !configs[loggerName]) {
-          /* eslint-disable vars-on-top */
-          var timestamp = options.timestampFormatter(new Date());
-          var level = options.levelFormatter(methodName);
-          var lname = options.nameFormatter(loggerName);
-          /* eslint-enable vars-on-top */
-
-          if (options.format) {
-            content += options.format(level, lname, timestamp);
-          } else {
-            content += options.template;
-            if (hasTimestamp) {
-              content = content.replace(/%t/, timestamp);
-            }
-            if (hasLevel) content = content.replace(/%l/, level);
-            if (hasName) content = content.replace(/%n/, lname);
-          }
-
-          if (args.length && typeof args[0] === 'string') {
-            // concat prefix with first argument to support string substitutions
-            args[0] = content + ' ' + args[0];
-          } else {
-            args.unshift(content);
-          }
-        }
-
-        originalMethod.apply(undefined, args);
-      };
-    }
-
-    if (!configs[name]) {
-      logger.methodFactory = methodFactory;
-    }
-
-    // for remove inherited format option if template option preset
-    config = config || {};
-    if (config.template) config.format = undefined;
-
-    configs[name] = merge({}, parent, config);
-
-    logger.setLevel(logger.getLevel());
-
-    if (!loglevel) {
-      logger.warn(
-        'It is necessary to call the function reg() of loglevel-plugin-prefix before calling apply. From the next release, it will throw an error. See more: https://github.com/kutuluk/loglevel-plugin-prefix/blob/master/README.md'
-      );
-    }
-
-    return logger;
-  };
-
-  var api = {
-    reg: reg,
-    apply: apply
-  };
-
-  var save;
-
-  if (root) {
-    save = root.prefix;
-    api.noConflict = function () {
-      if (root.prefix === api) {
-        root.prefix = save;
-      }
-      return api;
-    };
-  }
-
-  return api;
-}));
-
-
-/***/ }),
-
-/***/ "./node_modules/loglevel/lib/loglevel.js":
-/*!***********************************************!*\
-  !*** ./node_modules/loglevel/lib/loglevel.js ***!
-  \***********************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-var __WEBPACK_AMD_DEFINE_FACTORY__, __WEBPACK_AMD_DEFINE_RESULT__;/*
-* loglevel - https://github.com/pimterry/loglevel
-*
-* Copyright (c) 2013 Tim Perry
-* Licensed under the MIT license.
-*/
-(function (root, definition) {
-    "use strict";
-    if (true) {
-        !(__WEBPACK_AMD_DEFINE_FACTORY__ = (definition),
-				__WEBPACK_AMD_DEFINE_RESULT__ = (typeof __WEBPACK_AMD_DEFINE_FACTORY__ === 'function' ?
-				(__WEBPACK_AMD_DEFINE_FACTORY__.call(exports, __webpack_require__, exports, module)) :
-				__WEBPACK_AMD_DEFINE_FACTORY__),
-				__WEBPACK_AMD_DEFINE_RESULT__ !== undefined && (module.exports = __WEBPACK_AMD_DEFINE_RESULT__));
-    } else {}
-}(this, function () {
-    "use strict";
-
-    // Slightly dubious tricks to cut down minimized file size
-    var noop = function() {};
-    var undefinedType = "undefined";
-    var isIE = (typeof window !== undefinedType) && (typeof window.navigator !== undefinedType) && (
-        /Trident\/|MSIE /.test(window.navigator.userAgent)
-    );
-
-    var logMethods = [
-        "trace",
-        "debug",
-        "info",
-        "warn",
-        "error"
-    ];
-
-    // Cross-browser bind equivalent that works at least back to IE6
-    function bindMethod(obj, methodName) {
-        var method = obj[methodName];
-        if (typeof method.bind === 'function') {
-            return method.bind(obj);
-        } else {
-            try {
-                return Function.prototype.bind.call(method, obj);
-            } catch (e) {
-                // Missing bind shim or IE8 + Modernizr, fallback to wrapping
-                return function() {
-                    return Function.prototype.apply.apply(method, [obj, arguments]);
-                };
-            }
-        }
-    }
-
-    // Trace() doesn't print the message in IE, so for that case we need to wrap it
-    function traceForIE() {
-        if (console.log) {
-            if (console.log.apply) {
-                console.log.apply(console, arguments);
-            } else {
-                // In old IE, native console methods themselves don't have apply().
-                Function.prototype.apply.apply(console.log, [console, arguments]);
-            }
-        }
-        if (console.trace) console.trace();
-    }
-
-    // Build the best logging method possible for this env
-    // Wherever possible we want to bind, not wrap, to preserve stack traces
-    function realMethod(methodName) {
-        if (methodName === 'debug') {
-            methodName = 'log';
-        }
-
-        if (typeof console === undefinedType) {
-            return false; // No method possible, for now - fixed later by enableLoggingWhenConsoleArrives
-        } else if (methodName === 'trace' && isIE) {
-            return traceForIE;
-        } else if (console[methodName] !== undefined) {
-            return bindMethod(console, methodName);
-        } else if (console.log !== undefined) {
-            return bindMethod(console, 'log');
-        } else {
-            return noop;
-        }
-    }
-
-    // These private functions always need `this` to be set properly
-
-    function replaceLoggingMethods(level, loggerName) {
-        /*jshint validthis:true */
-        for (var i = 0; i < logMethods.length; i++) {
-            var methodName = logMethods[i];
-            this[methodName] = (i < level) ?
-                noop :
-                this.methodFactory(methodName, level, loggerName);
-        }
-
-        // Define log.log as an alias for log.debug
-        this.log = this.debug;
-    }
-
-    // In old IE versions, the console isn't present until you first open it.
-    // We build realMethod() replacements here that regenerate logging methods
-    function enableLoggingWhenConsoleArrives(methodName, level, loggerName) {
-        return function () {
-            if (typeof console !== undefinedType) {
-                replaceLoggingMethods.call(this, level, loggerName);
-                this[methodName].apply(this, arguments);
-            }
-        };
-    }
-
-    // By default, we use closely bound real methods wherever possible, and
-    // otherwise we wait for a console to appear, and then try again.
-    function defaultMethodFactory(methodName, level, loggerName) {
-        /*jshint validthis:true */
-        return realMethod(methodName) ||
-               enableLoggingWhenConsoleArrives.apply(this, arguments);
-    }
-
-    function Logger(name, defaultLevel, factory) {
-      var self = this;
-      var currentLevel;
-
-      var storageKey = "loglevel";
-      if (typeof name === "string") {
-        storageKey += ":" + name;
-      } else if (typeof name === "symbol") {
-        storageKey = undefined;
-      }
-
-      function persistLevelIfPossible(levelNum) {
-          var levelName = (logMethods[levelNum] || 'silent').toUpperCase();
-
-          if (typeof window === undefinedType || !storageKey) return;
-
-          // Use localStorage if available
-          try {
-              window.localStorage[storageKey] = levelName;
-              return;
-          } catch (ignore) {}
-
-          // Use session cookie as fallback
-          try {
-              window.document.cookie =
-                encodeURIComponent(storageKey) + "=" + levelName + ";";
-          } catch (ignore) {}
-      }
-
-      function getPersistedLevel() {
-          var storedLevel;
-
-          if (typeof window === undefinedType || !storageKey) return;
-
-          try {
-              storedLevel = window.localStorage[storageKey];
-          } catch (ignore) {}
-
-          // Fallback to cookies if local storage gives us nothing
-          if (typeof storedLevel === undefinedType) {
-              try {
-                  var cookie = window.document.cookie;
-                  var location = cookie.indexOf(
-                      encodeURIComponent(storageKey) + "=");
-                  if (location !== -1) {
-                      storedLevel = /^([^;]+)/.exec(cookie.slice(location))[1];
-                  }
-              } catch (ignore) {}
-          }
-
-          // If the stored level is not valid, treat it as if nothing was stored.
-          if (self.levels[storedLevel] === undefined) {
-              storedLevel = undefined;
-          }
-
-          return storedLevel;
-      }
-
-      /*
-       *
-       * Public logger API - see https://github.com/pimterry/loglevel for details
-       *
-       */
-
-      self.name = name;
-
-      self.levels = { "TRACE": 0, "DEBUG": 1, "INFO": 2, "WARN": 3,
-          "ERROR": 4, "SILENT": 5};
-
-      self.methodFactory = factory || defaultMethodFactory;
-
-      self.getLevel = function () {
-          return currentLevel;
-      };
-
-      self.setLevel = function (level, persist) {
-          if (typeof level === "string" && self.levels[level.toUpperCase()] !== undefined) {
-              level = self.levels[level.toUpperCase()];
-          }
-          if (typeof level === "number" && level >= 0 && level <= self.levels.SILENT) {
-              currentLevel = level;
-              if (persist !== false) {  // defaults to true
-                  persistLevelIfPossible(level);
-              }
-              replaceLoggingMethods.call(self, level, name);
-              if (typeof console === undefinedType && level < self.levels.SILENT) {
-                  return "No console available for logging";
-              }
-          } else {
-              throw "log.setLevel() called with invalid level: " + level;
-          }
-      };
-
-      self.setDefaultLevel = function (level) {
-          if (!getPersistedLevel()) {
-              self.setLevel(level, false);
-          }
-      };
-
-      self.enableAll = function(persist) {
-          self.setLevel(self.levels.TRACE, persist);
-      };
-
-      self.disableAll = function(persist) {
-          self.setLevel(self.levels.SILENT, persist);
-      };
-
-      // Initialize with the right level
-      var initialLevel = getPersistedLevel();
-      if (initialLevel == null) {
-          initialLevel = defaultLevel == null ? "WARN" : defaultLevel;
-      }
-      self.setLevel(initialLevel, false);
-    }
-
-    /*
-     *
-     * Top-level API
-     *
-     */
-
-    var defaultLogger = new Logger();
-
-    var _loggersByName = {};
-    defaultLogger.getLogger = function getLogger(name) {
-        if ((typeof name !== "symbol" && typeof name !== "string") || name === "") {
-          throw new TypeError("You must supply a name when creating a logger.");
-        }
-
-        var logger = _loggersByName[name];
-        if (!logger) {
-          logger = _loggersByName[name] = new Logger(
-            name, defaultLogger.getLevel(), defaultLogger.methodFactory);
-        }
-        return logger;
-    };
-
-    // Grab the current global log variable in case of overwrite
-    var _log = (typeof window !== undefinedType) ? window.log : undefined;
-    defaultLogger.noConflict = function() {
-        if (typeof window !== undefinedType &&
-               window.log === defaultLogger) {
-            window.log = _log;
-        }
-
-        return defaultLogger;
-    };
-
-    defaultLogger.getLoggers = function getLoggers() {
-        return _loggersByName;
-    };
-
-    // ES6 default export, for compatibility
-    defaultLogger['default'] = defaultLogger;
-
-    return defaultLogger;
-}));
-
-
-/***/ }),
-
 /***/ "./node_modules/moment/moment.js":
 /*!***************************************!*\
   !*** ./node_modules/moment/moment.js ***!
@@ -47322,8677 +58011,6 @@ exports.clearImmediate = (typeof self !== "undefined" && self.clearImmediate) ||
                          (this && this.clearImmediate);
 
 /* WEBPACK VAR INJECTION */}.call(this, __webpack_require__(/*! ./../webpack/buildin/global.js */ "./node_modules/webpack/buildin/global.js")))
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/Core.js":
-/*!***************************************************!*\
-  !*** ./node_modules/topt-core/build/core/Core.js ***!
-  \***************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.Core = void 0;
-const ApiWrapper_1 = __webpack_require__(/*! ./census/ApiWrapper */ "./node_modules/topt-core/build/core/census/ApiWrapper.js");
-const CensusAPI_1 = __webpack_require__(/*! ./census/CensusAPI */ "./node_modules/topt-core/build/core/census/CensusAPI.js");
-const OutfitAPI_1 = __webpack_require__(/*! ./census/OutfitAPI */ "./node_modules/topt-core/build/core/census/OutfitAPI.js");
-const CharacterAPI_1 = __webpack_require__(/*! ./census/CharacterAPI */ "./node_modules/topt-core/build/core/census/CharacterAPI.js");
-const index_1 = __webpack_require__(/*! ./objects/index */ "./node_modules/topt-core/build/core/objects/index.js");
-const InvididualGenerator_1 = __webpack_require__(/*! ./InvididualGenerator */ "./node_modules/topt-core/build/core/InvididualGenerator.js");
-const Loggers_1 = __webpack_require__(/*! ./Loggers */ "./node_modules/topt-core/build/core/Loggers.js");
-const log = Loggers_1.Logger.getLogger("Core");
-/**
- * Core class that manages all tracking, sockets, event processing, etc.
- */
-class Core {
-    constructor(serviceID, serverID) {
-        /**
-         * Collection of sockets used for tracking
-         */
-        this.sockets = {
-            tracked: null,
-            logistics: null,
-            logins: null,
-            facility: null,
-            debug: null,
-            added: null
-        };
-        /**
-         * Collection of variables used to track router placements
-         */
-        this.routerTracking = {
-            // key - Who placed the router
-            // value - Lastest npc ID that gave them a router spawn tick
-            routerNpcs: new Map(),
-            routers: [] // All routers that have been placed
-        };
-        /**
-         * Collection of squad related vars
-         */
-        this.squad = {
-            debug: false,
-            autoadd: false,
-            perm: [],
-            guesses: [],
-            members: new Map(),
-        };
-        /**
-         * Queue of messages to prevent duplicate messages from being processed
-         */
-        this.socketMessageQueue = [];
-        /**
-         * All messages collected in the debug socket
-         */
-        this.debugSocketMessages = [];
-        /**
-         * Collection of players who are being tracked, with the key being the character ID,
-         *      and value being where player specific stats are stored
-         */
-        this.stats = new Map();
-        /**
-         * List of outfits being tracked
-         */
-        this.outfits = [];
-        /**
-         * List of characters being tracked
-         */
-        this.characters = [];
-        /**
-         * Misc events that are needed for processing, but are not attached to a single player, such as a FacilityCapture
-         */
-        this.miscEvents = [];
-        /**
-         * List of PlayerFacilityCapture and PlayerFacilityDefend events, including those who are not tracked
-         */
-        this.playerCaptures = [];
-        /**
-         * List of all base captures that have occure
-         */
-        this.captures = [];
-        /**
-         * List of all events in raw unprocessed form, used to export data
-         */
-        this.rawData = [];
-        /**
-         * Tracking tracking
-         */
-        this.tracking = new InvididualGenerator_1.TimeTracking();
-        /**
-         * If core is corrently connected to Census or not
-         */
-        this.connected = false;
-        /**
-         * Event handlers that can be added onto
-         */
-        this.handlers = {
-            exp: [],
-            kill: [],
-            death: [],
-            teamkill: [],
-            capture: [],
-            defend: [],
-            vehicle: [],
-            login: [],
-            logout: [],
-            marker: [],
-            base: []
-        };
-        this.serviceID = serviceID;
-        this.serverID = serverID;
-        this.socketMessageQueue.length = 5;
-        CensusAPI_1.default.init(this.serviceID);
-        this.squadInit();
-    }
-    /**
-     * Emit an event and execute all handlers on it
-     *
-     * @param event Event being emitted to all handlers
-     */
-    emit(event) {
-        this.handlers[event.type].forEach((callback) => { callback(event); });
-    }
-    /**
-     * Add an event handler that will occur when a specific event is created from the core
-     *
-     * @param type      Event to attach the handler to
-     * @param handler   Handler that will be executed when that event is emitted
-     */
-    on(type, handler) {
-        switch (type) {
-            case "exp":
-                this.handlers.exp.push(handler);
-                break;
-            case "kill":
-                this.handlers.kill.push(handler);
-                break;
-            case "death":
-                this.handlers.death.push(handler);
-                break;
-            case "teamkill":
-                this.handlers.death.push(handler);
-                break;
-            case "capture":
-                this.handlers.capture.push(handler);
-                break;
-            case "defend":
-                this.handlers.defend.push(handler);
-                break;
-            case "vehicle":
-                this.handlers.vehicle.push(handler);
-                break;
-            case "login":
-                this.handlers.login.push(handler);
-                break;
-            case "logout":
-                this.handlers.logout.push(handler);
-                break;
-            case "marker":
-                this.handlers.marker.push(handler);
-                break;
-            case "base":
-                this.handlers.base.push(handler);
-                break;
-            default: throw `Unchecked event type ${type}`;
-        }
-    }
-    /**
-     * Remove handlers and no longer emit events to them
-     *
-     * @param type Optional type of handler to clear. If not given, all handlers are cleared
-     */
-    clearHandlers(type) {
-        if (type == undefined) {
-            this.handlers.exp.length = 0;
-            this.handlers.kill.length = 0;
-            this.handlers.death.length = 0;
-            this.handlers.teamkill.length = 0;
-            this.handlers.capture.length = 0;
-            this.handlers.defend.length = 0;
-            this.handlers.vehicle.length = 0;
-            this.handlers.login.length = 0;
-            this.handlers.logout.length = 0;
-            this.handlers.marker.length = 0;
-            this.handlers.base.length = 0;
-        }
-        else {
-            this.handlers[type].length = 0;
-        }
-    }
-    /**
-     * Start the tracking and begin saving events, the core must be connected for this to work
-     */
-    start() {
-        if (this.connected == false) {
-            throw `Cannot start TOPT: core is not connected`;
-        }
-        this.tracking.running = true;
-        const nowMs = new Date().getTime();
-        this.tracking.startTime = nowMs;
-        this.stats.forEach((char, charID) => {
-            char.joinTime = nowMs;
-        });
-        log.info(`Started core`);
-    }
-    /**
-     * Stop running the tracker
-     */
-    stop() {
-        if (this.tracking.running == true) {
-            const nowMs = new Date().getTime();
-            this.tracking.endTime = nowMs;
-        }
-        this.tracking.running = false;
-        this.stats.forEach((char, charID) => {
-            if (char.events.length > 0) {
-                const first = char.events[0];
-                const last = char.events[char.events.length - 1];
-                char.joinTime = first.timestamp;
-                char.secondsOnline = (last.timestamp - first.timestamp) / 1000;
-                const character = this.characters.find(iter => iter.ID == char.characterID);
-                if (character != undefined) {
-                    character.secondsPlayed = char.secondsOnline;
-                    if (character.secondsPlayed > 0) {
-                        character.online = true;
-                    }
-                }
-            }
-            else {
-                char.secondsOnline = 0;
-            }
-        });
-    }
-    /**
-     * Begin tracking all members of an outfit. The core must be connected before this is called
-     *
-     * @param tag Tag of the outfit to track. Case-insensitive
-     *
-     * @returns An ApiResponse that will resolve when the outfit has been loaded
-     */
-    addOutfit(tag) {
-        if (this.connected == false) {
-            throw `Cannot track outfit ${tag}: Core is not connected`;
-        }
-        const response = new ApiWrapper_1.ApiResponse();
-        if (tag.trim().length == 0) {
-            response.resolveOk();
-            return response;
-        }
-        OutfitAPI_1.OutfitAPI.getByTag(tag).ok((data) => {
-            this.outfits.push(data);
-        });
-        OutfitAPI_1.OutfitAPI.getCharactersByTag(tag).ok((data) => {
-            this.subscribeToEvents(data);
-            response.resolveOk();
-        });
-        return response;
-    }
-    /**
-     * Begin tracking a new player. The core must be connected before calling
-     *
-     * @param name Name of the player to track. Case-insensitive
-     *
-     * @returns An ApiResponse that will resolve when the character has been loaded and tracked
-     */
-    addPlayer(name) {
-        if (this.connected == false) {
-            throw `Cannot track character ${name}: Core is not connected`;
-        }
-        const response = new ApiWrapper_1.ApiResponse();
-        if (name.trim().length == 0) {
-            response.resolveOk();
-        }
-        else {
-            CharacterAPI_1.CharacterAPI.getByName(name).ok((data) => {
-                this.subscribeToEvents([data]);
-                response.resolveOk();
-            });
-        }
-        return response;
-    }
-    /**
-     * Being tracking a character by the character ID. Core must be connected before calling
-     *
-     * @param charID Character ID of the player to begin tracking
-     *
-     * @returns An ApiResponse that will resolve when the character has been loaded and tracked
-     */
-    addPlayerByID(charID) {
-        if (this.connected == false) {
-            throw `Cannot tracker character ${charID}: Core is not connected`;
-        }
-        const response = new ApiWrapper_1.ApiResponse();
-        if (charID.trim().length == 0) {
-            response.resolveOk();
-        }
-        else {
-            CharacterAPI_1.CharacterAPI.getByID(charID).ok((data) => {
-                this.subscribeToEvents([data]);
-                response.resolveOk();
-            }).notFound((err) => {
-                response.resolve({ code: 500, data: `Character ID ${charID} does not exist` });
-            });
-        }
-        return response;
-    }
-    /**
-     * Insert a new marker event at the current time. Calling this while the tracker is not running can be dangerous as it
-     *      modifies the event collection
-     *
-     * @param mark Mark to be made
-     */
-    addMarker(mark) {
-        if (this.tracking.running == false) {
-            log.warn(`A new marker for ${mark} is being added, adding a marker while not running is not recommended`);
-        }
-        const ev = {
-            type: "marker",
-            sourceID: "7103",
-            timestamp: new Date().getTime(),
-            mark: mark
-        };
-        this.rawData.push(JSON.stringify({
-            payload: {
-                type: ev.type,
-                sourceID: ev.sourceID,
-                timestamp: ev.timestamp.toString(),
-                mark: mark
-            },
-            service: "event",
-            type: "toptMarker"
-        }));
-        this.miscEvents.push(ev);
-        this.emit(ev);
-    }
-    subscribe(options) {
-        let obj = {
-            action: "subscribe",
-            service: "event"
-        };
-        if (options.characters && options.characters.length > 0) {
-            obj.characters = options.characters;
-        }
-        if (options.worlds && options.worlds.length > 0) {
-            obj.worlds = options.worlds;
-        }
-        if (options.events && options.events.length > 0) {
-            obj.eventNames = options.events;
-        }
-        if (options.charactersWorldAnd == true) {
-            obj.logicalAndCharactersWithWorlds = true;
-        }
-        const json = JSON.stringify(obj);
-        log.debug(`Sending on ${options.socket}: ${json}`);
-        if (options.socket == undefined || options.socket == "added") {
-            this.sockets.added.send(json);
-        }
-        else if (options.socket == "login") {
-            this.sockets.logins.send(json);
-        }
-        else if (options.socket == "tracked") {
-            this.sockets.tracked.send(json);
-        }
-        else {
-            throw `Unknown socket to subscribe: ${options.socket}`;
-        }
-    }
-    promiseTest() {
-        const t = new ApiWrapper_1.ApiResponse();
-        const p = t.promise();
-        setTimeout(() => __awaiter(this, void 0, void 0, function* () {
-            const contents = yield p;
-            if (contents.code == 200) {
-                console.log(`200: ${contents.data}`);
-            }
-            else if (contents.code == 500) {
-                console.error(`500: ${contents.data}`);
-            }
-        }));
-        setTimeout(() => {
-            t.resolve({ code: 200, data: `Hello from the other side` });
-        }, 3000);
-    }
-    /**
-     * Subscribe to the events in the event stream and begin tracking them in the squad tracker
-     *
-     * @param chars Characters to subscribe to
-     */
-    subscribeToEvents(chars) {
-        if (this.sockets.tracked == null) {
-            log.warn(`Cannot subscribe to events, tracked socket is null`);
-            return;
-        }
-        // No duplicates
-        chars = chars.filter((char) => {
-            return this.characters.map((c) => c.ID).indexOf(char.ID) == -1;
-        });
-        if (chars.length == 0) {
-            return;
-        }
-        this.characters = this.characters.concat(chars).sort((a, b) => {
-            return a.name.localeCompare(b.name);
-        });
-        chars.forEach((character) => {
-            const player = new index_1.TrackedPlayer();
-            player.characterID = character.ID;
-            player.faction = character.faction;
-            player.outfitTag = character.outfitTag;
-            player.name = character.name;
-            if (character.online == true) { // Begin squad tracking if they're online
-                player.joinTime = new Date().getTime();
-                this.addMember({ ID: player.characterID, name: player.name, outfitTag: character.outfitTag });
-            }
-            this.stats.set(character.ID, player);
-        });
-        // Large outfits like SKL really stress the websockets out if you try to subscribe to 12k members
-        //      at once, instead breaking them into chunks works nicely
-        const subscribeSetSize = 200;
-        for (let i = 0; i < chars.length; i += subscribeSetSize) {
-            //log.trace(`Slice: ${chars.slice(i, i + subscribeSetSize).map(iter => iter.ID).join(", ")}`);
-            const subscribeExp = {
-                "action": "subscribe",
-                "characters": [
-                    ...(chars.slice(i, i + subscribeSetSize).map(iter => iter.ID))
-                ],
-                "eventNames": [
-                    "GainExperience",
-                    "AchievementEarned",
-                    "Death",
-                    "FacilityControl",
-                    "ItemAdded",
-                    "VehicleDestroy"
-                ],
-                "service": "event"
-            };
-            this.sockets.tracked.send(JSON.stringify(subscribeExp));
-        }
-    }
-    /**
-     * Method called when a socket receives a new message
-     *
-     * @param ev Event from a websocket
-     */
-    onmessage(ev) {
-        for (const message of this.socketMessageQueue) {
-            if (ev.data == message) {
-                //log.warn(`Duplicate message found: ${ev.data}`);
-                return;
-            }
-        }
-        if (typeof (ev.data) != "string") {
-            log.error(`Invalid type received from socket: ${typeof (ev.data)}`);
-            return;
-        }
-        this.socketMessageQueue.push(ev.data);
-        this.socketMessageQueue.shift();
-        this.processMessage(ev.data, false);
-    }
-}
-exports.Core = Core;
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/CoreConnection.js":
-/*!*************************************************************!*\
-  !*** ./node_modules/topt-core/build/core/CoreConnection.js ***!
-  \*************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-const Core_1 = __webpack_require__(/*! ./Core */ "./node_modules/topt-core/build/core/Core.js");
-const ApiWrapper_1 = __webpack_require__(/*! ./census/ApiWrapper */ "./node_modules/topt-core/build/core/census/ApiWrapper.js");
-const websocket_1 = __webpack_require__(/*! websocket */ "./node_modules/websocket/lib/browser.js");
-const Loggers_1 = __webpack_require__(/*! ./Loggers */ "./node_modules/topt-core/build/core/Loggers.js");
-const log = Loggers_1.Logger.getLogger("Core:Connection");
-Core_1.Core.prototype.connect = function () {
-    const self = this;
-    const response = new ApiWrapper_1.ApiResponse();
-    self.disconnect();
-    let opsLeft = +1 // Tracker
-        + 1 // Logins
-        + 1 // Logistics
-        + 1 // Facilities
-        + 1; // Debug
-    // Common handler used when all sockets have connected
-    const handler = () => {
-        if (--opsLeft == 0) {
-            self.connected = true;
-            response.resolveOk();
-        }
-    };
-    setupTrackerSocket(self).always(() => handler());
-    setupLoginSocket(self).always(() => handler());
-    setupLogisticsSocket(self).always(() => handler());
-    setupFacilitySocket(self).always(() => handler());
-    setupDebugSocket(self).always(() => handler());
-    setupAddedSocket(self).always(() => handler());
-    return response;
-};
-Core_1.Core.prototype.disconnect = function () {
-    const self = this;
-    if (self.sockets.tracked != null) {
-        self.sockets.tracked.close();
-        self.sockets.tracked = null;
-    }
-    if (self.sockets.logins != null) {
-        self.sockets.logins.close();
-        self.sockets.logins = null;
-    }
-    if (self.sockets.logistics != null) {
-        self.sockets.logistics.close();
-        self.sockets.logistics = null;
-    }
-    if (self.sockets.facility != null) {
-        self.sockets.facility.close();
-        self.sockets.facility = null;
-    }
-    if (self.sockets.debug != null) {
-        self.sockets.debug.close();
-        self.sockets.debug = null;
-    }
-    if (self.sockets.added != null) {
-        self.sockets.added.close();
-        self.sockets.added = null;
-    }
-    self.connected = false;
-};
-Core_1.Core.prototype.onSocketError = function (socketName, ev) {
-    log.error(`Error on socket: ${socketName}> ${JSON.stringify(ev)}`);
-};
-function setupTrackerSocket(core) {
-    const response = new ApiWrapper_1.ApiResponse();
-    core.sockets.tracked = new websocket_1.w3cwebsocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${core.serviceID}`);
-    core.sockets.tracked.onopen = () => { };
-    core.sockets.tracked.onerror = () => {
-        response.resolve({ code: 500, data: `` });
-    };
-    core.sockets.tracked.onmessage = () => {
-        log.debug(`tracker socket connected`);
-        core.sockets.tracked.onmessage = core.onmessage.bind(core);
-        response.resolveOk();
-    };
-    return response;
-}
-function setupDebugSocket(core) {
-    const response = new ApiWrapper_1.ApiResponse();
-    core.sockets.debug = new websocket_1.w3cwebsocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${core.serviceID}`);
-    core.sockets.debug.onopen = () => { };
-    core.sockets.debug.onerror = () => {
-        response.resolve({ code: 500, data: `` });
-    };
-    core.sockets.debug.onmessage = () => {
-        log.debug(`debug socket connected`);
-        core.sockets.debug.onmessage = (ev) => {
-            core.debugSocketMessages.push(JSON.parse(ev.data));
-        };
-        response.resolveOk();
-    };
-    return response;
-}
-function setupAddedSocket(core) {
-    const response = new ApiWrapper_1.ApiResponse();
-    core.sockets.added = new websocket_1.w3cwebsocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${core.serviceID}`);
-    core.sockets.added.onopen = () => { response.resolveOk(); };
-    core.sockets.added.onerror = () => {
-        response.resolve({ code: 500, data: `` });
-    };
-    core.sockets.added.onmessage = core.onmessage.bind(core);
-    return response;
-}
-function setupLogisticsSocket(core) {
-    const response = new ApiWrapper_1.ApiResponse();
-    core.sockets.logistics = new websocket_1.w3cwebsocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${core.serviceID}`);
-    core.sockets.logistics.onopen = () => {
-        if (core.sockets.logistics == null) {
-            throw `Expected sockets.logistics to not be null`;
-        }
-        const msg = {
-            service: "event",
-            action: "subscribe",
-            characters: ["all"],
-            worlds: [
-                core.serverID
-            ],
-            eventNames: [
-                "GainExperience_experience_id_1409",
-            ],
-            logicalAndCharactersWithWorlds: true
-        };
-        core.sockets.logistics.send(JSON.stringify(msg));
-        log.debug(`logistics socket connected`);
-        response.resolveOk();
-    };
-    core.sockets.logistics.onerror = (ev) => core.onSocketError("logistics", ev);
-    core.sockets.logistics.onmessage = core.onmessage.bind(core);
-    return response;
-}
-function setupLoginSocket(core) {
-    const response = new ApiWrapper_1.ApiResponse();
-    core.sockets.logins = new websocket_1.w3cwebsocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${core.serviceID}`);
-    core.sockets.logins.onopen = () => {
-        if (core.sockets.logins == null) {
-            throw `Expected sockets.login to not be null`;
-        }
-        const msg = {
-            service: "event",
-            action: "subscribe",
-            characters: ["all"],
-            worlds: [
-                core.serverID
-            ],
-            eventNames: [
-                "PlayerLogin",
-                "PlayerLogout"
-            ],
-            logicalAndCharactersWithWorlds: true
-        };
-        core.sockets.logins.send(JSON.stringify(msg));
-        log.debug(`login socket connected`);
-        response.resolveOk();
-    };
-    core.sockets.logins.onerror = (ev) => core.onSocketError("login", ev);
-    core.sockets.logins.onmessage = core.onmessage.bind(core);
-    return response;
-}
-function setupFacilitySocket(core) {
-    const response = new ApiWrapper_1.ApiResponse();
-    core.sockets.facility = new websocket_1.w3cwebsocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${core.serviceID}`);
-    core.sockets.facility.onopen = () => {
-        if (core.sockets.facility == null) {
-            throw `sockets.facility is null`;
-        }
-        const msg = {
-            service: "event",
-            action: "subscribe",
-            characters: ["all"],
-            worlds: [
-                core.serverID
-            ],
-            eventNames: [
-                "PlayerFacilityCapture",
-                "PlayerFacilityDefend",
-                "FacilityControl"
-            ],
-            logicalAndCharactersWithWorlds: true
-        };
-        core.sockets.facility.send(JSON.stringify(msg));
-        log.debug(`facility socket connected`);
-        response.resolveOk();
-    };
-    core.sockets.facility.onmessage = core.onmessage.bind(core);
-    core.sockets.facility.onerror = (ev) => core.onSocketError("facility", ev);
-    return response;
-}
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/CoreDebugHelper.js":
-/*!**************************************************************!*\
-  !*** ./node_modules/topt-core/build/core/CoreDebugHelper.js ***!
-  \**************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-const Core_1 = __webpack_require__(/*! ./Core */ "./node_modules/topt-core/build/core/Core.js");
-const Loggers_1 = __webpack_require__(/*! ./Loggers */ "./node_modules/topt-core/build/core/Loggers.js");
-const log = Loggers_1.Logger.getLogger("Core.Debug");
-Core_1.Core.prototype.printExpEvent = function (expID) {
-    const self = this;
-    const events = Array.from(self.stats.values())
-        .map(iter => iter.events)
-        .reduce((acc, cur) => { acc.push(...cur); return acc; }, [])
-        .filter(iter => iter.type == "exp" && iter.expID == expID);
-    log.debug(events);
-};
-Core_1.Core.prototype.subscribeToEvent = function (...expID) {
-    if (this.sockets.debug == null) {
-        return log.error(`Cannot globally subscribe to ${expID}: debug socket is null`);
-    }
-    const msg = {
-        service: "event",
-        action: "subscribe",
-        characters: ["all"],
-        worlds: [
-            this.serverID
-        ],
-        eventNames: [
-            ...expID.map(iter => `GainExperience_experience_id_${iter}`)
-        ],
-        logicalAndCharactersWithWorlds: true
-    };
-    this.sockets.debug.send(JSON.stringify(msg));
-};
-Core_1.Core.prototype.subscribeToAllEvent = function (...expID) {
-    if (this.sockets.debug == null) {
-        return log.error(`Cannot globally subscribe to ${expID}: debug socket is null`);
-    }
-    const msg = {
-        service: "event",
-        action: "subscribe",
-        characters: ["all"],
-        worlds: ["all"],
-        eventNames: [
-            ...expID.map(iter => `GainExperience_experience_id_${iter}`)
-        ]
-    };
-    this.sockets.debug.send(JSON.stringify(msg));
-};
-Core_1.Core.prototype.subscribeToItemAdded = function () {
-    if (this.sockets.debug == null) {
-        return log.error(`Cannot subscribe to ItemAdded events: debug socket is null`);
-    }
-    const msg = {
-        service: "event",
-        action: "subscribe",
-        characters: ["all"],
-        worlds: [
-            this.serverID
-        ],
-        eventNames: [
-            "ItemAdded"
-        ],
-        logicalAndCharactersWithWorlds: true
-    };
-    this.sockets.debug.send(JSON.stringify(msg));
-};
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/CoreProcessing.js":
-/*!*************************************************************!*\
-  !*** ./node_modules/topt-core/build/core/CoreProcessing.js ***!
-  \*************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-const Core_1 = __webpack_require__(/*! ./Core */ "./node_modules/topt-core/build/core/Core.js");
-const PsEvent_1 = __webpack_require__(/*! ./PsEvent */ "./node_modules/topt-core/build/core/PsEvent.js");
-const PsLoadout_1 = __webpack_require__(/*! ./census/PsLoadout */ "./node_modules/topt-core/build/core/census/PsLoadout.js");
-const WeaponAPI_1 = __webpack_require__(/*! ./census/WeaponAPI */ "./node_modules/topt-core/build/core/census/WeaponAPI.js");
-const CharacterAPI_1 = __webpack_require__(/*! ./census/CharacterAPI */ "./node_modules/topt-core/build/core/census/CharacterAPI.js");
-const Loggers_1 = __webpack_require__(/*! ./Loggers */ "./node_modules/topt-core/build/core/Loggers.js");
-const log = Loggers_1.Logger.getLogger("Core.Processing");
-Core_1.Core.prototype.processMessage = function (input, override = false) {
-    const self = this;
-    if (self.tracking.running == false && override == false) {
-        return;
-    }
-    let save = false;
-    const msg = JSON.parse(input);
-    if (msg.type == "serviceMessage") {
-        const event = msg.payload.event_name;
-        const timestamp = Number.parseInt(msg.payload.timestamp) * 1000;
-        const zoneID = msg.payload.zone_id;
-        if (event == "GainExperience") {
-            const eventID = msg.payload.experience_id;
-            const charID = msg.payload.character_id;
-            const targetID = msg.payload.other_id;
-            const amount = Number.parseInt(msg.payload.amount);
-            const event = PsEvent_1.PsEvents.get(eventID);
-            if (eventID == "1410") {
-                if (self.stats.get(charID) != undefined) {
-                    if (self.routerTracking.routerNpcs.has(charID)) {
-                        //log.debug(`${charID} router npc check for ${targetID}`);
-                        const router = self.routerTracking.routerNpcs.get(charID);
-                        if (router.ID != targetID) {
-                            //log.warn(`New router placed by ${charID}, missed ItemAdded event: removing old one and replacing with ${targetID}`);
-                            router.destroyed = timestamp;
-                            self.routerTracking.routers.push(Object.assign({}, router));
-                            self.routerTracking.routerNpcs.set(charID, {
-                                ID: targetID,
-                                owner: charID,
-                                pulledAt: timestamp,
-                                firstSpawn: timestamp,
-                                destroyed: undefined,
-                                count: 1,
-                                type: "router"
-                            });
-                        }
-                        else {
-                            //log.debug(`Same router, incrementing count`);
-                            if (router.ID == "") {
-                                router.ID = targetID;
-                            }
-                            if (router.firstSpawn == undefined) {
-                                router.firstSpawn = timestamp;
-                            }
-                            ++router.count;
-                        }
-                    }
-                    else {
-                        //log.debug(`${charID} has new router ${targetID} placed/used`);
-                        self.routerTracking.routerNpcs.set(charID, {
-                            ID: targetID,
-                            owner: charID,
-                            pulledAt: timestamp,
-                            firstSpawn: timestamp,
-                            destroyed: undefined,
-                            count: 1,
-                            type: "router"
-                        });
-                    }
-                    save = true;
-                }
-            }
-            else if (eventID == "1409") {
-                const trackedNpcs = Array.from(self.routerTracking.routerNpcs.values());
-                const ids = trackedNpcs.map(iter => iter.ID);
-                if (ids.indexOf(targetID) > -1) {
-                    const router = trackedNpcs.find(iter => iter.ID == targetID);
-                    //log.debug(`Router ${router.ID} placed by ${router.owner} destroyed, saving`);
-                    router.destroyed = timestamp;
-                    self.routerTracking.routers.push(Object.assign({}, router));
-                    self.routerTracking.routerNpcs.delete(router.owner);
-                    save = true;
-                }
-            }
-            const ev = {
-                type: "exp",
-                amount: amount,
-                expID: eventID,
-                zoneID: zoneID,
-                trueExpID: eventID,
-                loadoutID: msg.payload.loadout_id,
-                sourceID: charID,
-                targetID: targetID,
-                timestamp: timestamp
-            };
-            // Undefined means was the target of the event, not the source
-            const player = self.stats.get(charID);
-            if (player != undefined) {
-                if (Number.isNaN(amount)) {
-                    log.warn(`NaN amount from event: ${JSON.stringify(msg)}`);
-                }
-                else {
-                    player.score += amount;
-                }
-                if (event != undefined) {
-                    if (event.track == true) {
-                        player.stats.increment(eventID);
-                        if (event.alsoIncrement != undefined) {
-                            const alsoEvent = PsEvent_1.PsEvents.get(event.alsoIncrement);
-                            if (alsoEvent.track == true) {
-                                player.stats.increment(event.alsoIncrement);
-                            }
-                            ev.expID = event.alsoIncrement;
-                        }
-                    }
-                }
-                player.events.push(ev);
-            }
-            else {
-                self.miscEvents.push(ev);
-            }
-            self.processExperienceEvent(ev);
-            self.emit(ev);
-            if (eventID == PsEvent_1.PsEvent.revive || eventID == PsEvent_1.PsEvent.squadRevive) {
-                const target = self.stats.get(targetID);
-                if (target != undefined) {
-                    if (target.recentDeath != null) {
-                        target.recentDeath.revived = true;
-                        target.recentDeath.revivedEvent = ev;
-                        //log.debug(`${targetID} died but was revived by ${charID}`);
-                    }
-                    target.stats.decrement(PsEvent_1.PsEvent.death);
-                    target.stats.increment(PsEvent_1.PsEvent.revived);
-                }
-            }
-            save = true;
-        }
-        else if (event == "Death") {
-            const targetID = msg.payload.character_id;
-            const sourceID = msg.payload.attacker_character_id;
-            const isHeadshot = msg.payload.is_headshot == "1";
-            const targetLoadoutID = msg.payload.character_loadout_id;
-            const sourceLoadoutID = msg.payload.attacker_loadout_id;
-            if (self.tracking.running == true) {
-                CharacterAPI_1.CharacterAPI.cache(targetID);
-                CharacterAPI_1.CharacterAPI.cache(sourceID);
-            }
-            const targetLoadout = PsLoadout_1.PsLoadouts.get(targetLoadoutID);
-            if (targetLoadout == undefined) {
-                return log.warn(`Unknown target loadout ID: ${targetLoadoutID}`);
-            }
-            const sourceLoadout = PsLoadout_1.PsLoadouts.get(sourceLoadoutID);
-            if (sourceLoadout == undefined) {
-                return log.warn(`Unknown source loadout ID: ${sourceLoadoutID}`);
-            }
-            let targetTicks = self.stats.get(targetID);
-            if (targetTicks != undefined && targetLoadout.faction != sourceLoadout.faction) {
-                targetTicks.stats.increment(PsEvent_1.PsEvent.death);
-                const ev = {
-                    type: "death",
-                    isHeadshot: isHeadshot,
-                    sourceID: targetID,
-                    targetID: sourceID,
-                    loadoutID: targetLoadoutID,
-                    targetLoadoutID: sourceLoadoutID,
-                    weaponID: msg.payload.attacker_weapon_id,
-                    revived: false,
-                    revivedEvent: null,
-                    timestamp: timestamp,
-                    zoneID: zoneID
-                };
-                targetTicks.events.push(ev);
-                targetTicks.recentDeath = ev;
-                if (self.tracking.running == true) {
-                    WeaponAPI_1.WeaponAPI.precache(ev.weaponID);
-                }
-                self.emit(ev);
-                self.processKillDeathEvent(ev);
-                save = true;
-            }
-            let sourceTicks = self.stats.get(sourceID);
-            if (sourceTicks != undefined) {
-                if (targetLoadout.faction == sourceLoadout.faction) {
-                    sourceTicks.stats.increment(PsEvent_1.PsEvent.teamkill);
-                    targetTicks === null || targetTicks === void 0 ? void 0 : targetTicks.stats.increment(PsEvent_1.PsEvent.teamkilled);
-                    const ev = {
-                        type: "teamkill",
-                        sourceID: sourceID,
-                        loadoutID: sourceLoadoutID,
-                        targetID: targetID,
-                        targetLoadoutID: targetLoadoutID,
-                        weaponID: msg.payload.attacker_weapon_id,
-                        zoneID: zoneID,
-                        timestamp: timestamp
-                    };
-                    sourceTicks.events.push(ev);
-                    self.emit(ev);
-                }
-                else {
-                    sourceTicks.stats.increment(PsEvent_1.PsEvent.kill);
-                    if (isHeadshot == true) {
-                        sourceTicks.stats.increment(PsEvent_1.PsEvent.headshot);
-                    }
-                    const ev = {
-                        type: "kill",
-                        isHeadshot: isHeadshot,
-                        sourceID: sourceID,
-                        targetID: targetID,
-                        loadoutID: sourceLoadoutID,
-                        targetLoadoutID: targetLoadoutID,
-                        weaponID: msg.payload.attacker_weapon_id,
-                        timestamp: timestamp,
-                        zoneID: zoneID
-                    };
-                    sourceTicks.events.push(ev);
-                    WeaponAPI_1.WeaponAPI.precache(ev.weaponID);
-                    self.emit(ev);
-                    self.processKillDeathEvent(ev);
-                }
-                save = true;
-            }
-        }
-        else if (event == "PlayerFacilityCapture") {
-            const playerID = msg.payload.character_id;
-            const outfitID = msg.payload.outfit_id;
-            const facilityID = msg.payload.facility_id;
-            const ev = {
-                type: "capture",
-                sourceID: playerID,
-                outfitID: outfitID,
-                facilityID: facilityID,
-                timestamp: timestamp,
-                zoneID: zoneID
-            };
-            self.playerCaptures.push(ev);
-            let player = self.stats.get(playerID);
-            if (player != undefined) {
-                log.debug(`Tracked player ${player.name} got a capture on ${ev.facilityID}`);
-                player.stats.increment(PsEvent_1.PsEvent.baseCapture);
-                player.events.push(ev);
-            }
-            self.emit(ev);
-            save = true;
-        }
-        else if (event == "PlayerFacilityDefend") {
-            const playerID = msg.payload.character_id;
-            const outfitID = msg.payload.outfit_id;
-            const facilityID = msg.payload.facility_id;
-            const ev = {
-                type: "defend",
-                sourceID: playerID,
-                outfitID: outfitID,
-                facilityID: facilityID,
-                timestamp: timestamp,
-                zoneID: zoneID,
-            };
-            self.playerCaptures.push(ev);
-            let player = self.stats.get(playerID);
-            if (player != undefined) {
-                player.stats.increment(PsEvent_1.PsEvent.baseDefense);
-                player.events.push(ev);
-            }
-            self.emit(ev);
-            save = true;
-        }
-        else if (event == "AchievementEarned") {
-            const charID = msg.payload.character_id;
-            const achivID = msg.payload.achievement_id;
-            const char = self.stats.get(charID);
-            if (char != undefined) {
-                char.ribbons.increment(achivID);
-                save = true;
-            }
-        }
-        else if (event == "FacilityControl") {
-            const outfitID = msg.payload.outfit_id;
-            const facilityID = msg.payload.facility_id;
-            const capture = {
-                facilityID: facilityID,
-                zoneID: zoneID,
-                timestamp: new Date(timestamp),
-                timeHeld: Number.parseInt(msg.payload.duration_held),
-                factionID: msg.payload.new_faction_id,
-                outfitID: outfitID,
-                previousFaction: msg.payload.old_faction_id,
-            };
-            self.captures.push(capture);
-            save = true;
-            const ev = {
-                type: "base",
-                sourceID: "7153",
-                facilityID: capture.facilityID,
-                timestamp: timestamp,
-                zoneID: zoneID,
-                outfitID: capture.outfitID,
-                factionID: capture.factionID,
-                previousFactionID: capture.previousFaction,
-                timeHeld: capture.timeHeld,
-                worldID: msg.payload.world_id
-            };
-            self.emit(ev);
-        }
-        else if (event == "ItemAdded") {
-            const itemID = msg.payload.item_id;
-            const charID = msg.payload.character_id;
-            if (itemID == "6003551") {
-                if (self.stats.get(charID) != undefined) {
-                    //log.debug(`${charID} pulled a new router`);
-                    if (self.routerTracking.routerNpcs.has(charID)) {
-                        const router = self.routerTracking.routerNpcs.get(charID);
-                        //log.debug(`${charID} pulled a new router, saving old one`);
-                        router.destroyed = timestamp;
-                        self.routerTracking.routers.push(Object.assign({}, router));
-                    }
-                    const router = {
-                        ID: "",
-                        owner: charID,
-                        count: 0,
-                        destroyed: undefined,
-                        firstSpawn: undefined,
-                        pulledAt: timestamp,
-                        type: "router"
-                    };
-                    self.routerTracking.routerNpcs.set(charID, router);
-                    save = true;
-                }
-            }
-        }
-        else if (event == "VehicleDestroy") {
-            const killerID = msg.payload.attacker_character_id;
-            const killerLoadoutID = msg.payload.attacker_loadout_id;
-            const killerWeaponID = msg.payload.attacker_weapon_id;
-            const vehicleID = msg.payload.vehicle_id;
-            const player = self.stats.get(killerID);
-            if (player != undefined) {
-                const ev = {
-                    type: "vehicle",
-                    sourceID: killerID,
-                    loadoutID: killerLoadoutID,
-                    weaponID: killerWeaponID,
-                    targetID: msg.payload.character_id,
-                    vehicleID: vehicleID,
-                    timestamp: timestamp,
-                    zoneID: zoneID
-                };
-                player.events.push(ev);
-                save = true;
-                self.emit(ev);
-            }
-        }
-        else if (event == "PlayerLogin") {
-            const charID = msg.payload.character_id;
-            if (this.stats.has(charID)) {
-                const char = this.stats.get(charID);
-                char.online = true;
-                if (this.tracking.running == true) {
-                    char.joinTime = new Date().getTime();
-                }
-                const ev = {
-                    type: "login",
-                    sourceID: charID,
-                    timestamp: timestamp
-                };
-                char.events.push(ev);
-                self.emit(ev);
-                self.addMember({
-                    ID: char.characterID,
-                    name: char.name,
-                    outfitTag: char.outfitTag
-                });
-            }
-        }
-        else if (event == "PlayerLogout") {
-            const charID = msg.payload.character_id;
-            if (this.stats.has(charID)) {
-                const char = this.stats.get(charID);
-                char.online = false;
-                if (this.tracking.running == true) {
-                    const diff = new Date().getTime() - char.joinTime;
-                    char.secondsOnline += (diff / 1000);
-                }
-                const ev = {
-                    type: "logout",
-                    sourceID: charID,
-                    timestamp: timestamp
-                };
-                char.events.push(ev);
-                self.emit(ev);
-                self.removeMember(charID);
-            }
-        }
-        else {
-            log.warn(`Unknown event type: ${event}\n${JSON.stringify(msg)}`);
-        }
-    }
-    else if (msg.type == "heartbeat") {
-        //log.debug(`Heartbeat ${new Date().toISOString()}`);
-    }
-    else if (msg.type == "serviceStateChanged") {
-        log.trace(`serviceStateChanged event`);
-    }
-    else if (msg.type == "connectionStateChanged") {
-        log.trace(`connectionStateChanged event`);
-    }
-    else if (msg.type == undefined) {
-        // Occurs in response to subscribing to new events
-    }
-    else if (msg.type == "toptMarker") {
-        // These events are special because they will only be encountered during playback, not during
-        //      traacking, as these are manually added by an outside source
-        log.info(`Processed a toptMarker event: ${JSON.stringify(msg)}`);
-        const ev = {
-            type: "marker",
-            mark: msg.payload.mark,
-            sourceID: msg.payload.sourceID,
-            timestamp: Number.parseInt(msg.payload.timestamp)
-        };
-        self.miscEvents.push(ev);
-        save = true;
-    }
-    else {
-        log.warn(`Unchecked message type: '${msg.type}'`);
-    }
-    if (save == true) {
-        self.rawData.push(JSON.stringify(msg));
-    }
-};
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/CoreSettings.js":
-/*!***********************************************************!*\
-  !*** ./node_modules/topt-core/build/core/CoreSettings.js ***!
-  \***********************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.CoreSettings = void 0;
-/**
- * Collection of settings used in core
- */
-class CoreSettings {
-    constructor() {
-        /**
-         * Service ID used to connect to the event stream
-         */
-        this.serviceID = "";
-        /**
-         * If the dark mode CSS will be added
-         */
-        this.darkMode = false;
-        /**
-         * ID of the server to listen to login/logout and facility events
-         */
-        this.serverID = "1";
-        /**
-         * If debug options will be shown
-         */
-        this.debug = false;
-    }
-}
-exports.CoreSettings = CoreSettings;
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/CoreSquad.js":
-/*!********************************************************!*\
-  !*** ./node_modules/topt-core/build/core/CoreSquad.js ***!
-  \********************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-const Core_1 = __webpack_require__(/*! ./Core */ "./node_modules/topt-core/build/core/Core.js");
-const PsLoadout_1 = __webpack_require__(/*! ./census/PsLoadout */ "./node_modules/topt-core/build/core/census/PsLoadout.js");
-const PsEvent_1 = __webpack_require__(/*! ./PsEvent */ "./node_modules/topt-core/build/core/PsEvent.js");
-const Squad_1 = __webpack_require__(/*! ./squad/Squad */ "./node_modules/topt-core/build/core/squad/Squad.js");
-const Loggers_1 = __webpack_require__(/*! ./Loggers */ "./node_modules/topt-core/build/core/Loggers.js");
-const log = Loggers_1.Logger.getLogger("Core.Squad");
-const squadEvents = [
-    PsEvent_1.PsEvent.squadResupply,
-    PsEvent_1.PsEvent.squadHeal,
-    PsEvent_1.PsEvent.squadMaxRepair,
-    PsEvent_1.PsEvent.squadMotionDetect,
-    PsEvent_1.PsEvent.squadRadarDetect,
-    PsEvent_1.PsEvent.squadRevive,
-    PsEvent_1.PsEvent.squadShieldRepair,
-    //PsEvent.squadSpawn, // Other ID isn't a char ID
-    PsEvent_1.PsEvent.squadSpotKill
-];
-const nonSquadEvents = [
-    PsEvent_1.PsEvent.heal,
-    PsEvent_1.PsEvent.revive,
-    PsEvent_1.PsEvent.resupply,
-    PsEvent_1.PsEvent.shieldRepair,
-    PsEvent_1.PsEvent.motionDetect,
-    PsEvent_1.PsEvent.radarDetect,
-    PsEvent_1.PsEvent.spotKill,
-];
-Core_1.Core.prototype.squadInit = function () {
-    // Make the four default squads
-    this.createPermSquad();
-    this.createPermSquad();
-    this.createPermSquad();
-    this.createPermSquad();
-    // Every second update the death timer and beacon cooldown if needed
-    setInterval(() => {
-        const time = new Date().getTime();
-        this.squad.members.forEach((member, charID) => {
-            // If they've died update their dying timer
-            if (member.state == "dying" && member.whenDied != null) {
-                member.timeDead = (time - member.whenDied) / 1000; // ms to seconds
-                if (member.timeDead > 29) {
-                    member.state = "dead"; // They've been dead too long
-                }
-            }
-            // If they've placed a beacon update the timer
-            if (member.whenBeacon) {
-                member.beaconCooldown = (time - member.whenBeacon) / 1000;
-                if (member.beaconCooldown > 299) {
-                    member.whenBeacon = null;
-                    member.beaconCooldown = 0;
-                }
-            }
-        });
-    }, 1000);
-};
-/**
- * Sort the names in a squad, by online status, then name
- *
- * @param squad Squad to sort the members of
- */
-function sortSquad(squad) {
-    squad.members.sort((a, b) => {
-        if (b.online == false && a.online == false) {
-            return a.name.localeCompare(b.name);
-        }
-        if (b.online == false && a.online == true) {
-            return -1;
-        }
-        if (b.online == true && a.online == false) {
-            return 1;
-        }
-        return a.name.localeCompare(b.name);
-    });
-}
-Core_1.Core.prototype.addMember = function (char) {
-    if (this.squad.members.has(char.ID)) {
-        this.squad.members.get(char.ID).online = true;
-        log.debug(`${char.name}/${char.ID} was online before, setting online again`);
-        return;
-    }
-    this.squad.members.set(char.ID, {
-        name: char.name,
-        charID: char.ID,
-        outfitTag: char.outfitTag,
-        class: "",
-        state: "alive",
-        timeDead: 0,
-        whenDied: null,
-        whenBeacon: null,
-        beaconCooldown: 0,
-        online: true
-    });
-    const member = this.squad.members.get(char.ID);
-    member.online = true;
-    log.debug(`Started squad tracking ${char.name}/${char.ID}`);
-    const squad = this.createGuessSquad();
-    squad.members.push(member);
-    sortSquad(squad);
-};
-Core_1.Core.prototype.processKillDeathEvent = function (event) {
-    var _a, _b;
-    if (event.type == "kill") {
-        if (this.squad.members.has(event.sourceID)) {
-            const member = this.squad.members.get(event.sourceID);
-            member.state = "alive";
-            member.timeDead = 0;
-            member.whenDied = null;
-            const loadout = (_a = PsLoadout_1.PsLoadouts.get(event.loadoutID)) !== null && _a !== void 0 ? _a : PsLoadout_1.PsLoadout.default;
-            switch (loadout.type) {
-                case "infil":
-                    member.class = "I";
-                    break;
-                case "lightAssault":
-                    member.class = "L";
-                    break;
-                case "medic":
-                    member.class = "M";
-                    break;
-                case "engineer":
-                    member.class = "E";
-                    break;
-                case "heavy":
-                    member.class = "H";
-                    break;
-                case "max":
-                    member.class = "W";
-                    break;
-                case "unknown":
-                    member.class = "";
-                    break;
-            }
-        }
-    }
-    else if (event.type == "death") {
-        if (this.squad.members.has(event.sourceID)) {
-            const member = this.squad.members.get(event.sourceID);
-            member.state = "dying";
-            member.whenDied = new Date().getTime();
-            member.timeDead = 0;
-            const loadout = (_b = PsLoadout_1.PsLoadouts.get(event.loadoutID)) !== null && _b !== void 0 ? _b : PsLoadout_1.PsLoadout.default;
-            switch (loadout.type) {
-                case "infil":
-                    member.class = "I";
-                    break;
-                case "lightAssault":
-                    member.class = "L";
-                    break;
-                case "medic":
-                    member.class = "M";
-                    break;
-                case "engineer":
-                    member.class = "E";
-                    break;
-                case "heavy":
-                    member.class = "H";
-                    break;
-                case "max":
-                    member.class = "W";
-                    break;
-                case "unknown":
-                    member.class = "";
-                    break;
-            }
-        }
-    }
-};
-const validRespawnEvent = (ev, whenDied) => {
-    // These events can happen whenever and aren't useful for knowing if someone is alive or not
-    if (ev.expID == PsEvent_1.PsEvent.resupply || ev.expID == PsEvent_1.PsEvent.squadResupply
-        || ev.expID == PsEvent_1.PsEvent.shieldRepair || ev.expID == PsEvent_1.PsEvent.squadShieldRepair
-        || ev.expID == PsEvent_1.PsEvent.killAssist
-        || ev.expID == PsEvent_1.PsEvent.ribbon
-        || ev.expID == PsEvent_1.PsEvent.motionDetect || ev.expID == PsEvent_1.PsEvent.squadMotionDetect
-        || ev.expID == PsEvent_1.PsEvent.squadSpawn
-        || ev.expID == PsEvent_1.PsEvent.drawfire
-    //|| ev.expID == PsEvent.heal || ev.expID == PsEvent.squadHeal // People rarely run mending field to make this an issue
-    ) {
-        return false;
-    }
-    // These events might be useful, depending on how long ago the player died, for example if they get a revive
-    //      within 1 second of death it might be a revive nade, but if it's after 8 seconds we know they had to respawn
-    //      in some other way as a revive nade takes 2.5 seconds to prime
-    /*
-    if (whenDied != null) {
-        log.log(`It's been ${ev.timestamp - whenDied} ms since death`);
-        if (((ev.expID == PsEvent.revive || ev.expID == PsEvent.squadRevive) && (ev.timestamp - whenDied <= 5)) // Revive nades take 2.5 seconds to prime
-            || ((ev.expID == PsEvent.heal || ev.expID == PsEvent.squadHeal) && (ev.timestamp - whenDied <= 15)) // Heal nades last for 10? seconds
-        ) {
-            return false;
-        }
-    }
-    */
-    return true;
-};
-Core_1.Core.prototype.processExperienceEvent = function (event) {
-    var _a;
-    if (event.expID == PsEvent_1.PsEvent.revive || event.expID == PsEvent_1.PsEvent.squadRevive) {
-        if (this.squad.members.has(event.targetID)) {
-            const member = this.squad.members.get(event.targetID);
-            member.state = "alive";
-            member.timeDead = 0;
-            member.whenDied = null;
-        }
-    }
-    if (event.expID == PsEvent_1.PsEvent.squadSpawn) {
-        if (this.squad.members.has(event.sourceID)) {
-            const member = this.squad.members.get(event.sourceID);
-            if (member.whenBeacon == null) {
-                log.debug(`${member.name} placed a beacon`);
-                member.beaconCooldown = 300;
-                member.whenBeacon = new Date().getTime();
-            }
-        }
-    }
-    if (this.squad.members.has(event.sourceID)) {
-        const member = this.squad.members.get(event.sourceID);
-        if (member.state != "alive") {
-            if (validRespawnEvent(event, member.whenDied) == true) {
-                member.state = "alive";
-                member.whenDied = null;
-                member.timeDead = 0;
-                //debug(`${member.name} was revived from ${event}`);
-            }
-        }
-        const loadout = (_a = PsLoadout_1.PsLoadouts.get(event.loadoutID)) !== null && _a !== void 0 ? _a : PsLoadout_1.PsLoadout.default;
-        switch (loadout.type) {
-            case "infil":
-                member.class = "I";
-                break;
-            case "lightAssault":
-                member.class = "L";
-                break;
-            case "medic":
-                member.class = "M";
-                break;
-            case "engineer":
-                member.class = "E";
-                break;
-            case "heavy":
-                member.class = "H";
-                break;
-            case "max":
-                member.class = "W";
-                break;
-            case "unknown":
-                log.warn(`Unknown class from event: ${event}`);
-                member.class = "";
-                break;
-        }
-    }
-    const sourceMember = this.squad.members.get(event.sourceID);
-    const targetMember = this.squad.members.get(event.targetID);
-    // There are events that happen where no one is tracked
-    if (sourceMember == undefined && targetMember == undefined) {
-        return;
-    }
-    if (this.squad.autoadd == false && (sourceMember == undefined || targetMember == undefined)) {
-        return;
-    }
-    if (this.squad.autoadd == true) {
-        if (squadEvents.indexOf(event.trueExpID) > -1) {
-            if (sourceMember == undefined && targetMember != undefined) {
-                log.info(`${event.sourceID} is not tracked, adding them to the tracker from ${JSON.stringify(event)}`);
-                this.addPlayerByID(event.sourceID).ok(() => {
-                    this.processExperienceEvent(event);
-                });
-            }
-            if (sourceMember != undefined && targetMember == undefined) {
-                log.info(`${event.targetID} is not tracked, adding them to the tracker from ${JSON.stringify(event)}`);
-                this.addPlayerByID(event.targetID).ok(() => {
-                    this.processExperienceEvent(event);
-                });
-            }
-            return;
-        }
-    }
-    if (this.squad.autoadd == true && (sourceMember == undefined || targetMember == undefined)) {
-        log.warn(`Not sure how we got here`);
-        return;
-    }
-    if (sourceMember == undefined || targetMember == undefined) {
-        throw `Bad logic above ^^^`;
-    }
-    let sourceSquad = this.getSquadOfMember(event.sourceID);
-    let targetSquad = this.getSquadOfMember(event.targetID);
-    if (sourceSquad == null) {
-        sourceSquad = this.createGuessSquad();
-        sourceSquad.members.push(sourceMember);
-    }
-    if (targetSquad == null) {
-        targetSquad = this.createGuessSquad();
-        targetSquad.members.push(targetMember);
-    }
-    // Check if the squads need to be merged into one another if this was a squad exp source
-    if (squadEvents.indexOf(event.trueExpID) > -1) {
-        if (sourceSquad.ID == targetSquad.ID) {
-            //log.log(`${sourceMember.name} // ${targetMember.name} are already in a squad`);
-        }
-        else {
-            const ev = PsEvent_1.PsEvents.get(event.expID);
-            // 3 cases:
-            //      1. Both squads are guesses => Merge squads
-            //      2. One squad isn't a guess => Move guess squad into non-guess squad
-            //      3. Neither squad is a guess => Move member who performed action into other squad
-            if (targetSquad.guess == true && sourceSquad.guess == true) {
-                log.debug(`Both guesses, merging ${sourceMember.name} (${sourceSquad}) into ${targetMember.name} (${targetSquad}) from ${ev === null || ev === void 0 ? void 0 : ev.name}`);
-                this.mergeSquads(sourceSquad, targetSquad);
-            }
-            else if (targetSquad.guess == false && sourceSquad.guess == true) {
-                log.debug(`Target is not a guess, merging ${sourceMember.name} (${sourceSquad}) into ${targetMember.name} (${targetSquad}) from ${ev === null || ev === void 0 ? void 0 : ev.name}`);
-                this.mergeSquads(targetSquad, sourceSquad);
-            }
-            else if (targetSquad.guess == true && sourceSquad.guess == false) {
-                log.debug(`Source is not a guess, merging ${targetMember.name} (${targetSquad}) into ${sourceMember.name} (${sourceSquad}) from ${ev === null || ev === void 0 ? void 0 : ev.name}`);
-                this.mergeSquads(sourceSquad, targetSquad);
-            }
-            else if (targetSquad.guess == false && sourceSquad.guess == false) {
-                log.debug(`Neither squad is a guess, moving ${targetMember.name} into ${sourceMember} (${sourceSquad}) from ${ev === null || ev === void 0 ? void 0 : ev.name}`);
-                sourceSquad.members.push(targetMember);
-                targetSquad.members = targetSquad.members.filter(iter => iter.charID != targetMember.charID);
-            }
-            sortSquad(sourceSquad);
-            sortSquad(targetSquad);
-        }
-    }
-    // Check if the squad is no longer valid and needs to be removed, i.e. moved squads
-    if (nonSquadEvents.indexOf(event.trueExpID) > -1) {
-        //log.log(`Non squad event: ${event.trueExpID}`);
-        if (sourceSquad.ID == targetSquad.ID) {
-            log.debug(`${sourceMember.name} was in squad with ${targetMember.name}, but didn't get an expect squad exp event`);
-            targetSquad.members = targetSquad.members.filter(iter => iter.charID != sourceMember.charID);
-            const squad = this.createGuessSquad();
-            squad.members.push(sourceMember);
-            sortSquad(squad);
-            sortSquad(targetSquad);
-            sortSquad(sourceSquad);
-        }
-    }
-};
-Core_1.Core.prototype.getSquad = function (squadName) {
-    let squad = this.squad.perm.find(iter => iter.name == squadName) || null;
-    if (squad != null) {
-        return squad;
-    }
-    return this.squad.guesses.find(iter => iter.name == squadName) || null;
-};
-Core_1.Core.prototype.getSquadByID = function (squadID) {
-    let squad = this.squad.perm.find(iter => iter.ID == squadID) || null;
-    if (squad != null) {
-        return squad;
-    }
-    return this.squad.guesses.find(iter => iter.ID == squadID) || null;
-};
-Core_1.Core.prototype.addMemberToSquad = function (charID, squadRef) {
-    const member = this.squad.members.get(charID);
-    if (member == undefined) {
-        return log.warn(`Cannot move ${charID} to ${squadRef}: ${charID} is not a squad member`);
-    }
-    const squad = (typeof (squadRef) == "string") ? this.getSquad(squadRef) : this.getSquadByID(squadRef);
-    if (squad == null) {
-        return log.warn(`Cannot move ${charID} to ${squadRef}: squad ${squadRef} does not exist`);
-    }
-    if (squad.members.find(iter => iter.charID == charID) != null) {
-        return log.debug(`${charID} is already part of squad ${squadRef}, no need to move`);
-    }
-    const oldSquad = this.getSquadOfMember(charID);
-    if (oldSquad != null) {
-        log.debug(`${charID} is currently in ${oldSquad.name}, moving out of it`);
-        oldSquad.members = oldSquad.members.filter(iter => iter.charID != charID);
-        if (oldSquad.members.length == 0 && oldSquad.guess == true) {
-            this.squad.guesses = this.squad.guesses.filter(iter => iter.ID != oldSquad.ID);
-        }
-    }
-    squad.members.push(member);
-    sortSquad(squad);
-};
-Core_1.Core.prototype.getSquadOfMember = function (charID) {
-    const check = (squad) => {
-        return squad.members.find(iter => iter.charID == charID) != null;
-    };
-    for (const squad of this.squad.perm) {
-        if (check(squad) == true) {
-            return squad;
-        }
-    }
-    for (const squad of this.squad.guesses) {
-        if (check(squad) == true) {
-            return squad;
-        }
-    }
-    log.debug(`Failed to find a squad for ${charID}`);
-    return null;
-};
-Core_1.Core.prototype.mergeSquads = function (into, from) {
-    into.members.push(...from.members);
-    from.members = [];
-    if (from.guess == true) {
-        log.debug(`${from.name} is a guess, removing from list`);
-        this.squad.guesses = this.squad.guesses.filter(iter => iter.ID != from.ID);
-    }
-};
-let squadNameIndex = 0;
-let squadNames = [
-    "q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "a", "s", "d",
-    "f", "g", "h", "j", "k", "l", "z", "x", "c", "v", "b", "n", "m"
-];
-let permSquadNames = [
-    "Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf", "Hotel"
-];
-Core_1.Core.prototype.createGuessSquad = function () {
-    const squad = new Squad_1.Squad();
-    squad.name = squadNames[(squadNameIndex++) % 26];
-    squad.guess = true;
-    log.debug(`Created new guess squad ${squad.name}`);
-    this.squad.guesses.push(squad);
-    return squad;
-};
-Core_1.Core.prototype.createPermSquad = function () {
-    const squad = new Squad_1.Squad();
-    squad.name = `${this.squad.perm.length + 1}`;
-    squad.guess = false;
-    squad.display = permSquadNames[(this.squad.perm.length % permSquadNames.length)];
-    log.debug(`Created new perm squad ${squad.name}/${squad.display}`);
-    this.squad.perm.push(squad);
-    return squad;
-};
-Core_1.Core.prototype.removePermSquad = function (squadName) {
-    for (const squad of this.squad.perm) {
-        if (squad.name == squadName && squad.members.length > 0) {
-            const newSquad = this.createGuessSquad();
-            for (const member of squad.members) {
-                newSquad.members.push(member);
-            }
-            sortSquad(newSquad);
-            squad.members = [];
-        }
-    }
-    this.squad.perm = this.squad.perm.filter(iter => iter.name != squadName);
-};
-Core_1.Core.prototype.removeMemberFromSquad = function (charID) {
-    log.debug(`Remove ${charID} from their current squad into a new one`);
-    const member = this.squad.members.get(charID);
-    if (member == undefined) {
-        log.warn(`Cannot remove ${charID} from their current squad, they are not tracked`);
-        return;
-    }
-    const squad = this.getSquadOfMember(charID);
-    if (squad == null) {
-        log.warn(`Failed to find the squad that ${charID} is in`);
-        return;
-    }
-    const newSquad = this.createGuessSquad();
-    this.addMemberToSquad(charID, newSquad.ID);
-};
-Core_1.Core.prototype.removeMember = function (charID) {
-    log.debug(`${charID} went offline`);
-    if (this.squad.members.has(charID)) {
-        const char = this.squad.members.get(charID);
-        char.online = false;
-        char.state = "alive";
-        char.whenDied = null;
-        char.timeDead = 0;
-    }
-};
-Core_1.Core.prototype.printSquadInfo = function () {
-    log.info(`Perm squads:`);
-    for (const squad of this.squad.perm) {
-        log.info(`\t${squad}`);
-    }
-    log.info(`Guess squads:`);
-    for (const squad of this.squad.guesses) {
-        log.info(`\t${squad}`);
-    }
-    log.info(`Members:`);
-    for (const entry of this.squad.members) {
-        const charID = entry[0];
-        const member = entry[1];
-        const squad = this.getSquadOfMember(charID);
-        log.info(`\t${member.name}/${member.charID} is in ${squad === null || squad === void 0 ? void 0 : squad.name}/${squad === null || squad === void 0 ? void 0 : squad.ID} ${squad == null ? "Missing squad" : ""}`);
-    }
-};
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/EventReporter.js":
-/*!************************************************************!*\
-  !*** ./node_modules/topt-core/build/core/EventReporter.js ***!
-  \************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.defaultVehicleMapper = exports.defaultWeaponMapper = exports.defaultCharacterSortField = exports.defaultCharacterMapper = exports.statMapToBreakdown = exports.Streak = exports.BaseCapture = exports.BaseCaptureOutfit = exports.classCollectionNumber = exports.BreakdownWeaponType = exports.OutfitVersusBreakdown = exports.BreakdownTrend = exports.BreakdownTimeslot = exports.Breakdown = exports.BreakdownArray = void 0;
-const ApiWrapper_1 = __webpack_require__(/*! ./census/ApiWrapper */ "./node_modules/topt-core/build/core/census/ApiWrapper.js");
-const CharacterAPI_1 = __webpack_require__(/*! ./census/CharacterAPI */ "./node_modules/topt-core/build/core/census/CharacterAPI.js");
-const WeaponAPI_1 = __webpack_require__(/*! ./census/WeaponAPI */ "./node_modules/topt-core/build/core/census/WeaponAPI.js");
-const StatMap_1 = __webpack_require__(/*! ./StatMap */ "./node_modules/topt-core/build/core/StatMap.js");
-const PsLoadout_1 = __webpack_require__(/*! ./census/PsLoadout */ "./node_modules/topt-core/build/core/census/PsLoadout.js");
-const VehicleAPI_1 = __webpack_require__(/*! ./census/VehicleAPI */ "./node_modules/topt-core/build/core/census/VehicleAPI.js");
-const PsEvent_1 = __webpack_require__(/*! ./PsEvent */ "./node_modules/topt-core/build/core/PsEvent.js");
-const InvididualGenerator_1 = __webpack_require__(/*! ./InvididualGenerator */ "./node_modules/topt-core/build/core/InvididualGenerator.js");
-const OutfitAPI_1 = __webpack_require__(/*! ./census/OutfitAPI */ "./node_modules/topt-core/build/core/census/OutfitAPI.js");
-const Loggers_1 = __webpack_require__(/*! ./Loggers */ "./node_modules/topt-core/build/core/Loggers.js");
-const log = Loggers_1.Logger.getLogger("EventReporter");
-class BreakdownArray {
-    constructor() {
-        this.data = [];
-        this.total = 0;
-        this.display = null;
-    }
-}
-exports.BreakdownArray = BreakdownArray;
-class Breakdown {
-    constructor() {
-        this.display = "";
-        this.sortField = "";
-        this.amount = 0;
-        this.color = undefined;
-    }
-}
-exports.Breakdown = Breakdown;
-class BreakdownTimeslot {
-    constructor() {
-        this.startTime = 0;
-        this.endTime = 0;
-        this.value = 0;
-    }
-}
-exports.BreakdownTimeslot = BreakdownTimeslot;
-class BreakdownTrend {
-    constructor() {
-        this.timestamp = new Date();
-        this.values = [];
-    }
-}
-exports.BreakdownTrend = BreakdownTrend;
-;
-class OutfitVersusBreakdown {
-    constructor() {
-        this.tag = "";
-        this.name = "";
-        this.faction = "";
-        this.kills = 0;
-        this.deaths = 0;
-        this.revived = 0;
-        this.players = 0;
-        this.classKills = classCollectionNumber();
-        this.classDeaths = classCollectionNumber();
-        this.classRevived = classCollectionNumber();
-    }
-}
-exports.OutfitVersusBreakdown = OutfitVersusBreakdown;
-class BreakdownWeaponType {
-    constructor() {
-        this.type = "";
-        this.deaths = 0;
-        this.revived = 0;
-        this.unrevived = 0;
-        this.headshots = 0;
-        this.mostUsed = "";
-        this.mostUsedDeaths = 0;
-    }
-}
-exports.BreakdownWeaponType = BreakdownWeaponType;
-function classCollectionNumber() {
-    return {
-        total: 0,
-        infil: 0,
-        lightAssault: 0,
-        medic: 0,
-        engineer: 0,
-        heavy: 0,
-        max: 0
-    };
-}
-exports.classCollectionNumber = classCollectionNumber;
-class BaseCaptureOutfit {
-    constructor() {
-        this.ID = "";
-        this.name = "";
-        this.tag = "";
-        this.amount = 0;
-    }
-}
-exports.BaseCaptureOutfit = BaseCaptureOutfit;
-class BaseCapture {
-    constructor() {
-        this.name = "";
-        this.faction = "";
-        this.timestamp = 0;
-        this.outfits = new BreakdownArray();
-    }
-}
-exports.BaseCapture = BaseCapture;
-class Streak {
-    constructor() {
-        /**
-         * How many instances of the event were in a streak
-         */
-        this.amount = 0;
-        /**
-         * When the streak started in ms
-         */
-        this.start = 0;
-    }
-}
-exports.Streak = Streak;
-function statMapToBreakdown(map, source, matcher, mapper, sortField = undefined) {
-    const breakdown = new ApiWrapper_1.ApiResponse();
-    const arr = new BreakdownArray();
-    if (map.size() > 0) {
-        const IDs = Array.from(map.getMap().keys());
-        source(IDs).ok((data) => {
-            map.getMap().forEach((amount, ID) => {
-                const datum = data.find(elem => matcher(elem, ID));
-                const breakdown = {
-                    display: mapper(datum, ID),
-                    sortField: (sortField != undefined) ? sortField(datum, ID) : mapper(datum, ID),
-                    amount: amount,
-                    color: undefined
-                };
-                arr.total += amount;
-                arr.data.push(breakdown);
-            });
-            arr.data.sort((a, b) => {
-                const diff = b.amount - a.amount;
-                return diff || b.sortField.localeCompare(a.sortField);
-            });
-            breakdown.resolveOk(arr);
-        });
-    }
-    else {
-        breakdown.resolveOk(arr);
-    }
-    return breakdown;
-}
-exports.statMapToBreakdown = statMapToBreakdown;
-function defaultCharacterMapper(elem, ID) {
-    return `${(elem === null || elem === void 0 ? void 0 : elem.outfitTag) ? `[${elem.outfitTag}] ` : ``}${(elem) ? elem.name : `Unknown ${ID}`}`;
-}
-exports.defaultCharacterMapper = defaultCharacterMapper;
-function defaultCharacterSortField(elem, ID) {
-    var _a;
-    return (_a = elem === null || elem === void 0 ? void 0 : elem.name) !== null && _a !== void 0 ? _a : `Unknown ${ID}}`;
-}
-exports.defaultCharacterSortField = defaultCharacterSortField;
-function defaultWeaponMapper(elem, ID) {
-    var _a;
-    return (_a = elem === null || elem === void 0 ? void 0 : elem.name) !== null && _a !== void 0 ? _a : `Unknown ${ID}`;
-}
-exports.defaultWeaponMapper = defaultWeaponMapper;
-function defaultVehicleMapper(elem, ID) {
-    var _a;
-    return (_a = elem === null || elem === void 0 ? void 0 : elem.name) !== null && _a !== void 0 ? _a : `Unknown ${ID}`;
-}
-exports.defaultVehicleMapper = defaultVehicleMapper;
-class EventReporter {
-    static medicHealStreaks(events, charID) {
-        let current = new Streak();
-        const streaks = [];
-        // Have 2453 1/3 (rounded to 2500) units of juice, decays at 0.32 per ms (320/sec), revive gives 750
-        const maxJuice = 2500;
-        const decayRate = 0.32; // per ms
-        const reviveJuice = 750;
-        let juice = 2500;
-        let prevRevive = 0;
-        for (const ev of events) {
-            if (ev.sourceID != charID) {
-                continue;
-            }
-            if (ev.type == "exp" || ev.type == "kill") {
-                if (ev.type == "exp" && (ev.expID == PsEvent_1.PsEvent.heal || ev.expID == PsEvent_1.PsEvent.squadHeal)) {
-                    if (current.start == 0) {
-                        current.start = ev.timestamp;
-                        log.debug(`${charID} streak started at ${ev.timestamp}`);
-                    }
-                    if (prevRevive == 0) {
-                        prevRevive = ev.timestamp;
-                    }
-                }
-                else if (PsLoadout_1.PsLoadout.getLoadoutType(ev.loadoutID) == "medic"
-                    && (ev.type == "kill" || ev.expID == PsEvent_1.PsEvent.revive || ev.expID == PsEvent_1.PsEvent.squadRevive)) {
-                    if (current.start == 0) {
-                        current.start = ev.timestamp;
-                        log.debug(`${charID} streak started at ${ev.timestamp}`);
-                    }
-                    if (prevRevive == 0) {
-                        prevRevive = ev.timestamp;
-                    }
-                    juice += reviveJuice;
-                    if (juice > maxJuice) {
-                        juice = maxJuice;
-                    }
-                }
-                if (current.start != 0) {
-                    const diff = ev.timestamp - prevRevive;
-                    const juiceLost = diff * decayRate;
-                    prevRevive = ev.timestamp;
-                    log.debug(`${charID} lost ${juiceLost} juice over ${diff}ms (${ev.timestamp} - ${prevRevive}). Had ${juice}, now have ${juice - juiceLost}`);
-                    juice = juice - juiceLost;
-                    if (juice <= 0) {
-                        const overtime = (ev.timestamp - current.start) / 1000;
-                        const otherJuice = juice / (decayRate * 1000);
-                        current.amount = overtime + otherJuice;
-                        streaks.push(current);
-                        log.debug(`${charID} streak ended, overtime: ${overtime}, otherJuice: ${otherJuice} went from ${current.start} to ${ev.timestamp} and lasted ${current.amount}ms`);
-                        prevRevive = 0;
-                        current = new Streak();
-                        current.start = 0; //ev.timestamp;
-                        current.amount = 0;
-                        juice = maxJuice;
-                    }
-                }
-            }
-        }
-        return streaks;
-    }
-    static facilityCaptures(data) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const baseCaptures = [];
-        const captures = data.captures;
-        const players = data.players;
-        log.debug(`Have ${data.captures.length} captures`);
-        const outfitIDs = players.map(iter => iter.outfitID)
-            .filter((value, index, arr) => arr.indexOf(value) == index);
-        log.debug(`Getting these outfits: [${outfitIDs.join(", ")}]`);
-        OutfitAPI_1.OutfitAPI.getByIDs(outfitIDs).ok((data) => {
-            var _a, _b;
-            log.debug(`Loaded ${data.length}/${outfitIDs.length}. Processing ${captures.length} captures`);
-            for (const capture of captures) {
-                // Same faction caps are boring
-                log.debug(`processing ${JSON.stringify(capture)}`);
-                if (capture.factionID == capture.previousFaction) {
-                    log.debug(`Skipping capture: ${JSON.stringify(capture)}`);
-                    continue;
-                }
-                const entry = new BaseCapture();
-                entry.timestamp = capture.timestamp.getTime();
-                entry.name = capture.name;
-                entry.faction = capture.previousFaction;
-                const outfitID = capture.outfitID;
-                const outfit = data.find(iter => iter.ID == outfitID);
-                if (outfit == undefined) {
-                    log.warn(`Missing outfit ${outfitID}`);
-                    continue;
-                }
-                const helpers = players.filter(iter => iter.timestamp == capture.timestamp.getTime());
-                const outfits = [{ name: "No outfit", ID: "-1", amount: 0, tag: "" }];
-                for (const helper of helpers) {
-                    let outfitEntry = undefined;
-                    if (helper.outfitID == "0" || helper.outfitID.length == 0) {
-                        outfitEntry = outfits[0];
-                    }
-                    else {
-                        outfitEntry = outfits.find(iter => iter.ID == helper.outfitID);
-                        if (outfitEntry == undefined) {
-                            const outfitDatum = data.find(iter => iter.ID == helper.outfitID);
-                            outfitEntry = {
-                                ID: helper.outfitID,
-                                name: (_a = outfitDatum === null || outfitDatum === void 0 ? void 0 : outfitDatum.name) !== null && _a !== void 0 ? _a : `Unknown ${helper.outfitID}`,
-                                amount: 0,
-                                tag: (_b = outfitDatum === null || outfitDatum === void 0 ? void 0 : outfitDatum.tag) !== null && _b !== void 0 ? _b : ``,
-                            };
-                            outfits.push(outfitEntry);
-                        }
-                    }
-                    ++outfitEntry.amount;
-                }
-                const breakdown = {
-                    data: outfits.sort((a, b) => b.amount - a.amount).map(iter => {
-                        return {
-                            display: iter.name,
-                            amount: iter.amount,
-                            color: undefined,
-                            sortField: `${iter.amount}`
-                        };
-                    }),
-                    total: outfits.reduce(((acc, iter) => acc += iter.amount), 0),
-                    display: null
-                };
-                entry.outfits = breakdown;
-                baseCaptures.push(entry);
-            }
-            response.resolveOk(baseCaptures);
-        });
-        return response;
-    }
-    static experience(expID, events) {
-        const exp = new StatMap_1.default();
-        for (const event of events) {
-            if (event.type == "exp" && (event.expID == expID || event.trueExpID == expID)) {
-                exp.increment(event.targetID);
-            }
-        }
-        return statMapToBreakdown(exp, CharacterAPI_1.CharacterAPI.getByIDs, (elem, charID) => elem.ID == charID, defaultCharacterMapper, defaultCharacterSortField);
-    }
-    static experienceSource(ids, targetID, events) {
-        const exp = new StatMap_1.default();
-        for (const event of events) {
-            if (event.type == "exp" && event.targetID == targetID && ids.indexOf(event.expID) > -1) {
-                exp.increment(event.sourceID);
-            }
-        }
-        if (exp.size() == 0) {
-            return ApiWrapper_1.ApiResponse.resolve({ code: 204, data: null });
-        }
-        log.debug(`charIDs: [${Array.from(exp.getMap().keys()).join(", ")}]`);
-        return statMapToBreakdown(exp, CharacterAPI_1.CharacterAPI.getByIDs, (elem, charID) => elem.ID == charID, defaultCharacterMapper, defaultCharacterSortField);
-    }
-    static outfitVersusBreakdown(events) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const outfitBreakdowns = new Map();
-        const outfitPlayers = new Map();
-        const killCount = events.filter(iter => iter.type == "kill").length;
-        const deathCount = events.filter(iter => iter.type == "death" && iter.revived == false).length;
-        const charIDs = events.filter((iter) => iter.type == "kill" || (iter.type == "death" && iter.revived == false))
-            .map((iter) => {
-            if (iter.type == "kill") {
-                return iter.targetID;
-            }
-            else if (iter.type == "death" && iter.revived == false) {
-                return iter.targetID;
-            }
-            throw `Invalid event type '${iter.type}'`;
-        });
-        CharacterAPI_1.CharacterAPI.getByIDs(charIDs).ok((data) => {
-            for (const ev of events) {
-                if (ev.type == "kill" || ev.type == "death") {
-                    const killedChar = data.find(iter => iter.ID == ev.targetID);
-                    if (killedChar == undefined) {
-                        log.warn(`Missing ${ev.type} targetID ${ev.targetID}`);
-                    }
-                    else {
-                        const outfitID = killedChar.outfitID;
-                        if (outfitBreakdowns.has(outfitID) == false) {
-                            const breakdown = new OutfitVersusBreakdown();
-                            breakdown.tag = killedChar.outfitTag;
-                            breakdown.name = killedChar.outfitName || "<No outfit>";
-                            breakdown.faction = killedChar.faction;
-                            outfitBreakdowns.set(outfitID, breakdown);
-                            outfitPlayers.set(outfitID, []);
-                        }
-                        const breakdown = outfitBreakdowns.get(outfitID);
-                        if (ev.type == "kill") {
-                            ++breakdown.kills;
-                        }
-                        else if (ev.type == "death") {
-                            if (ev.revived == true) {
-                                ++breakdown.revived;
-                            }
-                            else {
-                                ++breakdown.deaths;
-                            }
-                        }
-                        const loadout = PsLoadout_1.PsLoadouts.get(ev.loadoutID);
-                        const coll = ev.type == "kill" ? breakdown.classKills
-                            : ev.type == "death" && ev.revived == false ? breakdown.classDeaths
-                                : breakdown.classRevived;
-                        if (loadout != undefined) {
-                            if (loadout.type == "infil") {
-                                ++coll.infil;
-                            }
-                            else if (loadout.type == "lightAssault") {
-                                ++coll.lightAssault;
-                            }
-                            else if (loadout.type == "medic") {
-                                ++coll.medic;
-                            }
-                            else if (loadout.type == "engineer") {
-                                ++coll.engineer;
-                            }
-                            else if (loadout.type == "heavy") {
-                                ++coll.heavy;
-                            }
-                            else if (loadout.type == "max") {
-                                ++coll.max;
-                            }
-                        }
-                        const players = outfitPlayers.get(outfitID);
-                        if (players.indexOf(ev.targetID) == -1) {
-                            ++breakdown.players;
-                            players.push(ev.targetID);
-                        }
-                    }
-                }
-            }
-            // Only include the outfit if they were > 1% of the kills or deaths
-            const breakdowns = Array.from(outfitBreakdowns.values())
-                .filter(iter => iter.kills > (killCount / 100) || iter.deaths > (deathCount / 100));
-            breakdowns.sort((a, b) => {
-                return b.deaths - a.deaths
-                    || b.kills - a.kills
-                    || b.revived - a.revived
-                    || b.tag.localeCompare(a.tag);
-            });
-            response.resolveOk(breakdowns);
-        });
-        return response;
-    }
-    static kpmBoxplot(players, tracking, loadout) {
-        let kpms = [];
-        for (const player of players) {
-            if (player.secondsOnline <= 0) {
-                continue;
-            }
-            let secondsOnline = player.secondsOnline;
-            if (loadout != undefined) {
-                const playtime = InvididualGenerator_1.IndividualReporter.classUsage({ player: player, tracking: tracking, routers: [], events: [] });
-                if (loadout == "infil") {
-                    secondsOnline = playtime.infil.secondsAs;
-                }
-                else if (loadout == "lightAssault") {
-                    secondsOnline = playtime.lightAssault.secondsAs;
-                }
-                else if (loadout == "medic") {
-                    secondsOnline = playtime.medic.secondsAs;
-                }
-                else if (loadout == "engineer") {
-                    secondsOnline = playtime.engineer.secondsAs;
-                }
-                else if (loadout == "heavy") {
-                    secondsOnline = playtime.heavy.secondsAs;
-                }
-                else if (loadout == "max") {
-                    secondsOnline = playtime.max.secondsAs;
-                }
-                if (secondsOnline == 0) {
-                    continue;
-                }
-            }
-            let count = 0;
-            const kills = player.events.filter(iter => iter.type == "kill");
-            for (const kill of kills) {
-                const psloadout = PsLoadout_1.PsLoadouts.get(kill.loadoutID);
-                if (loadout == undefined || (psloadout != undefined && psloadout.type == loadout)) {
-                    ++count;
-                }
-            }
-            if (count == 0) {
-                continue;
-            }
-            const minutesOnline = secondsOnline / 60;
-            const kpm = Number.parseFloat((count / minutesOnline).toFixed(2));
-            log.debug(`${player.name} got ${count} kills on ${loadout} in ${minutesOnline} minutes (${kpm})`);
-            kpms.push(kpm);
-        }
-        kpms.sort((a, b) => b - a);
-        return kpms;
-    }
-    static kdBoxplot(players, tracking, loadout) {
-        let kds = [];
-        for (const player of players) {
-            if (player.secondsOnline <= 0) {
-                continue;
-            }
-            let killCount = 0;
-            const kills = player.events.filter(iter => iter.type == "kill");
-            for (const kill of kills) {
-                const psloadout = PsLoadout_1.PsLoadouts.get(kill.loadoutID);
-                if (loadout == undefined || (psloadout != undefined && psloadout.type == loadout)) {
-                    ++killCount;
-                }
-            }
-            let deathCount = 0;
-            const deaths = player.events.filter(iter => iter.type == "death" && iter.revived == false);
-            for (const death of deaths) {
-                const psloadout = PsLoadout_1.PsLoadouts.get(death.loadoutID);
-                if (loadout == undefined || (psloadout != undefined && psloadout.type == loadout)) {
-                    ++deathCount;
-                }
-            }
-            if (killCount == 0 || deathCount == 0) {
-                continue;
-            }
-            const kd = Number.parseFloat((killCount / deathCount).toFixed(2));
-            kds.push(kd);
-        }
-        kds.sort((a, b) => b - a);
-        return kds;
-    }
-    static weaponDeathBreakdown(events) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const weapons = events.filter((ev) => ev.type == "death")
-            .map((ev) => ev.weaponID)
-            .filter((ID, index, arr) => arr.indexOf(ID) == index);
-        let types = [];
-        // <weapon type, <weapon, count>>
-        const used = new Map();
-        const missingWeapons = new Set();
-        WeaponAPI_1.WeaponAPI.getByIDs(weapons).ok((data) => {
-            var _a, _b;
-            const deaths = events.filter(ev => ev.type == "death");
-            for (const death of deaths) {
-                const weapon = data.find(iter => iter.ID == death.weaponID);
-                if (weapon == undefined) {
-                    missingWeapons.add(death.weaponID);
-                }
-                const typeName = (_a = weapon === null || weapon === void 0 ? void 0 : weapon.type) !== null && _a !== void 0 ? _a : "Other";
-                let type = types.find(iter => iter.type == typeName);
-                if (type == undefined) {
-                    type = {
-                        type: typeName,
-                        deaths: 0,
-                        headshots: 0,
-                        revived: 0,
-                        unrevived: 0,
-                        mostUsed: "",
-                        mostUsedDeaths: 0
-                    };
-                    types.push(type);
-                }
-                if (weapon != undefined) {
-                    if (!used.has(weapon.type)) {
-                        used.set(weapon.type, new Map());
-                    }
-                    const set = used.get(weapon.type);
-                    set.set(weapon.name, ((_b = set.get(weapon.name)) !== null && _b !== void 0 ? _b : 0) + 1);
-                    used.set(weapon.type, set);
-                }
-                ++type.deaths;
-                if (death.revived == false) {
-                    ++type.unrevived;
-                }
-                else {
-                    ++type.revived;
-                }
-                if (death.isHeadshot == true) {
-                    ++type.headshots;
-                }
-            }
-            used.forEach((weapons, type) => {
-                const breakdown = types.find(iter => iter.type == type);
-                weapons.forEach((deaths, weapon) => {
-                    if (deaths > breakdown.mostUsedDeaths) {
-                        breakdown.mostUsedDeaths = deaths;
-                        breakdown.mostUsed = weapon;
-                    }
-                });
-            });
-            types = types.filter((iter) => {
-                return iter.deaths / deaths.length > 0.0025;
-            });
-            types.sort((a, b) => {
-                return b.deaths - a.deaths
-                    || b.headshots - a.headshots
-                    || b.type.localeCompare(a.type);
-            });
-            log.info(`Missing weapons:`, missingWeapons);
-            response.resolveOk(types);
-        });
-        return response;
-    }
-    static vehicleKills(events) {
-        const vehKills = new StatMap_1.default();
-        for (const event of events) {
-            if (event.type == "vehicle" && VehicleAPI_1.VehicleTypes.tracked.indexOf(event.vehicleID) > -1) {
-                vehKills.increment(event.vehicleID);
-            }
-        }
-        return statMapToBreakdown(vehKills, VehicleAPI_1.VehicleAPI.getAll, (elem, ID) => elem.ID == ID, defaultVehicleMapper);
-    }
-    static vehicleWeaponKills(events) {
-        const vehKills = new StatMap_1.default();
-        for (const event of events) {
-            if (event.type == "vehicle" && event.weaponID != "0") {
-                vehKills.increment(event.weaponID);
-            }
-        }
-        return statMapToBreakdown(vehKills, WeaponAPI_1.WeaponAPI.getByIDs, (elem, ID) => elem.ID == ID, defaultWeaponMapper);
-    }
-    static weaponKills(events) {
-        const wepKills = new StatMap_1.default();
-        for (const event of events) {
-            if (event.type == "kill") {
-                wepKills.increment(event.weaponID);
-            }
-        }
-        return statMapToBreakdown(wepKills, WeaponAPI_1.WeaponAPI.getByIDs, (elem, ID) => elem.ID == ID, defaultWeaponMapper);
-    }
-    static weaponTeamkills(events) {
-        const wepKills = new StatMap_1.default();
-        for (const ev of events) {
-            if (ev.type == "teamkill") {
-                wepKills.increment(ev.weaponID);
-            }
-        }
-        return statMapToBreakdown(wepKills, WeaponAPI_1.WeaponAPI.getByIDs, (elem, ID) => elem.ID == ID, defaultWeaponMapper);
-    }
-    static weaponDeaths(events, revived = undefined) {
-        const amounts = new StatMap_1.default();
-        for (const event of events) {
-            if (event.type == "death" && (revived == undefined || revived == event.revived)) {
-                amounts.increment(event.weaponID);
-            }
-        }
-        return statMapToBreakdown(amounts, WeaponAPI_1.WeaponAPI.getByIDs, (elem, ID) => elem.ID == ID, defaultWeaponMapper);
-    }
-    static weaponTypeKills(events) {
-        const amounts = new StatMap_1.default();
-        const response = new ApiWrapper_1.ApiResponse();
-        const weaponIDs = [];
-        for (const event of events) {
-            if (event.type == "kill") {
-                weaponIDs.push(event.weaponID);
-            }
-        }
-        const arr = new BreakdownArray();
-        WeaponAPI_1.WeaponAPI.getByIDs(weaponIDs).ok((data) => {
-            for (const event of events) {
-                if (event.type == "kill") {
-                    const weapon = data.find(iter => iter.ID == event.weaponID);
-                    if (weapon == undefined) {
-                        amounts.increment("Unknown");
-                    }
-                    else {
-                        amounts.increment(weapon.type);
-                    }
-                    ++arr.total;
-                }
-            }
-            amounts.getMap().forEach((count, wepType) => {
-                arr.data.push({
-                    display: wepType,
-                    amount: count,
-                    sortField: wepType,
-                    color: undefined
-                });
-            });
-            arr.data.sort((a, b) => {
-                const diff = b.amount - a.amount;
-                if (diff == 0) {
-                    return b.display.localeCompare(a.display);
-                }
-                return diff;
-            });
-            response.resolveOk(arr);
-        });
-        return response;
-    }
-    static weaponTypeDeaths(events, revived = undefined) {
-        const amounts = new StatMap_1.default();
-        const response = new ApiWrapper_1.ApiResponse();
-        const weaponIDs = [];
-        for (const event of events) {
-            if (event.type == "death" && (revived == undefined || event.revived == revived)) {
-                weaponIDs.push(event.weaponID);
-            }
-        }
-        const arr = new BreakdownArray();
-        WeaponAPI_1.WeaponAPI.getByIDs(weaponIDs).ok((data) => {
-            for (const event of events) {
-                if (event.type == "death" && (revived == undefined || event.revived == revived)) {
-                    const weapon = data.find(iter => iter.ID == event.weaponID);
-                    if (weapon == undefined) {
-                        amounts.increment("Unknown");
-                    }
-                    else {
-                        amounts.increment(weapon.type);
-                    }
-                    ++arr.total;
-                }
-            }
-            amounts.getMap().forEach((count, wepType) => {
-                arr.data.push({
-                    display: wepType,
-                    amount: count,
-                    sortField: wepType,
-                    color: undefined
-                });
-            });
-            arr.data.sort((a, b) => {
-                const diff = b.amount - a.amount;
-                if (diff == 0) {
-                    return b.display.localeCompare(a.display);
-                }
-                return diff;
-            });
-            response.resolveOk(arr);
-        });
-        return response;
-    }
-    static classPlaytimes(times) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const arr = new BreakdownArray();
-        const infil = {
-            amount: 0,
-            color: undefined,
-            display: "Infiltrator",
-            sortField: "infil"
-        };
-        const la = {
-            amount: 0,
-            color: undefined,
-            display: "Light Assault",
-            sortField: "LA"
-        };
-        const medic = {
-            amount: 0,
-            color: undefined,
-            display: "Medic playtime",
-            sortField: "medic"
-        };
-        const eng = {
-            amount: 0,
-            color: undefined,
-            display: "Engineer",
-            sortField: "engineer"
-        };
-        const heavy = {
-            amount: 0,
-            color: undefined,
-            display: "Heavy Assault",
-            sortField: "heavy"
-        };
-        const max = {
-            amount: 0,
-            color: undefined,
-            display: "MAX",
-            sortField: "max"
-        };
-        for (const time of times) {
-            infil.amount += time.infil.secondsAs;
-            la.amount += time.lightAssault.secondsAs;
-            medic.amount += time.medic.secondsAs;
-            eng.amount += time.engineer.secondsAs;
-            heavy.amount += time.heavy.secondsAs;
-            max.amount += time.max.secondsAs;
-        }
-        arr.data.push(infil, la, medic, eng, heavy, max);
-        arr.total = infil.amount + la.amount + medic.amount + eng.amount + heavy.amount + max.amount;
-        arr.display = (seconds) => {
-            const hours = Math.floor(seconds / 3600);
-            const mins = Math.floor((seconds - (3600 * hours)) / 60);
-            return `${hours.toFixed(0).padStart(2, "0")}:${mins.toFixed(0).padStart(2, "0")}:${(seconds % 60).toFixed(0).padStart(2, "0")}`;
-        };
-        response.resolveOk(arr);
-        return response;
-    }
-    static factionKills(events) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const arr = new BreakdownArray();
-        const countKills = function (ev, faction) {
-            if (ev.type != "kill") {
-                return false;
-            }
-            const loadout = PsLoadout_1.PsLoadouts.get(ev.targetLoadoutID);
-            return loadout != undefined && loadout.faction == faction;
-        };
-        arr.data.push({
-            amount: events.filter(iter => countKills(iter, "VS")).length,
-            color: "#AE06B3",
-            display: "VS",
-            sortField: "VS"
-        });
-        arr.data.push({
-            amount: events.filter(iter => countKills(iter, "NC")).length,
-            color: "#1A39F9",
-            display: "NC",
-            sortField: "NC"
-        });
-        arr.data.push({
-            amount: events.filter(iter => countKills(iter, "TR")).length,
-            color: "#CE2304",
-            display: "TR",
-            sortField: "TR"
-        });
-        arr.data.push({
-            amount: events.filter(iter => countKills(iter, "NS")).length,
-            color: "#6A6A6A",
-            display: "NS",
-            sortField: "NS"
-        });
-        arr.total = events.filter(iter => iter.type == "kill").length;
-        response.resolveOk(arr);
-        return response;
-    }
-    static factionDeaths(events) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const countDeaths = function (ev, faction) {
-            if (ev.type != "death" || ev.revived == true) {
-                return false;
-            }
-            const loadout = PsLoadout_1.PsLoadouts.get(ev.targetLoadoutID);
-            return loadout != undefined && loadout.faction == faction;
-        };
-        const arr = new BreakdownArray();
-        arr.data.push({
-            amount: events.filter(iter => countDeaths(iter, "VS")).length,
-            color: "#AE06B3",
-            display: "VS",
-            sortField: "VS"
-        });
-        arr.data.push({
-            amount: events.filter(iter => countDeaths(iter, "NC")).length,
-            color: "#1A39F9",
-            display: "NC",
-            sortField: "NC"
-        });
-        arr.data.push({
-            amount: events.filter(iter => countDeaths(iter, "TR")).length,
-            color: "#CE2304",
-            display: "TR",
-            sortField: "TR"
-        });
-        arr.data.push({
-            amount: events.filter(iter => countDeaths(iter, "NS")).length,
-            color: "#6A6A6A",
-            display: "NS",
-            sortField: "NS"
-        });
-        arr.total = events.filter(iter => iter.type == "death" && iter.revived == false).length;
-        response.resolveOk(arr);
-        return response;
-    }
-    static continentKills(events) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const countKills = function (ev, zoneID) {
-            return ev.type == "kill" && ev.zoneID == zoneID;
-        };
-        const arr = new BreakdownArray();
-        arr.data.push({
-            amount: events.filter(iter => countKills(iter, "2")).length,
-            color: "#F4E11D",
-            display: "Indar",
-            sortField: "Indar"
-        });
-        arr.data.push({
-            amount: events.filter(iter => countKills(iter, "4")).length,
-            color: "#09B118",
-            display: "Hossin",
-            sortField: "Hossin"
-        });
-        arr.data.push({
-            amount: events.filter(iter => countKills(iter, "6")).length,
-            color: "#2DE53E",
-            display: "Amerish",
-            sortField: "Amerish"
-        });
-        arr.data.push({
-            amount: events.filter(iter => countKills(iter, "8")).length,
-            color: "#D8E9EC",
-            display: "Esamir",
-            sortField: "Esamir"
-        });
-        arr.total = events.filter(iter => iter.type == "kill").length;
-        response.resolveOk(arr);
-        return response;
-    }
-    static continentDeaths(events) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const countDeaths = function (ev, zoneID) {
-            return ev.type == "death" && ev.revived == false && ev.zoneID == zoneID;
-        };
-        const arr = new BreakdownArray();
-        arr.data.push({
-            amount: events.filter(iter => countDeaths(iter, "2")).length,
-            color: "#F4E11D",
-            display: "Indar",
-            sortField: "Indar"
-        });
-        arr.data.push({
-            amount: events.filter(iter => countDeaths(iter, "4")).length,
-            color: "#09B118",
-            display: "Hossin",
-            sortField: "Hossin"
-        });
-        arr.data.push({
-            amount: events.filter(iter => countDeaths(iter, "6")).length,
-            color: "#2DE53E",
-            display: "Amerish",
-            sortField: "Amerish"
-        });
-        arr.data.push({
-            amount: events.filter(iter => countDeaths(iter, "8")).length,
-            color: "#D8E9EC",
-            display: "Esamir",
-            sortField: "Esamir"
-        });
-        arr.total = events.filter(iter => iter.type == "death" && iter.revived == false).length;
-        response.resolveOk(arr);
-        return response;
-    }
-    static characterKills(events) {
-        const amounts = new StatMap_1.default();
-        for (const event of events) {
-            if (event.type == "kill") {
-                amounts.increment(event.targetID);
-            }
-        }
-        return statMapToBreakdown(amounts, CharacterAPI_1.CharacterAPI.getByIDs, (elem, ID) => elem.ID == ID, defaultCharacterMapper);
-    }
-    static characterDeaths(events) {
-        const amounts = new StatMap_1.default();
-        for (const event of events) {
-            if (event.type == "death" && event.revived == false) {
-                amounts.increment(event.targetID);
-            }
-        }
-        return statMapToBreakdown(amounts, CharacterAPI_1.CharacterAPI.getByIDs, (elem, ID) => elem.ID == ID, defaultCharacterMapper);
-    }
-    static kpmOverTime(events, timeWidth = 300000) {
-        const kills = events.filter(iter => iter.type == "kill")
-            .sort((a, b) => a.timestamp - b.timestamp);
-        const players = new Set();
-        if (kills.length == 0) {
-            return [];
-        }
-        const slots = [];
-        const minutes = timeWidth / 60000;
-        const stop = kills[kills.length - 1].timestamp;
-        let start = events[0].timestamp;
-        let count = 0;
-        while (true) {
-            const end = start + timeWidth;
-            const section = kills.filter(iter => iter.timestamp >= start && iter.timestamp < end);
-            for (const ev of section) {
-                players.add(ev.sourceID);
-                ++count;
-            }
-            slots.push({
-                startTime: start,
-                endTime: end,
-                value: Number.parseFloat((count / (players.size || 1) / minutes).toFixed(2))
-            });
-            count = 0;
-            players.clear();
-            start += timeWidth;
-            if (start > stop) {
-                break;
-            }
-        }
-        return slots;
-    }
-    static kdOverTime(events, timeWidth = 300000) {
-        const evs = events.filter(iter => iter.type == "kill" || (iter.type == "death" && iter.revived == false));
-        if (evs.length == 0) {
-            return [];
-        }
-        const slots = [];
-        const stop = evs[evs.length - 1].timestamp;
-        let start = events[0].timestamp;
-        while (true) {
-            const end = start + timeWidth;
-            const section = evs.filter(iter => iter.timestamp >= start && iter.timestamp < end);
-            const kills = section.filter(iter => iter.type == "kill");
-            const deaths = section.filter(iter => iter.type == "death" && iter.revived == false);
-            slots.push({
-                startTime: start,
-                endTime: end,
-                value: Number.parseFloat((kills.length / (deaths.length || 1)).toFixed(2))
-            });
-            start += timeWidth;
-            if (start > stop) {
-                break;
-            }
-        }
-        return slots;
-    }
-    static kdPerUpdate(allEvents) {
-        const events = allEvents.filter(iter => iter.type == "kill" || (iter.type == "death" && iter.revived == false));
-        if (events.length == 0) {
-            return [];
-        }
-        let kills = 0;
-        let deaths = 0;
-        const slots = [];
-        for (let i = events[0].timestamp; i < events[events.length - 1].timestamp; i += 1000) {
-            const evs = events.filter(iter => iter.timestamp == i);
-            if (evs.length == 0) {
-                continue;
-            }
-            for (const ev of evs) {
-                if (ev.type == "kill") {
-                    ++kills;
-                }
-                else if (ev.type == "death") {
-                    ++deaths;
-                }
-            }
-            slots.push({
-                value: Number.parseFloat((kills / (deaths || 1)).toFixed(2)),
-                startTime: i,
-                endTime: i
-            });
-        }
-        return slots;
-    }
-    static revivesOverTime(events, timeWidth = 300000) {
-        const revives = events.filter(iter => iter.type == "exp" && (iter.expID == PsEvent_1.PsEvent.revive || iter.expID == PsEvent_1.PsEvent.squadRevive));
-        if (revives.length == 0) {
-            return [];
-        }
-        const slots = [];
-        const stop = revives[revives.length - 1].timestamp;
-        let start = events[0].timestamp;
-        while (true) {
-            const end = start + timeWidth;
-            const section = revives.filter(iter => iter.timestamp >= start && iter.timestamp < end);
-            const players = section.map(iter => iter.sourceID)
-                .filter((value, index, arr) => arr.indexOf(value) == index).length;
-            slots.push({
-                startTime: start,
-                endTime: end,
-                value: Number.parseFloat((section.length / (players || 1) / 5).toFixed(2))
-            });
-            start += timeWidth;
-            if (start > stop) {
-                break;
-            }
-        }
-        return slots;
-    }
-}
-exports.default = EventReporter;
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/InvididualGenerator.js":
-/*!******************************************************************!*\
-  !*** ./node_modules/topt-core/build/core/InvididualGenerator.js ***!
-  \******************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.IndividualReporter = exports.ReportParameters = exports.BreakdownSingle = exports.BreakdownMeta = exports.BreakdownSection = exports.BreakdownCollection = exports.BreakdownSpawn = exports.PlayerVersus = exports.PlayerVersusEntry = exports.Report = exports.ClassUsage = exports.Playtime = exports.TrackedRouter = exports.classCollectionBreakdownTrend = exports.classKdCollection = exports.TimeTracking = exports.ExpBreakdown = exports.FacilityCapture = exports.ClassBreakdown = void 0;
-const ApiWrapper_1 = __webpack_require__(/*! ./census/ApiWrapper */ "./node_modules/topt-core/build/core/census/ApiWrapper.js");
-const CharacterAPI_1 = __webpack_require__(/*! ./census/CharacterAPI */ "./node_modules/topt-core/build/core/census/CharacterAPI.js");
-const WeaponAPI_1 = __webpack_require__(/*! ./census/WeaponAPI */ "./node_modules/topt-core/build/core/census/WeaponAPI.js");
-const AchievementAPI_1 = __webpack_require__(/*! ./census/AchievementAPI */ "./node_modules/topt-core/build/core/census/AchievementAPI.js");
-const PsLoadout_1 = __webpack_require__(/*! ./census/PsLoadout */ "./node_modules/topt-core/build/core/census/PsLoadout.js");
-const PsEvent_1 = __webpack_require__(/*! ./PsEvent */ "./node_modules/topt-core/build/core/PsEvent.js");
-const StatMap_1 = __webpack_require__(/*! ./StatMap */ "./node_modules/topt-core/build/core/StatMap.js");
-const EventReporter_1 = __webpack_require__(/*! ./EventReporter */ "./node_modules/topt-core/build/core/EventReporter.js");
-const TrackedPlayer_1 = __webpack_require__(/*! ./objects/TrackedPlayer */ "./node_modules/topt-core/build/core/objects/TrackedPlayer.js");
-const Loggers_1 = __webpack_require__(/*! ./Loggers */ "./node_modules/topt-core/build/core/Loggers.js");
-const log = Loggers_1.Logger.getLogger("IndividualGenerator");
-class ClassBreakdown {
-    constructor() {
-        this.secondsAs = 0;
-        this.score = 0;
-        this.kills = 0;
-        this.deaths = 0;
-    }
-}
-exports.ClassBreakdown = ClassBreakdown;
-class FacilityCapture {
-    constructor() {
-        this.facilityID = "";
-        this.name = "";
-        this.type = "";
-        this.typeID = "";
-        this.zoneID = "";
-        this.timestamp = new Date();
-        this.timeHeld = 0;
-        this.factionID = "";
-        this.outfitID = "";
-        this.previousFaction = "";
-    }
-}
-exports.FacilityCapture = FacilityCapture;
-class ExpBreakdown {
-    constructor() {
-        this.name = "";
-        this.score = 0;
-        this.amount = 0;
-    }
-}
-exports.ExpBreakdown = ExpBreakdown;
-class TimeTracking {
-    constructor() {
-        this.running = false;
-        this.startTime = 0;
-        this.endTime = 0;
-    }
-}
-exports.TimeTracking = TimeTracking;
-function classKdCollection() {
-    return {
-        infil: new ClassBreakdown(),
-        lightAssault: new ClassBreakdown(),
-        medic: new ClassBreakdown(),
-        engineer: new ClassBreakdown(),
-        heavy: new ClassBreakdown(),
-        max: new ClassBreakdown(),
-        total: new ClassBreakdown()
-    };
-}
-exports.classKdCollection = classKdCollection;
-;
-function classCollectionBreakdownTrend() {
-    return {
-        total: [],
-        infil: [],
-        lightAssault: [],
-        medic: [],
-        engineer: [],
-        heavy: [],
-        max: []
-    };
-}
-exports.classCollectionBreakdownTrend = classCollectionBreakdownTrend;
-class TrackedRouter {
-    constructor() {
-        this.ID = "";
-        this.type = "router";
-        this.owner = "";
-        this.pulledAt = 0;
-        this.firstSpawn = undefined;
-        this.destroyed = undefined;
-        this.count = 0;
-    }
-}
-exports.TrackedRouter = TrackedRouter;
-class Playtime {
-    constructor() {
-        this.characterID = "";
-        this.secondsOnline = 0;
-        this.infil = new ClassBreakdown();
-        this.lightAssault = new ClassBreakdown();
-        this.medic = new ClassBreakdown();
-        this.engineer = new ClassBreakdown();
-        this.heavy = new ClassBreakdown();
-        this.max = new ClassBreakdown();
-        this.mostPlayed = {
-            name: "",
-            secondsAs: 0,
-        };
-    }
-}
-exports.Playtime = Playtime;
-class ClassUsage {
-    constructor() {
-        this.mostPlayed = {
-            name: "",
-            secondsAs: 0
-        };
-        this.infil = new ClassBreakdown();
-        this.lightAssault = new ClassBreakdown();
-        this.medic = new ClassBreakdown();
-        this.engineer = new ClassBreakdown();
-        this.heavy = new ClassBreakdown();
-        this.max = new ClassBreakdown();
-    }
-}
-exports.ClassUsage = ClassUsage;
-class Report {
-    constructor() {
-        this.opened = false;
-        this.player = null;
-        this.stats = new Map();
-        this.classBreakdown = new ClassUsage();
-        this.classKd = classKdCollection();
-        this.logistics = {
-            show: false,
-            routers: [],
-            metas: []
-        };
-        this.overtime = {
-            kpm: [],
-            kd: [],
-            rpm: []
-        };
-        this.perUpdate = {
-            kpm: [],
-            kd: [],
-            rpm: []
-        };
-        this.collections = [];
-        this.vehicleBreakdown = new EventReporter_1.BreakdownArray();
-        this.scoreBreakdown = [];
-        this.ribbons = [];
-        this.ribbonCount = 0;
-        this.breakdowns = [];
-        this.weaponKillBreakdown = new EventReporter_1.BreakdownArray();
-        this.weaponKillTypeBreakdown = new EventReporter_1.BreakdownArray();
-        this.weaponDeathBreakdown = new EventReporter_1.BreakdownArray();
-        this.weaponDeathTypeBreakdown = new EventReporter_1.BreakdownArray();
-        this.playerVersus = [];
-    }
-}
-exports.Report = Report;
-class PlayerVersusEntry {
-    constructor() {
-        this.timestamp = 0;
-        this.type = "unknown";
-        this.weaponName = "";
-        this.headshot = false;
-    }
-}
-exports.PlayerVersusEntry = PlayerVersusEntry;
-class PlayerVersus {
-    constructor() {
-        this.charID = "";
-        this.name = "";
-        this.kills = 0;
-        this.deaths = 0;
-        this.revives = 0;
-        this.weaponKills = new EventReporter_1.BreakdownArray();
-        this.weaponDeaths = new EventReporter_1.BreakdownArray();
-        this.encounters = [];
-    }
-}
-exports.PlayerVersus = PlayerVersus;
-class BreakdownSpawn {
-    constructor() {
-        this.npcID = "";
-        this.count = 0;
-        this.firstSeen = new Date();
-    }
-}
-exports.BreakdownSpawn = BreakdownSpawn;
-class BreakdownCollection {
-    constructor() {
-        this.title = "";
-        this.sections = [];
-    }
-}
-exports.BreakdownCollection = BreakdownCollection;
-class BreakdownSection {
-    constructor() {
-        this.title = "";
-        this.left = null;
-        this.right = null;
-        this.showPercent = true;
-        this.showTotal = true;
-    }
-}
-exports.BreakdownSection = BreakdownSection;
-class BreakdownMeta {
-    constructor() {
-        this.title = "";
-        this.altTitle = "Count";
-        this.data = new EventReporter_1.BreakdownArray();
-    }
-}
-exports.BreakdownMeta = BreakdownMeta;
-class BreakdownSingle {
-    constructor() {
-        this.title = "";
-        this.altTitle = "";
-        this.data = new EventReporter_1.BreakdownArray();
-        this.showPercent = true;
-        this.showTotal = true;
-    }
-}
-exports.BreakdownSingle = BreakdownSingle;
-class ReportParameters {
-    constructor() {
-        /**
-         * Player the report is being generated for
-         */
-        this.player = new TrackedPlayer_1.TrackedPlayer();
-        /**
-         * Contains all events collected during tracking. If you need just the player's events, use player
-         */
-        this.events = [];
-        /**
-         * Tracking information about the current state the tracker
-         */
-        this.tracking = { running: false, startTime: 0, endTime: 0 };
-        /**
-         * All routers tracked
-         */
-        this.routers = [];
-    }
-}
-exports.ReportParameters = ReportParameters;
-class IndividualReporter {
-    static generatePersonalReport(parameters) {
-        const response = new ApiWrapper_1.ApiResponse();
-        if (parameters.player.events.length == 0) {
-            response.resolve({ code: 400, data: "No events for player, cannot generate" });
-            return response;
-        }
-        const report = new Report();
-        let opsLeft = 
-        //1       // Transport assists
-        +1 // Supported by
-            + 1 // Misc collection
-            + 1 // Weapon kills
-            + 1 // Weapon type kills
-            + 1 // Weapon deaths
-            + 1 // Weapon death types
-            + 1 // Ribbons
-            + 1 // Medic breakdown
-            + 1 // Engineer breakdown
-            + 1 // Player versus
-        ;
-        const totalOps = opsLeft;
-        const firstPlayerEvent = parameters.player.events[0];
-        const lastPlayerEvent = parameters.player.events[parameters.player.events.length - 1];
-        report.player = Object.assign({}, parameters.player);
-        report.player.events = [];
-        report.player.secondsOnline = (lastPlayerEvent.timestamp - firstPlayerEvent.timestamp) / 1000;
-        report.classBreakdown = IndividualReporter.classUsage(parameters);
-        report.classKd = IndividualReporter.classVersusKd(parameters.player.events);
-        report.scoreBreakdown = IndividualReporter.scoreBreakdown(parameters);
-        report.player.stats.getMap().forEach((value, eventID) => {
-            var _a;
-            const event = PsEvent_1.PsEvents.get(eventID);
-            if (event == undefined) {
-                return;
-            }
-            report.stats.set(event.name, `${value}`);
-            (_a = report.player) === null || _a === void 0 ? void 0 : _a.stats.set(event.name, value);
-        });
-        const calculatedStats = IndividualReporter.calculatedStats(parameters, report.classBreakdown);
-        calculatedStats.forEach((value, key) => {
-            report.stats.set(key, value);
-        });
-        report.logistics.routers = IndividualReporter.routerBreakdown(parameters);
-        const callback = (step) => {
-            return () => {
-                log.debug(`Finished ${step}: Have ${opsLeft - 1} ops left outta ${totalOps}`);
-                if (--opsLeft == 0) {
-                    response.resolveOk(report);
-                }
-            };
-        };
-        IndividualReporter.supportedBy(parameters)
-            .ok(data => report.collections.push(data)).always(callback("Supported by"));
-        IndividualReporter.miscCollection(parameters)
-            .ok(data => report.collections.push(data)).always(callback("Misc coll"));
-        EventReporter_1.default.weaponKills(parameters.player.events)
-            .ok(data => report.weaponKillBreakdown = data).always(callback("Weapon kills"));
-        EventReporter_1.default.weaponTypeKills(parameters.player.events)
-            .ok(data => report.weaponKillTypeBreakdown = data).always(callback("Weapon type kills"));
-        EventReporter_1.default.weaponDeaths(parameters.player.events)
-            .ok(data => report.weaponDeathBreakdown = data).always(callback("Weapon deaths"));
-        EventReporter_1.default.weaponTypeDeaths(parameters.player.events)
-            .ok(data => report.weaponDeathTypeBreakdown = data).always(callback("Weapon type deaths"));
-        IndividualReporter.playerVersus(parameters).ok(data => report.playerVersus = data).always(callback("Player versus"));
-        report.overtime.kd = EventReporter_1.default.kdOverTime(parameters.player.events);
-        report.overtime.kpm = EventReporter_1.default.kpmOverTime(parameters.player.events);
-        if (parameters.player.events.find(iter => iter.type == "exp" && (iter.expID == PsEvent_1.PsEvent.revive || iter.expID == PsEvent_1.PsEvent.squadRevive)) != undefined) {
-            report.overtime.rpm = EventReporter_1.default.revivesOverTime(parameters.player.events);
-        }
-        report.perUpdate.kd = EventReporter_1.default.kdPerUpdate(parameters.player.events);
-        const ribbonIDs = Array.from(parameters.player.ribbons.getMap().keys());
-        if (ribbonIDs.length > 0) {
-            AchievementAPI_1.AchievementAPI.getByIDs(ribbonIDs).ok((data) => {
-                var _a;
-                (_a = report.player) === null || _a === void 0 ? void 0 : _a.ribbons.getMap().forEach((amount, achivID) => {
-                    const achiv = data.find((iter) => iter.ID == achivID) || AchievementAPI_1.AchievementAPI.unknown;
-                    const entry = Object.assign(Object.assign({}, achiv), { amount: amount });
-                    report.ribbonCount += amount;
-                    report.ribbons.push(entry);
-                });
-                report.ribbons.sort((a, b) => {
-                    return (b.amount - a.amount) || b.name.localeCompare(a.name);
-                });
-            }).always(() => {
-                callback("Ribbons")();
-            });
-        }
-        else {
-            callback("Ribbons")();
-        }
-        if (report.classBreakdown.medic.secondsAs > 10) {
-            IndividualReporter.medicBreakdown(parameters)
-                .ok(data => report.breakdowns.push(data)).always(callback("Medic breakdown"));
-        }
-        else {
-            callback("Medic breakdown")();
-        }
-        if (report.classBreakdown.engineer.secondsAs > 10) {
-            IndividualReporter.engineerBreakdown(parameters)
-                .ok(data => report.breakdowns.push(data)).always(callback("Eng breakdown"));
-        }
-        else {
-            callback("Eng breakdown")();
-        }
-        return response;
-    }
-    static playerVersus(parameters) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const versus = [];
-        const charIDs = [];
-        const wepIDs = [];
-        for (const ev of parameters.player.events) {
-            if (ev.sourceID != parameters.player.characterID) {
-                continue;
-            }
-            if (ev.type != "kill" && ev.type != "death") {
-                continue;
-            }
-            charIDs.push(ev.targetID);
-            wepIDs.push(ev.weaponID);
-        }
-        let characters = [];
-        let weapons = [];
-        let opsLeft = 2;
-        const killsMap = new Map();
-        const deathsMap = new Map();
-        const done = () => {
-            var _a, _b, _c, _d, _e, _f;
-            for (const ev of parameters.player.events) {
-                if (ev.sourceID != parameters.player.characterID) {
-                    continue;
-                }
-                if (ev.type != "kill" && ev.type != "death") {
-                    continue;
-                }
-                let entry = versus.find(iter => iter.charID == ev.targetID);
-                if (entry == undefined) {
-                    entry = new PlayerVersus();
-                    entry.charID = ev.targetID;
-                    entry.name = (_b = (_a = characters.find(iter => iter.ID == ev.targetID)) === null || _a === void 0 ? void 0 : _a.name) !== null && _b !== void 0 ? _b : `Unknown ${ev.targetID}`;
-                    killsMap.set(ev.targetID, new StatMap_1.default());
-                    deathsMap.set(ev.targetID, new StatMap_1.default());
-                    versus.push(entry);
-                }
-                const weaponName = (_d = (_c = weapons.find(iter => iter.ID == ev.weaponID)) === null || _c === void 0 ? void 0 : _c.name) !== null && _d !== void 0 ? _d : `Unknown ${ev.weaponID}`;
-                let type = "unknown";
-                if (ev.type == "kill") {
-                    ++entry.kills;
-                    type = "kill";
-                    killsMap.get(ev.targetID).increment(weaponName);
-                }
-                else if (ev.type == "death") {
-                    if (ev.revived == true) {
-                        ++entry.revives;
-                        type = "revived";
-                    }
-                    else {
-                        ++entry.deaths;
-                        type = "death";
-                        deathsMap.get(ev.targetID).increment(weaponName);
-                    }
-                }
-                else {
-                    log.error(`Unchecked event type: '${ev}'`);
-                }
-                const encounter = {
-                    timestamp: ev.timestamp,
-                    headshot: ev.isHeadshot,
-                    type: type,
-                    weaponName: (_f = (_e = weapons.find(iter => iter.ID == ev.weaponID)) === null || _e === void 0 ? void 0 : _e.name) !== null && _f !== void 0 ? _f : `Unknown ${ev.weaponID}`
-                };
-                entry.encounters.push(encounter);
-            }
-            for (const entry of versus) {
-                if (killsMap.has(entry.charID) == false) {
-                    log.error(`Missing killsMap entry for ${entry.name}`);
-                    continue;
-                }
-                if (deathsMap.has(entry.charID) == false) {
-                    log.error(`Missing deathsMap entry for ${entry.name}`);
-                    continue;
-                }
-                const killMap = killsMap.get(entry.charID);
-                const deathMap = deathsMap.get(entry.charID);
-                const killBreakdown = new EventReporter_1.BreakdownArray();
-                killMap.getMap().forEach((amount, weapon) => {
-                    killBreakdown.data.push({
-                        display: weapon,
-                        amount: amount,
-                        sortField: weapon,
-                        color: undefined
-                    });
-                    killBreakdown.total += amount;
-                });
-                entry.weaponKills = killBreakdown;
-                const deathBreakdown = new EventReporter_1.BreakdownArray();
-                deathMap.getMap().forEach((amount, weapon) => {
-                    deathBreakdown.data.push({
-                        display: weapon,
-                        amount: amount,
-                        sortField: weapon,
-                        color: undefined
-                    });
-                    deathBreakdown.total += amount;
-                });
-                entry.weaponDeaths = deathBreakdown;
-            }
-            response.resolveOk(versus);
-        };
-        CharacterAPI_1.CharacterAPI.getByIDs(charIDs).ok((data) => {
-            characters = data;
-            if (--opsLeft == 0) {
-                done();
-            }
-        });
-        WeaponAPI_1.WeaponAPI.getByIDs(wepIDs).ok((data) => {
-            weapons = data;
-            if (--opsLeft == 0) {
-                done();
-            }
-        });
-        return response;
-    }
-    static medicBreakdown(parameters) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const medicCollection = new BreakdownCollection();
-        medicCollection.title = "Medic";
-        let opsLeft = 1 // Heals
-            + 1 // Revives
-            + 1; // Shield repair
-        const add = (data) => {
-            medicCollection.sections.push(data);
-        };
-        const callback = () => {
-            if (--opsLeft == 0) {
-                response.resolveOk(medicCollection);
-            }
-        };
-        IndividualReporter.breakdownSection(parameters, "Heal ticks", PsEvent_1.PsEvent.heal, PsEvent_1.PsEvent.squadHeal).ok(add).always(callback);
-        IndividualReporter.breakdownSection(parameters, "Revives", PsEvent_1.PsEvent.revive, PsEvent_1.PsEvent.squadRevive).ok(add).always(callback);
-        IndividualReporter.breakdownSection(parameters, "Shield repair ticks", PsEvent_1.PsEvent.shieldRepair, PsEvent_1.PsEvent.squadShieldRepair).ok(add).always(callback);
-        return response;
-    }
-    static engineerBreakdown(parameters) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const engCollection = new BreakdownCollection();
-        engCollection.title = "Engineer";
-        let opsLeft = 1 // Resupply
-            + 1; // Repair MAX
-        const add = (data) => {
-            engCollection.sections.push(data);
-        };
-        const callback = () => {
-            if (--opsLeft == 0) {
-                response.resolveOk(engCollection);
-            }
-        };
-        IndividualReporter.breakdownSection(parameters, "Resupply ticks", PsEvent_1.PsEvent.resupply, PsEvent_1.PsEvent.squadResupply).ok(add).always(callback);
-        IndividualReporter.breakdownSection(parameters, "MAX repair ticks", PsEvent_1.PsEvent.maxRepair, PsEvent_1.PsEvent.squadMaxRepair).ok(add).always(callback);
-        return response;
-    }
-    static breakdownSection(parameters, name, expID, squadExpID) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const ticks = parameters.player.events.filter(iter => iter.type == "exp" && iter.expID == expID);
-        if (ticks.length > 0) {
-            const section = new BreakdownSection();
-            section.title = name;
-            let opsLeft = 2;
-            const callback = () => {
-                if (--opsLeft == 0) {
-                    response.resolveOk(section);
-                }
-            };
-            section.left = new BreakdownMeta();
-            section.left.title = "All";
-            EventReporter_1.default.experience(expID, ticks).ok((data) => {
-                section.left.data = data;
-            }).always(callback);
-            section.right = new BreakdownMeta();
-            section.right.title = "Squad only";
-            EventReporter_1.default.experience(squadExpID, ticks).ok((data) => {
-                section.right.data = data;
-            }).always(callback);
-        }
-        else {
-            response.resolve({ code: 204, data: null });
-        }
-        return response;
-    }
-    static miscCollection(parameters) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const coll = {
-            header: "Misc",
-            metas: []
-        };
-        let opsLeft = 1; // Deployabled destroyed
-        const dep = IndividualReporter.deployableDestroyedBreakdown(parameters);
-        if (dep != null) {
-            coll.metas.push(dep);
-        }
-        if (coll.metas.length > 0) {
-            response.resolveOk(coll);
-        }
-        else {
-            response.resolve({ code: 204, data: null });
-        }
-        return response;
-    }
-    static supportedBy(parameters) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const coll = {
-            header: "Supported by",
-            metas: []
-        };
-        let opsLeft = 1 // Healed by
-            + 1 // Revived by
-            + 1 // Shield repaired by
-            + 1 // Resupplied by
-            + 1; // Repaired by
-        const add = (data) => {
-            coll.metas.push(data);
-        };
-        const callback = () => {
-            if (--opsLeft == 0) {
-                response.resolveOk(coll);
-            }
-        };
-        IndividualReporter.singleSupportedBy(parameters, "Healed by", [PsEvent_1.PsEvent.heal, PsEvent_1.PsEvent.squadHeal]).ok(add).always(callback);
-        IndividualReporter.singleSupportedBy(parameters, "Revived by", [PsEvent_1.PsEvent.revive, PsEvent_1.PsEvent.squadRevive]).ok(add).always(callback);
-        IndividualReporter.singleSupportedBy(parameters, "Shield repaired by", [PsEvent_1.PsEvent.shieldRepair, PsEvent_1.PsEvent.squadShieldRepair]).ok(add).always(callback);
-        IndividualReporter.singleSupportedBy(parameters, "Resupplied by", [PsEvent_1.PsEvent.resupply, PsEvent_1.PsEvent.squadResupply]).ok(add).always(callback);
-        IndividualReporter.singleSupportedBy(parameters, "Repaired by", [PsEvent_1.PsEvent.maxRepair, PsEvent_1.PsEvent.squadMaxRepair]).ok(add).always(callback);
-        return response;
-    }
-    static singleSupportedBy(parameters, name, ids) {
-        const response = new ApiWrapper_1.ApiResponse();
-        let found = false;
-        for (const ev of parameters.events) {
-            if (ev.type == "exp" && ids.indexOf(ev.expID) > -1 && ev.targetID == parameters.player.characterID) {
-                found = true;
-                break;
-            }
-        }
-        if (found == false) {
-            response.resolve({ code: 204, data: null });
-        }
-        else {
-            const meta = new BreakdownSingle();
-            meta.title = name;
-            meta.altTitle = "Player";
-            meta.data = new EventReporter_1.BreakdownArray();
-            EventReporter_1.default.experienceSource(ids, parameters.player.characterID, parameters.events).ok((data) => {
-                meta.data = data;
-                log.trace(`Found [${data.data.map(iter => `${iter.display}:${iter.amount}`).join(", ")}] for [${ids.join(", ")}]`);
-                response.resolveOk(meta);
-            });
-        }
-        return response;
-    }
-    static deployableDestroyedBreakdown(parameters) {
-        const expIDs = [
-            "57",
-            "270",
-            "327",
-            "370",
-            "437",
-            "579",
-            "1373",
-            "1409",
-        ];
-        const ticks = parameters.player.events.filter((iter) => {
-            if (iter.type != "exp") {
-                return false;
-            }
-            return expIDs.indexOf(iter.expID) > -1;
-        });
-        if (ticks.length > 0) {
-            const meta = new BreakdownSingle();
-            meta.title = "Deployable kills";
-            meta.altTitle = "Deployable";
-            meta.data = new EventReporter_1.BreakdownArray();
-            const map = new StatMap_1.default();
-            for (const tick of ticks) {
-                let name = "unknown";
-                if (tick.expID == "57") {
-                    name = "Engineer turret";
-                }
-                else if (tick.expID == "270") {
-                    name = "Spawn beacon";
-                }
-                else if (tick.expID == "327") {
-                    name = "Tank mine";
-                }
-                else if (tick.expID == "370") {
-                    name = "Motion sensor";
-                }
-                else if (tick.expID == "437") {
-                    name = "Shield bubble";
-                }
-                else if (tick.expID == "579") {
-                    name = "Spitfire";
-                }
-                else if (tick.expID == "1373") {
-                    name = "Hardlight";
-                }
-                else if (tick.expID == "1409") {
-                    name = "Router";
-                }
-                else {
-                    name = `Unknown ${tick.expID}`;
-                }
-                map.increment(name);
-            }
-            map.getMap().forEach((amount, expName) => {
-                meta.data.total += amount;
-                meta.data.data.push({
-                    display: expName,
-                    sortField: expName,
-                    amount: amount,
-                    color: undefined
-                });
-            });
-            meta.data.data.sort((a, b) => {
-                return b.amount - a.amount || a.sortField.localeCompare(b.sortField);
-            });
-            return meta;
-        }
-        return null;
-    }
-    static routerBreakdown(parameters) {
-        const rts = parameters.routers.filter(iter => iter.owner == parameters.player.characterID);
-        return rts;
-    }
-    static calculatedStats(parameters, classKd) {
-        const map = new Map();
-        const stats = parameters.player.stats;
-        map.set("KPM", (stats.get("Kill") / (parameters.player.secondsOnline / 60)).toFixed(2));
-        // K/D = Kills / Deaths
-        map.set("K/D", (stats.get("Kill") / stats.get("Death", 1)).toFixed(2));
-        // KA/D = Kills + Assits / Deaths
-        map.set("KA/D", ((stats.get("Kill") + stats.get("Kill assist")) / stats.get("Death", 1)).toFixed(2));
-        // HSR = Headshots / Kills
-        map.set("HSR", `${(stats.get("Headshot") / stats.get("Kill") * 100).toFixed(2)}%`);
-        // KR/D  = Kills + Revives / Deaths
-        map.set("KR/D", ((classKd.medic.kills + stats.get("Revive"))
-            / (classKd.medic.deaths || 1)).toFixed(2));
-        // R/D = Revives / Death
-        map.set("R/D", (stats.get("Revive") / (classKd.medic.deaths || 1)).toFixed(2));
-        // RPM = Revives / minutes online
-        map.set("RPM", (stats.get("Revive") / (classKd.medic.secondsAs / 60)).toFixed(2));
-        return map;
-    }
-    static scoreBreakdown(parameters) {
-        const breakdown = new Map();
-        for (const event of parameters.player.events) {
-            if (event.type == "exp") {
-                const exp = PsEvent_1.PsEvents.get(event.expID) || PsEvent_1.PsEvent.other;
-                if (!breakdown.has(exp.name)) {
-                    breakdown.set(exp.name, new ExpBreakdown());
-                }
-                const score = breakdown.get(exp.name);
-                score.name = exp.name;
-                score.score += event.amount;
-                score.amount += 1;
-                if (exp == PsEvent_1.PsEvent.other) {
-                    //log.log(`Other: ${JSON.stringify(event)}`);
-                }
-            }
-        }
-        // Sort all the entries by score, followed by amount, then lastly name
-        return [...breakdown.entries()].sort((a, b) => {
-            return b[1].score - a[1].score
-                || b[1].amount - a[1].amount
-                || a[0].localeCompare(b[0]);
-        }).map((a) => a[1]); // Transform the tuple into the ExpBreakdown
-    }
-    static classVersusKd(events, classLimit) {
-        const kds = classKdCollection();
-        events.forEach((event) => {
-            if (event.type == "kill" || event.type == "death") {
-                const sourceLoadoutID = event.loadoutID;
-                const sourceLoadout = PsLoadout_1.PsLoadouts.get(sourceLoadoutID);
-                if (sourceLoadout == undefined) {
-                    return;
-                }
-                const targetLoadoutID = event.targetLoadoutID;
-                const targetLoadout = PsLoadout_1.PsLoadouts.get(targetLoadoutID);
-                if (targetLoadout == undefined) {
-                    return;
-                }
-                if (classLimit != undefined) {
-                    if (sourceLoadout.type != classLimit) {
-                        return; // Continue to next iteration
-                    }
-                }
-                if (event.type == "kill") {
-                    switch (targetLoadout.type) {
-                        case "infil":
-                            kds.infil.kills += 1;
-                            break;
-                        case "lightAssault":
-                            kds.lightAssault.kills += 1;
-                            break;
-                        case "medic":
-                            kds.medic.kills += 1;
-                            break;
-                        case "engineer":
-                            kds.engineer.kills += 1;
-                            break;
-                        case "heavy":
-                            kds.heavy.kills += 1;
-                            break;
-                        case "max":
-                            kds.max.kills += 1;
-                            break;
-                        default: log.warn(`Unknown type`);
-                    }
-                }
-                if (event.type == "death" && event.revived == false) {
-                    switch (targetLoadout.type) {
-                        case "infil":
-                            kds.infil.deaths += 1;
-                            break;
-                        case "lightAssault":
-                            kds.lightAssault.deaths += 1;
-                            break;
-                        case "medic":
-                            kds.medic.deaths += 1;
-                            break;
-                        case "engineer":
-                            kds.engineer.deaths += 1;
-                            break;
-                        case "heavy":
-                            kds.heavy.deaths += 1;
-                            break;
-                        case "max":
-                            kds.max.deaths += 1;
-                            break;
-                        default: log.warn(`Unknown type`);
-                    }
-                }
-                if (event.type == "death" && event.revived == true) {
-                    switch (targetLoadout.type) {
-                        case "infil":
-                            kds.infil.score += 1;
-                            break;
-                        case "lightAssault":
-                            kds.lightAssault.score += 1;
-                            break;
-                        case "medic":
-                            kds.medic.score += 1;
-                            break;
-                        case "engineer":
-                            kds.engineer.score += 1;
-                            break;
-                        case "heavy":
-                            kds.heavy.score += 1;
-                            break;
-                        case "max":
-                            kds.max.score += 1;
-                            break;
-                        default: log.warn(`Unknown type`);
-                    }
-                }
-            }
-        });
-        return kds;
-    }
-    static classUsage(parameters) {
-        const usage = new Playtime();
-        if (parameters.player.events.length == 0) {
-            return usage;
-        }
-        let lastLoadout = undefined;
-        let lastTimestamp = parameters.player.events[0].timestamp;
-        const finalTimestamp = parameters.player.events[parameters.player.events.length - 1].timestamp;
-        usage.characterID = parameters.player.characterID;
-        usage.secondsOnline = (finalTimestamp - lastTimestamp) / 1000;
-        parameters.player.events.forEach((event) => {
-            if (event.type == "capture" || event.type == "defend" || event.type == "login" || event.type == "logout" || event.type == "marker" || event.type == "base") {
-                return;
-            }
-            lastLoadout = PsLoadout_1.PsLoadouts.get(event.loadoutID);
-            if (lastLoadout == undefined) {
-                return log.warn(`Unknown loadout ID: ${event.loadoutID}`);
-            }
-            if (event.type == "exp") {
-                const diff = (event.timestamp - lastTimestamp) / 1000;
-                lastTimestamp = event.timestamp;
-                switch (lastLoadout.type) {
-                    case "infil":
-                        usage.infil.secondsAs += diff;
-                        break;
-                    case "lightAssault":
-                        usage.lightAssault.secondsAs += diff;
-                        break;
-                    case "medic":
-                        usage.medic.secondsAs += diff;
-                        break;
-                    case "engineer":
-                        usage.engineer.secondsAs += diff;
-                        break;
-                    case "heavy":
-                        usage.heavy.secondsAs += diff;
-                        break;
-                    case "max":
-                        usage.max.secondsAs += diff;
-                        break;
-                    default: log.warn(`Unknown type`);
-                }
-            }
-            if (event.type == "exp") {
-                switch (lastLoadout.type) {
-                    case "infil":
-                        usage.infil.score += event.amount;
-                        break;
-                    case "lightAssault":
-                        usage.lightAssault.score += event.amount;
-                        break;
-                    case "medic":
-                        usage.medic.score += event.amount;
-                        break;
-                    case "engineer":
-                        usage.engineer.score += event.amount;
-                        break;
-                    case "heavy":
-                        usage.heavy.score += event.amount;
-                        break;
-                    case "max":
-                        usage.max.score += event.amount;
-                        break;
-                    default: log.warn(`Unknown type`);
-                }
-            }
-            else if (event.type == "kill") {
-                switch (lastLoadout.type) {
-                    case "infil":
-                        usage.infil.kills += 1;
-                        break;
-                    case "lightAssault":
-                        usage.lightAssault.kills += 1;
-                        break;
-                    case "medic":
-                        usage.medic.kills += 1;
-                        break;
-                    case "engineer":
-                        usage.engineer.kills += 1;
-                        break;
-                    case "heavy":
-                        usage.heavy.kills += 1;
-                        break;
-                    case "max":
-                        usage.max.kills += 1;
-                        break;
-                    default: log.warn(`Unknown type`);
-                }
-            }
-            else if (event.type == "death" && event.revived == false) {
-                switch (lastLoadout.type) {
-                    case "infil":
-                        usage.infil.deaths += 1;
-                        break;
-                    case "lightAssault":
-                        usage.lightAssault.deaths += 1;
-                        break;
-                    case "medic":
-                        usage.medic.deaths += 1;
-                        break;
-                    case "engineer":
-                        usage.engineer.deaths += 1;
-                        break;
-                    case "heavy":
-                        usage.heavy.deaths += 1;
-                        break;
-                    case "max":
-                        usage.max.deaths += 1;
-                        break;
-                    default: log.warn(`Unknown type`);
-                }
-            }
-        });
-        let maxTime = 0;
-        if (usage.infil.secondsAs > maxTime) {
-            maxTime = usage.infil.secondsAs;
-            usage.mostPlayed.name = "Infiltrator";
-        }
-        if (usage.lightAssault.secondsAs > maxTime) {
-            maxTime = usage.lightAssault.secondsAs;
-            usage.mostPlayed.name = "Light Assault";
-        }
-        if (usage.medic.secondsAs > maxTime) {
-            maxTime = usage.medic.secondsAs;
-            usage.mostPlayed.name = "Medic";
-        }
-        if (usage.engineer.secondsAs > maxTime) {
-            maxTime = usage.engineer.secondsAs;
-            usage.mostPlayed.name = "Engineer";
-        }
-        if (usage.heavy.secondsAs > maxTime) {
-            maxTime = usage.heavy.secondsAs;
-            usage.mostPlayed.name = "Heavy";
-        }
-        if (usage.max.secondsAs > maxTime) {
-            maxTime = usage.max.secondsAs;
-            usage.mostPlayed.name = "MAX";
-        }
-        usage.mostPlayed.secondsAs = maxTime;
-        return usage;
-    }
-    static unrevivedTime(events) {
-        const array = [];
-        for (const ev of events) {
-            if (ev.type != "death") {
-                continue;
-            }
-            if (ev.revivedEvent != null) {
-                const diff = (ev.revivedEvent.timestamp - ev.timestamp) / 1000;
-                if (diff > 40) {
-                    continue; // Somehow death events are missed and a revive event is linked to the wrong death
-                }
-                array.push(diff);
-            }
-        }
-        return array.sort((a, b) => b - a);
-    }
-    static reviveLifeExpectance(events) {
-        const array = [];
-        for (const ev of events) {
-            if (ev.type != "death" || ev.revivedEvent == null) {
-                continue;
-            }
-            const charEvents = events.filter(iter => iter.sourceID == ev.sourceID);
-            const index = charEvents.findIndex(iter => {
-                return iter.type == "death" && iter.timestamp == ev.timestamp && iter.targetID == ev.targetID;
-            });
-            if (index == -1) {
-                log.error(`Failed to find a death for ${ev.sourceID} at ${ev.timestamp} but wasn't found in charEvents`);
-                continue;
-            }
-            let nextDeath = null;
-            for (let i = index + 1; i < charEvents.length; ++i) {
-                if (charEvents[i].type == "death") {
-                    nextDeath = charEvents[i];
-                    break;
-                }
-            }
-            if (nextDeath == null) {
-                log.error(`Failed to find the next death for ${ev.sourceID} at ${ev.timestamp}`);
-                continue;
-            }
-            const diff = (nextDeath.timestamp - ev.revivedEvent.timestamp) / 1000;
-            if (diff <= 20) {
-                array.push(diff);
-            }
-        }
-        return array.sort((a, b) => b - a);
-    }
-    static lifeExpectanceRate(events) {
-        const array = [];
-        for (const ev of events) {
-            if (ev.type != "death" || ev.revivedEvent == null) {
-                continue;
-            }
-            const charEvents = events.filter(iter => iter.sourceID == ev.sourceID);
-            const index = charEvents.findIndex(iter => {
-                return iter.type == "death" && iter.timestamp == ev.timestamp && iter.targetID == ev.targetID;
-            });
-            if (index == -1) {
-                log.error(`Failed to find a death for ${ev.sourceID} at ${ev.timestamp} but wasn't found in charEvents`);
-                continue;
-            }
-            let nextDeath = null;
-            for (let i = index + 1; i < charEvents.length; ++i) {
-                if (charEvents[i].type == "death") {
-                    nextDeath = charEvents[i];
-                    break;
-                }
-            }
-            if (nextDeath == null) {
-                log.error(`Failed to find the next death for ${ev.sourceID} at ${ev.timestamp}`);
-                continue;
-            }
-            const diff = (nextDeath.timestamp - ev.revivedEvent.timestamp) / 1000;
-            array.push(diff);
-        }
-        const probs = this.kaplanMeier(array, 20);
-        return probs;
-    }
-    static timeUntilReviveRate(events) {
-        const array = [];
-        for (const ev of events) {
-            if (ev.type != "death") {
-                continue;
-            }
-            if (ev.revivedEvent != null) {
-                const diff = (ev.revivedEvent.timestamp - ev.timestamp) / 1000;
-                if (diff > 40) {
-                    continue; // Somehow death events are missed and a revive event is linked to the wrong death
-                }
-                array.push(diff);
-            }
-        }
-        const probs = this.kaplanMeier(array);
-        return probs;
-    }
-    static kaplanMeier(data, max) {
-        const ticks = [...Array(max !== null && max !== void 0 ? max : Math.max(...data)).keys()];
-        const probs = [];
-        let cur_pop = [...Array(data.length).keys()];
-        for (const tick of ticks) {
-            const survived = data.filter(iter => iter > tick).length;
-            probs.push(survived / cur_pop.length);
-            cur_pop = data.filter(iter => iter > tick);
-        }
-        let cumul = 1;
-        for (let i = 0; i < probs.length; ++i) {
-            probs[i] = cumul * probs[i];
-            cumul = probs[i];
-        }
-        return probs;
-    }
-    static generateContinentPlayedOn(events) {
-        let indar = 0;
-        let esamir = 0;
-        let amerish = 0;
-        let hossin = 0;
-        for (const ev of events) {
-            if (ev.type == "kill" || ev.type == "death") {
-                switch (ev.zoneID) {
-                    case "2":
-                        ++indar;
-                        break;
-                    case "4":
-                        ++hossin;
-                        break;
-                    case "6":
-                        ++amerish;
-                        break;
-                    case "8":
-                        ++esamir;
-                        break;
-                }
-            }
-        }
-        let count = 0;
-        let cont = "Default";
-        if (indar > count) {
-            cont = "Indar";
-            count = indar;
-        }
-        if (esamir > count) {
-            cont = "Esamir";
-            count = esamir;
-        }
-        if (amerish > count) {
-            cont = "Amerish";
-            count = amerish;
-        }
-        if (hossin > count) {
-            cont = "Hossin";
-            count = hossin;
-        }
-        return cont;
-    }
-}
-exports.IndividualReporter = IndividualReporter;
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/Loggers.js":
-/*!******************************************************!*\
-  !*** ./node_modules/topt-core/build/core/Loggers.js ***!
-  \******************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.Logger = void 0;
-const log = __webpack_require__(/*! loglevel */ "./node_modules/loglevel/lib/loglevel.js");
-const prefix = __webpack_require__(/*! loglevel-plugin-prefix */ "./node_modules/loglevel-plugin-prefix/lib/loglevel-plugin-prefix.js");
-prefix.reg(log);
-class Logger {
-    /**
-     * Get a logger by it's name, creating a new one in the process if needed
-     *
-     * @param name Name of the logger to get
-     */
-    static getLogger(name) {
-        if (this.loggers.has(name) == false) {
-            const logger = log.getLogger(name);
-            logger.setLevel("info");
-            prefix.apply(logger, {
-                format(level, name, timestamp) {
-                    return `[${level}] ${name}>`;
-                }
-            });
-            this.loggers.set(name, logger);
-        }
-        return this.loggers.get(name);
-    }
-    /**
-     * Get the names of all loggers used
-     */
-    static getLoggerNames() {
-        return Array.from(this.loggers.keys());
-    }
-}
-exports.Logger = Logger;
-Logger.loggers = new Map();
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/Playback.js":
-/*!*******************************************************!*\
-  !*** ./node_modules/topt-core/build/core/Playback.js ***!
-  \*******************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.Playback = exports.PlaybackOptions = void 0;
-const OutfitAPI_1 = __webpack_require__(/*! ./census/OutfitAPI */ "./node_modules/topt-core/build/core/census/OutfitAPI.js");
-const ApiWrapper_1 = __webpack_require__(/*! ./census/ApiWrapper */ "./node_modules/topt-core/build/core/census/ApiWrapper.js");
-const Loggers_1 = __webpack_require__(/*! ./Loggers */ "./node_modules/topt-core/build/core/Loggers.js");
-const log = Loggers_1.Logger.getLogger("Playback");
-class PlaybackOptions {
-    constructor() {
-        this.speed = 0;
-    }
-}
-exports.PlaybackOptions = PlaybackOptions;
-class Playback {
-    static setCore(core) {
-        Playback._core = core;
-    }
-    static loadFile(file) {
-        if (Playback._core == null) {
-            throw `Cannot load file: Core has not been set. Did you forget to use Playback.setCore()?`;
-        }
-        const response = new ApiWrapper_1.ApiResponse();
-        if (typeof (file) == "string") {
-            log.debug(`using a string`);
-            this.process(file).ok(() => {
-                response.resolveOk();
-            });
-        }
-        else {
-            log.debug(`using a file`);
-            const reader = new FileReader();
-            reader.onload = ((ev) => {
-                this.process(reader.result).ok(() => {
-                    response.resolveOk();
-                });
-            });
-            reader.readAsText(file);
-        }
-        return response;
-    }
-    static process(str) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const data = JSON.parse(str);
-        if (!data.version) {
-            log.error(`Missing version from import`);
-            throw `Missing version from import`;
-        }
-        else if (data.version == "1") {
-            const nowMs = new Date().getTime();
-            log.debug(`Exported data uses version 1`);
-            const chars = data.players;
-            const outfits = data.outfits;
-            const events = data.events;
-            // Force online for squad tracking
-            this._core.subscribeToEvents(chars.map(iter => { iter.online = iter.secondsPlayed > 0; return iter; }));
-            if (events != undefined && events.length != 0) {
-                Playback._events = events;
-                const parsedData = events.map(iter => JSON.parse(iter));
-                Playback._parsed = parsedData;
-            }
-            if (outfits.length > 0) {
-                const item = outfits[0];
-                let outfitIDs = [];
-                if (typeof (item) == "string") {
-                    outfitIDs = outfits;
-                }
-                else {
-                    outfitIDs = outfits.map(iter => iter.ID);
-                }
-                OutfitAPI_1.OutfitAPI.getByIDs(outfitIDs).ok((data) => {
-                    this._core.outfits = data;
-                    log.info(`From [${outfitIDs.join(", ")}] loaded: ${JSON.stringify(data)}`);
-                }).always(() => {
-                    log.debug(`Took ${new Date().getTime() - nowMs}ms to import data`);
-                    response.resolveOk();
-                });
-            }
-            else {
-                log.debug(`Took ${new Date().getTime() - nowMs}ms to import data`);
-                response.resolveOk();
-            }
-        }
-        else {
-            log.error(`Unchecked version: ${data.version}`);
-            response.resolve({ code: 400, data: `` });
-        }
-        return response;
-    }
-    static start(parameters) {
-        if (this._core == null) {
-            throw `Cannot start playback, core is null. Did you forget to call Playback.setCore()?`;
-        }
-        // Instant playback
-        if (parameters.speed <= 0) {
-            log.debug(`Doing instant playback`);
-            const nowMs = new Date().getTime();
-            const timestamps = Playback._parsed.map((iter) => {
-                const ts = iter.payload.timestamp;
-                if (typeof (ts) == "number") { // An old bugged version of expo uses numbers not strings
-                    return ts;
-                }
-                if (ts.length == 10) {
-                    return Number.parseInt(ts) * 1000;
-                }
-                else if (ts.length == 13) { // Expo exports with the MS part, Census does not
-                    return Number.parseInt(ts);
-                }
-                else {
-                    log.warn(`Unchecked length of timestamp: ${ts.length} '${ts}'`);
-                    throw ``;
-                }
-            });
-            this._core.tracking.startTime = Math.min(...timestamps);
-            this._core.tracking.endTime = Math.max(...timestamps);
-            for (const ev of Playback._events) {
-                this._core.processMessage(ev, true);
-            }
-            this._core.stop();
-            log.debug(`Took ${new Date().getTime() - nowMs}ms to process data`);
-        }
-        else {
-            const start = Math.min(...Playback._parsed.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
-            const end = Math.max(...Playback._parsed.map(iter => (Number.parseInt(iter.payload.timestamp) * 1000) || 0));
-            this._core.tracking.startTime = start;
-            const slots = new Map();
-            for (const ev of Playback._parsed) {
-                const time = Number.parseInt(ev.payload.timestamp) * 1000;
-                if (Number.isNaN(time)) {
-                    log.warn(`Failed to get a timestamp from ${ev}`);
-                }
-                const diff = time - start;
-                if (!slots.has(diff)) {
-                    slots.set(diff, []);
-                }
-                slots.get(diff).push(ev);
-            }
-            let index = 0;
-            const intervalID = setInterval(() => {
-                if (!slots.has(index)) {
-                    log.debug(`Index ${index} has no events, skipping`);
-                }
-                else {
-                    const events = slots.get(index);
-                    for (const ev of events) {
-                        this._core.processMessage(JSON.stringify(ev), true);
-                    }
-                }
-                index += 1000;
-                if (index > end) {
-                    log.debug(`Ended on index ${index}`);
-                    clearInterval(intervalID);
-                }
-            }, 1000 * parameters.speed);
-        }
-    }
-}
-exports.Playback = Playback;
-Playback._core = null;
-Playback._events = [];
-Playback._parsed = [];
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/PsEvent.js":
-/*!******************************************************!*\
-  !*** ./node_modules/topt-core/build/core/PsEvent.js ***!
-  \******************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.PsEvents = exports.PsEvent = void 0;
-class PsEvent {
-    constructor() {
-        // Display friendly name
-        this.name = "";
-        // What type of event is this?
-        this.types = [];
-        // Is this an event that will be kept track of in the map?
-        this.track = true;
-        this.alsoIncrement = undefined;
-    }
-}
-exports.PsEvent = PsEvent;
-PsEvent.default = {
-    name: "Default",
-    types: [],
-    track: false
-};
-PsEvent.other = {
-    name: "Other",
-    types: [],
-    track: false
-};
-// General events
-PsEvent.kill = "1";
-PsEvent.killAssist = "2";
-PsEvent.headshot = "37";
-PsEvent.teamkill = "-2";
-PsEvent.teamkilled = "-7";
-PsEvent.death = "-1";
-PsEvent.revived = "-6";
-PsEvent.baseCapture = "-3";
-PsEvent.baseDefense = "-4";
-PsEvent.spotkill = "37";
-PsEvent.squadSpawn = "56";
-PsEvent.capturePoint = "272";
-// Medic events
-PsEvent.heal = "4";
-PsEvent.healAssist = "5";
-PsEvent.revive = "7";
-PsEvent.squadRevive = "53";
-PsEvent.squadHeal = "51";
-PsEvent.shieldRepair = "438";
-PsEvent.squadShieldRepair = "439";
-// Engineer events
-PsEvent.maxRepair = "6";
-PsEvent.vehicleRepair = "90";
-PsEvent.resupply = "34";
-PsEvent.squadResupply = "55";
-PsEvent.squadMaxRepair = "142";
-PsEvent.drawfire = "1393";
-// Recon events
-PsEvent.spotKill = "36";
-PsEvent.squadSpotKill = "54";
-PsEvent.motionDetect = "293";
-PsEvent.squadMotionDetect = "294";
-PsEvent.radarDetect = "353";
-PsEvent.squadRadarDetect = "354";
-PsEvent.roadkill = "26";
-PsEvent.transportAssists = "30";
-PsEvent.galaxySpawn = "201";
-PsEvent.concAssist = "550";
-PsEvent.squadConcAssist = "551";
-PsEvent.empAssist = "552";
-PsEvent.squadEmpAssist = "553";
-PsEvent.flashAssist = "554";
-PsEvent.squadFlashAssist = "555";
-PsEvent.savior = "335";
-PsEvent.ribbon = "291";
-PsEvent.routerKill = "1409";
-PsEvent.beaconKill = "270";
-PsEvent.controlPointAttack = "16";
-PsEvent.controlPointDefend = "15";
-const remap = (expID, toID) => {
-    return [expID, { name: "", types: [], track: true, alsoIncrement: toID }];
-};
-// All of the events to be tracked, updating this will change what events are subscribed as well
-exports.PsEvents = new Map([
-    [PsEvent.baseCapture, {
-            name: "Base capture",
-            types: ["general", "objective"],
-            track: false
-        }],
-    [PsEvent.baseDefense, {
-            name: "Base defense",
-            types: ["general", "objective"],
-            track: false
-        }],
-    [PsEvent.teamkill, {
-            name: "Teamkill",
-            types: ["versus"],
-            track: false
-        }],
-    [PsEvent.teamkilled, {
-            name: "Teamkilled",
-            types: ["versus"],
-            track: false
-        }],
-    [PsEvent.death, {
-            name: "Death",
-            types: ["general", "versus"],
-            track: false
-        }],
-    [PsEvent.revived, {
-            name: "Revived",
-            types: [],
-            track: false
-        }],
-    [PsEvent.kill, {
-            name: "Kill",
-            types: ["general", "versus"],
-            track: false
-        }],
-    [PsEvent.killAssist, {
-            name: "Kill assist",
-            types: ["versus"],
-            track: true,
-        }],
-    [PsEvent.heal, {
-            name: "Heal",
-            types: ["medic"],
-            track: true,
-        }],
-    [PsEvent.healAssist, {
-            name: "Heal assist",
-            types: [],
-            track: true,
-        }],
-    [PsEvent.maxRepair, {
-            name: "MAX repair",
-            types: ["engineer"],
-            track: true,
-        }],
-    [PsEvent.revive, {
-            name: "Revive",
-            types: ["medic"],
-            track: true,
-            alsoIncrement: undefined
-        }],
-    ["15", {
-            name: "Control point defend",
-            types: ["objective"],
-            track: true,
-            alsoIncrement: undefined
-        }],
-    ["16", {
-            name: "Control point attack",
-            types: ["objective"],
-            track: true,
-            alsoIncrement: undefined
-        }],
-    ["19", {
-            name: "Base capture",
-            types: ["objective"],
-            track: true,
-            alsoIncrement: undefined
-        }],
-    [PsEvent.roadkill, {
-            name: "Roadkill",
-            types: [],
-            track: true,
-            alsoIncrement: undefined
-        }],
-    ["29", {
-            name: "MAX kill",
-            types: ["versus"],
-            track: true,
-            alsoIncrement: PsEvent.kill
-        }],
-    [PsEvent.transportAssists, {
-            name: "Transport assist",
-            types: ["logistics"],
-            track: true,
-            alsoIncrement: undefined
-        }],
-    [PsEvent.resupply, {
-            name: "Resupply",
-            types: ["engineer"],
-            track: true,
-            alsoIncrement: undefined
-        }],
-    [PsEvent.spotKill, {
-            name: "Spot kill",
-            types: ["recon"],
-            track: true,
-            alsoIncrement: undefined
-        }],
-    [PsEvent.squadHeal, {
-            name: "Squad heal",
-            types: ["medic"],
-            track: true,
-            alsoIncrement: PsEvent.heal
-        }],
-    [PsEvent.squadRevive, {
-            name: "Squad revive",
-            types: ["medic"],
-            track: true,
-            alsoIncrement: PsEvent.revive
-        }],
-    [PsEvent.squadSpotKill, {
-            name: "Squad spot kill",
-            types: ["recon"],
-            track: true,
-            alsoIncrement: PsEvent.spotKill
-        }],
-    [PsEvent.squadResupply, {
-            name: "Squad resupply",
-            types: ["engineer"],
-            track: true,
-            alsoIncrement: PsEvent.resupply
-        }],
-    ["99", {
-            name: "Sundy repair",
-            types: ["engineer"],
-            track: true,
-            alsoIncrement: undefined
-        }],
-    remap("140", "99"),
-    [PsEvent.vehicleRepair, {
-            name: "Vehicle repair",
-            types: ["engineer"],
-            track: true,
-            alsoIncrement: undefined
-        }],
-    [PsEvent.headshot, {
-            name: "Headshot",
-            types: ["versus"],
-            track: false,
-            alsoIncrement: undefined
-        }],
-    [PsEvent.squadSpawn, {
-            name: "Squad spawn",
-            types: ["logistics"],
-            track: true,
-            alsoIncrement: undefined
-        }],
-    [PsEvent.squadMaxRepair, {
-            name: "Squad MAX repair",
-            types: ["engineer"],
-            track: true,
-            alsoIncrement: PsEvent.maxRepair
-        }],
-    [PsEvent.galaxySpawn, {
-            name: "Galaxy spawn bonus",
-            types: ["logistics"],
-            track: true,
-            alsoIncrement: PsEvent.squadSpawn
-        }],
-    ["233", {
-            name: "Sundy spawn",
-            types: ["logistics"],
-            track: true,
-            alsoIncrement: undefined
-        }],
-    ["236", {
-            name: "Facility terminal hack",
-            types: [],
-            track: true,
-            alsoIncrement: undefined
-        }],
-    ["270", {
-            name: "Beacon kill",
-            types: ["logistics"],
-            track: true,
-            alsoIncrement: undefined
-        }],
-    [PsEvent.capturePoint, {
-            name: "Capture point",
-            types: ["objective"],
-            track: true,
-            alsoIncrement: undefined
-        }],
-    [PsEvent.ribbon, {
-            name: "Ribbon",
-            types: [],
-            track: false,
-            alsoIncrement: undefined
-        }],
-    [PsEvent.motionDetect, {
-            name: "Motion detect",
-            types: ["recon"],
-            track: true,
-            alsoIncrement: undefined
-        }],
-    [PsEvent.squadMotionDetect, {
-            name: "Squad motion detect",
-            types: ["recon"],
-            track: true,
-            alsoIncrement: PsEvent.motionDetect
-        }],
-    [PsEvent.radarDetect, {
-            name: "Radar detect",
-            types: ["recon"],
-            track: true,
-            alsoIncrement: undefined
-        }],
-    [PsEvent.squadRadarDetect, {
-            name: "Squad radar detect",
-            types: ["recon"],
-            track: true,
-            alsoIncrement: PsEvent.radarDetect
-        }],
-    [PsEvent.savior, {
-            name: "Savior kill",
-            types: [],
-            track: true,
-            alsoIncrement: undefined
-        }],
-    ["355", {
-            name: "Squad vehicle spawn",
-            types: ["logistics"],
-            track: true,
-            alsoIncrement: undefined
-        }],
-    [PsEvent.shieldRepair, {
-            name: "Shield repair",
-            types: ["medic"],
-            track: true,
-            alsoIncrement: undefined
-        }],
-    [PsEvent.squadShieldRepair, {
-            name: "Squad shield repair",
-            types: ["medic"],
-            track: true,
-            alsoIncrement: PsEvent.shieldRepair
-        }],
-    [PsEvent.concAssist, {
-            name: "Conc assist",
-            types: ["versus"],
-            track: true,
-            alsoIncrement: undefined
-        }],
-    [PsEvent.squadConcAssist, {
-            name: "Squad conc assist",
-            types: ["versus"],
-            track: true,
-            alsoIncrement: "550" // Conc assist
-        }],
-    [PsEvent.empAssist, {
-            name: "EMP assist",
-            types: ["versus"],
-            track: true,
-            alsoIncrement: undefined
-        }],
-    [PsEvent.squadEmpAssist, {
-            name: "Squad EMP assist",
-            types: ["versus"],
-            track: true,
-            alsoIncrement: "552" // EMP assist
-        }],
-    [PsEvent.flashAssist, {
-            name: "Flash assist",
-            types: ["versus"],
-            track: true,
-            alsoIncrement: undefined
-        }],
-    [PsEvent.squadFlashAssist, {
-            name: "Squad flash assist",
-            types: ["versus"],
-            track: true,
-            alsoIncrement: "554" // Flash assist
-        }],
-    ["556", {
-            name: "Defend point pulse",
-            types: [],
-            track: true,
-            alsoIncrement: PsEvent.capturePoint
-        }],
-    ["557", {
-            name: "Capture point pulse",
-            types: [],
-            track: true,
-            alsoIncrement: PsEvent.capturePoint
-        }],
-    ["674", {
-            name: "Cortium harvest",
-            types: ["logistics"],
-            track: true
-        }],
-    ["675", {
-            name: "Cortium deposit",
-            types: ["logistics"],
-            track: true
-        }],
-    ["1393", {
-            name: "Hardlight cover",
-            types: ["engineer"],
-            track: true,
-            alsoIncrement: undefined
-        }],
-    ["1394", {
-            name: "Draw fire",
-            types: ["engineer"],
-            track: true,
-            alsoIncrement: "1393"
-        }],
-    ["1409", {
-            name: "Router kill",
-            types: ["logistics"],
-            track: true,
-            alsoIncrement: undefined
-        }],
-    ["1410", {
-            name: "Router spawn",
-            types: ["logistics"],
-            track: true,
-            alsoIncrement: undefined
-        }],
-    // Remap kills
-    remap("8", PsEvent.kill),
-    remap("10", PsEvent.kill),
-    remap("11", PsEvent.kill),
-    remap("25", PsEvent.kill),
-    remap("32", PsEvent.kill),
-    remap("38", PsEvent.kill),
-    remap("277", PsEvent.kill),
-    remap("278", PsEvent.kill),
-    remap("279", PsEvent.kill),
-    remap("335", PsEvent.kill),
-    remap("592", PsEvent.kill),
-    remap("593", PsEvent.kill),
-    remap("593", PsEvent.kill),
-    remap("595", PsEvent.kill),
-    remap("673", PsEvent.kill),
-    ...[
-        "3", "371", "372"
-    ].map((expID) => remap(expID, PsEvent.killAssist)),
-    // Remap vehicle repairs
-    ...[
-        "88", "89", "91", "92", "93", "94", "95", "96", "97", "98", "100", "303", "503", "581", "653", "1375",
-        "129", "130", "131", "132", "133", "134", "135", "136", "137", "138", "139", "141", "302", "505", "584", "656", "1378" // Squad
-    ].map((expID) => remap(expID, PsEvent.vehicleRepair))
-]);
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/StatMap.js":
-/*!******************************************************!*\
-  !*** ./node_modules/topt-core/build/core/StatMap.js ***!
-  \******************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-class StatMap {
-    constructor() {
-        this._stats = new Map();
-    }
-    get(statName, fallback = 0) {
-        return this._stats.get(statName) || fallback;
-    }
-    increment(statName, amount = 1) {
-        this._stats.set(statName, (this._stats.get(statName) || 0) + amount);
-    }
-    decrement(statName, amount = 1) {
-        const cur = this.get(statName);
-        if (cur < amount) {
-            this.set(statName, 0);
-        }
-        else {
-            this.set(statName, cur - amount);
-        }
-    }
-    set(statName, amount) {
-        this._stats.set(statName, amount);
-    }
-    size() { return this._stats.size; }
-    getMap() { return this._stats; }
-    clear() { this._stats.clear(); }
-    toString() {
-        return JSON.stringify(Array.from(this._stats.entries()));
-    }
-}
-exports.default = StatMap;
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/census/AchievementAPI.js":
-/*!********************************************************************!*\
-  !*** ./node_modules/topt-core/build/core/census/AchievementAPI.js ***!
-  \********************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.AchievementAPI = exports.Achievement = void 0;
-const CensusAPI_1 = __webpack_require__(/*! ./CensusAPI */ "./node_modules/topt-core/build/core/census/CensusAPI.js");
-const ApiWrapper_1 = __webpack_require__(/*! ./ApiWrapper */ "./node_modules/topt-core/build/core/census/ApiWrapper.js");
-const Loggers_1 = __webpack_require__(/*! ../Loggers */ "./node_modules/topt-core/build/core/Loggers.js");
-const log = Loggers_1.Logger.getLogger("AchievementAPI");
-class Achievement {
-    constructor() {
-        this.ID = "";
-        this.name = "";
-        this.imageUrl = "";
-        this.description = "";
-    }
-}
-exports.Achievement = Achievement;
-class AchievementAPI {
-    static parseCharacter(elem) {
-        var _a, _b;
-        return {
-            ID: elem.achievement_id,
-            name: elem.name.en,
-            description: (_b = (_a = elem.description) === null || _a === void 0 ? void 0 : _a.en) !== null && _b !== void 0 ? _b : "",
-            imageUrl: elem.image_path
-        };
-    }
-    static getByID(achivID) {
-        const response = new ApiWrapper_1.ApiResponse();
-        if (AchievementAPI._cache.has(achivID)) {
-            response.resolveOk(AchievementAPI._cache.get(achivID));
-        }
-        else {
-            const request = CensusAPI_1.default.get(`achievement?item_id=${achivID}`);
-            request.ok((data) => {
-                if (data.returned != 1) {
-                    response.resolve({ code: 404, data: `No or multiple weapons returned from ${name}` });
-                }
-                else {
-                    const wep = AchievementAPI.parseCharacter(data.item_list[0]);
-                    if (!AchievementAPI._cache.has(wep.ID)) {
-                        AchievementAPI._cache.set(wep.ID, wep);
-                        log.trace(`Cached ${wep.ID}: ${JSON.stringify(wep)}`);
-                    }
-                    response.resolveOk(wep);
-                }
-            });
-        }
-        return response;
-    }
-    static getByIDs(weaponIDs) {
-        const response = new ApiWrapper_1.ApiResponse();
-        if (weaponIDs.length == 0) {
-            response.resolveOk([]);
-            return response;
-        }
-        const weapons = [];
-        const requestIDs = [];
-        for (const weaponID of weaponIDs) {
-            if (AchievementAPI._cache.has(weaponID)) {
-                const wep = AchievementAPI._cache.get(weaponID);
-                weapons.push(wep);
-            }
-            else {
-                requestIDs.push(weaponID);
-            }
-        }
-        if (requestIDs.length > 0) {
-            const request = CensusAPI_1.default.get(`achievement?achievement_id=${requestIDs.join(",")}`);
-            request.ok((data) => {
-                if (data.returned == 0) {
-                    if (weapons.length == 0) {
-                        response.resolve({ code: 404, data: `No or multiple weapons returned from ${name}` });
-                    }
-                    else {
-                        response.resolveOk(weapons);
-                    }
-                }
-                else {
-                    for (const datum of data.achievement_list) {
-                        const wep = AchievementAPI.parseCharacter(datum);
-                        weapons.push(wep);
-                        AchievementAPI._cache.set(wep.ID, wep);
-                        log.trace(`Cached ${wep.ID}`);
-                    }
-                    response.resolveOk(weapons);
-                }
-            });
-        }
-        else {
-            response.resolveOk(weapons);
-        }
-        return response;
-    }
-}
-exports.AchievementAPI = AchievementAPI;
-AchievementAPI._cache = new Map([["0", null]]);
-AchievementAPI.unknown = {
-    ID: "-1",
-    name: "Unknown",
-    imageUrl: "",
-    description: "Unknown achievement"
-};
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/census/ApiWrapper.js":
-/*!****************************************************************!*\
-  !*** ./node_modules/topt-core/build/core/census/ApiWrapper.js ***!
-  \****************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.APIWrapper = exports.ApiResponse = void 0;
-const axios = __webpack_require__(/*! axios */ "./node_modules/axios/index.js");
-const Loggers_1 = __webpack_require__(/*! ../Loggers */ "./node_modules/topt-core/build/core/Loggers.js");
-const log = Loggers_1.Logger.getLogger("ApiWrapper");
-// Default to void as undefined is assignable to void. Would prefer to use never, but there is
-// no default value for never, and never cannot be assigned
-/**
- * Promise-ish class that is returned from an API request. Use the callback functions .ok(), etc. to handle
- * the result of the request. Unhandles responses will throw an exception
- */
-class ApiResponse {
-    /**
-     * Constructor for an ApiResponse
-     *
-     * @param responseData  Request that is being performed, and will produce a response
-     * @param reader        Function that will read the data from a successful request into the type param T
-     */
-    constructor(responseData = null, reader = null) {
-        /**
-         * Status code returned from the API endpoint
-         */
-        this.status = 0;
-        /**
-         * Data returned from the API endpoint
-         */
-        this.data = null;
-        /**
-         * Callbacks to call when specific status code response is resolved from the API call.
-         * If no callbacks are defined for a status code an exception is thrown
-         */
-        this._callbacks = new Map([]);
-        /**
-         * Has this API response already been resolved? If so, any additional callbacks added after the
-         * constructor is called (due to the late timeout) will immediately be ran
-         */
-        this._resolved = false;
-        this._steps = null;
-        if (responseData == null) {
-            return;
-        }
-        responseData.then((data) => {
-            let localStatus = data.status;
-            let localData = data.data;
-            // Handle errors from the API, which aren't request errors
-            if (localStatus == 200 && reader != null) {
-                if (localData.error != undefined || localData.errorCode != undefined || localData == "") {
-                    localStatus = 500;
-                }
-            }
-            // TODO: Get rid of this any
-            // I need to figure out a way to remove this any. Because the type of each element in codes is
-            //      a ResponseCode, not a number, and localStatus is a number, TS assumes that this can't be possible,
-            //      when in fact it is
-            if (ApiResponse.codes.indexOf(localStatus) == -1) {
-                throw `Unhandle status code: ${localStatus}`;
-            }
-            // TODO: AHHHH, it's an any!
-            // I need to find a better way to do this. Because the type of data is not known, Typescript rightly
-            //      assumes that code could be 204 and data is a string, which doesn't meet the requirements of a
-            //      ResponseContent. Maybe use a switch on localStatus?
-            this.resolve({ code: localStatus, data: localData });
-        }).catch((error) => {
-            throw `Don't expect this: ${error}`;
-        });
-    }
-    isResolved() { return this._resolved; }
-    /**
-     * Statically resolve an ApiResponse, similar to how Promise.resolve works. This is useful when creating
-     *      an ApiResponse from data that already exists
-     *
-     * @param status    Status code to resolve the response with
-     * @param data      Data to resolve the response with
-     *
-     * @returns An ApiResponse that has been resolved with the parameters passed
-     */
-    static resolve(content) {
-        const response = new ApiResponse(null, null);
-        response.resolve(content);
-        return response;
-    }
-    /**
-     * Resolve ApiResponse with specific data, calling the callback setup and setting it as resolved
-     *
-     * @param status    Status code the response will be resolved with
-     * @param data      Data the response will be resolved with
-     */
-    resolve(content) {
-        if (this._resolved == true) {
-            throw `This response has already been resolved`;
-        }
-        this.status = content.code;
-        this.data = content.data;
-        let callbacks = this._callbacks.get(this.status) || [];
-        for (const callback of callbacks) {
-            callback(content.data);
-        }
-        this._resolved = true;
-    }
-    /**
-     * Resolving with an Ok is done a lot, this just saves some typing
-     *
-     * @param data Data to resolve this response with
-     */
-    resolveOk(data) {
-        if (this._steps != null) {
-            const steps = this.getSteps();
-            let notDone = [];
-            for (const step of steps) {
-                if (this.getStepState(step) != "done") {
-                    notDone.push(step);
-                }
-            }
-            if (notDone.length > 0) {
-                log.warn(`The following steps are not done: [${notDone.join(", ")}]`);
-            }
-        }
-        this.resolve({ code: 200, data: data });
-    }
-    /**
-     * Add a new step to be tracked
-     *
-     * @param step Step being completed
-     */
-    addStep(step) {
-        if (this._steps == null) {
-            this._steps = new Map();
-        }
-        if (this._steps.has(step)) {
-            log.warn(`Duplicate step '${step}' in ApiResponse. Current steps: ${Array.from(this._steps.keys()).join(", ")}`);
-        }
-        this._steps.set(step, "working");
-        return this;
-    }
-    /**
-     * Update the state a step has
-     *
-     * @param step  Step to update
-     * @param state New state of the step being updated
-     */
-    updateStep(step, state) {
-        if (this._steps == null) {
-            log.warn(`Cannot update setp '${step}' to ${state}: No steps have been created`);
-            return;
-        }
-        if (!this._steps.has(step)) {
-            log.warn(`Cannot update step '${step}' to ${state}: Step not found`);
-        }
-        this._steps.set(step, state);
-    }
-    /**
-     * Shortcut method to mark a step as done
-     *
-     * @param step Step to mark as done
-     */
-    finishStep(step) {
-        this.updateStep(step, "done");
-    }
-    /**
-     * Get the steps in this ApiResponse
-     */
-    getSteps() {
-        if (this._steps == null) {
-            throw `No steps defined. Cannot get steps`;
-        }
-        return Array.from(this._steps.keys());
-    }
-    /**
-     * Get the state of a specific step. If no steps have been defined, an error is thrown
-     *
-     * @param step Step to get the state of
-     */
-    getStepState(step) {
-        if (this._steps == null) {
-            throw `Not steps defined. Cannot get step state`;
-        }
-        return this._steps.get(step) || null;
-    }
-    /**
-     * Forward the resolution of a response to a different ApiResponse. If a callback for the status code has already
-     *      been set, an error will be thrown
-     *
-     * @param code      Status code that will be forwarded to response
-     * @param response  ApiResponse that will be resolved instead of this ApiResponse
-     *
-     * @returns The F-bounded polymorphic this
-     */
-    forward(code, response) {
-        if (this._callbacks.has(code)) {
-            throw `Cannot forward ${code}, a callback has already been set`;
-        }
-        this.addCallback(code, (data) => {
-            // This any cast is safe, there is no way that an ApiResponse can be resolved with the wrong type thanks to TS
-            response.resolve({ code: code, data: data });
-        });
-        return this;
-    }
-    /**
-     * Forward all callbacks that haven't been set to a different response
-     *
-     * @param response ApiResponse to forward all callbacks to
-     */
-    forwardUnset(response) {
-        for (const code of ApiResponse.codes) {
-            if (!this._callbacks.has(code)) {
-                this.forward(code, response);
-            }
-        }
-    }
-    /**
-     * Remove all callbacks for resolution. Useful for when an ApiResponse is cached
-     */
-    resetCallbacks() {
-        this._callbacks.clear();
-        return this;
-    }
-    /**
-     * Add a new callback when the API request has resolved
-     *
-     * @param status    Status code to call parameter func for
-     * @param func      Callback to execut when the API request has resolved
-     */
-    addCallback(status, func) {
-        if (!this._callbacks.has(status)) {
-            this._callbacks.set(status, []);
-        }
-        this._callbacks.get(status).push(func); // TS doesn't see the .set() above making this not undefined
-    }
-    promise() {
-        return new Promise((resolve, reject) => {
-            this.always(() => {
-                if (this.status == 200) {
-                    resolve({ code: 200, data: this.data });
-                }
-                else if (this.status == 500) {
-                    resolve({ code: 500, data: this.data });
-                }
-                else {
-                    reject(`Unchecked status ${this.status}`);
-                }
-            });
-        });
-    }
-    /**
-     * Add a new callback that is always executed
-     *
-     * @param func Callback to call
-     *
-     * @returns The F-bounded polymorphic this
-     */
-    always(func) {
-        if (this._resolved == true) {
-            func();
-        }
-        for (const code of ApiResponse.codes) {
-            this.addCallback(code, func);
-        }
-        return this;
-    }
-    /**
-     * Add a new callback when the API request resolves with a 200 OK
-     *
-     * @param func Callback to call. Will take in the the parameter passed
-     *
-     * @returns The F-bounded polymorphic this
-     */
-    ok(func) {
-        if (this._resolved == true && this.status == 200) {
-            func(this.data);
-        }
-        this.addCallback(200, func);
-        return this;
-    }
-    /**
-     * Add a new callback when the API request resolves with a 201 created
-     *
-     * @param func Callback to call. Will take in the ID returned from the API endpoint
-     *
-     * @returns The F-bounded polymorphic this
-     */
-    created(func) {
-        if (this._resolved == true && this.status == 201) {
-            func(this.data);
-        }
-        this.addCallback(201, func);
-        return this;
-    }
-    /**
-     * Add a new callback when the API request resolves with a 204 No content
-     *
-     * @param func Callback to call. Takes in no parameters
-     *
-     * @returns The F-bounded polymorphic this
-     */
-    noContent(func) {
-        if (this._resolved == true && this.status == 204) {
-            func();
-        }
-        this.addCallback(204, func);
-        return this;
-    }
-    /**
-     * Add a new callback when the API request resolves with a 400 Bad request
-     *
-     * @param func Callback to call. Takes in a string representing the bad request's error
-     *
-     * @returns The F-bounded polymorphic this
-     */
-    badRequest(func) {
-        if (this._resolved == true && this.status == 400) {
-            func(this.data);
-        }
-        this.addCallback(400, func);
-        return this;
-    }
-    /**
-     * Add a new callback when the API request resolves with a 403 Forbidden
-     *
-     * @param func Callback to call. Takes in a string respresenting the string returned from the API
-     *
-     * @returns The F-bounded polymorphic this
-     */
-    forbidden(func) {
-        if (this._resolved == true && this.status == 403) {
-            func(this.data);
-        }
-        this.addCallback(403, func);
-        return this;
-    }
-    /**
-     * Add a new callback when the API request resolves with a 404 Not found. Different from noContent,
-     * as noContent is usually when a GET request does not find the object, where notFound is returned
-     * during validation errors (typically validation object IDs not found)
-     *
-     * @param func Callback to call. Takes in the resource ID that was not found
-     *
-     * @returns The F-bounded polymorphic this
-     */
-    notFound(func) {
-        if (this._resolved == true && this.status == 404) {
-            func(this.data);
-        }
-        this.addCallback(404, func);
-        return this;
-    }
-    /**
-     * Add a new callback when the API request resolves with a 500 Internal server error
-     *
-     * @param func Callback to call. Takes in the error returned from the server
-     *
-     * @returns The F-bounded polymorphic this
-     */
-    internalError(func) {
-        if (this._resolved == true && this.status == 500) {
-            func(this.data);
-        }
-        this.addCallback(500, func);
-        return this;
-    }
-}
-exports.ApiResponse = ApiResponse;
-/**
- * Array of possible status codes from a request
- */
-ApiResponse.codes = [200, 201, 204, 400, 401, 403, 404, 413, 500, 501];
-/**
- * Abstract wrapper class used by API wrappers
- */
-class APIWrapper {
-    /**
-     * Read an array of objects from the endpoint into an array of the wrapped object
-     *
-     * @param elem An array of elements from an API endpoint
-     *
-     * @returns An array of type T
-     */
-    readList(elem) {
-        let result = [];
-        if (Array.isArray(elem)) {
-            elem.forEach((item) => {
-                result.push(this.readEntry(item));
-            });
-        }
-        return result;
-    }
-    /**
-     * Get an array of data from an API endpoint
-     *
-     * @param url   URL the API endpoint is located at
-     * @param data  Optional data to pass to the API endpoint
-     *
-     * @returns The ApiResponse that is being performed. Add callbacks using .ok(), etc.
-     */
-    get(url, data) {
-        if (data != undefined) {
-            for (const name in data) {
-                const val = data[name];
-                // Convert dates into ISO strings, which is what c# uses for DateTime binding
-                if (val instanceof Date) {
-                    data[name] = val.toISOString();
-                }
-            }
-        }
-        const promise = axios.default.request({
-            url: url,
-            data: JSON.stringify(data),
-            validateStatus: null,
-            method: "GET"
-        });
-        // Bind this to ensure that .readEntry by binding the inherited class instead of
-        // the base class APIWrapper
-        let result = new ApiResponse(promise, this.readList.bind(this));
-        return result;
-    }
-    /**
-     * Read a single entry from the API endpoint. If multiple entries are returned, only the first
-     * entry will be returned. A 404 does not return null, instead it will throw. For a null to
-     * be returned, the response must reply 204NoContent
-     *
-     * @param url   URL the API endpoint is located at
-     * @param data  Optional data to pass to the API endpoint
-     *
-     * @returns The ApiResponse that is being performed. Add callbacks using .ok(), etc.
-     */
-    single(url, data) {
-        const promise = axios.default.request({
-            url: url,
-            data: JSON.stringify(data),
-            validateStatus: null,
-            method: "GET"
-        });
-        let result = new ApiResponse(promise, this.readEntry);
-        return result;
-    }
-    /**
-     * Perform a post request. Typically used for inserting new data, or other operations that are
-     * not idempotent
-     *
-     * @param url   URL to perform the post request on
-     * @param data  Data to be passed when performing the post request. This data is JSONified before sent
-     *
-     * @returns The ApiResponse that is being performed. Add callbacks using .ok(), etc.
-     */
-    post(url, data) {
-        const promise = axios.default.request({
-            url: url,
-            responseType: "json",
-            data: JSON.stringify(data),
-            validateStatus: null,
-            method: "POST"
-        });
-        let result = new ApiResponse(promise, null);
-        return result;
-    }
-    /**
-     * Post a message which expects a reply from the API
-     *
-     * @param url   URL to perform the POST request on
-     * @param data  Data to be passed to the POST request. this data is JSONified before being sent in the body
-     *
-     * @returns The ApiResponse that is being performed. Add callbacks using .ok(), etc.
-     */
-    postReply(url, data) {
-        const promise = axios.default.request({
-            url: url,
-            data: JSON.stringify(data),
-            validateStatus: null,
-            method: "POST"
-        });
-        let result = new ApiResponse(promise, null);
-        return result;
-    }
-    /**
-     * Perform a PUT request. Operations perform with this method should be idempotent, which means this request
-     * can be repeated as many times as the client needs to (if say the network is botched and the client isn't
-     * sure if the request was successfully completed). This means it is not appropriate for creating objects
-     * (which is why creating is done through POSTing), but could also not be appropriate for updating certain
-     * objects
-     *
-     * @param url   URL to PUT to
-     * @param data  Option data to be passed when performing the PUT request
-     *
-     * @returns The ApiResponse that is being performed. Add callbacks using .ok(), etc.
-     */
-    put(url, data) {
-        const promise = axios.default.request({
-            url: url,
-            data: JSON.stringify(data),
-            validateStatus: null,
-            method: "PUT"
-        });
-        let result = new ApiResponse(promise, null);
-        return result;
-    }
-    /**
-     * Perform a DELETE request. Typically DELETE endpoints just take in a single value, which is the
-     * ID of the resource to delete
-     *
-     * @param url   URL to DELETE to
-     * @param data  Data to pass to the API endpoint. This data will be JSONified in the body when passed
-     *
-     * @returns The ApiResponse that is being performed. Add callbacks using .ok(), etc.
-     */
-    delete(url, data) {
-        const promise = axios.default.request({
-            url: url,
-            data: JSON.stringify(data),
-            validateStatus: null,
-            method: "DELETE"
-        });
-        let result = new ApiResponse(promise, null);
-        return result;
-    }
-}
-exports.APIWrapper = APIWrapper;
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/census/CensusAPI.js":
-/*!***************************************************************!*\
-  !*** ./node_modules/topt-core/build/core/census/CensusAPI.js ***!
-  \***************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-const ApiWrapper_1 = __webpack_require__(/*! ./ApiWrapper */ "./node_modules/topt-core/build/core/census/ApiWrapper.js");
-const axios = __webpack_require__(/*! axios */ "./node_modules/axios/index.js");
-const Loggers_1 = __webpack_require__(/*! ../Loggers */ "./node_modules/topt-core/build/core/Loggers.js");
-const log = Loggers_1.Logger.getLogger("CensusAPI");
-class CensusAPI {
-    static baseUrl() {
-        return `https://census.daybreakgames.com/s:${CensusAPI.serviceID}/get/ps2:v2`;
-    }
-    static init(serviceID) {
-        CensusAPI.serviceID = serviceID;
-        log.debug(`Initalizied CensusAPI with serviceID`);
-    }
-    static getType(url, reader) {
-        if (url.charAt(0) != "/") {
-            url = `/${url}`;
-        }
-        if (CensusAPI.serviceID.length == 0) {
-            throw `serviceID not given`;
-        }
-        return new ApiWrapper_1.ApiResponse(axios.default.get(`https://census.daybreakgames.com/s:${CensusAPI.serviceID}/get/ps2:v2${url}`), reader);
-    }
-    static get(url) {
-        if (url.charAt(0) != "/") {
-            url = `/${url}`;
-        }
-        if (CensusAPI.serviceID.length == 0) {
-            throw `serviceID not given`;
-        }
-        return new ApiWrapper_1.ApiResponse(axios.default.get(`https://census.daybreakgames.com/s:${CensusAPI.serviceID}/get/ps2:v2${url}`), ((elem) => elem));
-    }
-}
-exports.default = CensusAPI;
-CensusAPI.serviceID = "";
-CensusAPI.requestCount = 0;
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/census/CharacterAPI.js":
-/*!******************************************************************!*\
-  !*** ./node_modules/topt-core/build/core/census/CharacterAPI.js ***!
-  \******************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.CharacterAPI = exports.Character = void 0;
-const CensusAPI_1 = __webpack_require__(/*! ./CensusAPI */ "./node_modules/topt-core/build/core/census/CensusAPI.js");
-const ApiWrapper_1 = __webpack_require__(/*! ./ApiWrapper */ "./node_modules/topt-core/build/core/census/ApiWrapper.js");
-const Loggers_1 = __webpack_require__(/*! ../Loggers */ "./node_modules/topt-core/build/core/Loggers.js");
-const log = Loggers_1.Logger.getLogger("CharacterAPI");
-class Character {
-    constructor() {
-        this.ID = "";
-        this.name = "";
-        this.faction = "";
-        this.outfitID = "";
-        this.outfitTag = "";
-        this.outfitName = "";
-        this.online = false;
-        this.joinTime = 0;
-        this.secondsPlayed = 0;
-    }
-}
-exports.Character = Character;
-class CharacterAPI {
-    static parseCharacter(elem) {
-        const char = {
-            ID: elem.character_id,
-            name: elem.name.first,
-            faction: elem.faction_id,
-            outfitID: (elem.outfit != undefined) ? elem.outfit.outfit_id : "",
-            outfitTag: (elem.outfit != undefined) ? elem.outfit.alias : "",
-            outfitName: (elem.outfit != undefined) ? elem.outfit.name : "",
-            online: elem.online_status != "0",
-            joinTime: (new Date()).getTime(),
-            secondsPlayed: 0
-        };
-        CharacterAPI._cache.set(char.ID, char);
-        return char;
-    }
-    static getByID(charID) {
-        if (CharacterAPI._pending.has(charID)) {
-            return CharacterAPI._pending.get(charID);
-        }
-        const response = new ApiWrapper_1.ApiResponse();
-        CharacterAPI._pending.set(charID, response);
-        if (CharacterAPI._cache.has(charID)) {
-            response.resolveOk(CharacterAPI._cache.get(charID));
-        }
-        else {
-            const request = CensusAPI_1.default.get(`/character/?character_id=${charID}&c:resolve=outfit,online_status`);
-            request.ok((data) => {
-                if (data.returned != 1) {
-                    response.resolve({ code: 404, data: `No or multiple characters returned from ${name}` });
-                }
-                else {
-                    response.resolveOk(CharacterAPI.parseCharacter(data.character_list[0]));
-                }
-            }).always(() => {
-                CharacterAPI._pending.delete(charID);
-            });
-        }
-        return response;
-    }
-    static cache(charID) {
-        if (CharacterAPI._cache.has(charID)) {
-            return;
-        }
-        clearTimeout(CharacterAPI._pendingResolveID);
-        CharacterAPI._pendingIDs.push(charID);
-        if (CharacterAPI._pendingIDs.length > 9) {
-            CharacterAPI.getByIDs(CharacterAPI._pendingIDs).ok(() => { });
-            CharacterAPI._pendingIDs = [];
-        }
-        else {
-            CharacterAPI._pendingResolveID = setTimeout(() => {
-                CharacterAPI.getByIDs(CharacterAPI._pendingIDs).ok(() => { });
-            }, 5000);
-        }
-    }
-    static getByIDs(charIDs) {
-        const response = new ApiWrapper_1.ApiResponse();
-        if (charIDs.length == 0) {
-            response.resolveOk([]);
-            return response;
-        }
-        const chars = [];
-        const requestIDs = [];
-        for (const charID of charIDs) {
-            if (CharacterAPI._cache.has(charID)) {
-                const char = CharacterAPI._cache.get(charID);
-                chars.push(char);
-            }
-            else {
-                requestIDs.push(charID);
-            }
-        }
-        if (requestIDs.length > 0) {
-            const sliceSize = 50;
-            let slicesLeft = Math.ceil(requestIDs.length / sliceSize);
-            //log.log(`Have ${slicesLeft} slices to do. size of ${sliceSize}, data of ${requestIDs.length}`);
-            for (let i = 0; i < requestIDs.length; i += sliceSize) {
-                const slice = requestIDs.slice(i, i + sliceSize);
-                //log.log(`Slice ${i}: ${i} - ${i + sliceSize - 1}: [${slice.join(",")}]`);
-                const request = CensusAPI_1.default.get(`/character/?character_id=${slice.join(",")}&c:resolve=outfit,online_status`);
-                request.ok((data) => {
-                    if (data.returned == 0) {
-                        if (chars.length == 0) {
-                            response.resolve({ code: 404, data: `Missing characters: ${charIDs.join(",")}` });
-                        }
-                        else {
-                            response.resolveOk(chars);
-                        }
-                    }
-                    else {
-                        for (const datum of data.character_list) {
-                            const char = CharacterAPI.parseCharacter(datum);
-                            chars.push(char);
-                        }
-                    }
-                    --slicesLeft;
-                    if (slicesLeft == 0) {
-                        //log.log(`No more slices left, resolving`);
-                        response.resolveOk(chars);
-                    }
-                    else {
-                        //log.log(`${slicesLeft} slices left`);
-                    }
-                });
-            }
-        }
-        else {
-            response.resolveOk(chars);
-        }
-        return response;
-    }
-    static getByName(name) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const request = CensusAPI_1.default.get(`/character/?name.first_lower=${name.toLowerCase()}&c:resolve=outfit,online_status`);
-        request.ok((data) => {
-            if (data.returned != 1) {
-                response.resolve({ code: 404, data: `No or multiple characters returned from ${name}` });
-            }
-            else {
-                response.resolveOk(CharacterAPI.parseCharacter(data.character_list[0]));
-            }
-        });
-        return response;
-    }
-}
-exports.CharacterAPI = CharacterAPI;
-CharacterAPI._cache = new Map();
-CharacterAPI._pending = new Map();
-CharacterAPI._pendingIDs = [];
-CharacterAPI._pendingResolveID = 0;
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/census/EventAPI.js":
-/*!**************************************************************!*\
-  !*** ./node_modules/topt-core/build/core/census/EventAPI.js ***!
-  \**************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.EventAPI = void 0;
-//import { Event, EventKill, EventDeath } from "core/events/index";
-class EventAPI {
-    static parseEvent(elem) {
-        throw ``;
-    }
-}
-exports.EventAPI = EventAPI;
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/census/FacilityAPI.js":
-/*!*****************************************************************!*\
-  !*** ./node_modules/topt-core/build/core/census/FacilityAPI.js ***!
-  \*****************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.FacilityAPI = exports.Facility = void 0;
-const CensusAPI_1 = __webpack_require__(/*! ./CensusAPI */ "./node_modules/topt-core/build/core/census/CensusAPI.js");
-const ApiWrapper_1 = __webpack_require__(/*! ./ApiWrapper */ "./node_modules/topt-core/build/core/census/ApiWrapper.js");
-const Loggers_1 = __webpack_require__(/*! ../Loggers */ "./node_modules/topt-core/build/core/Loggers.js");
-const log = Loggers_1.Logger.getLogger("FacilityAPI");
-class Facility {
-    constructor() {
-        this.ID = "";
-        this.zoneID = "";
-        this.name = "";
-        this.typeID = "";
-        this.type = "";
-    }
-}
-exports.Facility = Facility;
-class FacilityAPI {
-    static parse(elem) {
-        return {
-            ID: elem.facility_id,
-            zoneID: elem.zone_id,
-            name: elem.facility_name,
-            typeID: elem.facility_type_id,
-            type: elem.facility_type
-        };
-    }
-    static setCache(data) {
-        for (const fac of data) {
-            FacilityAPI._cache.set(fac.ID, fac);
-        }
-    }
-    static precache(facilityID) {
-        clearTimeout(this._timeoutID);
-        this._idList.push(facilityID);
-        if (this._idList.length > 49) {
-            if (this._idList.length > 0) {
-                this.getByIDs(this._idList);
-                this._idList = [];
-            }
-        }
-        this._timeoutID = setTimeout(() => {
-            if (this._idList.length > 0) {
-                this.getByIDs(this._idList);
-                this._idList = [];
-            }
-        });
-    }
-    static getByID(facilityID) {
-        if (FacilityAPI._pending.has(facilityID)) {
-            log.trace(`${facilityID} already has a pending request, using that one instead`);
-            return FacilityAPI._pending.get(facilityID);
-        }
-        const response = new ApiWrapper_1.ApiResponse();
-        if (FacilityAPI._cache.has(facilityID)) {
-            const facility = FacilityAPI._cache.get(facilityID);
-            if (facility == null) {
-                response.resolve({ code: 204, data: null });
-            }
-            else {
-                response.resolveOk(facility);
-            }
-        }
-        else {
-            const request = CensusAPI_1.default.get(`/map_region?facility_id=${facilityID}`);
-            FacilityAPI._pending.set(facilityID, request);
-            request.ok((data) => {
-                if (data.returned == 0) {
-                    FacilityAPI._cache.set(facilityID, null);
-                    response.resolve({ code: 204, data: null });
-                }
-                else {
-                    const facility = FacilityAPI.parse(data.map_region_list[0]);
-                    FacilityAPI._cache.set(facility.ID, facility);
-                    response.resolveOk(facility);
-                }
-                FacilityAPI._pending.delete(facilityID);
-            });
-        }
-        return response;
-    }
-    static getByIDs(IDs) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const facilities = [];
-        const requestIDs = [];
-        for (const facID of IDs) {
-            if (FacilityAPI._cache.has(facID)) {
-                const fac = FacilityAPI._cache.get(facID);
-                facilities.push(fac);
-            }
-            else {
-                requestIDs.push(facID);
-            }
-        }
-        if (requestIDs.length > 0) {
-            const request = CensusAPI_1.default.get(`/map_region?facility_id=${requestIDs.join(",")}&c:limit=100`);
-            request.ok((data) => {
-                if (data.returned == 0) {
-                    if (facilities.length == 0) {
-                        response.resolve({ code: 404, data: `No facilities returned from ${name}` });
-                    }
-                    else {
-                        response.resolveOk(facilities);
-                    }
-                }
-                else {
-                    const bases = [];
-                    for (const datum of data.map_region_list) {
-                        const fac = FacilityAPI.parse(datum);
-                        facilities.push(fac);
-                        bases.push(fac);
-                        FacilityAPI._cache.set(fac.ID, fac);
-                    }
-                    for (const facID of requestIDs) {
-                        const elem = bases.find(iter => iter.ID == facID);
-                        if (elem == undefined) {
-                            log.debug(`Failed to find Facility ID ${facID}, settings cache to null`);
-                            FacilityAPI._cache.set(facID, null);
-                        }
-                    }
-                    response.resolveOk(facilities);
-                }
-            }).internalError((err) => {
-                for (const wepID of requestIDs) {
-                    FacilityAPI._cache.set(wepID, null);
-                }
-                if (facilities.length > 0) {
-                    response.resolveOk(facilities);
-                }
-                else {
-                    response.resolve({ code: 500, data: "" });
-                }
-                log.error(err);
-            });
-        }
-        else {
-            response.resolveOk(facilities);
-        }
-        return response;
-    }
-}
-exports.FacilityAPI = FacilityAPI;
-FacilityAPI._cache = new Map();
-FacilityAPI._pending = new Map();
-FacilityAPI._idList = [];
-FacilityAPI._timeoutID = -1;
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/census/OutfitAPI.js":
-/*!***************************************************************!*\
-  !*** ./node_modules/topt-core/build/core/census/OutfitAPI.js ***!
-  \***************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.OutfitAPI = exports.Outfit = void 0;
-const CensusAPI_1 = __webpack_require__(/*! ./CensusAPI */ "./node_modules/topt-core/build/core/census/CensusAPI.js");
-const ApiWrapper_1 = __webpack_require__(/*! ./ApiWrapper */ "./node_modules/topt-core/build/core/census/ApiWrapper.js");
-const CharacterAPI_1 = __webpack_require__(/*! ./CharacterAPI */ "./node_modules/topt-core/build/core/census/CharacterAPI.js");
-const Loggers_1 = __webpack_require__(/*! ../Loggers */ "./node_modules/topt-core/build/core/Loggers.js");
-const log = Loggers_1.Logger.getLogger("OutfitAPI");
-class Outfit {
-    constructor() {
-        this.ID = "";
-        this.name = "";
-        this.tag = "";
-        this.faction = "";
-    }
-}
-exports.Outfit = Outfit;
-class OutfitAPI {
-    static parse(elem) {
-        var _a, _b;
-        return {
-            ID: elem.outfit_id,
-            name: elem.name,
-            tag: elem.alias,
-            faction: (_b = (_a = elem.leader) === null || _a === void 0 ? void 0 : _a.faction_id) !== null && _b !== void 0 ? _b : "-1"
-        };
-    }
-    static getByID(ID) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const request = CensusAPI_1.default.get(`/outfit/?outfit_id=${ID}&c:resolve=leader`);
-        request.ok((data) => {
-            if (data.returned != 1) {
-                response.resolve({ code: 404, data: `` });
-            }
-            else {
-                const outfit = OutfitAPI.parse(data.outfit_list[0]);
-                response.resolveOk(outfit);
-            }
-        });
-        return response;
-    }
-    static getByIDs(IDs) {
-        const response = new ApiWrapper_1.ApiResponse();
-        if (IDs.length == 0) {
-            response.resolve({ code: 204, data: null });
-            return response;
-        }
-        IDs = IDs.filter(i => i.length > 0 && i != "0");
-        log.debug(`Loading outfits: [${IDs.join(", ")}]`);
-        const outfits = [];
-        const sliceSize = 50;
-        let slicesLeft = Math.ceil(IDs.length / sliceSize);
-        log.debug(`Have ${slicesLeft} slices to do. size of ${sliceSize}, data of ${IDs.length}`);
-        for (let i = 0; i < IDs.length; i += sliceSize) {
-            const slice = IDs.slice(i, i + sliceSize);
-            log.trace(`slice: [${slice.join(", ")}]`);
-            const url = `/outfit/?outfit_id=${slice.join(",")}&c:resolve=leader`;
-            const request = CensusAPI_1.default.get(url);
-            log.trace(`made request to: '${url}'`);
-            request.ok((data) => {
-                if (data.returned == 0) {
-                }
-                else {
-                    for (const datum of data.outfit_list) {
-                        const char = OutfitAPI.parse(datum);
-                        outfits.push(char);
-                    }
-                }
-                --slicesLeft;
-                if (slicesLeft == 0) {
-                    log.debug(`No more slices left, resolving`);
-                    response.resolveOk(outfits);
-                }
-                else {
-                    log.trace(`${slicesLeft} slices left`);
-                }
-            }).always(() => {
-                log.debug(`${request.status}`);
-            });
-        }
-        return response;
-    }
-    static getByTag(outfitTag) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const request = CensusAPI_1.default.get(`/outfit/?alias_lower=${outfitTag.toLocaleLowerCase()}&c:resolve=leader`);
-        request.ok((data) => {
-            if (data.returned != 1) {
-                response.resolve({ code: 404, data: `` });
-            }
-            else {
-                const outfit = OutfitAPI.parse(data.outfit_list[0]);
-                response.resolveOk(outfit);
-            }
-        });
-        return response;
-    }
-    static getCharactersByTag(outfitTag) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const request = CensusAPI_1.default.get(`/outfit/?alias_lower=${outfitTag.toLowerCase()}&c:resolve=member_character,member_online_status`);
-        request.ok((data) => {
-            if (data.returned != 1) {
-                response.resolve({ code: 404, data: `${outfitTag} did not return 1 entry` });
-            }
-            else {
-                // With really big outfits (3k+ members) somehow a character that doesn't exist
-                //      shows up in the query. They don't have a name, so filter them out
-                const chars = data.outfit_list[0].members
-                    .filter((elem) => elem.name != undefined)
-                    .map((elem) => {
-                    return CharacterAPI_1.CharacterAPI.parseCharacter(Object.assign({ outfit: {
-                            alias: data.outfit_list[0].alias
-                        } }, elem));
-                });
-                response.resolveOk(chars);
-            }
-        });
-        return response;
-    }
-}
-exports.OutfitAPI = OutfitAPI;
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/census/PsLoadout.js":
-/*!***************************************************************!*\
-  !*** ./node_modules/topt-core/build/core/census/PsLoadout.js ***!
-  \***************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.PsLoadouts = exports.PsLoadout = void 0;
-class PsLoadout {
-    constructor() {
-        this.ID = 0;
-        this.faction = "";
-        this.longName = "";
-        this.shortName = "";
-        this.singleName = "";
-        this.type = "unknown";
-    }
-    /**
-     * Get the type of loadout a loadoutID is
-     *
-     * @param loadoutID ID of the loadout to get the type of
-     */
-    static getLoadoutType(loadoutID) {
-        // NC / TR / VS / NS
-        if (loadoutID == "1" || loadoutID == "8" || loadoutID == "15" || loadoutID == "28") {
-            return "infil";
-        }
-        else if (loadoutID == "3" || loadoutID == "10" || loadoutID == "17" || loadoutID == "29") {
-            return "lightAssault";
-        }
-        else if (loadoutID == "4" || loadoutID == "11" || loadoutID == "18" || loadoutID == "30") {
-            return "medic";
-        }
-        else if (loadoutID == "5" || loadoutID == "12" || loadoutID == "19" || loadoutID == "31") {
-            return "engineer";
-        }
-        else if (loadoutID == "6" || loadoutID == "13" || loadoutID == "20" || loadoutID == "32") {
-            return "heavy";
-        }
-        else if (loadoutID == "7" || loadoutID == "14" || loadoutID == "21" || loadoutID == "33") {
-            return "medic";
-        }
-        return "unknown";
-    }
-}
-exports.PsLoadout = PsLoadout;
-PsLoadout.default = {
-    ID: -1,
-    faction: "DD",
-    longName: "Default",
-    shortName: "Def",
-    singleName: "D",
-    type: "unknown"
-};
-exports.PsLoadouts = new Map([
-    ["1", {
-            ID: 1,
-            faction: "NC",
-            longName: "Infiltrator",
-            shortName: "Infil",
-            singleName: "I",
-            type: "infil"
-        }],
-    ["3", {
-            ID: 3,
-            faction: "NC",
-            longName: "Light Assault",
-            shortName: "LA",
-            singleName: "L",
-            type: "lightAssault"
-        }],
-    ["4", {
-            ID: 4,
-            faction: "NC",
-            longName: "Medic",
-            shortName: "Medic",
-            singleName: "M",
-            type: "medic"
-        }],
-    ["5", {
-            ID: 5,
-            faction: "NC",
-            longName: "Engineer",
-            shortName: "Eng",
-            singleName: "E",
-            type: "engineer"
-        }],
-    ["6", {
-            ID: 5,
-            faction: "NC",
-            longName: "Heavy Assault",
-            shortName: "HA",
-            singleName: "H",
-            type: "heavy"
-        }],
-    ["7", {
-            ID: 7,
-            faction: "NC",
-            longName: "Max",
-            shortName: "Max",
-            singleName: "W",
-            type: "max"
-        }],
-    ["8", {
-            ID: 8,
-            faction: "TR",
-            longName: "Infiltrator",
-            shortName: "Infil",
-            singleName: "I",
-            type: "infil"
-        }],
-    ["10", {
-            ID: 10,
-            faction: "TR",
-            longName: "Light Assault",
-            shortName: "LA",
-            singleName: "L",
-            type: "lightAssault"
-        }],
-    ["11", {
-            ID: 11,
-            faction: "TR",
-            longName: "Medic",
-            shortName: "Medic",
-            singleName: "M",
-            type: "medic"
-        }],
-    ["12", {
-            ID: 12,
-            faction: "TR",
-            longName: "Engineer",
-            shortName: "Eng",
-            singleName: "E",
-            type: "engineer"
-        }],
-    ["13", {
-            ID: 13,
-            faction: "TR",
-            longName: "Heavy Assault",
-            shortName: "HA",
-            singleName: "H",
-            type: "heavy"
-        }],
-    ["14", {
-            ID: 14,
-            faction: "TR",
-            longName: "Max",
-            shortName: "Max",
-            singleName: "W",
-            type: "max"
-        }],
-    ["15", {
-            ID: 15,
-            faction: "VS",
-            longName: "Infiltrator",
-            shortName: "Infil",
-            singleName: "I",
-            type: "infil"
-        }],
-    ["17", {
-            ID: 17,
-            faction: "VS",
-            longName: "Light Assault",
-            shortName: "LA",
-            singleName: "L",
-            type: "lightAssault"
-        }],
-    ["18", {
-            ID: 18,
-            faction: "VS",
-            longName: "Medic",
-            shortName: "Medic",
-            singleName: "M",
-            type: "medic"
-        }],
-    ["19", {
-            ID: 19,
-            faction: "VS",
-            longName: "Engineer",
-            shortName: "Eng",
-            singleName: "E",
-            type: "engineer"
-        }],
-    ["20", {
-            ID: 20,
-            faction: "VS",
-            longName: "Heavy Assault",
-            shortName: "HA",
-            singleName: "H",
-            type: "heavy"
-        }],
-    ["21", {
-            ID: 21,
-            faction: "VS",
-            longName: "Max",
-            shortName: "Max",
-            singleName: "W",
-            type: "max"
-        }],
-    ["28", {
-            ID: 28,
-            faction: "NS",
-            longName: "Infiltrator",
-            shortName: "Infil",
-            singleName: "I",
-            type: "infil"
-        }],
-    ["29", {
-            ID: 29,
-            faction: "NS",
-            longName: "Light Assault",
-            shortName: "LA",
-            singleName: "L",
-            type: "lightAssault"
-        }],
-    ["30", {
-            ID: 30,
-            faction: "NS",
-            longName: "Medic",
-            shortName: "medic",
-            singleName: "M",
-            type: "medic"
-        }],
-    ["31", {
-            ID: 31,
-            faction: "NS",
-            longName: "Engineer",
-            shortName: "eng",
-            singleName: "E",
-            type: "engineer"
-        }],
-    ["32", {
-            ID: 32,
-            faction: "NS",
-            longName: "Heavy Assault",
-            shortName: "heavy",
-            singleName: "H",
-            type: "heavy"
-        }],
-    ["45", {
-            ID: 45,
-            faction: "NS",
-            longName: "MAX",
-            shortName: "max",
-            singleName: "W",
-            type: "max"
-        }],
-]);
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/census/VehicleAPI.js":
-/*!****************************************************************!*\
-  !*** ./node_modules/topt-core/build/core/census/VehicleAPI.js ***!
-  \****************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.VehicleAPI = exports.Vehicles = exports.VehicleTypes = exports.Vehicle = void 0;
-const CensusAPI_1 = __webpack_require__(/*! ./CensusAPI */ "./node_modules/topt-core/build/core/census/CensusAPI.js");
-const ApiWrapper_1 = __webpack_require__(/*! ./ApiWrapper */ "./node_modules/topt-core/build/core/census/ApiWrapper.js");
-const Loggers_1 = __webpack_require__(/*! ../Loggers */ "./node_modules/topt-core/build/core/Loggers.js");
-const log = Loggers_1.Logger.getLogger("VehicleAPI");
-class Vehicle {
-    constructor() {
-        this.ID = "";
-        this.name = "";
-        this.typeID = "";
-    }
-}
-exports.Vehicle = Vehicle;
-class VehicleTypes {
-}
-exports.VehicleTypes = VehicleTypes;
-VehicleTypes.tracked = ["2033", "2010", "15", "14", "13", "12", "11", "10", "9", "8", "7", "6", "5", "4", "3", "2", "1"];
-VehicleTypes.ground = "5";
-VehicleTypes.magrider = "2";
-VehicleTypes.turret = "7";
-VehicleTypes.air = "1";
-VehicleTypes.spawn = "8";
-class Vehicles {
-}
-exports.Vehicles = Vehicles;
-Vehicles.flash = "1";
-Vehicles.sunderer = "2";
-Vehicles.lightning = "3";
-Vehicles.magrider = "4";
-Vehicles.vanguard = "5";
-Vehicles.prowler = "6";
-Vehicles.scythe = "7";
-Vehicles.reaver = "8";
-Vehicles.mosquito = "9";
-Vehicles.liberator = "10";
-Vehicles.galaxy = "11";
-Vehicles.harasser = "12";
-Vehicles.dropPod = "13";
-Vehicles.valkyrie = "14";
-Vehicles.ant = "15";
-Vehicles.bastionMosquite = "2122";
-Vehicles.bastionReaver = "2123";
-Vehicles.bastionScythe = "2124";
-class VehicleAPI {
-    static parse(elem) {
-        return {
-            ID: elem.vehicle_id,
-            typeID: elem.type_id,
-            name: elem.name.en,
-        };
-    }
-    static getByID(vehicleID) {
-        const response = new ApiWrapper_1.ApiResponse();
-        VehicleAPI.getAll().ok((data) => {
-            let found = false;
-            for (const veh of data) {
-                if (veh.ID == vehicleID) {
-                    response.resolveOk(veh);
-                    found = true;
-                    break;
-                }
-            }
-            if (found == false) {
-                response.resolve({ code: 204, data: null });
-            }
-        });
-        return response;
-    }
-    static getAll(ids = []) {
-        if (VehicleAPI._cache == null) {
-            VehicleAPI._cache = new ApiWrapper_1.ApiResponse();
-            const vehicles = [];
-            const response = CensusAPI_1.default.get(`vehicle?c:limit=100`);
-            response.ok((data) => {
-                for (const datum of data.vehicle_list) {
-                    vehicles.push(VehicleAPI.parse(datum));
-                }
-                VehicleAPI._cache.resolveOk(vehicles);
-                log.debug(`Cached ${vehicles.length} vehicles: [${vehicles.map(iter => iter.name).join(",")}]`);
-            });
-        }
-        return VehicleAPI._cache;
-    }
-}
-exports.VehicleAPI = VehicleAPI;
-VehicleAPI._cache = null;
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/census/WeaponAPI.js":
-/*!***************************************************************!*\
-  !*** ./node_modules/topt-core/build/core/census/WeaponAPI.js ***!
-  \***************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.WeaponAPI = exports.Weapon = void 0;
-const CensusAPI_1 = __webpack_require__(/*! ./CensusAPI */ "./node_modules/topt-core/build/core/census/CensusAPI.js");
-const ApiWrapper_1 = __webpack_require__(/*! ./ApiWrapper */ "./node_modules/topt-core/build/core/census/ApiWrapper.js");
-const Loggers_1 = __webpack_require__(/*! ../Loggers */ "./node_modules/topt-core/build/core/Loggers.js");
-const log = Loggers_1.Logger.getLogger("WeaponAPI");
-class Weapon {
-    constructor() {
-        this.ID = "";
-        this.name = "";
-        this.type = "";
-        this.factionID = "";
-        this.imageSetID = "";
-        this.imageID = "";
-    }
-}
-exports.Weapon = Weapon;
-class WeaponAPI {
-    static maxTypeFixer(name) {
-        if (name == "AI MAX (Left)" || name == "AI MAX (Right)") {
-            return "AI MAX";
-        }
-        if (name == "AV MAX (Left)" || name == "AV MAX (Right)") {
-            return "AV MAX";
-        }
-        if (name == "AA MAX (Left)" || name == "AA MAX (Right)") {
-            return "AA MAX";
-        }
-        return name;
-    }
-    static parseCharacter(elem) {
-        var _a, _b, _c, _d;
-        return {
-            ID: elem.item_id,
-            name: (_b = (_a = elem.name) === null || _a === void 0 ? void 0 : _a.en) !== null && _b !== void 0 ? _b : `Unnamed ${elem.item_id}`,
-            type: this.maxTypeFixer((_d = (_c = elem.category) === null || _c === void 0 ? void 0 : _c.name.en) !== null && _d !== void 0 ? _d : "Unknown"),
-            factionID: elem.faction_id,
-            imageSetID: elem.image_set_id,
-            imageID: elem.image_id
-        };
-    }
-    static setCache(weapons) {
-        for (const weapon of weapons) {
-            WeaponAPI._cache.set(weapon.ID, weapon);
-        }
-    }
-    static getEntires() {
-        // P sure this is safe
-        return Array.from(WeaponAPI._cache.values())
-            .filter(iter => iter != null);
-    }
-    static precache(weaponID) {
-        clearTimeout(this._pendingTimerID);
-        if (this._pendingCaches.indexOf(weaponID) == -1) {
-            this._pendingCaches.push(weaponID);
-        }
-        this._pendingTimerID = setTimeout(() => {
-            this.getByIDs(this._pendingCaches);
-        }, 100);
-    }
-    static getByID(weaponID) {
-        if (WeaponAPI._pendingRequests.has(weaponID)) {
-            return WeaponAPI._pendingRequests.get(weaponID);
-        }
-        const response = new ApiWrapper_1.ApiResponse();
-        if (WeaponAPI._cache.has(weaponID)) {
-            response.resolveOk(WeaponAPI._cache.get(weaponID));
-        }
-        else {
-            const request = CensusAPI_1.default.get(`item?item_id=${weaponID}&c:hide=description,max_stack_size,image_path&c:lang=en&c:join=item_category^inject_at:category`);
-            WeaponAPI._pendingRequests.set(weaponID, response);
-            request.ok((data) => {
-                if (data.returned != 1) {
-                    response.resolve({ code: 404, data: `No or multiple weapons returned from ${name}` });
-                }
-                else {
-                    const wep = WeaponAPI.parseCharacter(data.item_list[0]);
-                    if (!WeaponAPI._cache.has(wep.ID)) {
-                        WeaponAPI._cache.set(wep.ID, wep);
-                    }
-                    response.resolveOk(wep);
-                }
-            }).internalError((err) => {
-                WeaponAPI._cache.set(weaponID, null);
-                log.error(err);
-            }).always(() => {
-                WeaponAPI._pendingRequests.delete(weaponID);
-            });
-        }
-        return response;
-    }
-    static getByIDs(weaponIDs) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const weapons = [];
-        const requestIDs = [];
-        for (const weaponID of weaponIDs) {
-            if (WeaponAPI._cache.has(weaponID)) {
-                const wep = WeaponAPI._cache.get(weaponID);
-                if (wep != null) {
-                    weapons.push(wep);
-                }
-            }
-            else {
-                requestIDs.push(weaponID);
-            }
-        }
-        if (requestIDs.length > 0) {
-            const request = CensusAPI_1.default.get(`item?item_id=${requestIDs.join(",")}&c:hide=description,max_stack_size,image_path&c:lang=en&c:join=item_category^inject_at:category`);
-            request.ok((data) => {
-                if (data.returned == 0) {
-                    if (weapons.length == 0) {
-                        response.resolve({ code: 404, data: `No or multiple weapons returned from ${name}` });
-                    }
-                    else {
-                        response.resolveOk(weapons);
-                    }
-                }
-                else {
-                    for (const datum of data.item_list) {
-                        const wep = WeaponAPI.parseCharacter(datum);
-                        weapons.push(wep);
-                        WeaponAPI._cache.set(wep.ID, wep);
-                    }
-                    response.resolveOk(weapons);
-                }
-            }).internalError((err) => {
-                for (const wepID of requestIDs) {
-                    WeaponAPI._cache.set(wepID, null);
-                }
-                if (weapons.length > 0) {
-                    log.error(`API call failed, but some weapons were cached, so using that`);
-                    response.resolveOk(weapons);
-                }
-                else {
-                    response.resolve({ code: 500, data: "" });
-                }
-                log.error(err);
-            });
-        }
-        else {
-            response.resolveOk(weapons);
-        }
-        return response;
-    }
-}
-exports.WeaponAPI = WeaponAPI;
-WeaponAPI._cache = new Map([["0", null]]);
-WeaponAPI._pendingCaches = [];
-WeaponAPI._pendingTimerID = -1;
-// <weapon ID, response>
-WeaponAPI._pendingRequests = new Map();
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/events/index.js":
-/*!***********************************************************!*\
-  !*** ./node_modules/topt-core/build/core/events/index.js ***!
-  \***********************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/index.js":
-/*!****************************************************!*\
-  !*** ./node_modules/topt-core/build/core/index.js ***!
-  \****************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __exportStar = (this && this.__exportStar) || function(m, exports) {
-    for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-const Core_1 = __webpack_require__(/*! ./Core */ "./node_modules/topt-core/build/core/Core.js");
-__webpack_require__(/*! ./CoreProcessing */ "./node_modules/topt-core/build/core/CoreProcessing.js");
-__webpack_require__(/*! ./CoreConnection */ "./node_modules/topt-core/build/core/CoreConnection.js");
-__webpack_require__(/*! ./CoreDebugHelper */ "./node_modules/topt-core/build/core/CoreDebugHelper.js");
-__webpack_require__(/*! ./CoreSquad */ "./node_modules/topt-core/build/core/CoreSquad.js");
-exports.default = Core_1.Core;
-__exportStar(__webpack_require__(/*! ./census/AchievementAPI */ "./node_modules/topt-core/build/core/census/AchievementAPI.js"), exports);
-__exportStar(__webpack_require__(/*! ./census/ApiWrapper */ "./node_modules/topt-core/build/core/census/ApiWrapper.js"), exports);
-__exportStar(__webpack_require__(/*! ./census/CensusAPI */ "./node_modules/topt-core/build/core/census/CensusAPI.js"), exports);
-__exportStar(__webpack_require__(/*! ./census/CharacterAPI */ "./node_modules/topt-core/build/core/census/CharacterAPI.js"), exports);
-__exportStar(__webpack_require__(/*! ./census/EventAPI */ "./node_modules/topt-core/build/core/census/EventAPI.js"), exports);
-__exportStar(__webpack_require__(/*! ./census/FacilityAPI */ "./node_modules/topt-core/build/core/census/FacilityAPI.js"), exports);
-__exportStar(__webpack_require__(/*! ./census/OutfitAPI */ "./node_modules/topt-core/build/core/census/OutfitAPI.js"), exports);
-__exportStar(__webpack_require__(/*! ./census/PsLoadout */ "./node_modules/topt-core/build/core/census/PsLoadout.js"), exports);
-__exportStar(__webpack_require__(/*! ./census/VehicleAPI */ "./node_modules/topt-core/build/core/census/VehicleAPI.js"), exports);
-__exportStar(__webpack_require__(/*! ./census/WeaponAPI */ "./node_modules/topt-core/build/core/census/WeaponAPI.js"), exports);
-__exportStar(__webpack_require__(/*! ./objects/index */ "./node_modules/topt-core/build/core/objects/index.js"), exports);
-__exportStar(__webpack_require__(/*! ./Playback */ "./node_modules/topt-core/build/core/Playback.js"), exports);
-__exportStar(__webpack_require__(/*! ./events/index */ "./node_modules/topt-core/build/core/events/index.js"), exports);
-__exportStar(__webpack_require__(/*! ./reports/OutfitReport */ "./node_modules/topt-core/build/core/reports/OutfitReport.js"), exports);
-__exportStar(__webpack_require__(/*! ./reports/FightReport */ "./node_modules/topt-core/build/core/reports/FightReport.js"), exports);
-__exportStar(__webpack_require__(/*! ./squad/Squad */ "./node_modules/topt-core/build/core/squad/Squad.js"), exports);
-__exportStar(__webpack_require__(/*! ./squad/SquadMember */ "./node_modules/topt-core/build/core/squad/SquadMember.js"), exports);
-__exportStar(__webpack_require__(/*! ./CoreSettings */ "./node_modules/topt-core/build/core/CoreSettings.js"), exports);
-__exportStar(__webpack_require__(/*! ./EventReporter */ "./node_modules/topt-core/build/core/EventReporter.js"), exports);
-__exportStar(__webpack_require__(/*! ./InvididualGenerator */ "./node_modules/topt-core/build/core/InvididualGenerator.js"), exports);
-__exportStar(__webpack_require__(/*! ./PsEvent */ "./node_modules/topt-core/build/core/PsEvent.js"), exports);
-__exportStar(__webpack_require__(/*! ./StatMap */ "./node_modules/topt-core/build/core/StatMap.js"), exports);
-__exportStar(__webpack_require__(/*! ./winter/index */ "./node_modules/topt-core/build/core/winter/index.js"), exports);
-__exportStar(__webpack_require__(/*! ./Loggers */ "./node_modules/topt-core/build/core/Loggers.js"), exports);
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/objects/BaseExchange.js":
-/*!*******************************************************************!*\
-  !*** ./node_modules/topt-core/build/core/objects/BaseExchange.js ***!
-  \*******************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.BaseExchange = void 0;
-class BaseExchange {
-    constructor() {
-        /**
-         * ID of the facility that was captured
-         */
-        this.facilityID = "";
-        /**
-         * ID of the zone the capture took place
-         */
-        this.zoneID = "";
-        /**
-         * Timestamp of when the capture too place
-         */
-        this.timestamp = new Date();
-        /**
-         * How many ms the base was held before it was captured
-         */
-        this.timeHeld = 0;
-        /**
-         * ID of the faction that captured the base
-         */
-        this.factionID = "";
-        /**
-         * ID of the outfit that captured the base
-         */
-        this.outfitID = "";
-        /**
-         * ID of the previous faction that held the base before it was captured
-         */
-        this.previousFaction = "";
-    }
-}
-exports.BaseExchange = BaseExchange;
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/objects/BaseFightEncounter.js":
-/*!*************************************************************************!*\
-  !*** ./node_modules/topt-core/build/core/objects/BaseFightEncounter.js ***!
-  \*************************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.BaseFightEncounter = void 0;
-class BaseFightEncounter {
-    constructor() {
-        /**
-         * In milliseconds
-         */
-        this.timestamp = 0;
-        this.sourceID = "";
-        this.targetID = "";
-        this.outcome = "unknown";
-    }
-}
-exports.BaseFightEncounter = BaseFightEncounter;
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/objects/BaseFightEntry.js":
-/*!*********************************************************************!*\
-  !*** ./node_modules/topt-core/build/core/objects/BaseFightEntry.js ***!
-  \*********************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.BaseFightEntry = void 0;
-class BaseFightEntry {
-    constructor() {
-        this.charID = "";
-        this.name = "";
-        this.score = 0;
-        this.kills = [];
-        this.deaths = [];
-        this.events = [];
-    }
-}
-exports.BaseFightEntry = BaseFightEntry;
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/objects/BaseOverview.js":
-/*!*******************************************************************!*\
-  !*** ./node_modules/topt-core/build/core/objects/BaseOverview.js ***!
-  \*******************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.BaseOverview = void 0;
-class BaseOverview {
-    constructor() {
-        this.facilityID = "";
-        this.facilityName = "";
-        this.facilityType = "";
-        this.fightDuration = 0;
-        this.participants = [];
-        this.events = [];
-        this.encounters = [];
-        this.enc = [];
-        this.top = {
-            kills: ["", 0],
-            heals: ["", 0],
-            revives: ["", 0],
-            resupplies: ["", 0],
-        };
-    }
-}
-exports.BaseOverview = BaseOverview;
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/objects/BaseStatus.js":
-/*!*****************************************************************!*\
-  !*** ./node_modules/topt-core/build/core/objects/BaseStatus.js ***!
-  \*****************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.BaseStatus = void 0;
-class BaseStatus {
-    constructor() {
-        this.timestamp = 0;
-        this.alive = 0;
-        this.dead = 0;
-        this.total = 0;
-    }
-}
-exports.BaseStatus = BaseStatus;
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/objects/SquadStat.js":
-/*!****************************************************************!*\
-  !*** ./node_modules/topt-core/build/core/objects/SquadStat.js ***!
-  \****************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.SquadStat = void 0;
-class SquadStat {
-    constructor() {
-        /**
-         * Name of the squad these stats are for
-         */
-        this.name = "";
-        /**
-         * Lets of members in the squad
-         */
-        this.members = [];
-        /**
-         * Number of kills people in the squad got
-         */
-        this.kills = 0;
-        /**
-         * Number of deaths people in the squad got
-         */
-        this.deaths = 0;
-        /**
-         * Number of revives the people in the squad got
-         */
-        this.revives = 0;
-        /**
-         * Number of heals people in the squad got
-         */
-        this.heals = 0;
-        /**
-         * Number of resupplies people in the squad got
-         */
-        this.resupplies = 0;
-        /**
-         * Number of repairs people in the squad got
-         */
-        this.repairs = 0;
-        /**
-         * Number of vehicle kills people in the squad got
-         */
-        this.vKills = 0;
-    }
-}
-exports.SquadStat = SquadStat;
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/objects/TrackedPlayer.js":
-/*!********************************************************************!*\
-  !*** ./node_modules/topt-core/build/core/objects/TrackedPlayer.js ***!
-  \********************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.TrackedPlayer = void 0;
-const StatMap_1 = __webpack_require__(/*! ../StatMap */ "./node_modules/topt-core/build/core/StatMap.js");
-/**
- * Represents a character that is being tracked
- */
-class TrackedPlayer {
-    constructor() {
-        /**
-         * Unique character ID of the tracked player
-         */
-        this.characterID = "";
-        /**
-         * Tag of the outfit, if the character is in one
-         */
-        this.outfitTag = "";
-        /**
-         * Name of the character
-         */
-        this.name = "";
-        /**
-         * What faction the character is a part of
-         */
-        this.faction = "";
-        /**
-         * How much accumulated score a character has gotten during tracking
-         */
-        this.score = 0;
-        /**
-         * If this character is currently online
-         */
-        this.online = true;
-        /**
-         * What time (in MS) the character more recently joined, to a minimum of when the tracker started
-         */
-        this.joinTime = 0;
-        /**
-         * How many seconds the character has been online for
-         */
-        this.secondsOnline = 0;
-        /**
-         * How many times a character has gotten each experience event
-         */
-        this.stats = new StatMap_1.default();
-        /**
-         * How many times a character has gotten each ribbon
-         */
-        this.ribbons = new StatMap_1.default();
-        /**
-         * Reference to the most recent death event, used for tracking revives
-         */
-        this.recentDeath = null;
-        /**
-         * The events that have occured because of a player
-         */
-        this.events = [];
-    }
-}
-exports.TrackedPlayer = TrackedPlayer;
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/objects/index.js":
-/*!************************************************************!*\
-  !*** ./node_modules/topt-core/build/core/objects/index.js ***!
-  \************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.BaseStatus = exports.BaseFightEncounter = exports.BaseFightEntry = exports.BaseOverview = exports.SquadStat = exports.TrackedPlayer = exports.BaseExchange = void 0;
-const BaseExchange_1 = __webpack_require__(/*! ./BaseExchange */ "./node_modules/topt-core/build/core/objects/BaseExchange.js");
-Object.defineProperty(exports, "BaseExchange", { enumerable: true, get: function () { return BaseExchange_1.BaseExchange; } });
-const TrackedPlayer_1 = __webpack_require__(/*! ./TrackedPlayer */ "./node_modules/topt-core/build/core/objects/TrackedPlayer.js");
-Object.defineProperty(exports, "TrackedPlayer", { enumerable: true, get: function () { return TrackedPlayer_1.TrackedPlayer; } });
-const SquadStat_1 = __webpack_require__(/*! ./SquadStat */ "./node_modules/topt-core/build/core/objects/SquadStat.js");
-Object.defineProperty(exports, "SquadStat", { enumerable: true, get: function () { return SquadStat_1.SquadStat; } });
-const BaseOverview_1 = __webpack_require__(/*! ./BaseOverview */ "./node_modules/topt-core/build/core/objects/BaseOverview.js");
-Object.defineProperty(exports, "BaseOverview", { enumerable: true, get: function () { return BaseOverview_1.BaseOverview; } });
-const BaseFightEntry_1 = __webpack_require__(/*! ./BaseFightEntry */ "./node_modules/topt-core/build/core/objects/BaseFightEntry.js");
-Object.defineProperty(exports, "BaseFightEntry", { enumerable: true, get: function () { return BaseFightEntry_1.BaseFightEntry; } });
-const BaseFightEncounter_1 = __webpack_require__(/*! ./BaseFightEncounter */ "./node_modules/topt-core/build/core/objects/BaseFightEncounter.js");
-Object.defineProperty(exports, "BaseFightEncounter", { enumerable: true, get: function () { return BaseFightEncounter_1.BaseFightEncounter; } });
-const BaseStatus_1 = __webpack_require__(/*! ./BaseStatus */ "./node_modules/topt-core/build/core/objects/BaseStatus.js");
-Object.defineProperty(exports, "BaseStatus", { enumerable: true, get: function () { return BaseStatus_1.BaseStatus; } });
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/reports/FightReport.js":
-/*!******************************************************************!*\
-  !*** ./node_modules/topt-core/build/core/reports/FightReport.js ***!
-  \******************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.FightReportGenerator = exports.FightReportPlayer = exports.FightReportEntry = exports.FightReportEncounter = exports.FightReport = exports.FightReportParameters = void 0;
-const ApiWrapper_1 = __webpack_require__(/*! ../census/ApiWrapper */ "./node_modules/topt-core/build/core/census/ApiWrapper.js");
-const PsEvent_1 = __webpack_require__(/*! ../PsEvent */ "./node_modules/topt-core/build/core/PsEvent.js");
-const EventReporter_1 = __webpack_require__(/*! ../EventReporter */ "./node_modules/topt-core/build/core/EventReporter.js");
-const InvididualGenerator_1 = __webpack_require__(/*! ../InvididualGenerator */ "./node_modules/topt-core/build/core/InvididualGenerator.js");
-const FacilityAPI_1 = __webpack_require__(/*! ../census/FacilityAPI */ "./node_modules/topt-core/build/core/census/FacilityAPI.js");
-const StatMap_1 = __webpack_require__(/*! ../StatMap */ "./node_modules/topt-core/build/core/StatMap.js");
-const Loggers_1 = __webpack_require__(/*! ../Loggers */ "./node_modules/topt-core/build/core/Loggers.js");
-const log = Loggers_1.Logger.getLogger("FightReport");
-class FightReportParameters {
-    constructor() {
-        /**
-         * Events used to generate the report
-         */
-        this.events = [];
-        /**
-         * Map of players that will be part of the report <Character ID, TrackedPlayer>
-         */
-        this.players = new Map();
-    }
-}
-exports.FightReportParameters = FightReportParameters;
-class FightReport {
-    constructor() {
-        /**
-         * When the first event was created
-         */
-        this.startTime = new Date();
-        /**
-         * When the last event was produced
-         */
-        this.endTime = new Date();
-        /**
-         * Each fight in the session
-         */
-        this.entries = [];
-    }
-}
-exports.FightReport = FightReport;
-class FightReportEncounter {
-    constructor() {
-        this.charID = "";
-        this.timestamps = [];
-    }
-}
-exports.FightReportEncounter = FightReportEncounter;
-class FightReportEntry {
-    constructor() {
-        /**
-         * When the fight started
-         */
-        this.startTime = new Date();
-        /**
-         * When the fight ended
-         */
-        this.endTime = new Date();
-        /**
-         * How long the fight lasted in seconds
-         */
-        this.duration = 0;
-        /**
-         * ID of the facility the fight might have taken place at
-         */
-        this.facilityID = null;
-        /**
-         * Idk what I'll use this for yet
-         */
-        this.name = "Unknown fight";
-        /**
-         * Players who were tracked for this fight
-         */
-        this.participants = [];
-        /**
-         * Breakdown of classes at the fight
-         */
-        this.classBreakdown = new EventReporter_1.BreakdownArray();
-        /**
-         * Events that occured during the fight
-         */
-        this.events = [];
-        /**
-         * Char IDs of all the allies found at the fight
-         */
-        this.allies = new Map();
-        /**
-         * Char IDs of all enemies found at the fight
-         */
-        this.enemies = new Map();
-        this.count = {
-            score: 0,
-            kills: 0,
-            deaths: 0,
-            revives: 0,
-            heals: 0,
-            spawns: 0
-        };
-        this.perPlayer = {
-            kpm: [],
-            dpm: [],
-            kd: [],
-            hpm: [],
-            rpm: []
-        };
-        this.charts = {
-            kills: [],
-            deaths: [],
-            heals: [],
-            revives: [],
-            kpm: [],
-            uniqueEnemies: []
-        };
-    }
-}
-exports.FightReportEntry = FightReportEntry;
-/**
- * What a single player did during a single fight
- */
-class FightReportPlayer {
-    constructor() {
-        /**
-         * ID of the player
-         */
-        this.ID = "";
-        /**
-         * Name of the player
-         */
-        this.name = "";
-        /**
-         * Outfit tag of the player
-         */
-        this.tag = "";
-        /**
-         * When the first event during a fight was
-         */
-        this.startDate = new Date();
-        /**
-         * When the last event during a fight was
-         */
-        this.endDate = new Date();
-        /**
-         * How long in seconds this player was part of the fight
-         */
-        this.duration = 0;
-        /**
-         * How many kills this player got during the fight
-         */
-        this.kills = 0;
-        /**
-         * How many times this player died during the fight
-         */
-        this.deaths = 0;
-        /**
-         * How many heals they got during this fight
-         */
-        this.heals = 0;
-        /**
-         * How many revives they got during the fight
-         */
-        this.revives = 0;
-        /**
-         * How many spawns they got during the fight
-         */
-        this.spawns = 0;
-    }
-}
-exports.FightReportPlayer = FightReportPlayer;
-class FightReportGenerator {
-    static generate(parameters) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const report = new FightReport();
-        if (parameters.events.length == 0 || parameters.players.size == 0) {
-            response.resolveOk(report);
-            return response;
-        }
-        report.startTime = new Date(parameters.events[0].timestamp);
-        report.endTime = new Date(parameters.events[parameters.events.length - 1].timestamp);
-        const playerIDs = [];
-        parameters.players.forEach((player, charID) => {
-            playerIDs.push(charID);
-        });
-        log.debug(`Looking for these char IDs for capture/defend events: [${playerIDs.join(", ")}]`);
-        const facilityIDs = parameters.events.filter(iter => iter.type == "capture" || iter.type == "defend")
-            .map(iter => iter.facilityID)
-            .filter((v, i, a) => a.indexOf(v) == i);
-        // These events will contain the char ID of someone who is allied to the source,
-        //      which is useful in determining which base a fight took place at
-        const allyEventIDs = [
-            PsEvent_1.PsEvent.heal, PsEvent_1.PsEvent.squadHeal,
-            PsEvent_1.PsEvent.revive, PsEvent_1.PsEvent.squadRevive,
-            PsEvent_1.PsEvent.resupply, PsEvent_1.PsEvent.squadResupply,
-            PsEvent_1.PsEvent.maxRepair, PsEvent_1.PsEvent.squadMaxRepair,
-            PsEvent_1.PsEvent.shieldRepair, PsEvent_1.PsEvent.squadShieldRepair,
-        ];
-        FacilityAPI_1.FacilityAPI.getByIDs(facilityIDs).ok((facilities) => {
-            var _a, _b;
-            log.debug(`Loaded ${facilities.length} from ${facilityIDs.length} IDs`);
-            let inFight = false;
-            let entry = new FightReportEntry();
-            let alliesFound = new Map();
-            let enemiesFound = new Map();
-            for (let i = 0; i < parameters.events.length; ++i) {
-                const event = parameters.events[i];
-                // Check if this is a fight start marker
-                if (event.type == "marker") {
-                    // Check if we're starting a fight or not
-                    if (event.mark == "battle-start") {
-                        if (inFight == false) {
-                            log.debug(`New fight started at ${event.timestamp}`);
-                            entry.startTime = new Date(event.timestamp);
-                        }
-                        inFight = true;
-                    }
-                    else if (event.mark == "battle-end") {
-                        if (inFight == true) {
-                            log.debug(`Current fight ended at ${event.timestamp} (from ${entry.startTime.getTime()}), saving`);
-                            entry.endTime = new Date(event.timestamp);
-                            entry.duration = (event.timestamp - entry.startTime.getTime()) / 1000; // ms to seconds
-                            entry.allies = alliesFound;
-                            entry.enemies = enemiesFound;
-                            log.info(`#Allies: ${entry.allies.size}, #Enemies: ${entry.enemies.size}`);
-                            report.entries.push(this.finalizeEntry(entry, parameters, facilities));
-                            entry = new FightReportEntry();
-                        }
-                        inFight = false;
-                    }
-                }
-                // Who cares if we're not in a fight
-                if (inFight == false) {
-                    continue;
-                }
-                entry.events.push(event);
-                // Handle the event based on it's type
-                if (event.type == "kill") {
-                    ++entry.count.kills;
-                    enemiesFound.set(event.targetID, event.timestamp);
-                }
-                else if (event.type == "death") {
-                    if (event.revived == false) {
-                        ++entry.count.deaths;
-                    }
-                    enemiesFound.set(event.targetID, event.timestamp);
-                }
-                else if (event.type == "exp") {
-                    if (event.expID == PsEvent_1.PsEvent.heal || event.expID == PsEvent_1.PsEvent.squadHeal) {
-                        ++entry.count.heals;
-                    }
-                    else if (event.expID == PsEvent_1.PsEvent.revive || event.expID == PsEvent_1.PsEvent.squadRevive) {
-                        ++entry.count.revives;
-                    }
-                    else if (event.expID == PsEvent_1.PsEvent.squadSpawn || ["201", "233", "355", "1410"].indexOf(event.expID) > -1) {
-                        ++entry.count.spawns;
-                    }
-                    if (allyEventIDs.indexOf(event.expID) > -1) {
-                        alliesFound.set(event.targetID, event.timestamp);
-                    }
-                }
-                else if (event.type == "capture") {
-                    if (playerIDs.indexOf(event.sourceID) > -1) {
-                        if (entry.facilityID == null) {
-                            const fac = facilities.find(iter => iter.ID == event.facilityID);
-                            entry.name = `Successful capture of ${(_a = fac === null || fac === void 0 ? void 0 : fac.name) !== null && _a !== void 0 ? _a : `bad ID ${event.facilityID}`}`;
-                            entry.facilityID = event.facilityID;
-                        }
-                        else if (entry.facilityID != event.facilityID) {
-                            log.warn(`Fight already has a name: ${entry.name}`);
-                        }
-                    }
-                    else {
-                        //log.debug(`${event.sourceID} is not tracked, skipping`);
-                    }
-                }
-                else if (event.type == "defend" && playerIDs.indexOf(event.sourceID) > -1) {
-                    if (entry.facilityID == null) {
-                        const fac = facilities.find(iter => iter.ID == event.facilityID);
-                        entry.name = `Successful defense of ${(_b = fac === null || fac === void 0 ? void 0 : fac.name) !== null && _b !== void 0 ? _b : `bad ID ${event.facilityID}`}`;
-                        entry.facilityID = event.facilityID;
-                    }
-                    else if (entry.facilityID != event.facilityID) {
-                        log.warn(`Fight already has a name: ${entry.name}`);
-                    }
-                }
-            }
-            response.resolveOk(report);
-        });
-        return response;
-    }
-    /**
-     * Finalize the entry to be added to a report, such as getting the top contributers, kills over time, etc.
-     *
-     * @param entry Entry to finalize before inserting
-     *
-     * @returns |entry|
-     */
-    static finalizeEntry(entry, parameters, facilities) {
-        // Get all the participants during a fight
-        for (const event of entry.events) {
-            const player = parameters.players.get(event.sourceID);
-            if (player == undefined) {
-                continue;
-            }
-            let part = entry.participants.find(iter => iter.ID == event.sourceID);
-            if (part == undefined) {
-                part = {
-                    ID: player.characterID,
-                    name: player.name,
-                    tag: player.outfitTag,
-                    startDate: entry.startTime,
-                    endDate: new Date(),
-                    duration: 0,
-                    kills: 0,
-                    deaths: 0,
-                    heals: 0,
-                    revives: 0,
-                    spawns: 0
-                };
-                entry.participants.push(part);
-            }
-            if (event.type == "kill") {
-                ++part.kills;
-            }
-            else if (event.type == "death" && event.revived == false) {
-                ++part.deaths;
-            }
-            else if (event.type == "exp") {
-                if (event.expID == PsEvent_1.PsEvent.heal || event.expID == PsEvent_1.PsEvent.squadHeal) {
-                    ++part.heals;
-                }
-                else if (event.expID == PsEvent_1.PsEvent.revive || event.expID == PsEvent_1.PsEvent.squadRevive) {
-                    ++part.revives;
-                }
-                else if (event.expID == PsEvent_1.PsEvent.squadSpawn || ["201", "233", "355", "1410"].indexOf(event.expID) > -1) {
-                    ++part.spawns;
-                }
-            }
-            if (event.timestamp < entry.startTime.getTime() || event.timestamp > entry.endTime.getTime()) {
-                log.warn(`Event at ${event.timestamp} occured outside fight period (${entry.startTime.getTime()} to ${entry.endTime.getTime()}): ${JSON.stringify(event)}`);
-            }
-        }
-        const classBreakdown = new EventReporter_1.BreakdownArray();
-        const classArray = [
-            { display: "Infiltrator", sortField: "", amount: 0, color: undefined },
-            { display: "Light Assault", sortField: "", amount: 0, color: undefined },
-            { display: "Medic", sortField: "", amount: 0, color: undefined },
-            { display: "Engineer", sortField: "", amount: 0, color: undefined },
-            { display: "Heavy", sortField: "", amount: 0, color: undefined },
-            { display: "MAX", sortField: "", amount: 0, color: undefined },
-        ];
-        const reversedEvents = [...entry.events].reverse();
-        for (const part of entry.participants) {
-            part.endDate = entry.endTime;
-            //part.endDate = new Date(reversedEvents.find(iter => iter.sourceID == part.ID)!.timestamp);
-            part.duration = (part.endDate.getTime() - part.startDate.getTime()) / 1000;
-            let kpm = part.kills / (part.duration / 60);
-            entry.perPlayer.kpm.push(Number.isFinite(kpm) == false ? 0 : kpm);
-            let dpm = part.deaths / (part.duration / 60);
-            entry.perPlayer.dpm.push(Number.isFinite(dpm) == false ? 0 : dpm);
-            let hpm = part.heals / (part.duration / 60);
-            entry.perPlayer.hpm.push(Number.isFinite(hpm) == false ? 0 : hpm);
-            let rpm = part.revives / (part.duration / 60);
-            entry.perPlayer.rpm.push(Number.isFinite(rpm) == false ? 0 : rpm);
-            let kd = part.kills / (part.deaths || 1);
-            entry.perPlayer.kd.push(Number.isFinite(kd) == false ? 0 : kd);
-            const playtime = InvididualGenerator_1.IndividualReporter.classUsage({
-                events: entry.events,
-                player: parameters.players.get(part.ID),
-                routers: [],
-                tracking: { startTime: 0, endTime: 0, running: false }
-            });
-            const c = classArray.find(iter => iter.display == playtime.mostPlayed.name);
-            if (c == undefined) {
-                log.warn(`Failed to find Breakdown for class '${playtime.mostPlayed.name}'`);
-            }
-            else {
-                c.amount += 1;
-            }
-            //log.info(`${part.name} playtime: ${JSON.stringify(playtime)}`);
-        }
-        classBreakdown.data = classArray;
-        classBreakdown.total = classArray.length;
-        entry.classBreakdown = classBreakdown;
-        entry.perPlayer.kpm.sort((a, b) => a - b);
-        entry.perPlayer.dpm.sort((a, b) => a - b);
-        entry.perPlayer.hpm.sort((a, b) => a - b);
-        entry.perPlayer.rpm.sort((a, b) => a - b);
-        entry.perPlayer.kd.sort((a, b) => a - b);
-        let killCount = 0;
-        let deathCount = 0;
-        let reviveCount = 0;
-        let healCount = 0;
-        let kpm = 0;
-        let kpmTime = entry.events[0].timestamp;
-        const kpmInterval = 10;
-        const encountered = [];
-        // More stat getting, it's in a separate loop to make things logically easier to understand
-        //      with the huge downside of going thru all the events multiple times
-        for (const event of entry.events) {
-            if (event.type == "kill") {
-                killCount += 1;
-                entry.charts.kills.push({
-                    startTime: event.timestamp,
-                    endTime: event.timestamp,
-                    value: killCount
-                });
-                if (event.timestamp > (kpmTime + (kpmInterval * 1000))) {
-                    entry.charts.kpm.push({
-                        startTime: event.timestamp,
-                        endTime: event.timestamp,
-                        value: (kpm * (60 / kpmInterval)) / entry.participants.length
-                    });
-                    kpm = 0;
-                    kpmTime = event.timestamp;
-                }
-                kpm += 1;
-                if (encountered.indexOf(event.targetID) == -1) {
-                    encountered.push(event.targetID);
-                    entry.charts.uniqueEnemies.push({
-                        startTime: event.timestamp,
-                        endTime: event.timestamp,
-                        value: encountered.length
-                    });
-                }
-            }
-            else if (event.type == "death") {
-                deathCount += 1;
-                entry.charts.deaths.push({
-                    startTime: event.timestamp,
-                    endTime: event.timestamp,
-                    value: deathCount
-                });
-                if (encountered.indexOf(event.targetID) == -1) {
-                    encountered.push(event.targetID);
-                    entry.charts.uniqueEnemies.push({
-                        startTime: event.timestamp,
-                        endTime: event.timestamp,
-                        value: encountered.length
-                    });
-                }
-            }
-            else if (event.type == "exp") {
-                if (event.expID == PsEvent_1.PsEvent.heal || event.expID == PsEvent_1.PsEvent.squadHeal) {
-                    healCount += 1;
-                    entry.charts.heals.push({
-                        startTime: event.timestamp,
-                        endTime: event.timestamp,
-                        value: healCount
-                    });
-                }
-                else if (event.expID == PsEvent_1.PsEvent.revive || event.expID == PsEvent_1.PsEvent.squadRevive) {
-                    reviveCount += 1;
-                    entry.charts.revives.push({
-                        startTime: event.timestamp,
-                        endTime: event.timestamp,
-                        value: reviveCount
-                    });
-                }
-            }
-        }
-        if (entry.facilityID == null) {
-            log.debug(`No name for fight yet, finding`);
-            log.debug(`Allies: ${entry.allies.size}`);
-            log.debug(`Enemies: ${entry.enemies.size}`);
-            let successCaps = new StatMap_1.default();
-            let failedCaps = new StatMap_1.default();
-            let successDef = new StatMap_1.default();
-            let failedDef = new StatMap_1.default();
-            for (const event of entry.events) {
-                if (event.type == "capture") {
-                    log.debug(`Capture event: ${JSON.stringify(event)}`);
-                    if (entry.allies.has(event.sourceID)) {
-                        const value = entry.allies.get(event.sourceID);
-                        const diff = value - entry.startTime.getTime();
-                        log.debug(`Have a ${diff}ms diff between when ${event.sourceID} was seen and a good cap`);
-                        successCaps.increment(event.facilityID, diff);
-                    }
-                    if (entry.enemies.has(event.sourceID)) {
-                        const value = entry.enemies.get(event.sourceID);
-                        const diff = value - entry.startTime.getTime();
-                        log.debug(`Have a ${diff}ms diff between when ${event.sourceID} was seen and a bad def`);
-                        failedDef.increment(event.facilityID, diff);
-                    }
-                }
-                else if (event.type == "defend") {
-                    log.debug(`Defend event: ${JSON.stringify(event)}`);
-                    if (entry.allies.has(event.sourceID)) {
-                        const value = entry.allies.get(event.sourceID);
-                        const diff = value - entry.startTime.getTime();
-                        log.debug(`Have a ${diff}ms diff between when ${event.sourceID} was seen and a good def`);
-                        successDef.increment(event.facilityID, diff);
-                    }
-                    if (entry.enemies.has(event.sourceID)) {
-                        const value = entry.enemies.get(event.sourceID);
-                        const diff = value - entry.startTime.getTime();
-                        log.debug(`Have a ${diff}ms diff between when ${event.sourceID} was seen and a good def`);
-                        failedCaps.increment(event.facilityID, diff);
-                    }
-                }
-            }
-            log.info(`Cap/Def info:\n #SuccessCaps: ${successCaps.size()}\n #FailedCaps: ${failedCaps.size()}\n #SuccessDefs: ${successDef.size()}\n #FailedDefs: ${failedDef.size()}`);
-            log.debug(`${successCaps}`);
-            log.debug(`${failedCaps}`);
-            log.debug(`${successDef}`);
-            log.debug(`${failedDef}`);
-            let confidence = 0;
-            let name = `Unknown fight`;
-            const updateWeight = (map, context) => {
-                map.getMap().forEach((weight, facID) => {
-                    var _a;
-                    log.debug(`Checking if ${weight} from '${context}' at ${facID} is greater than ${confidence}`);
-                    if (weight > confidence) {
-                        const facility = facilities.find(iter => iter.ID == facID);
-                        name = `${context} of ${(_a = facility === null || facility === void 0 ? void 0 : facility.name) !== null && _a !== void 0 ? _a : `unknown facility ID ${facID}`}`;
-                        confidence = weight;
-                        entry.facilityID = facID;
-                    }
-                });
-            };
-            updateWeight(successCaps, "Successful capture");
-            updateWeight(failedCaps, "Failed capture");
-            updateWeight(successDef, "Successful defense");
-            updateWeight(failedDef, "Failed defense");
-            entry.name = name;
-        }
-        return entry;
-    }
-}
-exports.FightReportGenerator = FightReportGenerator;
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/reports/OutfitReport.js":
-/*!*******************************************************************!*\
-  !*** ./node_modules/topt-core/build/core/reports/OutfitReport.js ***!
-  \*******************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.OutfitReportGenerator = exports.OutfitReport = exports.OutfitReportParameters = exports.OutfitReportSettings = void 0;
-const ApiWrapper_1 = __webpack_require__(/*! ../census/ApiWrapper */ "./node_modules/topt-core/build/core/census/ApiWrapper.js");
-const PsLoadout_1 = __webpack_require__(/*! ../census/PsLoadout */ "./node_modules/topt-core/build/core/census/PsLoadout.js");
-const PsEvent_1 = __webpack_require__(/*! ../PsEvent */ "./node_modules/topt-core/build/core/PsEvent.js");
-const EventReporter_1 = __webpack_require__(/*! ../EventReporter */ "./node_modules/topt-core/build/core/EventReporter.js");
-const InvididualGenerator_1 = __webpack_require__(/*! ../InvididualGenerator */ "./node_modules/topt-core/build/core/InvididualGenerator.js");
-const index_1 = __webpack_require__(/*! ../objects/index */ "./node_modules/topt-core/build/core/objects/index.js");
-const Squad_1 = __webpack_require__(/*! ../squad/Squad */ "./node_modules/topt-core/build/core/squad/Squad.js");
-const FacilityAPI_1 = __webpack_require__(/*! ../census/FacilityAPI */ "./node_modules/topt-core/build/core/census/FacilityAPI.js");
-const Loggers_1 = __webpack_require__(/*! ../Loggers */ "./node_modules/topt-core/build/core/Loggers.js");
-const log = Loggers_1.Logger.getLogger("OutfitReport");
-class OutfitReportSettings {
-    constructor() {
-        /**
-         * ID of the zone to limit events to. Leaven null for all zones
-         */
-        this.zoneID = null;
-        /**
-         * If squad stats will be generated and displayed
-         */
-        this.showSquadStats = false;
-    }
-}
-exports.OutfitReportSettings = OutfitReportSettings;
-/**
- * Parameters used to generate an outfit report
- */
-class OutfitReportParameters {
-    constructor() {
-        /**
-         * Settings used to generate the report
-         */
-        this.settings = new OutfitReportSettings();
-        /**
-         * Facility captures that will be included in the report
-         */
-        //public captures: FacilityCapture[] = [];
-        this.captures = [];
-        /**
-         * List of all the capture events related to players that will be included in the report
-         */
-        this.playerCaptures = [];
-        /**
-         * List of events that will be included in the report
-         */
-        this.events = [];
-        /**
-         * Map of players that will be part of the report <Character ID, TrackedPlayer>
-         */
-        this.players = new Map();
-        /**
-         * Squad stats
-         */
-        this.squads = {
-            perm: [],
-            guesses: []
-        };
-        /**
-         * List of outfit IDs that will be included in the report
-         */
-        this.outfits = [];
-        /**
-         * The period of time that the report will be generated over
-         */
-        this.tracking = new InvididualGenerator_1.TimeTracking();
-    }
-}
-exports.OutfitReportParameters = OutfitReportParameters;
-/**
- * Outfit report
- */
-class OutfitReport {
-    constructor() {
-        /**
-         * The various stats and how many the outfit got, based on the exp events
-         */
-        this.stats = new Map();
-        /**
-         * Total score that was gained during the ops
-         */
-        this.score = 0;
-        /**
-         * The players that make the outfit report
-         */
-        this.players = [];
-        /**
-         * List of events that was generated during the outfit report
-         */
-        this.events = [];
-        /**
-         * The start and stop times that tracking was done over
-         */
-        this.tracking = new InvididualGenerator_1.TimeTracking();
-        /**
-         * The facility captures that took place
-         */
-        this.facilityCaptures = [];
-        /**
-         * Breakdown of each class and how many of each exp event each class got
-         */
-        this.classStats = new Map();
-        /**
-         * Breakdown of the score, what how many of each event and how much score
-         */
-        this.scoreBreakdown = [];
-        /**
-         * How many seconds each class is played over all members
-         */
-        this.classPlaytimes = new EventReporter_1.BreakdownArray();
-        /**
-         * Collection of stats per 5 minute blocks
-         */
-        this.overtimePer5 = {
-            kpm: [],
-            kd: [],
-            rpm: [],
-        };
-        /**
-         * Collection of stats per 1 minute blocks
-         */
-        this.overtimePer1 = {
-            kpm: [],
-            kd: [],
-            rpm: [],
-        };
-        /**
-         * Collection of stats updated everytime a relevant event is performed
-         */
-        this.perUpdate = {
-            kpm: [],
-            kd: [],
-            rpm: []
-        };
-        /**
-         * Numbers used to create the boxplot of KPMs
-         */
-        this.kpmBoxPlot = {
-            total: [],
-            infil: [],
-            lightAssault: [],
-            medic: [],
-            engineer: [],
-            heavy: [],
-            max: []
-        };
-        /**
-         * Numbers used to create the boxplot of KDs
-         */
-        this.kdBoxPlot = {
-            total: [],
-            infil: [],
-            lightAssault: [],
-            medic: [],
-            engineer: [],
-            heavy: [],
-            max: []
-        };
-        this.squadStats = {
-            data: [],
-            all: new index_1.SquadStat()
-        };
-        this.weaponKillBreakdown = new EventReporter_1.BreakdownArray();
-        this.weaponTypeKillBreakdown = new EventReporter_1.BreakdownArray();
-        this.teamkillBreakdown = new EventReporter_1.BreakdownArray();
-        this.teamkillTypeBreakdown = new EventReporter_1.BreakdownArray();
-        this.deathAllBreakdown = new EventReporter_1.BreakdownArray();
-        this.deathAllTypeBreakdown = new EventReporter_1.BreakdownArray();
-        this.deathRevivedBreakdown = new EventReporter_1.BreakdownArray();
-        this.deathRevivedTypeBreakdown = new EventReporter_1.BreakdownArray();
-        this.deathKilledBreakdown = new EventReporter_1.BreakdownArray();
-        this.deathKilledTypeBreakdown = new EventReporter_1.BreakdownArray();
-        this.outfitVersusBreakdown = [];
-        this.weaponTypeDeathBreakdown = [];
-        this.vehicleKillBreakdown = new EventReporter_1.BreakdownArray();
-        this.vehicleKillWeaponBreakdown = new EventReporter_1.BreakdownArray();
-        /**
-         * Unused
-         */
-        this.timeUnrevived = [];
-        this.revivedLifeExpectance = [];
-        this.kmLifeExpectance = [];
-        this.kmTimeDead = [];
-        this.factionKillBreakdown = new EventReporter_1.BreakdownArray();
-        this.factionDeathBreakdown = new EventReporter_1.BreakdownArray();
-        this.continentKillBreakdown = new EventReporter_1.BreakdownArray();
-        this.continentDeathBreakdown = new EventReporter_1.BreakdownArray();
-        this.baseCaptures = [];
-        /**
-         * The KD of class against all other classes, i.e. how many kills/deaths medics got against heavies
-         */
-        this.classKds = {
-            infil: InvididualGenerator_1.classKdCollection(),
-            lightAssault: InvididualGenerator_1.classKdCollection(),
-            medic: InvididualGenerator_1.classKdCollection(),
-            engineer: InvididualGenerator_1.classKdCollection(),
-            heavy: InvididualGenerator_1.classKdCollection(),
-            max: InvididualGenerator_1.classKdCollection(),
-            total: InvididualGenerator_1.classKdCollection()
-        };
-        this.classTypeKills = {
-            infil: new EventReporter_1.BreakdownArray(),
-            lightAssault: new EventReporter_1.BreakdownArray(),
-            medic: new EventReporter_1.BreakdownArray(),
-            engineer: new EventReporter_1.BreakdownArray(),
-            heavy: new EventReporter_1.BreakdownArray(),
-            max: new EventReporter_1.BreakdownArray(),
-        };
-        this.classTypeDeaths = {
-            infil: new EventReporter_1.BreakdownArray(),
-            lightAssault: new EventReporter_1.BreakdownArray(),
-            medic: new EventReporter_1.BreakdownArray(),
-            engineer: new EventReporter_1.BreakdownArray(),
-            heavy: new EventReporter_1.BreakdownArray(),
-            max: new EventReporter_1.BreakdownArray(),
-        };
-    }
-}
-exports.OutfitReport = OutfitReport;
-class OutfitReportGenerator {
-    static generate(parameters) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const report = new OutfitReport();
-        report.tracking = parameters.tracking;
-        response.addStep("Facility captures")
-            .addStep("Weapon kills")
-            .addStep("Weapon type kills")
-            .addStep("Teamkills")
-            .addStep("Faction kills")
-            .addStep("Faction deaths")
-            .addStep("Continent kills")
-            .addStep("Continent deaths")
-            .addStep("All weapon deaths")
-            .addStep("Unrevived weapon deaths")
-            .addStep("Revived weapon deaths")
-            .addStep("All weapon type deaths")
-            .addStep("Unrevived weapon type deaths")
-            .addStep("Revived weapon type deaths")
-            .addStep("Weapon death breakdown")
-            .addStep("Outfit KD")
-            .addStep("Vehicle kills")
-            .addStep("Vehicle weapon kills");
-        for (const clazz of ["Infil", "LA", "Medic", "Engineer", "Heavy", "MAX"]) {
-            response.addStep(`Weapon type kills for ${clazz}`);
-            response.addStep(`Weapon type deaths for ${clazz}`);
-        }
-        let opsLeft = response.getSteps().length;
-        const totalOps = opsLeft;
-        const callback = (step) => {
-            return () => {
-                log.debug(`Finished ${step}: Have ${opsLeft - 1} ops left outta ${totalOps}`);
-                response.finishStep(step);
-                if (--opsLeft == 0) {
-                    response.resolveOk(report);
-                }
-            };
-        };
-        const facilityIDs = parameters.captures.filter(iter => parameters.outfits.indexOf(iter.outfitID) > -1)
-            .map(iter => iter.facilityID)
-            .filter((value, index, arr) => arr.indexOf(value) == index);
-        FacilityAPI_1.FacilityAPI.getByIDs(facilityIDs).ok((data) => {
-            log.debug(`Got these facilities when loaded: [${facilityIDs.join(", ")}]:\n${JSON.stringify(data)}`);
-            let missing = [];
-            for (const capture of parameters.captures) {
-                if (parameters.outfits.indexOf(capture.outfitID) == -1) {
-                    continue;
-                }
-                const facility = data.find(iter => iter.ID == capture.facilityID);
-                if (facility != undefined) {
-                    const cap = {
-                        facilityID: facility.ID,
-                        zoneID: capture.zoneID,
-                        name: facility.name,
-                        typeID: facility.typeID,
-                        type: facility.type,
-                        timestamp: capture.timestamp,
-                        timeHeld: capture.timeHeld,
-                        factionID: capture.factionID,
-                        outfitID: capture.outfitID,
-                        previousFaction: capture.previousFaction
-                    };
-                    report.facilityCaptures.push(cap);
-                }
-                else {
-                    if (missing.indexOf(capture.facilityID) == -1) {
-                        log.warn(`Failed to find facility ID ${capture.facilityID}`);
-                        missing.push(capture.facilityID);
-                    }
-                }
-            }
-            report.facilityCaptures.sort((a, b) => {
-                return a.timestamp.getTime() - b.timestamp.getTime();
-            });
-            EventReporter_1.default.facilityCaptures({
-                captures: report.facilityCaptures,
-                players: parameters.playerCaptures
-            }).ok(data => report.baseCaptures = data).always(callback("Facility captures"));
-        });
-        const chars = Array.from(parameters.players.values());
-        report.kpmBoxPlot = {
-            total: EventReporter_1.default.kpmBoxplot(chars, parameters.tracking),
-            infil: EventReporter_1.default.kpmBoxplot(chars, parameters.tracking, "infil"),
-            lightAssault: EventReporter_1.default.kpmBoxplot(chars, parameters.tracking, "lightAssault"),
-            medic: EventReporter_1.default.kpmBoxplot(chars, parameters.tracking, "medic"),
-            engineer: EventReporter_1.default.kpmBoxplot(chars, parameters.tracking, "engineer"),
-            heavy: EventReporter_1.default.kpmBoxplot(chars, parameters.tracking, "heavy"),
-            max: EventReporter_1.default.kpmBoxplot(chars, parameters.tracking, "max"),
-        };
-        report.kdBoxPlot = {
-            total: EventReporter_1.default.kdBoxplot(chars, parameters.tracking),
-            infil: EventReporter_1.default.kdBoxplot(chars, parameters.tracking, "infil"),
-            lightAssault: EventReporter_1.default.kdBoxplot(chars, parameters.tracking, "lightAssault"),
-            medic: EventReporter_1.default.kdBoxplot(chars, parameters.tracking, "medic"),
-            engineer: EventReporter_1.default.kdBoxplot(chars, parameters.tracking, "engineer"),
-            heavy: EventReporter_1.default.kdBoxplot(chars, parameters.tracking, "heavy"),
-            max: EventReporter_1.default.kdBoxplot(chars, parameters.tracking, "max")
-        };
-        parameters.players.forEach((player, charID) => {
-            player.stats.getMap().forEach((amount, expID) => {
-                var _a;
-                const event = PsEvent_1.PsEvents.get(expID);
-                if (event == undefined) {
-                    return;
-                }
-                const reportAmount = (_a = report.stats.get(event.name)) !== null && _a !== void 0 ? _a : 0;
-                report.stats.set(event.name, reportAmount + amount);
-            });
-        });
-        const playtimes = [];
-        parameters.players.forEach((player, charID) => {
-            if (player.events.length == 0) {
-                return;
-            }
-            report.score += player.score;
-            report.events.push(...player.events);
-            const playtime = InvididualGenerator_1.IndividualReporter.classUsage({
-                player: player,
-                events: [],
-                routers: [],
-                tracking: parameters.tracking
-            });
-            playtimes.push(playtime);
-            report.players.push(Object.assign({ name: `${(player.outfitTag != '' ? `[${player.outfitTag}] ` : '')}${player.name}` }, playtime));
-        });
-        EventReporter_1.default.classPlaytimes(playtimes).ok(data => report.classPlaytimes = data).always(() => callback("Class playtimes"));
-        report.events = report.events.sort((a, b) => a.timestamp - b.timestamp);
-        // Track how many headshots each class got
-        const headshots = EventReporter_1.classCollectionNumber();
-        for (const ev of report.events) {
-            if (ev.type != "kill" || ev.isHeadshot == false) {
-                continue;
-            }
-            const loadout = PsLoadout_1.PsLoadouts.get(ev.loadoutID);
-            if (loadout == undefined) {
-                continue;
-            }
-            if (loadout.type == "infil") {
-                ++headshots.infil;
-            }
-            else if (loadout.type == "lightAssault") {
-                ++headshots.lightAssault;
-            }
-            else if (loadout.type == "medic") {
-                ++headshots.medic;
-            }
-            else if (loadout.type == "engineer") {
-                ++headshots.engineer;
-            }
-            else if (loadout.type == "heavy") {
-                ++headshots.heavy;
-            }
-            else if (loadout.type == "max") {
-                ++headshots.max;
-            }
-            ++headshots.total;
-        }
-        report.classStats.set("Headshot", headshots);
-        for (const ev of report.events) {
-            let statName = "Other";
-            if (ev.type == "kill") {
-                statName = "Kill";
-            }
-            else if (ev.type == "death") {
-                statName = (ev.revived == true) ? "Revived" : "Death";
-            }
-            else if (ev.type == "exp") {
-                const event = PsEvent_1.PsEvents.get(ev.expID);
-                if (event != undefined) {
-                    if (event.track == false) {
-                        continue;
-                    }
-                    statName = event.name;
-                }
-            }
-            else {
-                continue;
-            }
-            if (!report.classStats.has(statName)) {
-                //log.debug(`Added stats for '${statName}'`);
-                report.classStats.set(statName, EventReporter_1.classCollectionNumber());
-            }
-            const classCollection = report.classStats.get(statName);
-            ++classCollection.total;
-            const loadout = PsLoadout_1.PsLoadouts.get(ev.loadoutID);
-            if (loadout == undefined) {
-                continue;
-            }
-            if (loadout.type == "infil") {
-                ++classCollection.infil;
-            }
-            else if (loadout.type == "lightAssault") {
-                ++classCollection.lightAssault;
-            }
-            else if (loadout.type == "medic") {
-                ++classCollection.medic;
-            }
-            else if (loadout.type == "engineer") {
-                ++classCollection.engineer;
-            }
-            else if (loadout.type == "heavy") {
-                ++classCollection.heavy;
-            }
-            else if (loadout.type == "max") {
-                ++classCollection.max;
-            }
-        }
-        EventReporter_1.default.weaponKills(report.events).ok(data => report.weaponKillBreakdown = data).always(callback("Weapon kills"));
-        EventReporter_1.default.weaponTypeKills(report.events).ok(data => report.weaponTypeKillBreakdown = data).always(callback("Weapon type kills"));
-        EventReporter_1.default.weaponTeamkills(report.events).ok(data => report.teamkillBreakdown = data).always(callback("Teamkills"));
-        EventReporter_1.default.factionKills(report.events).ok(data => report.factionKillBreakdown = data).always(callback("Faction kills"));
-        EventReporter_1.default.factionDeaths(report.events).ok(data => report.factionDeathBreakdown = data).always(callback("Faction deaths"));
-        EventReporter_1.default.continentKills(report.events).ok(data => report.continentKillBreakdown = data).always(callback("Continent kills"));
-        EventReporter_1.default.continentDeaths(report.events).ok(data => report.continentDeathBreakdown = data).always(callback("Continent deaths"));
-        EventReporter_1.default.weaponDeaths(report.events).ok(data => report.deathAllBreakdown = data).always(callback("All weapon deaths"));
-        EventReporter_1.default.weaponDeaths(report.events, true).ok(data => report.deathRevivedBreakdown = data).always(callback("Revived weapon deaths"));
-        EventReporter_1.default.weaponDeaths(report.events, false).ok(data => report.deathKilledBreakdown = data).always(callback("Unrevived weapon deaths"));
-        EventReporter_1.default.weaponTypeDeaths(report.events).ok(data => report.deathAllTypeBreakdown = data).always(callback("All weapon type deaths"));
-        EventReporter_1.default.weaponTypeDeaths(report.events, true).ok(data => report.deathRevivedTypeBreakdown = data).always(callback("Revived weapon type deaths"));
-        EventReporter_1.default.weaponTypeDeaths(report.events, false).ok(data => report.deathKilledTypeBreakdown = data).always(callback("Unrevived weapon type deaths"));
-        EventReporter_1.default.weaponDeathBreakdown(report.events).ok(data => report.weaponTypeDeathBreakdown = data).always(callback("Weapon death breakdown"));
-        /* Not super useful and take a long time to generate
-        report.timeUnrevived = IndividualReporter.unrevivedTime(report.events);
-        report.revivedLifeExpectance = IndividualReporter.reviveLifeExpectance(report.events);
-        report.kmLifeExpectance = IndividualReporter.lifeExpectanceRate(report.events);
-        report.kmTimeDead = IndividualReporter.timeUntilReviveRate(report.events);
-        */
-        const classFilter = (iter, type, loadouts) => {
-            if (iter.type == type) {
-                return loadouts.indexOf(iter.loadoutID) > -1;
-            }
-            return false;
-        };
-        EventReporter_1.default.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["1", "8", "15"])))
-            .ok(data => report.classTypeKills.infil = data).always(callback("Weapon type kills for Infil"));
-        EventReporter_1.default.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["3", "10", "17"])))
-            .ok(data => report.classTypeKills.lightAssault = data).always(callback("Weapon type kills for LA"));
-        EventReporter_1.default.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["4", "11", "18"])))
-            .ok(data => report.classTypeKills.medic = data).always(callback("Weapon type kills for Medic"));
-        EventReporter_1.default.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["5", "12", "19"])))
-            .ok(data => report.classTypeKills.engineer = data).always(callback("Weapon type kills for Engineer"));
-        EventReporter_1.default.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["6", "13", "20"])))
-            .ok(data => report.classTypeKills.heavy = data).always(callback("Weapon type kills for Heavy"));
-        EventReporter_1.default.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["7", "14", "21"])))
-            .ok(data => report.classTypeKills.max = data).always(callback("Weapon type kills for MAX"));
-        EventReporter_1.default.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["1", "8", "15"])))
-            .ok(data => report.classTypeDeaths.infil = data).always(callback("Weapon type deaths for Infil"));
-        EventReporter_1.default.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["3", "10", "17"])))
-            .ok(data => report.classTypeDeaths.lightAssault = data).always(callback("Weapon type deaths for LA"));
-        EventReporter_1.default.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["4", "11", "18"])))
-            .ok(data => report.classTypeDeaths.medic = data).always(callback("Weapon type deaths for Medic"));
-        EventReporter_1.default.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["5", "12", "19"])))
-            .ok(data => report.classTypeDeaths.engineer = data).always(callback("Weapon type deaths for Engineer"));
-        EventReporter_1.default.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["6", "13", "20"])))
-            .ok(data => report.classTypeDeaths.heavy = data).always(callback("Weapon type deaths for Heavy"));
-        EventReporter_1.default.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["7", "14", "21"])))
-            .ok(data => report.classTypeDeaths.max = data).always(callback("Weapon type deaths for MAX"));
-        report.classKds.infil = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events, "infil");
-        report.classKds.lightAssault = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events, "lightAssault");
-        report.classKds.medic = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events, "medic");
-        report.classKds.engineer = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events, "engineer");
-        report.classKds.heavy = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events, "heavy");
-        report.classKds.max = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events, "max");
-        report.classKds.total = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events);
-        EventReporter_1.default.outfitVersusBreakdown(report.events).ok(data => report.outfitVersusBreakdown = data).always(callback("Outfit KD"));
-        EventReporter_1.default.vehicleKills(report.events).ok(data => report.vehicleKillBreakdown = data).always(callback("Vehicle kills"));
-        EventReporter_1.default.vehicleWeaponKills(report.events).ok(data => report.vehicleKillWeaponBreakdown = data).always(callback("Vehicle weapon kills"));
-        const getSquadStats = (squad, name) => {
-            const squadIDs = squad.members.map(iter => iter.charID);
-            return {
-                name: name,
-                members: squad.members.map(iter => iter.name),
-                kills: parameters.events.filter(iter => iter.type == "kill"
-                    && squadIDs.indexOf(iter.sourceID) > -1).length,
-                deaths: parameters.events.filter(iter => iter.type == "death" && iter.revived == false
-                    && squadIDs.indexOf(iter.sourceID) > -1).length,
-                revives: parameters.events.filter(iter => iter.type == "exp"
-                    && (iter.expID == PsEvent_1.PsEvent.revive || iter.expID == PsEvent_1.PsEvent.squadRevive)
-                    && squadIDs.indexOf(iter.sourceID) > -1).length,
-                heals: parameters.events.filter(iter => iter.type == "exp"
-                    && (iter.expID == PsEvent_1.PsEvent.heal || iter.expID == PsEvent_1.PsEvent.squadHeal)
-                    && squadIDs.indexOf(iter.sourceID) > -1).length,
-                resupplies: parameters.events.filter(iter => iter.type == "exp"
-                    && (iter.expID == PsEvent_1.PsEvent.resupply || iter.expID == PsEvent_1.PsEvent.squadResupply)
-                    && squadIDs.indexOf(iter.sourceID) > -1).length,
-                repairs: parameters.events.filter(iter => iter.type == "exp"
-                    && (iter.expID == PsEvent_1.PsEvent.maxRepair || iter.expID == PsEvent_1.PsEvent.squadMaxRepair)
-                    && squadIDs.indexOf(iter.sourceID) > -1).length,
-                vKills: parameters.events.filter(iter => iter.type == "vehicle"
-                    && squadIDs.indexOf(iter.sourceID) > -1).length,
-            };
-        };
-        for (const squad of parameters.squads.perm) {
-            report.squadStats.data.push(getSquadStats(squad, squad.display || "Other"));
-        }
-        for (const squad of parameters.squads.guesses) {
-            report.squadStats.data.push(getSquadStats(squad, squad.display || "Other"));
-        }
-        const allSquad = new Squad_1.Squad();
-        for (const squad of [...parameters.squads.perm, ...parameters.squads.guesses]) {
-            allSquad.members.push(...squad.members);
-        }
-        report.squadStats.all = getSquadStats(allSquad, "All");
-        report.squadStats.data.push(report.squadStats.all);
-        let otherIDs = [];
-        const breakdown = new Map();
-        for (const event of report.events) {
-            if (event.type == "exp") {
-                const exp = PsEvent_1.PsEvents.get(event.expID) || PsEvent_1.PsEvent.other;
-                if (!breakdown.has(exp.name)) {
-                    breakdown.set(exp.name, new InvididualGenerator_1.ExpBreakdown());
-                }
-                const score = breakdown.get(exp.name);
-                score.name = exp.name;
-                score.score += event.amount;
-                score.amount += 1;
-                if (exp == PsEvent_1.PsEvent.other) {
-                    otherIDs.push(event.expID);
-                }
-            }
-        }
-        log.debug(`Untracked experience IDs: ${otherIDs.filter((v, i, a) => a.indexOf(v) == i).join(", ")}`);
-        // Sort all the entries by score, followed by amount, then lastly name
-        report.scoreBreakdown = [...breakdown.entries()].sort((a, b) => {
-            return (b[1].score - a[1].score)
-                || (b[1].amount - a[1].amount)
-                || (b[0].localeCompare(a[0]));
-        }).map((a) => a[1]); // Transform the tuple into the ExpBreakdown
-        report.overtimePer1.kpm = EventReporter_1.default.kpmOverTime(report.events, 60000);
-        report.overtimePer1.kd = EventReporter_1.default.kdOverTime(report.events, 60000);
-        report.overtimePer1.rpm = EventReporter_1.default.revivesOverTime(report.events, 60000);
-        report.overtimePer5.kpm = EventReporter_1.default.kpmOverTime(report.events);
-        report.overtimePer5.kd = EventReporter_1.default.kdOverTime(report.events);
-        report.overtimePer5.rpm = EventReporter_1.default.revivesOverTime(report.events);
-        report.perUpdate.kd = EventReporter_1.default.kdPerUpdate(report.events);
-        return response;
-    }
-}
-exports.OutfitReportGenerator = OutfitReportGenerator;
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/squad/Squad.js":
-/*!**********************************************************!*\
-  !*** ./node_modules/topt-core/build/core/squad/Squad.js ***!
-  \**********************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.Squad = void 0;
-class Squad {
-    constructor() {
-        /**
-         * Display name of the squad
-         */
-        this.name = "";
-        /**
-         * Alternate display of a squad, such as Alpha/Bravo/etc.
-         */
-        this.display = null;
-        /**
-         * Members that are currently in the squad
-         */
-        this.members = [];
-        /**
-         * If this squad is a guess squad or not, affects how automatic merging is done
-         */
-        this.guess = true;
-        this.ID = ++Squad._previousID;
-    }
-    /**
-     * Check if a member is within this squad
-     *
-     * @param charID Character ID to check membership of
-     */
-    isMember(charID) {
-        return this.members.find(iter => iter.charID == charID) != null;
-    }
-    toString() {
-        return `Squad ${this.name}: [${this.members.map(iter => iter.name).join(", ")}]`;
-    }
-}
-exports.Squad = Squad;
-Squad._previousID = 0;
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/squad/SquadMember.js":
-/*!****************************************************************!*\
-  !*** ./node_modules/topt-core/build/core/squad/SquadMember.js ***!
-  \****************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.SquadMember = void 0;
-class SquadMember {
-    constructor() {
-        /**
-         * Display name of the squad member
-         */
-        this.name = "";
-        /**
-         * Tag of the outfit. Empty string for no outfit
-         */
-        this.outfitTag = "";
-        /**
-         * Character ID of the squad member
-         */
-        this.charID = "";
-        /**
-         * What class the squad member currently is
-         */
-        this.class = "";
-        /**
-         * The current state of the squad member
-         */
-        this.state = "alive";
-        /**
-         * How many seconds the squad member has been dead for
-         */
-        this.timeDead = 0;
-        /**
-         * Timestamp (in MS) of when this character died
-         */
-        this.whenDied = null;
-        /**
-         * How many seconds until they can place a beacon again
-         */
-        this.beaconCooldown = 0;
-        /**
-         * Timestamp (in MS) of when this character last put a beacon down
-         */
-        this.whenBeacon = null;
-        /**
-         * Is this squad member online or not
-         */
-        this.online = true;
-    }
-}
-exports.SquadMember = SquadMember;
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/winter/WinterMetric.js":
-/*!******************************************************************!*\
-  !*** ./node_modules/topt-core/build/core/winter/WinterMetric.js ***!
-  \******************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.WinterMetricEntry = exports.WinterMetric = void 0;
-class WinterMetric {
-    constructor() {
-        this.name = "";
-        this.funName = "";
-        this.description = "";
-        this.entries = [];
-    }
-}
-exports.WinterMetric = WinterMetric;
-class WinterMetricEntry {
-    constructor() {
-        this.name = "";
-        this.outfitTag = "";
-        this.value = 0;
-        this.display = null;
-    }
-}
-exports.WinterMetricEntry = WinterMetricEntry;
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/winter/WinterReport.js":
-/*!******************************************************************!*\
-  !*** ./node_modules/topt-core/build/core/winter/WinterReport.js ***!
-  \******************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.WinterReport = void 0;
-class WinterReport {
-    constructor() {
-        this.start = new Date();
-        this.end = new Date();
-        this.essential = [];
-        this.fun = [];
-        this.players = [];
-    }
-}
-exports.WinterReport = WinterReport;
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/winter/WinterReportGenerator.js":
-/*!***************************************************************************!*\
-  !*** ./node_modules/topt-core/build/core/winter/WinterReportGenerator.js ***!
-  \***************************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.WinterReportGenerator = exports.WinterMetricIndex = void 0;
-const ApiWrapper_1 = __webpack_require__(/*! ../census/ApiWrapper */ "./node_modules/topt-core/build/core/census/ApiWrapper.js");
-const WinterReport_1 = __webpack_require__(/*! ./WinterReport */ "./node_modules/topt-core/build/core/winter/WinterReport.js");
-const WinterMetric_1 = __webpack_require__(/*! ./WinterMetric */ "./node_modules/topt-core/build/core/winter/WinterMetric.js");
-const StatMap_1 = __webpack_require__(/*! ../StatMap */ "./node_modules/topt-core/build/core/StatMap.js");
-const PsEvent_1 = __webpack_require__(/*! ../PsEvent */ "./node_modules/topt-core/build/core/PsEvent.js");
-const VehicleAPI_1 = __webpack_require__(/*! ../census/VehicleAPI */ "./node_modules/topt-core/build/core/census/VehicleAPI.js");
-const WeaponAPI_1 = __webpack_require__(/*! ../census/WeaponAPI */ "./node_modules/topt-core/build/core/census/WeaponAPI.js");
-const PsLoadout_1 = __webpack_require__(/*! ../census/PsLoadout */ "./node_modules/topt-core/build/core/census/PsLoadout.js");
-const EventReporter_1 = __webpack_require__(/*! ../EventReporter */ "./node_modules/topt-core/build/core/EventReporter.js");
-const Loggers_1 = __webpack_require__(/*! ../Loggers */ "./node_modules/topt-core/build/core/Loggers.js");
-const log = Loggers_1.Logger.getLogger("WinterReportGenerator");
-class WinterMetricIndex {
-}
-exports.WinterMetricIndex = WinterMetricIndex;
-WinterMetricIndex.KILLS = 0;
-WinterMetricIndex.KD = 1;
-WinterMetricIndex.REVIVES = 2;
-WinterMetricIndex.HEALS = 3;
-WinterMetricIndex.RESUPPLIES = 4;
-WinterMetricIndex.REPAIRS = 5;
-class WinterReportGenerator {
-    static generate(parameters) {
-        const response = new ApiWrapper_1.ApiResponse();
-        parameters.events = parameters.events.sort((a, b) => a.timestamp - b.timestamp);
-        const report = new WinterReport_1.WinterReport();
-        report.start = new Date(parameters.events[0].timestamp);
-        report.end = new Date(parameters.events[parameters.events.length - 1].timestamp);
-        report.players = [...parameters.players.filter(iter => iter.events.length > 0)];
-        report.essential.length = 6;
-        report.essential[WinterMetricIndex.KILLS] = this.kills(parameters);
-        report.essential[WinterMetricIndex.KD] = this.kds(parameters);
-        report.essential[WinterMetricIndex.HEALS] = this.heals(parameters);
-        report.essential[WinterMetricIndex.REVIVES] = this.revives(parameters);
-        report.essential[WinterMetricIndex.REPAIRS] = this.repairs(parameters);
-        report.essential[WinterMetricIndex.RESUPPLIES] = this.resupplies(parameters);
-        report.fun.push(this.mostRevived(parameters));
-        report.fun.push(this.mostTransportAssists(parameters));
-        report.fun.push(this.mostReconAssists(parameters));
-        //report.fun.push(this.mostConcAssists(parameters));
-        //report.fun.push(this.mostEMPAssist(parameters));
-        //report.fun.push(this.mostFlashAssists(parameters));
-        report.fun.push(this.mostSaviors(parameters));
-        report.fun.push(this.mostAssists(parameters));
-        report.fun.push(this.mostUniqueRevives(parameters));
-        report.fun.push(this.longestKillStreak(parameters));
-        report.fun.push(this.highestHSR(parameters));
-        report.fun.push(this.getDifferentWeapons(parameters));
-        report.fun.push(this.mostESFSKills(parameters));
-        report.fun.push(this.mostLightningKills(parameters));
-        report.fun.push(this.mostHarasserKills(parameters));
-        report.fun.push(this.mostMBTKills(parameters));
-        report.fun.push(this.mostSunderersKilled(parameters));
-        report.fun.push(this.mostRoadkills(parameters));
-        report.fun.push(this.mostUsefulRevives(parameters));
-        report.fun.push(this.highestAverageLifeExpectance(parameters));
-        report.fun.push(this.mostC4Kills(parameters));
-        report.fun.push(this.mostPercentRevive(parameters));
-        report.fun.push(this.mostDrawfireAssists(parameters));
-        report.fun.push(this.mostRouterKills(parameters));
-        report.fun.push(this.mostBeaconKills(parameters));
-        report.fun.push(this.mostMAXKills(parameters));
-        report.fun.push(this.mostSundySpawns(parameters));
-        report.fun.push(this.mostRouterSpawns(parameters));
-        report.fun.push(this.longestHealStreak(parameters));
-        let opsLeft = +1 // Knife kills
-            + 1 // Pistol kills
-            + 1 // Grenade kills
-        ;
-        const handler = () => {
-            if (--opsLeft == 0) {
-                if (parameters.settings.funMetricCount != -1) {
-                    // Shuffle array
-                    for (let i = report.fun.length - 1; i > 0; i--) {
-                        const elem = Math.floor(Math.random() * (i + 1));
-                        [report.fun[i], report.fun[elem]] = [report.fun[elem], report.fun[i]];
-                    }
-                    report.fun = report.fun.slice(0, parameters.settings.funMetricCount);
-                }
-                response.resolveOk(report);
-            }
-        };
-        this.mostKnifeKills(parameters).ok(data => report.fun.push(data)).always(handler);
-        this.mostGrenadeKills(parameters).ok(data => report.fun.push(data)).always(handler);
-        this.mostPistolKills(parameters).ok(data => report.fun.push(data)).always(handler);
-        return response;
-    }
-    static revives(parameters) {
-        return this.metric(parameters, [PsEvent_1.PsEvent.revive, PsEvent_1.PsEvent.squadResupply], {
-            name: "Revives",
-            funName: "Necromancer",
-            description: "Most revives",
-            entries: []
-        });
-    }
-    static heals(parameters) {
-        return this.metric(parameters, [PsEvent_1.PsEvent.heal, PsEvent_1.PsEvent.squadHeal], {
-            name: "Heals",
-            funName: "Green Wizard",
-            description: "Most heals",
-            entries: []
-        });
-    }
-    static repairs(parameters) {
-        return this.metric(parameters, [PsEvent_1.PsEvent.maxRepair, PsEvent_1.PsEvent.squadMaxRepair], {
-            name: "MAX Repairs",
-            funName: "Welder",
-            description: "Most MAX repairs",
-            entries: []
-        });
-    }
-    static resupplies(parameters) {
-        return this.metric(parameters, [PsEvent_1.PsEvent.resupply, PsEvent_1.PsEvent.squadResupply], {
-            name: "Resupply",
-            funName: "Ammo printer",
-            description: "Most resupplies",
-            entries: []
-        });
-    }
-    static kills(parameters) {
-        return this.value(parameters, (player) => player.events.filter(iter => iter.type == "kill").length, {
-            name: "Kills",
-            funName: "Kills",
-            description: "Most kills",
-            entries: []
-        });
-    }
-    static kds(parameters) {
-        return this.value(parameters, (player) => (player.stats.get(PsEvent_1.PsEvent.kill) > 24) ? player.stats.get(PsEvent_1.PsEvent.kill) / player.stats.get(PsEvent_1.PsEvent.death, 1) : 0, {
-            name: "K/D",
-            funName: "K/D",
-            description: "Highest K/D",
-            entries: []
-        }, (value) => value.toFixed(2));
-    }
-    static mostRevived(parameters) {
-        return this.value(parameters, ((player) => player.events.filter(iter => iter.type == "death" && iter.revived == true).length), {
-            name: "Revived",
-            funName: "Zombie",
-            description: "Revived the most",
-            entries: []
-        });
-    }
-    static mostTransportAssists(parameters) {
-        return this.metric(parameters, [PsEvent_1.PsEvent.transportAssists], {
-            name: "Transport assists",
-            funName: "Logistics Specialists",
-            description: "Most transport assists",
-            entries: []
-        });
-    }
-    static mostReconAssists(parameters) {
-        return this.metric(parameters, [PsEvent_1.PsEvent.motionDetect, PsEvent_1.PsEvent.squadMotionDetect], {
-            name: "Recon detections",
-            funName: "Flies on the Wall",
-            description: "Most recon detection ticks",
-            entries: []
-        });
-    }
-    static mostDrawfireAssists(parameters) {
-        return this.metric(parameters, [PsEvent_1.PsEvent.drawfire], {
-            name: "Drawfire Assists",
-            funName: "Professional Distraction",
-            description: "Most drawfire assists",
-            entries: []
-        });
-    }
-    static longestHealStreak(parameters) {
-        return this.value(parameters, ((player) => {
-            const streaks = EventReporter_1.default.medicHealStreaks(player.events, player.characterID);
-            if (streaks.length == 0) {
-                return 0;
-            }
-            let max = 0;
-            let maxStreak = streaks[0]; // Will always have one, length check above
-            for (const streak of streaks) {
-                if (streak.amount > max) {
-                    max = streak.amount;
-                    maxStreak = streak;
-                }
-            }
-            log.debug(`Longest heal streak of ${player.name} started ${maxStreak.start} for ${maxStreak.amount} seconds`);
-            return maxStreak.amount;
-        }), {
-            name: "Longest heal streak",
-            funName: "Long time healer",
-            description: "Longest theoretical time with AOE heal, assuming combat surgeon 5",
-            entries: []
-        }, ((display) => {
-            return `${display.toFixed(2)} seconds`;
-        }));
-    }
-    static mostConcAssists(parameters) {
-        return this.metric(parameters, [PsEvent_1.PsEvent.concAssist, PsEvent_1.PsEvent.squadConcAssist], {
-            name: "Conced killers",
-            funName: "Concussive Maintenance",
-            description: "Most kills on concussed players",
-            entries: []
-        });
-    }
-    static mostFlashAssists(parameters) {
-        return this.metric(parameters, [PsEvent_1.PsEvent.flashAssist, PsEvent_1.PsEvent.squadFlashAssist], {
-            name: "Flashed killers",
-            funName: "Darklight",
-            description: "Most kills on flashed players",
-            entries: []
-        });
-    }
-    static mostEMPAssist(parameters) {
-        return this.metric(parameters, [PsEvent_1.PsEvent.empAssist, PsEvent_1.PsEvent.squadEmpAssist], {
-            name: "EMPed killers",
-            funName: "Sparky Sparky Boom",
-            description: "Most kills on EMPed players",
-            entries: []
-        });
-    }
-    static mostSaviors(parameters) {
-        return this.metric(parameters, [PsEvent_1.PsEvent.savior], {
-            name: "Savior",
-            funName: "Savior",
-            description: "Most savior kills",
-            entries: []
-        });
-    }
-    static mostAssists(parameters) {
-        return this.metric(parameters, [PsEvent_1.PsEvent.killAssist], {
-            name: "Kill assists",
-            funName: "Wingmen",
-            description: "Players with the most kill assists",
-            entries: []
-        });
-    }
-    static mostRouterKills(parameters) {
-        return this.metric(parameters, [PsEvent_1.PsEvent.routerKill], {
-            name: "Router kills",
-            funName: "Connectivity Issues",
-            description: "Players with the most router kills",
-            entries: []
-        });
-    }
-    static mostBeaconKills(parameters) {
-        return this.metric(parameters, [PsEvent_1.PsEvent.beaconKill], {
-            name: "Beacon kills",
-            funName: "Bacon Fryer",
-            description: "Players with the most beacon kills",
-            entries: []
-        });
-    }
-    static mostRouterSpawns(parameters) {
-        return this.metric(parameters, ["1410"], {
-            name: "Router spawns",
-            funName: "Network Provider",
-            description: "Players with the most router spawns",
-            entries: []
-        });
-    }
-    static mostSundySpawns(parameters) {
-        return this.metric(parameters, ["233"], {
-            name: "Sundy spawns",
-            funName: "Cat herder",
-            description: "Players with the most sundy spawns",
-            entries: []
-        });
-    }
-    static mostUniqueRevives(parameters) {
-        return this.value(parameters, ((player) => {
-            const ev = player.events.filter(iter => iter.type == "exp"
-                && (iter.expID == PsEvent_1.PsEvent.revive || iter.expID == PsEvent_1.PsEvent.squadRevive));
-            return ev.map(iter => iter.targetID).filter((value, index, array) => array.indexOf(value) == index).length;
-        }), {
-            name: "Most unique revives",
-            funName: "Spread the love",
-            description: "Most unique revives",
-            entries: []
-        });
-    }
-    static mostMAXKills(parameters) {
-        return this.value(parameters, ((player) => {
-            return player.events.filter(iter => iter.type == "kill"
-                && (iter.targetLoadoutID == "7" || iter.targetLoadoutID == "14" || iter.targetLoadoutID == "21")).length;
-        }), {
-            name: "Most MAX kills",
-            funName: "Wheelchair flipper",
-            description: "Players with most MAX kills",
-            entries: []
-        });
-    }
-    static longestKillStreak(parameters) {
-        const metric = new WinterMetric_1.WinterMetric();
-        metric.name = "Kill streaks";
-        metric.funName = "Big fish";
-        metric.description = "Longest kill streak";
-        const amounts = new StatMap_1.default();
-        for (const player of parameters.players) {
-            let currentStreak = 0;
-            let longestStreak = 0;
-            for (const ev of player.events) {
-                if (ev.type != "kill" && ev.type != "death") {
-                    continue;
-                }
-                if (ev.type == "kill") {
-                    ++currentStreak;
-                }
-                else if (ev.type == "death" && ev.revivedEvent == null) {
-                    if (currentStreak > longestStreak) {
-                        longestStreak = currentStreak;
-                        amounts.set(player.name, longestStreak);
-                    }
-                    currentStreak = 0;
-                }
-            }
-        }
-        metric.entries = this.statMapToEntires(parameters, amounts);
-        return metric;
-    }
-    static highestHSR(parameters) {
-        const metric = new WinterMetric_1.WinterMetric();
-        metric.name = "HSR";
-        metric.funName = "Head poppers";
-        metric.description = "Highest headshot ratio";
-        const map = new StatMap_1.default();
-        for (const player of parameters.players) {
-            const kills = player.events.filter(iter => iter.type == "kill").length || 1;
-            const hsKills = player.events.filter(iter => iter.type == "kill" && iter.isHeadshot == true).length || 1;
-            if (player.secondsOnline < 10) {
-                continue;
-            }
-            if (kills == 1 || hsKills == 1 || kills < 25) {
-                continue;
-            }
-            map.set(player.name, hsKills / kills);
-        }
-        metric.entries = this.statMapToEntires(parameters, map, (iter) => `${(iter * 100).toFixed(2)}%`);
-        return metric;
-    }
-    static getDifferentWeapons(parameters) {
-        const metric = new WinterMetric_1.WinterMetric();
-        metric.name = "Different weapons";
-        metric.funName = "Diverse Skillset";
-        metric.description = "Most amount of unique weapons";
-        const stats = new StatMap_1.default();
-        for (const player of parameters.players) {
-            const set = new Set();
-            for (const ev of player.events) {
-                if (ev.type != "kill") {
-                    continue;
-                }
-                set.add(ev.weaponID);
-            }
-            stats.set(player.name, set.size);
-        }
-        metric.entries = this.statMapToEntires(parameters, stats);
-        return metric;
-    }
-    static mostESFSKills(parameters) {
-        return this.vehicle(parameters, [VehicleAPI_1.Vehicles.mosquito, VehicleAPI_1.Vehicles.reaver, VehicleAPI_1.Vehicles.scythe], {
-            name: "ESFs destroyed",
-            funName: "Fly Swatter",
-            description: "Most ESFs destroyed",
-            entries: []
-        });
-    }
-    static mostMBTKills(parameters) {
-        return this.vehicle(parameters, [VehicleAPI_1.Vehicles.vanguard, VehicleAPI_1.Vehicles.prowler, VehicleAPI_1.Vehicles.magrider], {
-            name: "MBTs destroyed",
-            funName: "Heavy Hitter",
-            description: "Most MBTs destroyed",
-            entries: []
-        });
-    }
-    static mostHarasserKills(parameters) {
-        return this.vehicle(parameters, [VehicleAPI_1.Vehicles.harasser], {
-            name: "Harassers destroyed",
-            funName: "Rasser Harasser",
-            description: "Most harassers destroyed",
-            entries: []
-        });
-    }
-    static mostLightningKills(parameters) {
-        return this.vehicle(parameters, [VehicleAPI_1.Vehicles.lightning], {
-            name: "Lightnings destroyed",
-            funName: "Thunder Struck",
-            description: "Most lightnings destroyed",
-            entries: []
-        });
-    }
-    static mostSunderersKilled(parameters) {
-        return this.vehicle(parameters, [VehicleAPI_1.Vehicles.sunderer], {
-            name: "Sunderers killed",
-            funName: "Bus Bully",
-            description: "Most sundies destroyed",
-            entries: []
-        });
-    }
-    static mostRoadkills(parameters) {
-        return this.metric(parameters, [PsEvent_1.PsEvent.roadkill], {
-            name: "Roadkills",
-            funName: "Road rage",
-            description: "Most roadkills",
-            entries: []
-        });
-    }
-    static mostUsefulRevives(parameters) {
-        const metric = new WinterMetric_1.WinterMetric();
-        metric.name = "Kills after revives";
-        metric.funName = "Rise of the Undead";
-        metric.description = "Most kills 10 seconds after being revived";
-        const amounts = new StatMap_1.default();
-        for (const player of parameters.players) {
-            const revives = player.events.filter(iter => iter.type == "death" && iter.revivedEvent != null);
-            for (const ev of revives) {
-                const kills = player.events.filter(iter => {
-                    return iter.type == "kill" && iter.timestamp >= ev.timestamp && iter.timestamp < ev.timestamp + 10000;
-                });
-                if (kills.length == 0) {
-                    continue;
-                }
-                amounts.increment(player.name, kills.length);
-            }
-        }
-        metric.entries = this.statMapToEntires(parameters, amounts);
-        return metric;
-    }
-    static mostPercentRevive(parameters) {
-        return this.value(parameters, (player) => {
-            const revived = player.events.filter(iter => iter.type == "death" && iter.revived == true).length;
-            const killed = player.events.filter(iter => iter.type == "death").length;
-            return revived / killed;
-        }, {
-            name: "Percent revived",
-            funName: "Makes me strong",
-            description: "Highest percentage of revived deaths to respawns",
-            entries: []
-        }, (value) => `${(value * 100).toFixed(2)}%`);
-    }
-    static highestAverageLifeExpectance(parameters) {
-        const metric = new WinterMetric_1.WinterMetric();
-        metric.name = "Longest life expectance";
-        metric.funName = "Elders";
-        metric.description = "Longest average life expectance";
-        const amounts = new StatMap_1.default();
-        for (const player of parameters.players) {
-            if (player.events.length == 0) {
-                continue;
-            }
-            const expectances = [];
-            let start = player.events[0].timestamp;
-            for (const ev of player.events) {
-                if (ev.type == "death" && ev.revived == false) {
-                    expectances.push((ev.timestamp - start) / 1000);
-                    start = ev.timestamp;
-                }
-            }
-            if (expectances.length == 0) {
-                continue;
-            }
-            const total = expectances.reduce((acc, val) => { return acc += val; }, 0);
-            const avg = total / expectances.length;
-            amounts.set(player.name, avg);
-        }
-        metric.entries = this.statMapToEntires(parameters, amounts, (value) => {
-            let mins = 0;
-            let seconds = value;
-            if (value > 60) {
-                mins = Math.floor(seconds / 60);
-                seconds = seconds % 60;
-                return `${mins.toFixed(0)} mins ${seconds.toFixed(0)} seconds`;
-            }
-            return `${value.toFixed(1)} seconds`;
-        });
-        return metric;
-    }
-    static shortestLife(parameters) {
-        const metric = new WinterMetric_1.WinterMetric();
-        metric.name = "Shortest life expectance";
-        metric.funName = "Not elders";
-        metric.description = "Shortest average life expectance";
-        const amounts = new StatMap_1.default();
-        for (const player of parameters.players) {
-            if (player.events.length == 0) {
-                continue;
-            }
-            const expectances = [];
-            let start = player.events[0].timestamp;
-            for (const ev of player.events) {
-                if (ev.type == "death" && ev.revived == false) {
-                    expectances.push((ev.timestamp - start) / 1000);
-                    start = ev.timestamp;
-                }
-            }
-            if (expectances.length == 0) {
-                continue;
-            }
-            const total = expectances.reduce((acc, val) => { return acc += val; }, 0);
-            const avg = total / expectances.length;
-            amounts.set(player.name, avg);
-        }
-        metric.entries = this.statMapToEntires(parameters, amounts, (value) => {
-            let mins = 0;
-            let seconds = value;
-            if (value > 60) {
-                mins = Math.floor(seconds / 60);
-                seconds = seconds % 60;
-                return `${mins.toFixed(0)} mins ${seconds.toFixed(0)} seconds`;
-            }
-            return `${value.toFixed(1)} seconds`;
-        });
-        return metric;
-    }
-    static mostKnifeKills(parameters) {
-        return this.weaponType(parameters, "Knife", {
-            name: "Knife kills",
-            funName: "Slasher",
-            description: "Most knife kills",
-            entries: []
-        });
-    }
-    static mostC4Kills(parameters) {
-        return this.weapon(parameters, ["432", "800623"], {
-            name: "C4 kills",
-            funName: "Explosive Tedencies",
-            description: "Most C-4 kills",
-            entries: []
-        });
-    }
-    static mostGrenadeKills(parameters) {
-        return this.weaponType(parameters, "Grenade", {
-            name: "Grenade kills",
-            funName: "Hot Potato",
-            description: "Most grenade kills",
-            entries: []
-        });
-    }
-    static mostPistolKills(parameters) {
-        return this.weaponType(parameters, "Pistol", {
-            name: "Pistol kills",
-            funName: "The Cowboy",
-            description: "Most pistol kills",
-            entries: []
-        });
-    }
-    static weaponType(parameters, type, metric) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const wepIDs = new Set();
-        for (const player of parameters.players) {
-            const IDs = player.events.filter(iter => iter.type == "kill")
-                .map(iter => iter.weaponID);
-            for (const id of IDs) {
-                wepIDs.add(id);
-            }
-        }
-        const amounts = new StatMap_1.default();
-        WeaponAPI_1.WeaponAPI.getByIDs(Array.from(wepIDs.keys())).ok((data) => {
-            for (const player of parameters.players) {
-                const kills = player.events.filter(iter => iter.type == "kill");
-                for (const kill of kills) {
-                    const weapon = data.find(iter => iter.ID == kill.weaponID);
-                    if (weapon == undefined) {
-                        continue;
-                    }
-                    if (weapon.type == type) {
-                        amounts.increment(player.name);
-                    }
-                }
-            }
-            metric.entries = this.statMapToEntires(parameters, amounts);
-        });
-        response.resolveOk(metric);
-        return response;
-    }
-    static weapon(parameters, ids, metric) {
-        const amounts = new StatMap_1.default();
-        for (const player of parameters.players) {
-            for (const ev of player.events) {
-                if (ev.type == "kill") {
-                    if (ids.indexOf(ev.weaponID) > -1) {
-                        amounts.increment(player.name);
-                    }
-                }
-            }
-        }
-        metric.entries = this.statMapToEntires(parameters, amounts);
-        return metric;
-    }
-    static vehicle(parameters, vehicles, metric) {
-        const amounts = new StatMap_1.default();
-        for (const player of parameters.players) {
-            for (const ev of player.events) {
-                if (ev.type != "vehicle") {
-                    continue;
-                }
-                const loadout = PsLoadout_1.PsLoadouts.get(ev.loadoutID);
-                if (loadout != undefined) {
-                    if (loadout.faction == "VS" && (ev.vehicleID == VehicleAPI_1.Vehicles.scythe || ev.vehicleID == VehicleAPI_1.Vehicles.bastionScythe || ev.vehicleID == VehicleAPI_1.Vehicles.magrider)) {
-                        continue;
-                    }
-                    if (loadout.faction == "TR" && (ev.vehicleID == VehicleAPI_1.Vehicles.mosquito || ev.vehicleID == VehicleAPI_1.Vehicles.bastionMosquite || ev.vehicleID == VehicleAPI_1.Vehicles.prowler)) {
-                        continue;
-                    }
-                    if (loadout.faction == "NC" && (ev.vehicleID == VehicleAPI_1.Vehicles.reaver || ev.vehicleID == VehicleAPI_1.Vehicles.bastionReaver || ev.vehicleID == VehicleAPI_1.Vehicles.vanguard)) {
-                        continue;
-                    }
-                }
-                if (vehicles.indexOf(ev.vehicleID) > -1) {
-                    amounts.increment(player.name);
-                }
-            }
-        }
-        metric.entries = this.statMapToEntires(parameters, amounts);
-        return metric;
-    }
-    static metric(parameters, events, metric) {
-        const amounts = new StatMap_1.default();
-        for (const player of parameters.players) {
-            const evs = player.events.filter(iter => iter.type == "exp" && events.indexOf(iter.expID) > -1);
-            if (evs.length > 0) {
-                amounts.set(player.name, evs.length);
-            }
-        }
-        metric.entries = this.statMapToEntires(parameters, amounts);
-        return metric;
-    }
-    static value(parameters, accessor, metric, display = null) {
-        const map = new StatMap_1.default();
-        for (const player of parameters.players) {
-            map.set(player.name, accessor(player));
-        }
-        metric.entries = this.statMapToEntires(parameters, map, display);
-        return metric;
-    }
-    static statMapToEntires(parameters, map, display = null) {
-        return Array.from(map.getMap().entries()).map((iter) => {
-            var _a, _b;
-            const tag = (_b = (_a = parameters.players.find(i => i.name.toLowerCase() == iter[0].toLowerCase())) === null || _a === void 0 ? void 0 : _a.outfitTag) !== null && _b !== void 0 ? _b : "";
-            return {
-                name: iter[0],
-                outfitTag: tag,
-                value: iter[1],
-                display: display != null ? display(iter[1]) : null
-            };
-        }).filter(iter => iter.value)
-            .sort((a, b) => b.value - a.value)
-            .slice(0, parameters.settings.topNPlayers == -1 ? undefined : parameters.settings.topNPlayers);
-    }
-}
-exports.WinterReportGenerator = WinterReportGenerator;
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/winter/WinterReportParameters.js":
-/*!****************************************************************************!*\
-  !*** ./node_modules/topt-core/build/core/winter/WinterReportParameters.js ***!
-  \****************************************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.WinterReportSettings = exports.WinterReportParameters = void 0;
-class WinterReportParameters {
-    constructor() {
-        this.players = [];
-        this.events = [];
-        this.timeTracking = { startTime: 0, endTime: 0, running: false };
-        this.settings = new WinterReportSettings();
-    }
-}
-exports.WinterReportParameters = WinterReportParameters;
-class WinterReportSettings {
-    constructor() {
-        /**
-         * If the fun names will be used instead of descriptive names
-         */
-        this.useFunNames = false;
-        /**
-         * How many players to show for each card
-         */
-        this.topNPlayers = 5;
-        /**
-         * How many fun metrics to show. Fun being like unique revives, -1 to show all
-         */
-        this.funMetricCount = -1;
-        /**
-         * Will the outfit tag be shown?
-         */
-        this.displayOutfitTag = false;
-        /**
-         * Char IDs of players to ignore and skip if they are in the top
-         */
-        this.ignoredPlayers = [];
-    }
-}
-exports.WinterReportSettings = WinterReportSettings;
-
-
-/***/ }),
-
-/***/ "./node_modules/topt-core/build/core/winter/index.js":
-/*!***********************************************************!*\
-  !*** ./node_modules/topt-core/build/core/winter/index.js ***!
-  \***********************************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.WinterReportSettings = exports.WinterReportParameters = exports.WinterReportGenerator = exports.WinterReport = void 0;
-const WinterReportGenerator_1 = __webpack_require__(/*! ./WinterReportGenerator */ "./node_modules/topt-core/build/core/winter/WinterReportGenerator.js");
-Object.defineProperty(exports, "WinterReportGenerator", { enumerable: true, get: function () { return WinterReportGenerator_1.WinterReportGenerator; } });
-const WinterReport_1 = __webpack_require__(/*! ./WinterReport */ "./node_modules/topt-core/build/core/winter/WinterReport.js");
-Object.defineProperty(exports, "WinterReport", { enumerable: true, get: function () { return WinterReport_1.WinterReport; } });
-const WinterReportParameters_1 = __webpack_require__(/*! ./WinterReportParameters */ "./node_modules/topt-core/build/core/winter/WinterReportParameters.js");
-Object.defineProperty(exports, "WinterReportParameters", { enumerable: true, get: function () { return WinterReportParameters_1.WinterReportParameters; } });
-Object.defineProperty(exports, "WinterReportSettings", { enumerable: true, get: function () { return WinterReportParameters_1.WinterReportSettings; } });
-
 
 /***/ }),
 
@@ -68054,90 +70072,6 @@ module.exports = function(module) {
 
 /***/ }),
 
-/***/ "./node_modules/websocket/lib/browser.js":
-/*!***********************************************!*\
-  !*** ./node_modules/websocket/lib/browser.js ***!
-  \***********************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-var _globalThis;
-try {
-	_globalThis = __webpack_require__(/*! es5-ext/global */ "./node_modules/es5-ext/global.js");
-} catch (error) {
-} finally {
-	if (!_globalThis && typeof window !== 'undefined') { _globalThis = window; }
-	if (!_globalThis) { throw new Error('Could not determine global this'); }
-}
-
-var NativeWebSocket = _globalThis.WebSocket || _globalThis.MozWebSocket;
-var websocket_version = __webpack_require__(/*! ./version */ "./node_modules/websocket/lib/version.js");
-
-
-/**
- * Expose a W3C WebSocket class with just one or two arguments.
- */
-function W3CWebSocket(uri, protocols) {
-	var native_instance;
-
-	if (protocols) {
-		native_instance = new NativeWebSocket(uri, protocols);
-	}
-	else {
-		native_instance = new NativeWebSocket(uri);
-	}
-
-	/**
-	 * 'native_instance' is an instance of nativeWebSocket (the browser's WebSocket
-	 * class). Since it is an Object it will be returned as it is when creating an
-	 * instance of W3CWebSocket via 'new W3CWebSocket()'.
-	 *
-	 * ECMAScript 5: http://bclary.com/2004/11/07/#a-13.2.2
-	 */
-	return native_instance;
-}
-if (NativeWebSocket) {
-	['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'].forEach(function(prop) {
-		Object.defineProperty(W3CWebSocket, prop, {
-			get: function() { return NativeWebSocket[prop]; }
-		});
-	});
-}
-
-/**
- * Module exports.
- */
-module.exports = {
-    'w3cwebsocket' : NativeWebSocket ? W3CWebSocket : null,
-    'version'      : websocket_version
-};
-
-
-/***/ }),
-
-/***/ "./node_modules/websocket/lib/version.js":
-/*!***********************************************!*\
-  !*** ./node_modules/websocket/lib/version.js ***!
-  \***********************************************/
-/*! no static exports found */
-/***/ (function(module, exports, __webpack_require__) {
-
-module.exports = __webpack_require__(/*! ../package.json */ "./node_modules/websocket/package.json").version;
-
-
-/***/ }),
-
-/***/ "./node_modules/websocket/package.json":
-/*!*********************************************!*\
-  !*** ./node_modules/websocket/package.json ***!
-  \*********************************************/
-/*! exports provided: _from, _id, _inBundle, _integrity, _location, _phantomChildren, _requested, _requiredBy, _resolved, _shasum, _spec, _where, author, browser, bugs, bundleDependencies, config, contributors, dependencies, deprecated, description, devDependencies, directories, engines, homepage, keywords, license, main, name, repository, scripts, version, default */
-/***/ (function(module) {
-
-module.exports = JSON.parse("{\"_from\":\"websocket@^1.0.32\",\"_id\":\"websocket@1.0.33\",\"_inBundle\":false,\"_integrity\":\"sha512-XwNqM2rN5eh3G2CUQE3OHZj+0xfdH42+OFK6LdC2yqiC0YU8e5UK0nYre220T0IyyN031V/XOvtHvXozvJYFWA==\",\"_location\":\"/websocket\",\"_phantomChildren\":{},\"_requested\":{\"type\":\"range\",\"registry\":true,\"raw\":\"websocket@^1.0.32\",\"name\":\"websocket\",\"escapedName\":\"websocket\",\"rawSpec\":\"^1.0.32\",\"saveSpec\":null,\"fetchSpec\":\"^1.0.32\"},\"_requiredBy\":[\"/topt-core\"],\"_resolved\":\"https://registry.npmjs.org/websocket/-/websocket-1.0.33.tgz\",\"_shasum\":\"407f763fc58e74a3fa41ca3ae5d78d3f5e3b82a5\",\"_spec\":\"websocket@^1.0.32\",\"_where\":\"C:\\\\Users\\\\Hdt\\\\Programming\\\\TOPT\\\\node_modules\\\\topt-core\",\"author\":{\"name\":\"Brian McKelvey\",\"email\":\"theturtle32@gmail.com\",\"url\":\"https://github.com/theturtle32\"},\"browser\":\"lib/browser.js\",\"bugs\":{\"url\":\"https://github.com/theturtle32/WebSocket-Node/issues\"},\"bundleDependencies\":false,\"config\":{\"verbose\":false},\"contributors\":[{\"name\":\"Iñaki Baz Castillo\",\"email\":\"ibc@aliax.net\",\"url\":\"http://dev.sipdoc.net\"}],\"dependencies\":{\"bufferutil\":\"^4.0.1\",\"debug\":\"^2.2.0\",\"es5-ext\":\"^0.10.50\",\"typedarray-to-buffer\":\"^3.1.5\",\"utf-8-validate\":\"^5.0.2\",\"yaeti\":\"^0.0.6\"},\"deprecated\":false,\"description\":\"Websocket Client & Server Library implementing the WebSocket protocol as specified in RFC 6455.\",\"devDependencies\":{\"buffer-equal\":\"^1.0.0\",\"gulp\":\"^4.0.2\",\"gulp-jshint\":\"^2.0.4\",\"jshint\":\"^2.0.0\",\"jshint-stylish\":\"^2.2.1\",\"tape\":\"^4.9.1\"},\"directories\":{\"lib\":\"./lib\"},\"engines\":{\"node\":\">=4.0.0\"},\"homepage\":\"https://github.com/theturtle32/WebSocket-Node\",\"keywords\":[\"websocket\",\"websockets\",\"socket\",\"networking\",\"comet\",\"push\",\"RFC-6455\",\"realtime\",\"server\",\"client\"],\"license\":\"Apache-2.0\",\"main\":\"index\",\"name\":\"websocket\",\"repository\":{\"type\":\"git\",\"url\":\"git+https://github.com/theturtle32/WebSocket-Node.git\"},\"scripts\":{\"gulp\":\"gulp\",\"test\":\"tape test/unit/*.js\"},\"version\":\"1.0.33\"}");
-
-/***/ }),
-
 /***/ "./src/BreakdownBar.ts":
 /*!*****************************!*\
   !*** ./src/BreakdownBar.ts ***!
@@ -69487,7 +71421,7 @@ class SessionV1 {
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "PersonalReportGenerator", function() { return PersonalReportGenerator; });
-/* harmony import */ var tcore__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! tcore */ "./node_modules/topt-core/build/core/index.js");
+/* harmony import */ var tcore__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
 /* harmony import */ var tcore__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(tcore__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var axios__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! axios */ "./node_modules/axios/index.js");
 /* harmony import */ var axios__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(axios__WEBPACK_IMPORTED_MODULE_1__);
@@ -69794,7 +71728,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var MomentFilter__WEBPACK_IMPORTED_MODULE_18__ = __webpack_require__(/*! MomentFilter */ "./src/MomentFilter.ts");
 /* harmony import */ var KillfeedSquad__WEBPACK_IMPORTED_MODULE_19__ = __webpack_require__(/*! KillfeedSquad */ "./src/KillfeedSquad.ts");
 /* harmony import */ var FightReportTop__WEBPACK_IMPORTED_MODULE_20__ = __webpack_require__(/*! FightReportTop */ "./src/FightReportTop.ts");
-/* harmony import */ var tcore__WEBPACK_IMPORTED_MODULE_21__ = __webpack_require__(/*! tcore */ "./node_modules/topt-core/build/core/index.js");
+/* harmony import */ var tcore__WEBPACK_IMPORTED_MODULE_21__ = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
 /* harmony import */ var tcore__WEBPACK_IMPORTED_MODULE_21___default = /*#__PURE__*/__webpack_require__.n(tcore__WEBPACK_IMPORTED_MODULE_21__);
 /* harmony import */ var PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_22__ = __webpack_require__(/*! PersonalReportGenerator */ "./src/PersonalReportGenerator.ts");
 /* harmony import */ var addons_SquadAddon__WEBPACK_IMPORTED_MODULE_23__ = __webpack_require__(/*! addons/SquadAddon */ "./src/addons/SquadAddon.ts");
