@@ -2058,6 +2058,17 @@
                                 <option :value="false">No</option>
                             </select>
 
+                            <label class="col-form-label">Limit by squad?</label>
+                            <select v-model.number="parameters.squadForReport" class="form-control">
+                                <option :value="null">Nope</option>
+                                <template v-for="squad in core.squad.perm">
+                                    <option :value="squad.ID">{{squad.display}} / {{squad.name}}</option>
+                                </template>
+                                <template v-for="squad in core.squad.guesses">
+                                    <option :value="squad.ID">{{squad.name}}</option>
+                                </template>
+                            </select>
+
                             <hr>
 
                             <div v-if="outfitReportResponse != null">
@@ -2112,6 +2123,18 @@
                             <label class="col-form-label">Players to ignore (separate with a space)</label>
                             <textarea v-model="winter.ignoredPlayers" class="form-control">
                             </textarea>
+
+                            <label class="col-form-label">Limit by squad?</label>
+                            <select v-model.number="parameters.squadForReport" class="form-control">
+                                <option :value="null">Nope</option>
+                                <template v-for="squad in core.squad.perm">
+                                    <option :value="squad.ID">{{squad.display}} / {{squad.name}}</option>
+                                </template>
+                                <template v-for="squad in core.squad.guesses">
+                                    <option :value="squad.ID">{{squad.name}}</option>
+                                </template>
+                            </select>
+
                         </div>
 
                         <div v-else-if="parameters.report == 'personal'">

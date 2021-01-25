@@ -71768,6 +71768,8 @@ window.Logger = tcore__WEBPACK_IMPORTED_MODULE_21__["Logger"];
 window.PsEvent = tcore__WEBPACK_IMPORTED_MODULE_21__["PsEvent"];
 window.moment = moment__WEBPACK_IMPORTED_MODULE_5__;
 window.$ = jquery__WEBPACK_IMPORTED_MODULE_6__;
+const log = tcore__WEBPACK_IMPORTED_MODULE_21__["Logger"].getLogger("UI");
+log.enableAll();
 const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
     el: "#app",
     data: {
@@ -71793,6 +71795,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             startTimerID: -1,
             startTimeLeft: 0,
             report: "",
+            squadForReport: null
         },
         storage: {
             enabled: false,
@@ -72143,6 +72146,27 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             });
             events.push(...this.core.miscEvents);
             events = events.sort((a, b) => a.timestamp - b.timestamp);
+            let players = this.core.stats;
+            if (this.parameters.squadForReport != null) {
+                const squad = this.core.getSquadByID(this.parameters.squadForReport);
+                log.info(`Building outfit report with squad ID ${this.parameters.squadForReport}`);
+                if (squad == null) {
+                    log.error(`Failed to find squad ID ${this.parameters.squadForReport}`);
+                }
+                else {
+                    log.debug(`Found squad ${squad.name}/#${squad.ID}. Members: ${squad.members.map(i => i.name).join(", ")}`);
+                    players = new Map();
+                    for (const player of squad.members) {
+                        const entry = this.core.stats.get(player.charID);
+                        if (entry == undefined) {
+                            log.warn(`Failed to find char ${player.name}/${player.charID} in squad ${squad.name}/${squad.ID}`);
+                        }
+                        else {
+                            players.set(player.charID, entry);
+                        }
+                    }
+                }
+            }
             const outfitResponse = tcore__WEBPACK_IMPORTED_MODULE_21__["OutfitReportGenerator"].generate({
                 settings: {
                     zoneID: null,
@@ -72150,7 +72174,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 },
                 captures: this.core.captures,
                 playerCaptures: this.core.playerCaptures,
-                players: this.core.stats,
+                players: players,
                 outfits: this.core.outfits.map(iter => iter.ID),
                 events: events,
                 tracking: this.core.tracking,
@@ -72189,6 +72213,20 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
         generateWinterReport: function () {
             const playerNames = this.winter.ignoredPlayers.split(" ")
                 .map(iter => iter.toLowerCase());
+            if (this.parameters.squadForReport != null) {
+                const squad = this.core.getSquadByID(this.parameters.squadForReport);
+                if (squad == null) {
+                    log.warn(`Failed to find squad #${this.parameters.squadForReport}`);
+                }
+                else {
+                    for (const player of Array.from(this.core.stats.values())) {
+                        const playerSquad = this.core.getSquadOfMember(player.characterID);
+                        if (playerSquad == null || playerSquad.ID != squad.ID) {
+                            playerNames.push(player.name.toLowerCase());
+                        }
+                    }
+                }
+            }
             const players = Array.from(this.core.stats.values())
                 .filter(iter => playerNames.indexOf(iter.name.toLowerCase()) == -1);
             console.log(`Making a winter report with: ${players.map(iter => iter.name).join(", ")}`);

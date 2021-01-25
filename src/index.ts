@@ -54,15 +54,17 @@ import { PersonalReportGenerator } from "PersonalReportGenerator";
 import { SquadAddon } from "addons/SquadAddon";
 import { StorageHelper } from "Storage";
 import { LoggerMetadata, LoggerMetadataLevel } from "LoggerMetadata";
-import * as log from "loglevel";
+import * as loglevel from "loglevel";
 
 (window as any).CharacterAPI = CharacterAPI;
 (window as any).Playback = Playback;
 (window as any).Logger = Logger;
 (window as any).PsEvent = PsEvent;
 (window as any).moment = moment;
-
 (window as any).$ = $;
+
+const log = Logger.getLogger("UI");
+log.enableAll();
 
 export const vm = new Vue({
     el: "#app" as string,
@@ -96,6 +98,8 @@ export const vm = new Vue({
             startTimeLeft: 0 as number,
 
             report: "" as string,
+
+            squadForReport: null as number | null
         },
 
         storage: {
@@ -518,6 +522,27 @@ export const vm = new Vue({
 
             events = events.sort((a, b) => a.timestamp - b.timestamp);
 
+            let players: Map<string, TrackedPlayer> = this.core.stats;
+
+            if (this.parameters.squadForReport != null) {
+                const squad: Squad | null = this.core.getSquadByID(this.parameters.squadForReport);
+                log.info(`Building outfit report with squad ID ${this.parameters.squadForReport}`);
+                if (squad == null) {
+                    log.error(`Failed to find squad ID ${this.parameters.squadForReport}`);
+                } else {
+                    log.debug(`Found squad ${squad.name}/#${squad.ID}. Members: ${squad.members.map(i => i.name).join(", ")}`);
+                    players = new Map();
+                    for (const player of squad.members) {
+                        const entry: TrackedPlayer | undefined = this.core.stats.get(player.charID);
+                        if (entry == undefined) {
+                            log.warn(`Failed to find char ${player.name}/${player.charID} in squad ${squad.name}/${squad.ID}`);
+                        } else {
+                            players.set(player.charID, entry);
+                        }
+                    }
+                }
+            }
+
             const outfitResponse: ApiResponse<OutfitReport> = OutfitReportGenerator.generate({
                 settings: {
                     zoneID: null,
@@ -525,7 +550,7 @@ export const vm = new Vue({
                 },
                 captures: this.core.captures,
                 playerCaptures: this.core.playerCaptures,
-                players: this.core.stats,
+                players: players,
                 outfits: this.core.outfits.map(iter => iter.ID),
                 events: events,
                 tracking: this.core.tracking,
@@ -572,6 +597,20 @@ export const vm = new Vue({
         generateWinterReport: function(): void {
             const playerNames: string[] = this.winter.ignoredPlayers.split(" ")
                 .map(iter => iter.toLowerCase());
+
+            if (this.parameters.squadForReport != null) {
+                const squad: Squad | null = this.core.getSquadByID(this.parameters.squadForReport);
+                if (squad == null) {
+                    log.warn(`Failed to find squad #${this.parameters.squadForReport}`);
+                } else {
+                    for (const player of Array.from(this.core.stats.values())) {
+                        const playerSquad = this.core.getSquadOfMember(player.characterID);
+                        if (playerSquad == null || playerSquad.ID != squad.ID) {
+                            playerNames.push(player.name.toLowerCase());
+                        }
+                    }
+                }
+            }
 
             const players: TrackedPlayer[] = Array.from(this.core.stats.values())
                 .filter(iter => playerNames.indexOf(iter.name.toLowerCase()) == -1);
@@ -823,7 +862,7 @@ export const vm = new Vue({
             this.loggers = [];
 
             for (const loggerName of loggers) {
-                const logger: log.Logger = Logger.getLogger(loggerName);
+                const logger: loglevel.Logger = Logger.getLogger(loggerName);
 
                 this.loggers.push({
                     name: loggerName,
@@ -842,8 +881,8 @@ export const vm = new Vue({
             $("#logger-modal").modal("show");
         },
 
-        updateLogger: function(name: string, mod: (logger: log.Logger) => void): void {
-            const logger: log.Logger = Logger.getLogger(name);
+        updateLogger: function(name: string, mod: (logger: loglevel.Logger) => void): void {
+            const logger: loglevel.Logger = Logger.getLogger(name);
 
             mod(logger);
 
