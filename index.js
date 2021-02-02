@@ -8146,11 +8146,16 @@ class WinterReportGenerator {
         report.fun.push(this.longestKillStreak(parameters));
         report.fun.push(this.highestHSR(parameters));
         report.fun.push(this.getDifferentWeapons(parameters));
-        report.fun.push(this.mostESFSKills(parameters));
-        report.fun.push(this.mostLightningKills(parameters));
-        report.fun.push(this.mostHarasserKills(parameters));
-        report.fun.push(this.mostMBTKills(parameters));
-        report.fun.push(this.mostSunderersKilled(parameters));
+        if (parameters.settings.includeVehicles == true) {
+            report.fun.push(this.mostESFSKills(parameters));
+            report.fun.push(this.mostValkKills(parameters));
+            report.fun.push(this.mostLibKills(parameters));
+            report.fun.push(this.mostGalaxyKills(parameters));
+            report.fun.push(this.mostHarasserKills(parameters));
+            report.fun.push(this.mostSunderersKilled(parameters));
+            report.fun.push(this.mostLightningKills(parameters));
+            report.fun.push(this.mostMBTKills(parameters));
+        }
         report.fun.push(this.mostRoadkills(parameters));
         report.fun.push(this.mostUsefulRevives(parameters));
         report.fun.push(this.highestAverageLifeExpectance(parameters));
@@ -8466,6 +8471,30 @@ class WinterReportGenerator {
             name: "ESFs destroyed",
             funName: "Fly Swatter",
             description: "Most ESFs destroyed",
+            entries: []
+        });
+    }
+    static mostValkKills(parameters) {
+        return this.vehicle(parameters, [VehicleAPI_1.Vehicles.valkyrie], {
+            name: "Valks destroyed",
+            funName: "Valhalla wrecker",
+            description: "Most valks destroyed",
+            entries: []
+        });
+    }
+    static mostLibKills(parameters) {
+        return this.vehicle(parameters, [VehicleAPI_1.Vehicles.liberator], {
+            name: "Libs destroyed",
+            funName: "Gunships crashed",
+            description: "Most libs destroyed",
+            entries: []
+        });
+    }
+    static mostGalaxyKills(parameters) {
+        return this.vehicle(parameters, [VehicleAPI_1.Vehicles.galaxy], {
+            name: "Galaxies destroyed",
+            funName: "Quasar tsunami",
+            description: "Most galaxies destroyed",
             entries: []
         });
     }
@@ -8786,6 +8815,10 @@ class WinterReportSettings {
          * If the fun names will be used instead of descriptive names
          */
         this.useFunNames = false;
+        /**
+         * If all vehicle kills will be included in the report
+         */
+        this.includeVehicles = false;
         /**
          * How many players to show for each card
          */

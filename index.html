@@ -2120,6 +2120,12 @@
                                 <option :value="true">Yes</option>
                             </select>
 
+                            <label class="col-form-label">Include vehicle stats</label>
+                            <select v-model="winter.settings.includeVehicles" class="form-control">
+                                <option :value="false">No</option>
+                                <option :value="true">Yes</option>
+                            </select>
+
                             <label class="col-form-label">Players to ignore (separate with a space)</label>
                             <textarea v-model="winter.ignoredPlayers" class="form-control">
                             </textarea>
