@@ -5696,16 +5696,13 @@ class FacilityAPI {
                 requestIDs.push(facID);
             }
         }
+        log.debug(`Getting ${requestIDs.join(", ")} from census`);
         if (requestIDs.length > 0) {
             const request = CensusAPI_1.default.get(`/map_region?facility_id=${requestIDs.join(",")}&c:limit=100`);
             request.ok((data) => {
                 if (data.returned == 0) {
-                    if (facilities.length == 0) {
-                        response.resolve({ code: 404, data: `No facilities returned from ${name}` });
-                    }
-                    else {
-                        response.resolveOk(facilities);
-                    }
+                    log.warn(`Failed to get any of ${requestIDs.join(",")} from Census`);
+                    response.resolveOk(facilities);
                 }
                 else {
                     const bases = [];
