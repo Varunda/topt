@@ -194,6 +194,10 @@ class Core {
          * If core is corrently connected to Census or not
          */
         this.connected = false;
+        /**
+         * If only include desolation events from the event stream
+         */
+        this.desolationFilter = false;
         this.markerCount = 0;
         /**
          * Event handlers that can be added onto
@@ -857,6 +861,7 @@ const WeaponAPI_1 = __webpack_require__(/*! ./census/WeaponAPI */ "../topt-core/
 const CharacterAPI_1 = __webpack_require__(/*! ./census/CharacterAPI */ "../topt-core/build/core/census/CharacterAPI.js");
 const Loggers_1 = __webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Loggers.js");
 const log = Loggers_1.Logger.getLogger("Core.Processing");
+const log2 = Loggers_1.Logger.getLogger("Core.Processing.Trace");
 Core_1.Core.prototype.processMessage = function (input, override = false) {
     const self = this;
     if (self.tracking.running == false && override == false) {
@@ -868,6 +873,16 @@ Core_1.Core.prototype.processMessage = function (input, override = false) {
         const event = msg.payload.event_name;
         const timestamp = Number.parseInt(msg.payload.timestamp) * 1000;
         const zoneID = msg.payload.zone_id;
+        if (self.desolationFilter == true && zoneID != undefined) {
+            const zoneIDN = Number.parseInt(zoneID);
+            if ((zoneIDN & 0x0000FFFF) == 0x0169) {
+                log2.debug(`Got ${event} in definition id ${zoneIDN & 0xFFFF} instance id ${(zoneIDN & 0xFFFF0000) >> 16}`);
+            }
+            else {
+                log2.debug(`Skipped ${event} in zone ${zoneID}`);
+                return;
+            }
+        }
         if (event == "GainExperience") {
             const eventID = msg.payload.experience_id;
             const charID = msg.payload.character_id;

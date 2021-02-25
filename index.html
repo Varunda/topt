@@ -311,6 +311,12 @@
                         <button class="btn btn-success w-100" data-toggle="modal" data-target="#report-modal">
                             Reports
                         </button>
+
+                        <button class="btn w-100" :class="[core.desolationFilter == true ? 'btn-primary' : 'btn-secondary']"
+                            @click="core.desolationFilter = !core.desolationFilter">
+
+                            {{core.desolationFilter == true ? 'Turn filter off (currently on)' : 'Turn filter on (currently off)'}}
+                        </button>
                     </div>
 
                     <hr/>
