@@ -351,6 +351,10 @@
                             Load ops report test
                         </button>
 
+                        <button class="btn btn-primary" @click="debugLoadfile('deso')">
+                            Load deso report test
+                        </button>
+
                         <button class="btn btn-primary" @click="openLoggerModal()">
                             Loggers
                         </button>
@@ -1908,6 +1912,344 @@
             </div>
         </div>
 
+        <div v-else-if="view == 'deso'" class="row">
+            <div class="col-12"> <!-- Header -->
+                <div class="d-flex align-items-center mb-2">
+                    <img :src="showFrog == false ? '/data/logo.png' : '/data/frog.png'" class="mr-1" style="max-width: 128px; max-height: 128px; border-radius: 30%;" title="Tide logo">
+                    <div class="d-flex flex-row flex-grow-1">
+                        <div class="flex-grow-1">
+                            <h2>Tide OP Tracker (TOPT)</h2>
+                            <h5 class="text-muted">Asteroid report</h5>
+                            <h5>
+                                <a href="https://github.com/Varunda/topt/">https://github.com/Varunda/topt/</a>
+                            </h5>
+                        </div>
+
+                        <div class="flex-grow-1">
+                            <div><b>Start:</b> {{deso.report.data.startTime | moment}}</div>
+                            <div><b>End:</b> {{deso.report.data.endTime | moment}}</div>
+                            <div><b>Duration: </b> {{deso.report.data.startTime | between(deso.report.data.endTime)}}</div>
+                        </div>
+
+                        <div>
+                            <button @click="view = 'realtime'" type="button" class="btn btn-secondary float-right">
+                                &times;
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12">
+                <h2 class="strike mt-0">Metrics</h2>
+                <table class="table table-sm table-striped">
+                    <thead>
+                        <tr class="table-secondary">
+                            <td><b>Metric</b></td>
+                            <td><b>Total</b></td>
+                            <td><b>Average</b></td>
+                            <td><b>Infil</b></td>
+                            <td><b>LA</b></td>
+                            <td><b>Medic</b></td>
+                            <td><b>Eng</b></td>
+                            <td><b>Heavy</b></td>
+                            <td><b>MAX</b></td>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        <tr>
+                            <td><b>Players</b></td>
+                            <td>
+                                {{deso.report.data.players.length}}
+                            </td>
+                            <td>
+                                --
+                            </td>
+                            <td>
+                                {{deso.report.data.players.filter(iter => iter.mostPlayed.name == 'Infiltrator').length}}
+                            </td>
+                            <td>
+                                {{deso.report.data.players.filter(iter => iter.mostPlayed.name == 'Light Assault').length}}
+                            </td>
+                            <td>
+                                {{deso.report.data.players.filter(iter => iter.mostPlayed.name == 'Medic').length}}
+                            </td>
+                            <td>
+                                {{deso.report.data.players.filter(iter => iter.mostPlayed.name == 'Engineer').length}}
+                            </td>
+                            <td>
+                                {{deso.report.data.players.filter(iter => iter.mostPlayed.name == 'Heavy').length}}
+                            </td>
+                            <td>
+                                {{deso.report.data.players.filter(iter => iter.mostPlayed.name == 'MAX').length}}
+                            </td>
+                        </tr>
+                        <tr v-for="stat in ['Kill', 'Death']">
+                            <template v-if="deso.report.data.classStats.get(stat) != undefined">
+                                <td><b>{{stat}}</b></td>
+                                <td>{{deso.report.data.classStats.get(stat).total}}</td>
+                                <td>{{(deso.report.data.classStats.get(stat).total / deso.report.data.players.length).toFixed(2)}}</td>
+                                <td>{{deso.report.data.classStats.get(stat).infil}}</td>
+                                <td>{{deso.report.data.classStats.get(stat).lightAssault}}</td>
+                                <td>{{deso.report.data.classStats.get(stat).medic}}</td>
+                                <td>{{deso.report.data.classStats.get(stat).engineer}}</td>
+                                <td>{{deso.report.data.classStats.get(stat).heavy}}</td>
+                                <td>{{deso.report.data.classStats.get(stat).max}}</td>
+                            </template>
+                        </tr>
+                        <tr>
+                            <template v-if="deso.report.data.classStats.get('Kill') != undefined && deso.report.data.classStats.get('Death') != undefined">
+                                <td><b>K/D</b></td>
+                                <td>--</td>
+                                <td>{{(deso.report.data.classStats.get('Kill').total / deso.report.data.classStats.get('Death').total).toFixed(2)}}</td>
+                                <td>{{(deso.report.data.classStats.get('Kill').infil / deso.report.data.classStats.get('Death').infil).toFixed(2)}}</td>
+                                <td>{{(deso.report.data.classStats.get('Kill').lightAssault / deso.report.data.classStats.get('Death').lightAssault).toFixed(2)}}</td>
+                                <td>{{(deso.report.data.classStats.get('Kill').medic / deso.report.data.classStats.get('Death').medic).toFixed(2)}}</td>
+                                <td>{{(deso.report.data.classStats.get('Kill').engineer/ deso.report.data.classStats.get('Death').engineer).toFixed(2)}}</td>
+                                <td>{{(deso.report.data.classStats.get('Kill').heavy / deso.report.data.classStats.get('Death').heavy).toFixed(2)}}</td>
+                                <td>{{(deso.report.data.classStats.get('Kill').max / deso.report.data.classStats.get('Death').max).toFixed(2)}}</td>
+                            </template>
+                        </tr>
+                        <tr>
+                            <template v-if="deso.report.data.classStats.get('Headshot') != undefined">
+                                <td><b>Headshot</b></td>
+                                <td>
+                                    {{deso.report.data.classStats.get('Headshot').total}}
+                                    ({{(deso.report.data.classStats.get('Headshot').total / deso.report.data.classStats.get('Kill').total * 100).toFixed(2)}}%)
+                                </td>
+                                <td>
+                                    {{(deso.report.data.classStats.get('Headshot').total / deso.report.data.players.length).toFixed(2)}}
+                                </td>
+                                <td>
+                                    {{deso.report.data.classStats.get('Headshot').infil}}
+                                    ({{(deso.report.data.classStats.get('Headshot').infil / deso.report.data.classStats.get('Kill').infil * 100).toFixed(2)}}%)
+                                </td>
+                                <td>
+                                    {{deso.report.data.classStats.get('Headshot').lightAssault}}
+                                    ({{(deso.report.data.classStats.get('Headshot').lightAssault / deso.report.data.classStats.get('Kill').lightAssault * 100).toFixed(2)}}%)
+                                </td>
+                                <td>
+                                    {{deso.report.data.classStats.get('Headshot').medic}}
+                                    ({{(deso.report.data.classStats.get('Headshot').medic / deso.report.data.classStats.get('Kill').medic * 100).toFixed(2)}}%)
+                                </td>
+                                <td>
+                                    {{deso.report.data.classStats.get('Headshot').engineer}}
+                                    ({{(deso.report.data.classStats.get('Headshot').engineer / deso.report.data.classStats.get('Kill').engineer * 100).toFixed(2)}}%)
+                                </td>
+                                <td>
+                                    {{deso.report.data.classStats.get('Headshot').heavy}}
+                                    ({{(deso.report.data.classStats.get('Headshot').heavy / deso.report.data.classStats.get('Kill').heavy * 100).toFixed(2)}}%)
+                                </td>
+                                <td>
+                                    {{deso.report.data.classStats.get('Headshot').max}}
+                                    ({{(deso.report.data.classStats.get('Headshot').max / deso.report.data.classStats.get('Kill').max * 100).toFixed(2)}}%)
+                                </td>
+                            </template>
+                        </tr>
+
+                        <tr v-for="stat in ['Kill assist', 'Revived', 'Transport assist', 'Beacon kill', 'Control point attack', 'Control point defend']">
+                            <template v-if="deso.report.data.classStats.get(stat) != undefined">
+                                <td><b>{{stat}}</b></td>
+                                <td>{{deso.report.data.classStats.get(stat).total}}</td>
+                                <td>{{(deso.report.data.classStats.get(stat).total / deso.report.data.players.length).toFixed(2)}}</td>
+                                <td>{{deso.report.data.classStats.get(stat).infil}}</td>
+                                <td>{{deso.report.data.classStats.get(stat).lightAssault}}</td>
+                                <td>{{deso.report.data.classStats.get(stat).medic}}</td>
+                                <td>{{deso.report.data.classStats.get(stat).engineer}}</td>
+                                <td>{{deso.report.data.classStats.get(stat).heavy}}</td>
+                                <td>{{deso.report.data.classStats.get(stat).max}}</td>
+                            </template>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="col-12">
+                <h2 class="strike">Spawns</h2>
+                <div class="row">
+                    <div class="col-3">
+                        <breakdown-chart :src="deso.report.data.spawnType"
+                            :show-all="true" :clipped-amount="8">
+                        </breakdown-chart>
+                    </div>
+
+                    <div class="col-3">
+                        <breakdown :data="deso.report.data.spawnType" :show-all="true"
+                            left-title="Spawn type" right-title="Amount"
+                            :show-percent="true" :clipped-amount="10" :show-total="true">
+                        </breakdown>
+                    </div>
+
+                    <div class="col-3">
+                        <breakdown-chart :src="deso.report.data.spawnProviders"
+                            :show-all="false" :clipped-amount="8">
+                        </breakdown-chart>
+                    </div>
+
+                    <div class="col-3">
+                        <breakdown :data="deso.report.data.spawnProviders" :show-all="false"
+                            left-title="Player" right-title="Spawns"
+                            :show-percent="true" :clipped-amount="10" :show-total="true">
+                        </breakdown>
+                    </div>
+                </div>
+
+                <h4 class="strike">Sundy spawn stats ({{deso.report.data.sundies.length}} total)</h4>
+                <table class="table table-sm table-striped">
+                    <tr>
+                        <th>Owner</th>
+                        <th>First spawn</th>
+                        <th>Last spawn</th>
+                        <th>Destroyed at</th>
+                        <td>Duration</td>
+                        <th>Destroyed by</th>
+                        <th>Total spawns</th>
+                        <th>Spawns per minute</th>
+                    </tr>
+
+                    <tr v-for="entry in deso.report.data.sundies">
+                        <td>{{entry.ownerID}}</td>
+                        <td>{{entry.firstSpawnAt | moment}}</td>
+                        <td>{{entry.spawns[entry.spawns.length - 1] | moment}}</td>
+                        <td>{{entry.destroyedAt | moment}}</td>
+                        <td>{{entry.firstSpawnAt | between(entry.destroyedAt)}}</td>
+                        <td>{{entry.destroyedByID}}</td>
+                        <td>{{entry.spawns.length}}</td>
+                        <td>{{
+                                ((entry.spawns.length) / ((entry.destroyedAt - entry.firstSpawnAt) / 60000)).toFixed(2)
+                        }}</td>
+                    </tr>
+
+                </table>
+
+                <h4 class="strike">Router spawn stats ({{deso.report.data.routers.length}} total)</h4>
+                <table class="table table-sm table-striped">
+                    <tr>
+                        <th>Owner</th>
+                        <th>First spawn</th>
+                        <th>Last spawn</th>
+                        <th>Destroyed at</th>
+                        <td>Duration</td>
+                        <th>Destroyed by</th>
+                        <th>Total spawns</th>
+                        <th>Spawns per minute</th>
+                    </tr>
+
+                    <tr v-for="entry in deso.report.data.routers">
+                        <td>{{entry.ownerID}}</td>
+                        <td>{{entry.firstSpawnAt | moment}}</td>
+                        <td>{{entry.spawns[entry.spawns.length - 1] | moment}}</td>
+                        <td>{{entry.destroyedAt | moment}}</td>
+                        <td>{{entry.firstSpawnAt | between(entry.destroyedAt)}}</td>
+                        <td>{{entry.destroyedByID}}</td>
+                        <td>{{entry.spawns.length}}</td>
+                        <td>{{
+                                ((entry.spawns.length) / ((entry.destroyedAt - entry.firstSpawnAt) / 60000)).toFixed(2)
+                        }}</td>
+                    </tr>
+                </table>
+
+                <h2 class="strike">Vehicles killed</h2>
+                <div class="row">
+                    <div class="col-3">
+                        <breakdown-chart :src="deso.report.data.vehicleKills.type"
+                            :show-all="false" :clipped-amount="8">
+                        </breakdown-chart>
+                    </div>
+
+                    <div class="col-3">
+                        <breakdown :data="deso.report.data.vehicleKills.type" :show-all="false"
+                            left-title="Vehicle" right-title="Amount"
+                            :show-percent="true" :clipped-amount="10" :show-total="true">
+                        </breakdown>
+                    </div>
+
+                    <div class="col-3">
+                        <breakdown-chart :src="deso.report.data.vehicleKills.players"
+                            :show-all="false" :clipped-amount="8">
+                        </breakdown-chart>
+                    </div>
+
+                    <div class="col-3">
+                        <breakdown :data="deso.report.data.vehicleKills.players" :show-all="false"
+                            left-title="Player" right-title="Amount"
+                            :show-percent="true" :clipped-amount="10" :show-total="true">
+                        </breakdown>
+                    </div>
+                </div>
+
+                <h2 class="strike">Vehicles lost</h2>
+                <div class="row">
+                    <div class="col-3">
+                        <breakdown-chart :src="deso.report.data.vehicleDeaths.type"
+                            :show-all="false" :clipped-amount="8">
+                        </breakdown-chart>
+                    </div>
+
+                    <div class="col-3">
+                        <breakdown :data="deso.report.data.vehicleDeaths.type" :show-all="false"
+                            left-title="Vehicle" right-title="Amount"
+                            :show-percent="true" :clipped-amount="10" :show-total="true">
+                        </breakdown>
+                    </div>
+
+                    <div class="col-3">
+                        <breakdown-chart :src="deso.report.data.vehicleDeaths.players"
+                            :show-all="false" :clipped-amount="8">
+                        </breakdown-chart>
+                    </div>
+
+                    <div class="col-3">
+                        <breakdown :data="deso.report.data.vehicleDeaths.players" :show-all="false"
+                            left-title="Player" right-title="Amount"
+                            :show-percent="true" :clipped-amount="10" :show-total="true">
+                        </breakdown>
+                    </div>
+                </div>
+
+                <h2 class="strike">Vehicle v Vehicle</h2>
+                <table class="table table-sm table-striped">
+                    <tr>
+                        <th></th>
+                        <th>Flash</th>
+                        <th>Sunderer</th>
+                        <th>Lightning</th>
+                        <th>Magrider</th>
+                        <th>Vanguard</th>
+                        <th>Prowler</th>
+                        <th>Scythe</th>
+                        <th>Reaver</th>
+                        <th>Mosquito</th>
+                        <th>Liberator</th>
+                        <th>Galaxy</th>
+                        <th>Harasser</th>
+                        <th>Valkyrie</th>
+                        <th>ANT</th>
+                        <th>Colossus</th>
+                    </tr>
+
+                    <tr is="vehicle-versus-entry" name="Flash" :entry="deso.report.data.versus.flash"></tr>
+                    <tr is="vehicle-versus-entry" name="Sunderer" :entry="deso.report.data.versus.sundy"></tr>
+                    <tr is="vehicle-versus-entry" name="Lightning" :entry="deso.report.data.versus.lightning"></tr>
+                    <tr is="vehicle-versus-entry" name="Magrider" :entry="deso.report.data.versus.magrider"></tr>
+                    <tr is="vehicle-versus-entry" name="Vanguard" :entry="deso.report.data.versus.vanguard"></tr>
+                    <tr is="vehicle-versus-entry" name="Prowler" :entry="deso.report.data.versus.prowler"></tr>
+                    <tr is="vehicle-versus-entry" name="Scythe" :entry="deso.report.data.versus.scythe"></tr>
+                    <tr is="vehicle-versus-entry" name="Reaver" :entry="deso.report.data.versus.reaver"></tr>
+                    <tr is="vehicle-versus-entry" name="Mosquito" :entry="deso.report.data.versus.mossie"></tr>
+                    <tr is="vehicle-versus-entry" name="Liberator" :entry="deso.report.data.versus.lib"></tr>
+                    <tr is="vehicle-versus-entry" name="Galaxy" :entry="deso.report.data.versus.galaxy"></tr>
+                    <tr is="vehicle-versus-entry" name="Harasser" :entry="deso.report.data.versus.harasser"></tr>
+                    <tr is="vehicle-versus-entry" name="Valkyrie" :entry="deso.report.data.versus.valk"></tr>
+                    <tr is="vehicle-versus-entry" name="ANT" :entry="deso.report.data.versus.ant"></tr>
+                    <tr is="vehicle-versus-entry" name="Colossus" :entry="deso.report.data.versus.colussus"></tr>
+                </table>
+
+            </div>
+
+        </div>
+
         <div v-else>
             Unknown view: {{view}}
 
@@ -2051,6 +2393,7 @@
                             <option value="winter">Winter report</option>
                             <option value="battle">Fight report</option>
                             <option value="personal">Personal reports</option>
+                            <option value="deso">Asteriod report</option>
                         </select>
 
                         <hr>
@@ -2077,7 +2420,7 @@
 
                             <hr>
 
-                            <div v-if="outfitReportResponse != null">
+                            <div v-if="outfit.steps.length > 0">
                                 Progresss:
                                 <table class="table table-sm">
                                     <thead>
@@ -2088,9 +2431,9 @@
                                     </thead>
 
                                     <tbody>
-                                        <tr v-for="step in outfitReportResponse.getSteps()">
-                                            <td>{{step}}</td>
-                                            <td>{{outfitReportResponse.getStepState(step)}}</td>
+                                        <tr v-for="step in outfit.steps">
+                                            <td>{{step.name}}</td>
+                                            <td>{{step.state}}</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -2151,6 +2494,10 @@
 
                         <div v-else-if="parameters.report == 'personal'">
                             <h6 class="strike">Personal report settings</h6>
+                        </div>
+
+                        <div v-else-if="parameters.report == 'deso'">
+                            <h6 class="strike">Asteroid report settings</h6>
                         </div>
 
                         <hr>

@@ -31,6 +31,7 @@ import "BreakdownBar";
 import "MomentFilter";
 import "KillfeedSquad";
 import "FightReportTop";
+import "VehicleVersusEntry";
 
 import Core, {
     ApiResponse,
@@ -38,6 +39,8 @@ import Core, {
     IndividualReporter, Report, ReportParameters,
     OutfitReport, OutfitReportGenerator, OutfitReportSettings,
     FightReport, FightReportParameters, FightReportGenerator, FightReportEntry,
+    DesoReport, DesoReportParameters, DesoReportGenerator,
+    ProgressCallback, ProgressNotification, ProgressSteps, ProgressUpdate,
     TrackedPlayer,
     CoreSettings,
     Squad,
@@ -55,6 +58,8 @@ import { SquadAddon } from "addons/SquadAddon";
 import { StorageHelper } from "Storage";
 import { LoggerMetadata, LoggerMetadataLevel } from "LoggerMetadata";
 import * as loglevel from "loglevel";
+import { param } from "jquery";
+import { OutfitReportParameters } from "../../topt-core/build/core/index.js";
 
 (window as any).CharacterAPI = CharacterAPI;
 (window as any).Playback = Playback;
@@ -72,7 +77,7 @@ export const vm = new Vue({
     data: {
         coreObject: null as (Core | null),
 
-        view: "setup" as "setup" | "realtime" | "ops" | "killfeed" | "winter" | "example" | "battle",
+        view: "setup" as "setup" | "realtime" | "ops" | "killfeed" | "winter" | "example" | "battle" | "deso",
 
         // Field related to settings about how TOPT runs
         settings: {
@@ -133,11 +138,23 @@ export const vm = new Vue({
             ignoredPlayers: "" as string
         },
 
+        deso: {
+            report: Loadable.idle() as Loading<DesoReport>
+        },
+
+        battle: {
+            report: Loadable.idle() as Loading<FightReport>
+        },
+
+        outfit: {
+            report: Loadable.idle() as Loading<OutfitReport>,
+            steps: [] as {name: string, state: string}[]
+        },
+
         battleReport: new FightReport() as FightReport,
 
         outfitReport: new OutfitReport() as OutfitReport,
         opsReportSettings: new OutfitReportSettings() as OutfitReportSettings,
-        outfitReportResponse: null as ApiResponse<OutfitReport> | null,
 
         refreshIntervalID: -1 as number, // ID of the timed interval to refresh the realtime view
 
@@ -288,21 +305,26 @@ export const vm = new Vue({
             }
 
             Playback.setCore(this.core);
+            log.info(`loading ${input.files.length} files`);
 
             for (let i = 0; i < input.files.length; ++ i) {
                 const file = input.files[i];
-                Playback.loadFile(file).ok(() => {
+                Playback.loadFile(file).then(() => {
+                    log.debug(`Playing back ${file.name}`);
                     Playback.start({ speed: 0.0 });
                 });
             }
         },
 
         exportData: function(): void {
+            log.debug(`Including ${CharacterAPI.getCache().length} cached characters in export`);
+
             const json: object = {
                 version: "1" as string,
                 events: this.core.rawData,
                 players: this.core.characters,
-                outfits: this.core.outfits
+                outfits: this.core.outfits,
+                characters: CharacterAPI.getCache()
             };
 
             const file = new File([JSON.stringify(json)], "data.json", { type: "text/json" });
@@ -311,7 +333,7 @@ export const vm = new Vue({
         },
 
         exportOpsReport: function(): void {
-            this.generateOutfitReport().ok(() => {
+            this.generateOutfitReport().then(() => {
                 const json: string = JSON.stringify(this.outfitReport, null, 2);
                 const file = new File([json], "report.json", { type: "text/json" });
 
@@ -345,16 +367,21 @@ export const vm = new Vue({
         },
 
         debugLoadfile: function(reportType?: string): void {
-            const response = new ApiResponse<unknown>(axios.default.get(`/test-data/2020-12-12-T1DE.json`)).ok((data: unknown) => {
+            const response = new ApiResponse<unknown>(axios.default.get(`/test-data/OW3-DPSO.json`)).ok((data: unknown) => {
                 const type = typeof(data);
 
                 Playback.setCore(this.core);
                 if (type == "string") {
-                    Playback.loadFile(data as string).ok(() => {
+                    Playback.loadFile(data as string).then(() => {
                         Playback.start({ speed: 0 });
+
+                        if (reportType != undefined) {
+                            this.parameters.report = reportType;
+                            this.generateReport();
+                        }
                     });
                 } else if (type == "object") {
-                    Playback.loadFile(JSON.stringify(data)).ok(() => {
+                    Playback.loadFile(JSON.stringify(data)).then(() => {
                         Playback.start({ speed: 0 });
 
                         if (reportType != undefined) {
@@ -487,13 +514,12 @@ export const vm = new Vue({
             }
         },
 
-        generateReport: function(): void {
+        generateReport: async function(): Promise<void> {
             if (this.parameters.report == "ops") {
-                this.generateOutfitReport().ok(() => {
-                    $("#report-modal").modal("hide");
-                    this.parameters.report = "";
-                    console.log(`Report generated`);
-                });
+                await this.generateOutfitReport();
+                $("#report-modal").modal("hide");
+                this.parameters.report = "";
+                console.log(`Report generated`);
             } else if (this.parameters.report == "winter") {
                 this.generateWinterReport();
                 $("#report-modal").modal("hide");
@@ -504,14 +530,15 @@ export const vm = new Vue({
                 this.parameters.report = "";
             } else if (this.parameters.report == "battle") {
                 this.generateBattleReport();
-                $("#report-modal").modal("hide");
-                this.parameters.report = "";
+            } else if (this.parameters.report == "deso") {
+                this.generateDesoReport().then(() => {
+                    $("#report-modal").modal("hide");
+                    this.parameters.report = "";
+                });
             }
         },
 
-        generateOutfitReport: function(): ApiResponse {
-            const response: ApiResponse = new ApiResponse();
-
+        generateOutfitReport: async function(): Promise<void> {
             let events: TEvent[] = [];
 
             this.core.stats.forEach((player: TrackedPlayer, charID: string) => {
@@ -543,7 +570,7 @@ export const vm = new Vue({
                 }
             }
 
-            const outfitResponse: ApiResponse<OutfitReport> = OutfitReportGenerator.generate({
+            const outfitReport: OutfitReport = await OutfitReportGenerator.generate({
                 settings: {
                     zoneID: null,
                     showSquadStats: this.opsReportSettings.showSquadStats
@@ -558,22 +585,34 @@ export const vm = new Vue({
                     perm: this.core.squad.perm,
                     guesses: this.core.squad.guesses
                 }
+            }, (ev: ProgressNotification) => {
+                if (ev.type == "steps") {
+                    log.info(`Steps: ${ev.steps.join(", ")}`);
+                    this.outfit.steps = ev.steps.map(iter => {
+                        return {
+                            name: iter,
+                            state: "pending"
+                        };
+                    });
+                } else if (ev.type == "update") {
+                    const step = this.outfit.steps.find(iter => iter.name == ev.step);
+                    if (step) {
+                        if (ev.state == "started") {
+                            step.state = "In progress";
+                        } else if (ev.state == "done") {
+                            step.state = "Done";
+                        } else if (ev.state == "errored") {
+                            step.state = "Errored!";
+                        }
+                    }
+                }
             });
 
-            this.outfitReportResponse = outfitResponse;
-            console.log(`Have ${this.outfitReportResponse.getSteps().length} steps to complete`);
-
-            outfitResponse.ok((data: OutfitReport) => { 
-                this.outfitReport = data;
-                this.view = "ops";
-                response.resolveOk();
-                this.outfitReportResponse = null;
-            });
-
-            return response;
+            this.outfitReport = outfitReport;
+            this.view = "ops";
         },
 
-        generateBattleReport: function(): void {
+        generateBattleReport: async function(): Promise<void> {
             const params: FightReportParameters = new FightReportParameters();
 
             this.core.stats.forEach((player: TrackedPlayer, charID: string) => {
@@ -588,13 +627,11 @@ export const vm = new Vue({
 
             params.players = this.core.stats;
 
-            FightReportGenerator.generate(params).ok((data: FightReport) => {
-                this.battleReport = data;
-                this.view = "battle";
-            });
+            this.battleReport = await FightReportGenerator.generate(params);
+            this.view = "battle";
         },
 
-        generateWinterReport: function(): void {
+        generateWinterReport: async function(): Promise<void> {
             const playerNames: string[] = this.winter.ignoredPlayers.split(" ")
                 .map(iter => iter.toLowerCase());
 
@@ -630,53 +667,45 @@ export const vm = new Vue({
             });
 
             this.winter.report = Loadable.loading();
-            WinterReportGenerator.generate(params).ok((data: WinterReport) => {
-                this.winter.report = Loadable.loaded(data);
-                this.view = "winter";
-            });
+            this.winter.report = Loadable.loaded(await WinterReportGenerator.generate(params));
+            this.view = "winter";
         },
 
-        generatePersonalReport: function(charID: string): void {
-            let opsLeft: number = 2;
+        generateDesoReport: async function(): Promise<void> {
+            const params: DesoReportParameters = new DesoReportParameters();
+            this.core.stats.forEach((player: TrackedPlayer, charID: string) => {
+                if (player.events.length == 0) { return; }
 
-            let html: string = "";
-            let report: Report = new Report();
-
-            const personalTemplate = PersonalReportGenerator.getTemplate().ok((type: string) => {
-                html = type;
-                if (--opsLeft == 0) {
-                    done();
-                } else {
-                    console.log(`Template loaded, waiting on player report`);
-                }
-            }).always(() => {
-                console.log(`Report return ${personalTemplate.status}`);
+                params.events.push(...player.events);
             });
+            params.events.push(...this.core.miscEvents);
 
-            this.generatePlayerReport(charID).ok((data: Report) => {
-                report = data;
-                console.log(`Made report`, report);
-                if (--opsLeft == 0) {
-                    done(); 
-                } else {
-                    console.log(`Report loaded, waiting on template`);
-                }
-            });
+            params.npcs = [...this.core.npcs.all];
+            params.players = [...Array.from(this.core.stats.values())];
+            params.tracking = this.core.tracking;
 
-            const done = () => {
-                const str: string = PersonalReportGenerator.generate(html, report);
-                console.log(`Saving report for ${charID}`);
-
-                FileSaver.saveAs(new File([str], `topt-${report.player?.name}.html`, { type: "text/html" }))
-            };
+            this.deso.report = Loadable.loading();
+            this.deso.report = Loadable.loaded(await DesoReportGenerator.generate(params));
+            this.view = "deso";
         },
 
-        generatePlayerReport: function(charID: string): ApiResponse<Report> {
-            const response: ApiResponse<Report> = new ApiResponse();
+        generatePersonalReport: async function(charID: string): Promise<void> {
+            let html: string = await PersonalReportGenerator.getTemplate();
+            let report: Report | null = await this.generatePlayerReport(charID);
+            if (report == null) {
+                return;
+            }
 
+            const str: string = PersonalReportGenerator.generate(html, report);
+            console.log(`Saving report for ${charID}`);
+
+            FileSaver.saveAs(new File([str], `topt-${report.player?.name}.html`, { type: "text/html" }))
+        },
+
+        generatePlayerReport: async function(charID: string): Promise<Report | null> {
             const player: TrackedPlayer | undefined = this.core.stats.get(charID);
             if (player == undefined) {
-                response.resolve({ code: 404, data: `` });
+                return null;
             } else {
                 const events: TEvent[] = [...player.events];
                 this.core.stats.forEach((player: TrackedPlayer, _: string) => {
@@ -692,19 +721,15 @@ export const vm = new Vue({
                 const parameters: ReportParameters = {
                     player: player,
                     events: events,
-                    tracking: {...this.core.tracking},
-                    routers: [...this.core.routerTracking.routers]
+                    tracking: { ...this.core.tracking },
+                    routers: [ ...this.core.npcs.all.filter(iter => iter.type == "router") ]
                 };
 
-                IndividualReporter.generatePersonalReport(parameters).ok(data => {
-                    response.resolveOk(data);
-                });
+                return IndividualReporter.generatePersonalReport(parameters);
             }
-
-            return response;
         },
 
-        generateAllReports: function(): void {
+        generateAllReports: async function(): Promise<void> {
             let left: TrackedPlayer[] = [];
             this.core.stats.forEach((player: TrackedPlayer, charID: string) => {
                 if (player.events.length > 0) {
@@ -713,82 +738,50 @@ export const vm = new Vue({
             });
 
             let reports: Report[] = [];
-            let html: string = "";
-
-            let opsLeft: number = 2;
+            const html: string = await PersonalReportGenerator.getTemplate();
 
             this.generation.names = left.map(iter => iter.name);
             this.generation.state = left.map(iter => "Pending");
 
             $("#generation-modal").modal("show");
 
-            const generateReport = () => {
-                if (left.length == 0) {
-                    if (--opsLeft == 0) {
-                        console.log(`opsLeft is 0, performing done`);
-                        done();
-                    }
-                    console.log(`No reports left`);
-                    return;
-                }
-
-                const char: TrackedPlayer = left.shift()!;
-                console.log(`Generating report for ${char.name}: Have ${left.length} left`);
-
+            for (const char of left) {
                 const index: number = this.generation.names.findIndex(iter => iter == char.name);
                 this.generation.state[index] = "Generating...";
 
                 try {
-                    this.generatePlayerReport(char.characterID).ok((report: Report) => {
-                        if (report.player == null) {
-                            console.warn(`Missing player for report ${char.characterID}`);
-                        }
+                    const report: Report | null = await this.generatePlayerReport(char.characterID);
+                    if (report != null) {
                         reports.push(report);
-                        this.generation.state[index] = "Done";
-
-                        generateReport();
-                    }).always(() => {
-                        console.log(`Finished ${char.name} generation`);
-                    });
+                    }
+                    this.generation.state[index] = "Done";
                 } catch {
                     this.generation.state[index] = "Error";
-                    generateReport();
                 }
-            };
+            }
 
-            PersonalReportGenerator.getTemplate().ok((type: string) => {
-                html = type;
-                if (--opsLeft == 0) {
-                    done();
-                }
+            $("#generation-modal").modal("hide");
+
+            const zip: JSZip = new JSZip();
+
+            const timestamp: string = moment(new Date()).format("YYYY-MM-DD");
+
+            for (const report of reports) {
+                const str = PersonalReportGenerator.generate(html, report);
+
+                zip.file(`topt_report_${report.player?.name}_${timestamp}.html`, str);
+                console.log(`Added ${report.player?.name} to zip file`);
+            }
+
+            console.log(`Generating zip file`);
+
+            zip.generateAsync({
+                type: "blob"
+            }).then((content: Blob) => {
+                console.log(`Generated zip file`);
+                FileSaver.saveAs(content, `topt_ops_${timestamp}_all.zip`);
+                console.log(`FileSaver performed save of zip`);
             });
-
-            const done = () => {
-                $("#generation-modal").modal("hide");
-
-                const zip: JSZip = new JSZip();
-
-                const timestamp: string = moment(new Date()).format("YYYY-MM-DD");
-
-                for (const report of reports) {
-                    const str = PersonalReportGenerator.generate(html, report);
-
-                    zip.file(`topt_report_${report.player?.name}_${timestamp}.html`, str);
-                    console.log(`Added ${report.player?.name} to zip file`);
-                }
-
-                console.log(`Generating zip file`);
-
-                zip.generateAsync({
-                    type: "blob"
-                }).then((content: Blob) => {
-                    console.log(`Generated zip file`);
-                    FileSaver.saveAs(content, `topt_ops_${timestamp}_all.zip`);
-                    console.log(`FileSaver performed save of zip`);
-                });
-            };
-
-            generateReport();
         },
 
         removeMostRecentPermSquad: function(): void {
@@ -822,7 +815,7 @@ export const vm = new Vue({
             }
         },
 
-        addOutfit: function(): void {
+        addOutfit: async function(): Promise<void> {
             if (this.parameters.outfitTag.trim().length == 0) {
                 return;
             }
@@ -832,11 +825,9 @@ export const vm = new Vue({
             }
 
             this.loadingOutfit = true;
-            this.core.addOutfit(this.parameters.outfitTag).ok(() => {
-                console.log(`Loaded ${this.parameters.outfitTag}`);
-                this.loadingOutfit = false;
-                this.parameters.outfitTag = "";
-            });
+            await this.core.addOutfit(this.parameters.outfitTag);
+            this.loadingOutfit = false;
+            this.parameters.outfitTag = "";
         },
 
         addPlayer: function(): void {

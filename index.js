@@ -106,7 +106,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Core = void 0;
-const ApiWrapper_1 = __webpack_require__(/*! ./census/ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
 const CensusAPI_1 = __webpack_require__(/*! ./census/CensusAPI */ "../topt-core/build/core/census/CensusAPI.js");
 const OutfitAPI_1 = __webpack_require__(/*! ./census/OutfitAPI */ "../topt-core/build/core/census/OutfitAPI.js");
 const CharacterAPI_1 = __webpack_require__(/*! ./census/CharacterAPI */ "../topt-core/build/core/census/CharacterAPI.js");
@@ -131,13 +130,17 @@ class Core {
             added: null
         };
         /**
-         * Collection of variables used to track router placements
+         * NPCs that are tracked
          */
-        this.routerTracking = {
-            // key - Who placed the router
-            // value - Lastest npc ID that gave them a router spawn tick
-            routerNpcs: new Map(),
-            routers: [] // All routers that have been placed
+        this.npcs = {
+            /**
+             * NPCs that are actively providing spawns. <npc_id, npc>
+             */
+            active: new Map(),
+            /**
+             * All NPCs that were tracked and found
+             */
+            all: []
         };
         /**
          * Collection of squad related vars
@@ -220,6 +223,7 @@ class Core {
         this.socketMessageQueue.length = 5;
         CensusAPI_1.default.init(this.serviceID);
         this.squadInit();
+        log.info(`Using Promise core`);
     }
     /**
      * Emit an event and execute all handlers on it
@@ -338,6 +342,16 @@ class Core {
                 char.secondsOnline = 0;
             }
         });
+        this.npcs.active.forEach((npc, npcID) => {
+            const withEnd = Object.assign({}, npc);
+            if (withEnd.spawns.length == 0) {
+                withEnd.destroyedAt = withEnd.pulledAt;
+            }
+            else {
+                withEnd.destroyedAt = withEnd.spawns[withEnd.spawns.length - 1];
+            }
+            this.npcs.all.push(withEnd);
+        });
     }
     /**
      * Begin tracking all members of an outfit. The core must be connected before this is called
@@ -347,22 +361,22 @@ class Core {
      * @returns An ApiResponse that will resolve when the outfit has been loaded
      */
     addOutfit(tag) {
-        if (this.connected == false) {
-            throw `Cannot track outfit ${tag}: Core is not connected`;
-        }
-        const response = new ApiWrapper_1.ApiResponse();
-        if (tag.trim().length == 0) {
-            response.resolveOk();
-            return response;
-        }
-        OutfitAPI_1.OutfitAPI.getByTag(tag).ok((data) => {
-            this.outfits.push(data);
+        return __awaiter(this, void 0, void 0, function* () {
+            if (this.connected == false) {
+                throw `Cannot track outfit ${tag}: Core is not connected`;
+            }
+            try {
+                const outfit = yield OutfitAPI_1.OutfitAPI.getByTag(tag);
+                if (outfit != null) {
+                    this.outfits.push(outfit);
+                }
+                const chars = yield OutfitAPI_1.OutfitAPI.getCharactersByTag(tag);
+                this.subscribeToEvents(chars);
+            }
+            catch (err) {
+                log.error(err);
+            }
         });
-        OutfitAPI_1.OutfitAPI.getCharactersByTag(tag).ok((data) => {
-            this.subscribeToEvents(data);
-            response.resolveOk();
-        });
-        return response;
     }
     /**
      * Begin tracking a new player. The core must be connected before calling
@@ -372,20 +386,17 @@ class Core {
      * @returns An ApiResponse that will resolve when the character has been loaded and tracked
      */
     addPlayer(name) {
-        if (this.connected == false) {
-            throw `Cannot track character ${name}: Core is not connected`;
-        }
-        const response = new ApiWrapper_1.ApiResponse();
-        if (name.trim().length == 0) {
-            response.resolveOk();
-        }
-        else {
-            CharacterAPI_1.CharacterAPI.getByName(name).ok((data) => {
-                this.subscribeToEvents([data]);
-                response.resolveOk();
-            });
-        }
-        return response;
+        return __awaiter(this, void 0, void 0, function* () {
+            if (this.connected == false) {
+                throw `Cannot track character ${name}: Core is not connected`;
+            }
+            if (name.trim().length > 0) {
+                const char = yield CharacterAPI_1.CharacterAPI.getByName(name);
+                if (char != null) {
+                    this.subscribeToEvents([char]);
+                }
+            }
+        });
     }
     /**
      * Being tracking a character by the character ID. Core must be connected before calling
@@ -395,22 +406,20 @@ class Core {
      * @returns An ApiResponse that will resolve when the character has been loaded and tracked
      */
     addPlayerByID(charID) {
-        if (this.connected == false) {
-            throw `Cannot tracker character ${charID}: Core is not connected`;
-        }
-        const response = new ApiWrapper_1.ApiResponse();
-        if (charID.trim().length == 0) {
-            response.resolveOk();
-        }
-        else {
-            CharacterAPI_1.CharacterAPI.getByID(charID).ok((data) => {
-                this.subscribeToEvents([data]);
-                response.resolveOk();
-            }).notFound((err) => {
-                response.resolve({ code: 500, data: `Character ID ${charID} does not exist` });
-            });
-        }
-        return response;
+        return __awaiter(this, void 0, void 0, function* () {
+            if (this.connected == false) {
+                throw `Cannot track character ${charID}: Core is not connected`;
+            }
+            if (charID.trim().length > 0) {
+                const char = yield CharacterAPI_1.CharacterAPI.getByID(charID);
+                if (char != null) {
+                    this.subscribeToEvents([char]);
+                }
+                else {
+                    log.warn(`Failed to get ${charID} from CharacterAPI`);
+                }
+            }
+        });
     }
     /**
      * Insert a new marker event at the current time. Calling this while the tracker is not running can be dangerous as it
@@ -473,22 +482,6 @@ class Core {
             throw `Unknown socket to subscribe: ${options.socket}`;
         }
     }
-    promiseTest() {
-        const t = new ApiWrapper_1.ApiResponse();
-        const p = t.promise();
-        setTimeout(() => __awaiter(this, void 0, void 0, function* () {
-            const contents = yield p;
-            if (contents.code == 200) {
-                console.log(`200: ${contents.data}`);
-            }
-            else if (contents.code == 500) {
-                console.error(`500: ${contents.data}`);
-            }
-        }));
-        setTimeout(() => {
-            t.resolve({ code: 200, data: `Hello from the other side` });
-        }, 3000);
-    }
     /**
      * Subscribe to the events in the event stream and begin tracking them in the squad tracker
      *
@@ -543,6 +536,27 @@ class Core {
             };
             this.sockets.tracked.send(JSON.stringify(subscribeExp));
         }
+    }
+    subcribeByID(charID) {
+        if (this.sockets.tracked == null) {
+            return log.error(`cannot subscribe to ${charID}, sockets.tracked is null`);
+        }
+        const subscribeExp = {
+            "action": "subscribe",
+            "characters": [
+                charID
+            ],
+            "eventNames": [
+                "GainExperience",
+                "AchievementEarned",
+                "Death",
+                "FacilityControl",
+                "ItemAdded",
+                "VehicleDestroy"
+            ],
+            "service": "event"
+        };
+        this.sockets.tracked.send(JSON.stringify(subscribeExp));
     }
     /**
      * Method called when a socket receives a new message
@@ -696,6 +710,8 @@ function setupLogisticsSocket(core) {
             ],
             eventNames: [
                 "GainExperience_experience_id_1409",
+                "GainExperience_experience_id_60",
+                "GainExperience_experience_id_68",
             ],
             logicalAndCharactersWithWorlds: true
         };
@@ -822,6 +838,21 @@ Core_1.Core.prototype.subscribeToAllEvent = function (...expID) {
     };
     this.sockets.debug.send(JSON.stringify(msg));
 };
+Core_1.Core.prototype.subscribeToAllEventsOnTracked = function (...expID) {
+    if (this.sockets.tracked == null) {
+        return log.error(`Cannot globally subscribe to ${expID}: debug socket is null`);
+    }
+    const msg = {
+        service: "event",
+        action: "subscribe",
+        characters: ["all"],
+        worlds: ["all"],
+        eventNames: [
+            ...expID.map(iter => `GainExperience_experience_id_${iter}`)
+        ]
+    };
+    this.sockets.tracked.send(JSON.stringify(msg));
+};
 Core_1.Core.prototype.subscribeToItemAdded = function () {
     if (this.sockets.debug == null) {
         return log.error(`Cannot subscribe to ItemAdded events: debug socket is null`);
@@ -835,6 +866,24 @@ Core_1.Core.prototype.subscribeToItemAdded = function () {
         ],
         eventNames: [
             "ItemAdded"
+        ],
+        logicalAndCharactersWithWorlds: true
+    };
+    this.sockets.debug.send(JSON.stringify(msg));
+};
+Core_1.Core.prototype.subscribeToSkillAdded = function () {
+    if (this.sockets.debug == null) {
+        return log.error(``);
+    }
+    const msg = {
+        service: "event",
+        action: "subscribe",
+        characters: ["all"],
+        worlds: [
+            this.serverID
+        ],
+        eventNames: [
+            "SkillAdded"
         ],
         logicalAndCharactersWithWorlds: true
     };
@@ -889,61 +938,50 @@ Core_1.Core.prototype.processMessage = function (input, override = false) {
             const targetID = msg.payload.other_id;
             const amount = Number.parseInt(msg.payload.amount);
             const event = PsEvent_1.PsEvents.get(eventID);
-            if (eventID == "1410") {
-                if (self.stats.get(charID) != undefined) {
-                    if (self.routerTracking.routerNpcs.has(charID)) {
-                        //log.debug(`${charID} router npc check for ${targetID}`);
-                        const router = self.routerTracking.routerNpcs.get(charID);
-                        if (router.ID != targetID) {
-                            //log.warn(`New router placed by ${charID}, missed ItemAdded event: removing old one and replacing with ${targetID}`);
-                            router.destroyed = timestamp;
-                            self.routerTracking.routers.push(Object.assign({}, router));
-                            self.routerTracking.routerNpcs.set(charID, {
-                                ID: targetID,
-                                owner: charID,
-                                pulledAt: timestamp,
-                                firstSpawn: timestamp,
-                                destroyed: undefined,
-                                count: 1,
-                                type: "router"
-                            });
-                        }
-                        else {
-                            //log.debug(`Same router, incrementing count`);
-                            if (router.ID == "") {
-                                router.ID = targetID;
-                            }
-                            if (router.firstSpawn == undefined) {
-                                router.firstSpawn = timestamp;
-                            }
-                            ++router.count;
+            if (eventID == PsEvent_1.PsEvent.constructionSpawn || eventID == PsEvent_1.PsEvent.sundySpawn) {
+                const type = (eventID == PsEvent_1.PsEvent.constructionSpawn) ? "router"
+                    : (eventID == PsEvent_1.PsEvent.sundySpawn) ? "sundy"
+                        : "unknown";
+                const npcID = Number.parseInt(targetID);
+                if (type == "router") {
+                    const npcs = Array.from(self.npcs.active.values());
+                    for (const npc of npcs) {
+                        if (npc.ownerID == charID && npc.ID != targetID) {
+                            log.debug(`Router replaced, adding to destroyed`);
+                            npc.destroyedAt = timestamp;
+                            npc.destroyedByID = charID;
+                            self.npcs.all.push(npc);
+                            self.npcs.active.delete(npc.ID);
                         }
                     }
-                    else {
-                        //log.debug(`${charID} has new router ${targetID} placed/used`);
-                        self.routerTracking.routerNpcs.set(charID, {
-                            ID: targetID,
-                            owner: charID,
-                            pulledAt: timestamp,
-                            firstSpawn: timestamp,
-                            destroyed: undefined,
-                            count: 1,
-                            type: "router"
-                        });
-                    }
-                    save = true;
                 }
+                if (self.npcs.active.has(targetID) == false) {
+                    const npc = {
+                        ID: targetID,
+                        ownerID: charID,
+                        pulledAt: timestamp,
+                        firstSpawnAt: timestamp,
+                        destroyedAt: null,
+                        destroyedByID: null,
+                        spawns: [],
+                        count: 1,
+                        type: type
+                    };
+                    self.npcs.active.set(targetID, npc);
+                    log.debug(`${npc.type}/${npcID.toString(16)} found, placed by ${charID} at ${timestamp}`);
+                }
+                const npc = self.npcs.active.get(targetID);
+                npc.spawns.push(timestamp);
+                npc.count += 1;
             }
-            else if (eventID == "1409") {
-                const trackedNpcs = Array.from(self.routerTracking.routerNpcs.values());
-                const ids = trackedNpcs.map(iter => iter.ID);
-                if (ids.indexOf(targetID) > -1) {
-                    const router = trackedNpcs.find(iter => iter.ID == targetID);
-                    //log.debug(`Router ${router.ID} placed by ${router.owner} destroyed, saving`);
-                    router.destroyed = timestamp;
-                    self.routerTracking.routers.push(Object.assign({}, router));
-                    self.routerTracking.routerNpcs.delete(router.owner);
-                    save = true;
+            else if (eventID == PsEvent_1.PsEvent.routerKill || eventID == PsEvent_1.PsEvent.sundyDestroyed) {
+                if (self.npcs.active.has(targetID) == true) {
+                    const npc = self.npcs.active.get(targetID);
+                    npc.destroyedAt = timestamp;
+                    npc.destroyedByID = charID;
+                    self.npcs.all.push(Object.assign({}, npc));
+                    self.npcs.active.delete(npc.ID);
+                    log.debug(`${npc.type}/${Number.parseInt(npc.ID).toString(16)} destroyed, lasted ${(npc.destroyedAt - npc.pulledAt) / 1000}s, killed by ${charID}, ${npc.count} spawns`);
                 }
             }
             const ev = {
@@ -1099,7 +1137,7 @@ Core_1.Core.prototype.processMessage = function (input, override = false) {
             self.playerCaptures.push(ev);
             let player = self.stats.get(playerID);
             if (player != undefined) {
-                log.debug(`Tracked player ${player.name} got a capture on ${ev.facilityID}`);
+                //log.debug(`Tracked player ${player.name} got a capture on ${ev.facilityID}`);
                 player.stats.increment(PsEvent_1.PsEvent.baseCapture);
                 player.events.push(ev);
             }
@@ -1169,23 +1207,30 @@ Core_1.Core.prototype.processMessage = function (input, override = false) {
             const charID = msg.payload.character_id;
             if (itemID == "6003551") {
                 if (self.stats.get(charID) != undefined) {
+                    /* Turned off cause it's not actually that useful and making tracking harder
                     //log.debug(`${charID} pulled a new router`);
+
                     if (self.routerTracking.routerNpcs.has(charID)) {
-                        const router = self.routerTracking.routerNpcs.get(charID);
+                        const router: TrackedNpc = self.routerTracking.routerNpcs.get(charID)!;
                         //log.debug(`${charID} pulled a new router, saving old one`);
-                        router.destroyed = timestamp;
-                        self.routerTracking.routers.push(Object.assign({}, router));
+                        router.destroyedAt = timestamp;
+
+                        self.routerTracking.routers.push({...router});
                     }
-                    const router = {
-                        ID: "",
-                        owner: charID,
+
+                    const router: TrackedNpc = {
+                        ID: "", // We don't get the NPC ID until someone spawns on the router
+                        ownerID: charID,
                         count: 0,
-                        destroyed: undefined,
-                        firstSpawn: undefined,
+                        firstSpawnAt: null,
+                        destroyedAt: null,
+                        destroyedByID: null,
                         pulledAt: timestamp,
                         type: "router"
                     };
+
                     self.routerTracking.routerNpcs.set(charID, router);
+                    */
                     save = true;
                 }
             }
@@ -1195,22 +1240,26 @@ Core_1.Core.prototype.processMessage = function (input, override = false) {
             const killerLoadoutID = msg.payload.attacker_loadout_id;
             const killerWeaponID = msg.payload.attacker_weapon_id;
             const vehicleID = msg.payload.vehicle_id;
+            const ev = {
+                type: "vehicle",
+                sourceID: killerID,
+                loadoutID: killerLoadoutID,
+                weaponID: killerWeaponID,
+                targetID: msg.payload.character_id,
+                vehicleID: vehicleID,
+                attackerVehicleID: msg.payload.attacker_vehicle_id,
+                timestamp: timestamp,
+                zoneID: zoneID
+            };
             const player = self.stats.get(killerID);
             if (player != undefined) {
-                const ev = {
-                    type: "vehicle",
-                    sourceID: killerID,
-                    loadoutID: killerLoadoutID,
-                    weaponID: killerWeaponID,
-                    targetID: msg.payload.character_id,
-                    vehicleID: vehicleID,
-                    timestamp: timestamp,
-                    zoneID: zoneID
-                };
                 player.events.push(ev);
-                save = true;
-                self.emit(ev);
             }
+            else {
+                self.miscEvents.push(ev);
+            }
+            self.emit(ev);
+            save = true;
         }
         else if (event == "PlayerLogin") {
             const charID = msg.payload.character_id;
@@ -1604,13 +1653,13 @@ Core_1.Core.prototype.processExperienceEvent = function (event) {
         if (squadEvents.indexOf(event.trueExpID) > -1) {
             if (sourceMember == undefined && targetMember != undefined) {
                 log.info(`${event.sourceID} is not tracked, adding them to the tracker from ${JSON.stringify(event)}`);
-                this.addPlayerByID(event.sourceID).ok(() => {
+                this.addPlayerByID(event.sourceID).then(() => {
                     this.processExperienceEvent(event);
                 });
             }
             if (sourceMember != undefined && targetMember == undefined) {
                 log.info(`${event.targetID} is not tracked, adding them to the tracker from ${JSON.stringify(event)}`);
-                this.addPlayerByID(event.targetID).ok(() => {
+                this.addPlayerByID(event.targetID).then(() => {
                     this.processExperienceEvent(event);
                 });
             }
@@ -1835,6 +1884,15 @@ Core_1.Core.prototype.printSquadInfo = function () {
 
 "use strict";
 
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.defaultVehicleMapper = exports.defaultWeaponMapper = exports.defaultCharacterSortField = exports.defaultCharacterMapper = exports.statMapToBreakdown = exports.Streak = exports.BaseCapture = exports.BaseCaptureOutfit = exports.classCollectionNumber = exports.BreakdownWeaponType = exports.OutfitVersusBreakdown = exports.BreakdownTrend = exports.BreakdownTimeslot = exports.Breakdown = exports.BreakdownArray = void 0;
 const ApiWrapper_1 = __webpack_require__(/*! ./census/ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
@@ -1952,11 +2010,12 @@ class Streak {
 }
 exports.Streak = Streak;
 function statMapToBreakdown(map, source, matcher, mapper, sortField = undefined) {
-    const breakdown = new ApiWrapper_1.ApiResponse();
-    const arr = new BreakdownArray();
-    if (map.size() > 0) {
-        const IDs = Array.from(map.getMap().keys());
-        source(IDs).ok((data) => {
+    return __awaiter(this, void 0, void 0, function* () {
+        const breakdown = new ApiWrapper_1.ApiResponse();
+        const arr = new BreakdownArray();
+        if (map.size() > 0) {
+            const IDs = Array.from(map.getMap().keys());
+            const data = yield source(IDs);
             map.getMap().forEach((amount, ID) => {
                 const datum = data.find(elem => matcher(elem, ID));
                 const breakdown = {
@@ -1972,13 +2031,10 @@ function statMapToBreakdown(map, source, matcher, mapper, sortField = undefined)
                 const diff = b.amount - a.amount;
                 return diff || b.sortField.localeCompare(a.sortField);
             });
-            breakdown.resolveOk(arr);
-        });
-    }
-    else {
-        breakdown.resolveOk(arr);
-    }
-    return breakdown;
+            return arr;
+        }
+        return arr;
+    });
 }
 exports.statMapToBreakdown = statMapToBreakdown;
 function defaultCharacterMapper(elem, ID) {
@@ -2062,17 +2118,17 @@ class EventReporter {
         return streaks;
     }
     static facilityCaptures(data) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const baseCaptures = [];
-        const captures = data.captures;
-        const players = data.players;
-        log.debug(`Have ${data.captures.length} captures`);
-        const outfitIDs = players.map(iter => iter.outfitID)
-            .filter((value, index, arr) => arr.indexOf(value) == index);
-        log.debug(`Getting these outfits: [${outfitIDs.join(", ")}]`);
-        OutfitAPI_1.OutfitAPI.getByIDs(outfitIDs).ok((data) => {
-            var _a, _b;
-            log.debug(`Loaded ${data.length}/${outfitIDs.length}. Processing ${captures.length} captures`);
+        var _a, _b;
+        return __awaiter(this, void 0, void 0, function* () {
+            const baseCaptures = [];
+            const captures = data.captures;
+            const players = data.players;
+            log.debug(`Have ${data.captures.length} captures`);
+            const outfitIDs = players.map(iter => iter.outfitID)
+                .filter((value, index, arr) => arr.indexOf(value) == index);
+            log.debug(`Getting these outfits: [${outfitIDs.join(", ")}]`);
+            const outfits = yield OutfitAPI_1.OutfitAPI.getByIDs(outfitIDs);
+            log.debug(`Loaded ${outfits.length}/${outfitIDs.length}. Processing ${captures.length} captures`);
             for (const capture of captures) {
                 // Same faction caps are boring
                 log.debug(`processing ${JSON.stringify(capture)}`);
@@ -2085,35 +2141,35 @@ class EventReporter {
                 entry.name = capture.name;
                 entry.faction = capture.previousFaction;
                 const outfitID = capture.outfitID;
-                const outfit = data.find(iter => iter.ID == outfitID);
+                const outfit = outfits.find(iter => iter.ID == outfitID);
                 if (outfit == undefined) {
                     log.warn(`Missing outfit ${outfitID}`);
                     continue;
                 }
                 const helpers = players.filter(iter => iter.timestamp == capture.timestamp.getTime());
-                const outfits = [{ name: "No outfit", ID: "-1", amount: 0, tag: "" }];
+                const outfitEntries = [{ name: "No outfit", ID: "-1", amount: 0, tag: "" }];
                 for (const helper of helpers) {
                     let outfitEntry = undefined;
                     if (helper.outfitID == "0" || helper.outfitID.length == 0) {
-                        outfitEntry = outfits[0];
+                        outfitEntry = outfitEntries[0];
                     }
                     else {
-                        outfitEntry = outfits.find(iter => iter.ID == helper.outfitID);
+                        outfitEntry = outfitEntries.find(iter => iter.ID == helper.outfitID);
                         if (outfitEntry == undefined) {
-                            const outfitDatum = data.find(iter => iter.ID == helper.outfitID);
+                            const outfitDatum = outfits.find(iter => iter.ID == helper.outfitID);
                             outfitEntry = {
                                 ID: helper.outfitID,
                                 name: (_a = outfitDatum === null || outfitDatum === void 0 ? void 0 : outfitDatum.name) !== null && _a !== void 0 ? _a : `Unknown ${helper.outfitID}`,
                                 amount: 0,
                                 tag: (_b = outfitDatum === null || outfitDatum === void 0 ? void 0 : outfitDatum.tag) !== null && _b !== void 0 ? _b : ``,
                             };
-                            outfits.push(outfitEntry);
+                            outfitEntries.push(outfitEntry);
                         }
                     }
                     ++outfitEntry.amount;
                 }
                 const breakdown = {
-                    data: outfits.sort((a, b) => b.amount - a.amount).map(iter => {
+                    data: outfitEntries.sort((a, b) => b.amount - a.amount).map(iter => {
                         return {
                             display: iter.name,
                             amount: iter.amount,
@@ -2121,15 +2177,14 @@ class EventReporter {
                             sortField: `${iter.amount}`
                         };
                     }),
-                    total: outfits.reduce(((acc, iter) => acc += iter.amount), 0),
+                    total: outfitEntries.reduce(((acc, iter) => acc += iter.amount), 0),
                     display: null
                 };
                 entry.outfits = breakdown;
                 baseCaptures.push(entry);
             }
-            response.resolveOk(baseCaptures);
+            return baseCaptures;
         });
-        return response;
     }
     static experience(expID, events) {
         const exp = new StatMap_1.default();
@@ -2141,35 +2196,39 @@ class EventReporter {
         return statMapToBreakdown(exp, CharacterAPI_1.CharacterAPI.getByIDs, (elem, charID) => elem.ID == charID, defaultCharacterMapper, defaultCharacterSortField);
     }
     static experienceSource(ids, targetID, events) {
-        const exp = new StatMap_1.default();
-        for (const event of events) {
-            if (event.type == "exp" && event.targetID == targetID && ids.indexOf(event.expID) > -1) {
-                exp.increment(event.sourceID);
+        return __awaiter(this, void 0, void 0, function* () {
+            const exp = new StatMap_1.default();
+            for (const event of events) {
+                if (event.type == "exp" && event.targetID == targetID && ids.indexOf(event.expID) > -1) {
+                    exp.increment(event.sourceID);
+                }
             }
-        }
-        if (exp.size() == 0) {
-            return ApiWrapper_1.ApiResponse.resolve({ code: 204, data: null });
-        }
-        log.debug(`charIDs: [${Array.from(exp.getMap().keys()).join(", ")}]`);
-        return statMapToBreakdown(exp, CharacterAPI_1.CharacterAPI.getByIDs, (elem, charID) => elem.ID == charID, defaultCharacterMapper, defaultCharacterSortField);
+            if (exp.size() == 0) {
+                return new BreakdownArray();
+            }
+            log.debug(`charIDs: [${Array.from(exp.getMap().keys()).join(", ")}]`);
+            return statMapToBreakdown(exp, CharacterAPI_1.CharacterAPI.getByIDs, (elem, charID) => elem.ID == charID, defaultCharacterMapper, defaultCharacterSortField);
+        });
     }
     static outfitVersusBreakdown(events) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const outfitBreakdowns = new Map();
-        const outfitPlayers = new Map();
-        const killCount = events.filter(iter => iter.type == "kill").length;
-        const deathCount = events.filter(iter => iter.type == "death" && iter.revived == false).length;
-        const charIDs = events.filter((iter) => iter.type == "kill" || (iter.type == "death" && iter.revived == false))
-            .map((iter) => {
-            if (iter.type == "kill") {
-                return iter.targetID;
-            }
-            else if (iter.type == "death" && iter.revived == false) {
-                return iter.targetID;
-            }
-            throw `Invalid event type '${iter.type}'`;
-        });
-        CharacterAPI_1.CharacterAPI.getByIDs(charIDs).ok((data) => {
+        return __awaiter(this, void 0, void 0, function* () {
+            const outfitBreakdowns = new Map();
+            const outfitPlayers = new Map();
+            const killCount = events.filter(iter => iter.type == "kill").length;
+            const deathCount = events.filter(iter => iter.type == "death" && iter.revived == false).length;
+            const charIDs = events.filter((iter) => iter.type == "kill" || (iter.type == "death" && iter.revived == false))
+                .map((iter) => {
+                if (iter.type == "kill") {
+                    return iter.targetID;
+                }
+                else if (iter.type == "death" && iter.revived == false) {
+                    return iter.targetID;
+                }
+                throw `Invalid event type '${iter.type}'`;
+            });
+            log.debug(`Loading ${charIDs.length} characters`);
+            const data = yield CharacterAPI_1.CharacterAPI.getByIDs(charIDs);
+            log.debug(`Loaded ${data.length}/${charIDs.length} characters`);
             for (const ev of events) {
                 if (ev.type == "kill" || ev.type == "death") {
                     const killedChar = data.find(iter => iter.ID == ev.targetID);
@@ -2239,9 +2298,8 @@ class EventReporter {
                     || b.revived - a.revived
                     || b.tag.localeCompare(a.tag);
             });
-            response.resolveOk(breakdowns);
+            return breakdowns;
         });
-        return response;
     }
     static kpmBoxplot(players, tracking, loadout) {
         let kpms = [];
@@ -2325,20 +2383,20 @@ class EventReporter {
         return kds;
     }
     static weaponDeathBreakdown(events) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const weapons = events.filter((ev) => ev.type == "death")
-            .map((ev) => ev.weaponID)
-            .filter((ID, index, arr) => arr.indexOf(ID) == index);
-        let types = [];
-        // <weapon type, <weapon, count>>
-        const used = new Map();
-        const missingWeapons = new Set();
-        WeaponAPI_1.WeaponAPI.getByIDs(weapons).ok((data) => {
-            var _a, _b;
+        var _a, _b;
+        return __awaiter(this, void 0, void 0, function* () {
+            const weapons = events.filter((ev) => ev.type == "death")
+                .map((ev) => ev.weaponID)
+                .filter((ID, index, arr) => arr.indexOf(ID) == index);
+            let types = [];
+            // <weapon type, <weapon, count>>
+            const used = new Map();
+            const missingWeapons = new Set();
+            const data = yield WeaponAPI_1.WeaponAPI.getByIDs(weapons);
             const deaths = events.filter(ev => ev.type == "death");
             for (const death of deaths) {
                 const weapon = data.find(iter => iter.ID == death.weaponID);
-                if (weapon == undefined) {
+                if (weapon == undefined && death.weaponID != "0") {
                     missingWeapons.add(death.weaponID);
                 }
                 const typeName = (_a = weapon === null || weapon === void 0 ? void 0 : weapon.type) !== null && _a !== void 0 ? _a : "Other";
@@ -2384,17 +2442,18 @@ class EventReporter {
                 });
             });
             types = types.filter((iter) => {
-                return iter.deaths / deaths.length > 0.0025;
+                return iter.deaths / deaths.length > 0.0025; // Only include outfits with at least 2.5% of deaths
             });
             types.sort((a, b) => {
                 return b.deaths - a.deaths
                     || b.headshots - a.headshots
                     || b.type.localeCompare(a.type);
             });
-            log.info(`Missing weapons:`, missingWeapons);
-            response.resolveOk(types);
+            if (missingWeapons.size > 0) {
+                log.info(`Missing weapons:`, missingWeapons);
+            }
+            return types;
         });
-        return response;
     }
     static vehicleKills(events) {
         const vehKills = new StatMap_1.default();
@@ -2424,21 +2483,21 @@ class EventReporter {
         return statMapToBreakdown(wepKills, WeaponAPI_1.WeaponAPI.getByIDs, (elem, ID) => elem.ID == ID, defaultWeaponMapper);
     }
     static weaponHeadshot(events) {
-        const total = new StatMap_1.default();
-        const hs = new StatMap_1.default();
-        const weapons = new Set();
-        for (const ev of events) {
-            if (ev.type == "kill") {
-                if (ev.isHeadshot == true) {
-                    hs.increment(ev.weaponID);
+        return __awaiter(this, void 0, void 0, function* () {
+            const total = new StatMap_1.default();
+            const hs = new StatMap_1.default();
+            const weapons = new Set();
+            for (const ev of events) {
+                if (ev.type == "kill") {
+                    if (ev.isHeadshot == true) {
+                        hs.increment(ev.weaponID);
+                    }
+                    total.increment(ev.weaponID);
+                    weapons.add(ev.weaponID);
                 }
-                total.increment(ev.weaponID);
-                weapons.add(ev.weaponID);
             }
-        }
-        const response = new ApiWrapper_1.ApiResponse();
-        const arr = new BreakdownArray();
-        WeaponAPI_1.WeaponAPI.getByIDs(Array.from(weapons.values())).ok((data) => {
+            const arr = new BreakdownArray();
+            const data = yield WeaponAPI_1.WeaponAPI.getByIDs(Array.from(weapons.values()));
             total.getMap().forEach((kills, weaponID) => {
                 var _a;
                 const hsKills = hs.get(weaponID, 0);
@@ -2453,9 +2512,8 @@ class EventReporter {
                 arr.data.push(entry);
             });
             arr.total = 1;
-            response.resolveOk(arr);
+            return arr;
         });
-        return response;
     }
     static weaponTeamkills(events) {
         const wepKills = new StatMap_1.default();
@@ -2475,19 +2533,24 @@ class EventReporter {
         }
         return statMapToBreakdown(amounts, WeaponAPI_1.WeaponAPI.getByIDs, (elem, ID) => elem.ID == ID, defaultWeaponMapper);
     }
-    static weaponTypeKills(events) {
-        const amounts = new StatMap_1.default();
-        const response = new ApiWrapper_1.ApiResponse();
-        const weaponIDs = [];
-        for (const event of events) {
-            if (event.type == "kill") {
-                weaponIDs.push(event.weaponID);
-            }
-        }
-        const arr = new BreakdownArray();
-        WeaponAPI_1.WeaponAPI.getByIDs(weaponIDs).ok((data) => {
+    static weaponTypeKills(events, loadout) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const amounts = new StatMap_1.default();
+            const weaponIDs = [];
             for (const event of events) {
                 if (event.type == "kill") {
+                    weaponIDs.push(event.weaponID);
+                }
+            }
+            const arr = new BreakdownArray();
+            const data = yield WeaponAPI_1.WeaponAPI.getByIDs(weaponIDs);
+            for (const event of events) {
+                if (event.type == "kill") {
+                    if (loadout != undefined) {
+                        if (loadout != PsLoadout_1.PsLoadout.getLoadoutType(event.loadoutID)) {
+                            continue;
+                        }
+                    }
                     const weapon = data.find(iter => iter.ID == event.weaponID);
                     if (weapon == undefined) {
                         amounts.increment("Unknown");
@@ -2513,23 +2576,30 @@ class EventReporter {
                 }
                 return diff;
             });
-            response.resolveOk(arr);
+            return arr;
         });
-        return response;
     }
-    static weaponTypeDeaths(events, revived = undefined) {
-        const amounts = new StatMap_1.default();
-        const response = new ApiWrapper_1.ApiResponse();
-        const weaponIDs = [];
-        for (const event of events) {
-            if (event.type == "death" && (revived == undefined || event.revived == revived)) {
-                weaponIDs.push(event.weaponID);
-            }
-        }
-        const arr = new BreakdownArray();
-        WeaponAPI_1.WeaponAPI.getByIDs(weaponIDs).ok((data) => {
+    static weaponTypeDeaths(events, revivedType, loadout) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const amounts = new StatMap_1.default();
+            const revived = revivedType == "all" ? undefined
+                : revivedType == "unrevived" ? false
+                    : true;
+            const weaponIDs = [];
             for (const event of events) {
                 if (event.type == "death" && (revived == undefined || event.revived == revived)) {
+                    weaponIDs.push(event.weaponID);
+                }
+            }
+            const arr = new BreakdownArray();
+            const data = yield WeaponAPI_1.WeaponAPI.getByIDs(weaponIDs);
+            for (const event of events) {
+                if (event.type == "death" && (revived == undefined || event.revived == revived)) {
+                    if (loadout != undefined) {
+                        if (loadout != PsLoadout_1.PsLoadout.getLoadoutType(event.loadoutID)) {
+                            continue;
+                        }
+                    }
                     const weapon = data.find(iter => iter.ID == event.weaponID);
                     if (weapon == undefined) {
                         amounts.increment("Unknown");
@@ -2548,19 +2618,11 @@ class EventReporter {
                     color: undefined
                 });
             });
-            arr.data.sort((a, b) => {
-                const diff = b.amount - a.amount;
-                if (diff == 0) {
-                    return b.display.localeCompare(a.display);
-                }
-                return diff;
-            });
-            response.resolveOk(arr);
+            arr.data.sort((a, b) => (b.amount - a.amount) || b.display.localeCompare(a.display));
+            return arr;
         });
-        return response;
     }
     static classPlaytimes(times) {
-        const response = new ApiWrapper_1.ApiResponse();
         const arr = new BreakdownArray();
         const infil = {
             amount: 0,
@@ -2613,11 +2675,9 @@ class EventReporter {
             const mins = Math.floor((seconds - (3600 * hours)) / 60);
             return `${hours.toFixed(0).padStart(2, "0")}:${mins.toFixed(0).padStart(2, "0")}:${(seconds % 60).toFixed(0).padStart(2, "0")}`;
         };
-        response.resolveOk(arr);
-        return response;
+        return arr;
     }
     static factionKills(events) {
-        const response = new ApiWrapper_1.ApiResponse();
         const arr = new BreakdownArray();
         const countKills = function (ev, faction) {
             if (ev.type != "kill") {
@@ -2651,11 +2711,9 @@ class EventReporter {
             sortField: "NS"
         });
         arr.total = events.filter(iter => iter.type == "kill").length;
-        response.resolveOk(arr);
-        return response;
+        return arr;
     }
     static factionDeaths(events) {
-        const response = new ApiWrapper_1.ApiResponse();
         const countDeaths = function (ev, faction) {
             if (ev.type != "death" || ev.revived == true) {
                 return false;
@@ -2689,11 +2747,9 @@ class EventReporter {
             sortField: "NS"
         });
         arr.total = events.filter(iter => iter.type == "death" && iter.revived == false).length;
-        response.resolveOk(arr);
-        return response;
+        return arr;
     }
     static continentKills(events) {
-        const response = new ApiWrapper_1.ApiResponse();
         const countKills = function (ev, zoneID) {
             return ev.type == "kill" && ev.zoneID == zoneID;
         };
@@ -2723,11 +2779,9 @@ class EventReporter {
             sortField: "Esamir"
         });
         arr.total = events.filter(iter => iter.type == "kill").length;
-        response.resolveOk(arr);
-        return response;
+        return arr;
     }
     static continentDeaths(events) {
-        const response = new ApiWrapper_1.ApiResponse();
         const countDeaths = function (ev, zoneID) {
             return ev.type == "death" && ev.revived == false && ev.zoneID == zoneID;
         };
@@ -2757,8 +2811,7 @@ class EventReporter {
             sortField: "Esamir"
         });
         arr.total = events.filter(iter => iter.type == "death" && iter.revived == false).length;
-        response.resolveOk(arr);
-        return response;
+        return arr;
     }
     static characterKills(events) {
         const amounts = new StatMap_1.default();
@@ -2905,9 +2958,17 @@ exports.default = EventReporter;
 
 "use strict";
 
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.IndividualReporter = exports.ReportParameters = exports.BreakdownSingle = exports.BreakdownMeta = exports.BreakdownSection = exports.BreakdownCollection = exports.BreakdownSpawn = exports.PlayerVersus = exports.PlayerVersusEntry = exports.Report = exports.ClassUsage = exports.Playtime = exports.TrackedRouter = exports.classCollectionBreakdownTrend = exports.classKdCollection = exports.TimeTracking = exports.ExpBreakdown = exports.FacilityCapture = exports.ClassBreakdown = void 0;
-const ApiWrapper_1 = __webpack_require__(/*! ./census/ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
+exports.IndividualReporter = exports.ReportParameters = exports.BreakdownSingle = exports.BreakdownMeta = exports.BreakdownSection = exports.BreakdownCollection = exports.BreakdownSpawn = exports.PlayerVersus = exports.PlayerVersusEntry = exports.Report = exports.ClassUsage = exports.Playtime = exports.classCollectionBreakdownTrend = exports.classKdCollection = exports.TimeTracking = exports.ExpBreakdown = exports.FacilityCapture = exports.ClassBreakdown = void 0;
 const CharacterAPI_1 = __webpack_require__(/*! ./census/CharacterAPI */ "../topt-core/build/core/census/CharacterAPI.js");
 const WeaponAPI_1 = __webpack_require__(/*! ./census/WeaponAPI */ "../topt-core/build/core/census/WeaponAPI.js");
 const AchievementAPI_1 = __webpack_require__(/*! ./census/AchievementAPI */ "../topt-core/build/core/census/AchievementAPI.js");
@@ -2915,7 +2976,7 @@ const PsLoadout_1 = __webpack_require__(/*! ./census/PsLoadout */ "../topt-core/
 const PsEvent_1 = __webpack_require__(/*! ./PsEvent */ "../topt-core/build/core/PsEvent.js");
 const StatMap_1 = __webpack_require__(/*! ./StatMap */ "../topt-core/build/core/StatMap.js");
 const EventReporter_1 = __webpack_require__(/*! ./EventReporter */ "../topt-core/build/core/EventReporter.js");
-const TrackedPlayer_1 = __webpack_require__(/*! ./objects/TrackedPlayer */ "../topt-core/build/core/objects/TrackedPlayer.js");
+const index_1 = __webpack_require__(/*! ./objects/index */ "../topt-core/build/core/objects/index.js");
 const Loggers_1 = __webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Loggers.js");
 const log = Loggers_1.Logger.getLogger("IndividualGenerator");
 class ClassBreakdown {
@@ -2983,18 +3044,6 @@ function classCollectionBreakdownTrend() {
     };
 }
 exports.classCollectionBreakdownTrend = classCollectionBreakdownTrend;
-class TrackedRouter {
-    constructor() {
-        this.ID = "";
-        this.type = "router";
-        this.owner = "";
-        this.pulledAt = 0;
-        this.firstSpawn = undefined;
-        this.destroyed = undefined;
-        this.count = 0;
-    }
-}
-exports.TrackedRouter = TrackedRouter;
 class Playtime {
     constructor() {
         this.characterID = "";
@@ -3134,7 +3183,7 @@ class ReportParameters {
         /**
          * Player the report is being generated for
          */
-        this.player = new TrackedPlayer_1.TrackedPlayer();
+        this.player = new index_1.TrackedPlayer();
         /**
          * Contains all events collected during tracking. If you need just the player's events, use player
          */
@@ -3152,136 +3201,88 @@ class ReportParameters {
 exports.ReportParameters = ReportParameters;
 class IndividualReporter {
     static generatePersonalReport(parameters) {
-        const response = new ApiWrapper_1.ApiResponse();
-        if (parameters.player.events.length == 0) {
-            response.resolve({ code: 400, data: "No events for player, cannot generate" });
-            return response;
-        }
-        const report = new Report();
-        let opsLeft = 
-        //1       // Transport assists
-        +1 // Supported by
-            + 1 // Misc collection
-            + 1 // Weapon kills
-            + 1 // Weapon type kills
-            + 1 // Weapon deaths
-            + 1 // Weapon death types
-            + 1 // Ribbons
-            + 1 // Medic breakdown
-            + 1 // Engineer breakdown
-            + 1 // Player versus
-            + 1 // Weapon HS breakdown
-        ;
-        const totalOps = opsLeft;
-        const firstPlayerEvent = parameters.player.events[0];
-        const lastPlayerEvent = parameters.player.events[parameters.player.events.length - 1];
-        report.player = Object.assign({}, parameters.player);
-        report.player.events = [];
-        report.player.secondsOnline = (lastPlayerEvent.timestamp - firstPlayerEvent.timestamp) / 1000;
-        report.classBreakdown = IndividualReporter.classUsage(parameters);
-        report.classKd = IndividualReporter.classVersusKd(parameters.player.events);
-        report.scoreBreakdown = IndividualReporter.scoreBreakdown(parameters);
-        report.player.stats.getMap().forEach((value, eventID) => {
-            var _a;
-            const event = PsEvent_1.PsEvents.get(eventID);
-            if (event == undefined) {
-                return;
+        var _a;
+        return __awaiter(this, void 0, void 0, function* () {
+            if (parameters.player.events.length == 0) {
+                return new Report();
             }
-            report.stats.set(event.name, `${value}`);
-            (_a = report.player) === null || _a === void 0 ? void 0 : _a.stats.set(event.name, value);
-        });
-        const calculatedStats = IndividualReporter.calculatedStats(parameters, report.classBreakdown);
-        calculatedStats.forEach((value, key) => {
-            report.stats.set(key, value);
-        });
-        report.logistics.routers = IndividualReporter.routerBreakdown(parameters);
-        const callback = (step) => {
-            return () => {
-                log.debug(`Finished ${step}: Have ${opsLeft - 1} ops left outta ${totalOps}`);
-                if (--opsLeft == 0) {
-                    response.resolveOk(report);
-                }
-            };
-        };
-        IndividualReporter.supportedBy(parameters)
-            .ok(data => report.collections.push(data)).always(callback("Supported by"));
-        IndividualReporter.miscCollection(parameters)
-            .ok(data => report.collections.push(data)).always(callback("Misc coll"));
-        EventReporter_1.default.weaponHeadshot(parameters.player.events)
-            .ok(data => report.weaponHeadshotBreakdown = data).always(callback("Weapon headshots"));
-        EventReporter_1.default.weaponKills(parameters.player.events)
-            .ok(data => report.weaponKillBreakdown = data).always(callback("Weapon kills"));
-        EventReporter_1.default.weaponTypeKills(parameters.player.events)
-            .ok(data => report.weaponKillTypeBreakdown = data).always(callback("Weapon type kills"));
-        EventReporter_1.default.weaponDeaths(parameters.player.events)
-            .ok(data => report.weaponDeathBreakdown = data).always(callback("Weapon deaths"));
-        EventReporter_1.default.weaponTypeDeaths(parameters.player.events)
-            .ok(data => report.weaponDeathTypeBreakdown = data).always(callback("Weapon type deaths"));
-        IndividualReporter.playerVersus(parameters).ok(data => report.playerVersus = data).always(callback("Player versus"));
-        report.overtime.kd = EventReporter_1.default.kdOverTime(parameters.player.events);
-        report.overtime.kpm = EventReporter_1.default.kpmOverTime(parameters.player.events);
-        if (parameters.player.events.find(iter => iter.type == "exp" && (iter.expID == PsEvent_1.PsEvent.revive || iter.expID == PsEvent_1.PsEvent.squadRevive)) != undefined) {
-            report.overtime.rpm = EventReporter_1.default.revivesOverTime(parameters.player.events);
-        }
-        report.perUpdate.kd = EventReporter_1.default.kdPerUpdate(parameters.player.events);
-        const ribbonIDs = Array.from(parameters.player.ribbons.getMap().keys());
-        if (ribbonIDs.length > 0) {
-            AchievementAPI_1.AchievementAPI.getByIDs(ribbonIDs).ok((data) => {
+            const report = new Report();
+            const firstPlayerEvent = parameters.player.events[0];
+            const lastPlayerEvent = parameters.player.events[parameters.player.events.length - 1];
+            report.player = Object.assign({}, parameters.player);
+            report.player.events = [];
+            report.player.secondsOnline = (lastPlayerEvent.timestamp - firstPlayerEvent.timestamp) / 1000;
+            report.classBreakdown = IndividualReporter.classUsage(parameters);
+            report.classKd = IndividualReporter.classVersusKd(parameters.player.events);
+            report.scoreBreakdown = IndividualReporter.scoreBreakdown(parameters);
+            report.player.stats.getMap().forEach((value, eventID) => {
                 var _a;
+                const event = PsEvent_1.PsEvents.get(eventID);
+                if (event == undefined) {
+                    return;
+                }
+                report.stats.set(event.name, `${value}`);
+                (_a = report.player) === null || _a === void 0 ? void 0 : _a.stats.set(event.name, value);
+            });
+            const calculatedStats = IndividualReporter.calculatedStats(parameters, report.classBreakdown);
+            calculatedStats.forEach((value, key) => {
+                report.stats.set(key, value);
+            });
+            report.logistics.routers = IndividualReporter.routerBreakdown(parameters);
+            report.collections.push(yield IndividualReporter.supportedBy(parameters));
+            report.collections.push(yield IndividualReporter.miscCollection(parameters));
+            report.weaponHeadshotBreakdown = yield EventReporter_1.default.weaponHeadshot(parameters.player.events);
+            report.weaponKillBreakdown = yield EventReporter_1.default.weaponKills(parameters.player.events);
+            report.weaponKillTypeBreakdown = yield EventReporter_1.default.weaponTypeKills(parameters.player.events);
+            report.weaponDeathBreakdown = yield EventReporter_1.default.weaponDeaths(parameters.player.events);
+            report.weaponDeathTypeBreakdown = yield EventReporter_1.default.weaponTypeDeaths(parameters.player.events, "unrevived");
+            report.playerVersus = yield IndividualReporter.playerVersus(parameters);
+            report.overtime.kd = EventReporter_1.default.kdOverTime(parameters.player.events);
+            report.perUpdate.kd = EventReporter_1.default.kdPerUpdate(parameters.player.events);
+            report.overtime.kpm = EventReporter_1.default.kpmOverTime(parameters.player.events);
+            if (parameters.player.events.find(iter => iter.type == "exp" && (iter.expID == PsEvent_1.PsEvent.revive || iter.expID == PsEvent_1.PsEvent.squadRevive)) != undefined) {
+                report.overtime.rpm = EventReporter_1.default.revivesOverTime(parameters.player.events);
+            }
+            const ribbonIDs = Array.from(parameters.player.ribbons.getMap().keys());
+            if (ribbonIDs.length > 0) {
+                const data = yield AchievementAPI_1.AchievementAPI.getByIDs(ribbonIDs);
                 (_a = report.player) === null || _a === void 0 ? void 0 : _a.ribbons.getMap().forEach((amount, achivID) => {
                     const achiv = data.find((iter) => iter.ID == achivID) || AchievementAPI_1.AchievementAPI.unknown;
                     const entry = Object.assign(Object.assign({}, achiv), { amount: amount });
                     report.ribbonCount += amount;
                     report.ribbons.push(entry);
                 });
-                report.ribbons.sort((a, b) => {
-                    return (b.amount - a.amount) || b.name.localeCompare(a.name);
-                });
-            }).always(() => {
-                callback("Ribbons")();
-            });
-        }
-        else {
-            callback("Ribbons")();
-        }
-        if (report.classBreakdown.medic.secondsAs > 10) {
-            IndividualReporter.medicBreakdown(parameters)
-                .ok(data => report.breakdowns.push(data)).always(callback("Medic breakdown"));
-        }
-        else {
-            callback("Medic breakdown")();
-        }
-        if (report.classBreakdown.engineer.secondsAs > 10) {
-            IndividualReporter.engineerBreakdown(parameters)
-                .ok(data => report.breakdowns.push(data)).always(callback("Eng breakdown"));
-        }
-        else {
-            callback("Eng breakdown")();
-        }
-        return response;
+                report.ribbons.sort((a, b) => (b.amount - a.amount) || b.name.localeCompare(a.name));
+            }
+            if (report.classBreakdown.medic.secondsAs > 10) {
+                report.breakdowns.push(yield IndividualReporter.medicBreakdown(parameters));
+            }
+            if (report.classBreakdown.engineer.secondsAs > 10) {
+                report.breakdowns.push(yield IndividualReporter.engineerBreakdown(parameters));
+            }
+            return report;
+        });
     }
     static playerVersus(parameters) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const versus = [];
-        const charIDs = [];
-        const wepIDs = [];
-        for (const ev of parameters.player.events) {
-            if (ev.sourceID != parameters.player.characterID) {
-                continue;
+        var _a, _b, _c, _d, _e, _f;
+        return __awaiter(this, void 0, void 0, function* () {
+            const versus = [];
+            const charIDs = new Set();
+            const wepIDs = new Set();
+            for (const ev of parameters.player.events) {
+                if (ev.sourceID != parameters.player.characterID) {
+                    continue;
+                }
+                if (ev.type != "kill" && ev.type != "death") {
+                    continue;
+                }
+                charIDs.add(ev.targetID);
+                wepIDs.add(ev.weaponID);
             }
-            if (ev.type != "kill" && ev.type != "death") {
-                continue;
-            }
-            charIDs.push(ev.targetID);
-            wepIDs.push(ev.weaponID);
-        }
-        let characters = [];
-        let weapons = [];
-        let opsLeft = 2;
-        const killsMap = new Map();
-        const deathsMap = new Map();
-        const done = () => {
-            var _a, _b, _c, _d, _e, _f;
+            const killsMap = new Map();
+            const deathsMap = new Map();
+            const characters = yield CharacterAPI_1.CharacterAPI.getByIDs(Array.from(charIDs.values()));
+            const weapons = yield WeaponAPI_1.WeaponAPI.getByIDs(Array.from(wepIDs.values()));
             for (const ev of parameters.player.events) {
                 if (ev.sourceID != parameters.player.characterID) {
                     continue;
@@ -3361,157 +3362,93 @@ class IndividualReporter {
                 });
                 entry.weaponDeaths = deathBreakdown;
             }
-            response.resolveOk(versus);
-        };
-        CharacterAPI_1.CharacterAPI.getByIDs(charIDs).ok((data) => {
-            characters = data;
-            if (--opsLeft == 0) {
-                done();
-            }
+            return versus;
         });
-        WeaponAPI_1.WeaponAPI.getByIDs(wepIDs).ok((data) => {
-            weapons = data;
-            if (--opsLeft == 0) {
-                done();
-            }
-        });
-        return response;
     }
     static medicBreakdown(parameters) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const medicCollection = new BreakdownCollection();
-        medicCollection.title = "Medic";
-        let opsLeft = 1 // Heals
-            + 1 // Revives
-            + 1; // Shield repair
-        const add = (data) => {
-            medicCollection.sections.push(data);
-        };
-        const callback = () => {
-            if (--opsLeft == 0) {
-                response.resolveOk(medicCollection);
-            }
-        };
-        IndividualReporter.breakdownSection(parameters, "Heal ticks", PsEvent_1.PsEvent.heal, PsEvent_1.PsEvent.squadHeal).ok(add).always(callback);
-        IndividualReporter.breakdownSection(parameters, "Revives", PsEvent_1.PsEvent.revive, PsEvent_1.PsEvent.squadRevive).ok(add).always(callback);
-        IndividualReporter.breakdownSection(parameters, "Shield repair ticks", PsEvent_1.PsEvent.shieldRepair, PsEvent_1.PsEvent.squadShieldRepair).ok(add).always(callback);
-        return response;
+        return __awaiter(this, void 0, void 0, function* () {
+            const coll = new BreakdownCollection();
+            coll.title = "Medic";
+            coll.sections.push(yield IndividualReporter.breakdownSection(parameters, "Heal ticks", PsEvent_1.PsEvent.heal, PsEvent_1.PsEvent.squadHeal));
+            coll.sections.push(yield IndividualReporter.breakdownSection(parameters, "Revives", PsEvent_1.PsEvent.revive, PsEvent_1.PsEvent.squadRevive));
+            coll.sections.push(yield IndividualReporter.breakdownSection(parameters, "Shield repair ticks", PsEvent_1.PsEvent.shieldRepair, PsEvent_1.PsEvent.squadShieldRepair));
+            return coll;
+        });
     }
     static engineerBreakdown(parameters) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const engCollection = new BreakdownCollection();
-        engCollection.title = "Engineer";
-        let opsLeft = 1 // Resupply
-            + 1; // Repair MAX
-        const add = (data) => {
-            engCollection.sections.push(data);
-        };
-        const callback = () => {
-            if (--opsLeft == 0) {
-                response.resolveOk(engCollection);
-            }
-        };
-        IndividualReporter.breakdownSection(parameters, "Resupply ticks", PsEvent_1.PsEvent.resupply, PsEvent_1.PsEvent.squadResupply).ok(add).always(callback);
-        IndividualReporter.breakdownSection(parameters, "MAX repair ticks", PsEvent_1.PsEvent.maxRepair, PsEvent_1.PsEvent.squadMaxRepair).ok(add).always(callback);
-        return response;
+        return __awaiter(this, void 0, void 0, function* () {
+            const coll = new BreakdownCollection();
+            coll.title = "Engineer";
+            coll.sections.push(yield IndividualReporter.breakdownSection(parameters, "Resupply ticks", PsEvent_1.PsEvent.resupply, PsEvent_1.PsEvent.squadResupply));
+            coll.sections.push(yield IndividualReporter.breakdownSection(parameters, "MAX repair ticks", PsEvent_1.PsEvent.maxRepair, PsEvent_1.PsEvent.squadMaxRepair));
+            return coll;
+        });
     }
     static breakdownSection(parameters, name, expID, squadExpID) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const ticks = parameters.player.events.filter(iter => iter.type == "exp" && iter.expID == expID);
-        if (ticks.length > 0) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const ticks = parameters.player.events.filter(iter => iter.type == "exp" && iter.expID == expID);
             const section = new BreakdownSection();
             section.title = name;
-            let opsLeft = 2;
-            const callback = () => {
-                if (--opsLeft == 0) {
-                    response.resolveOk(section);
-                }
-            };
             section.left = new BreakdownMeta();
             section.left.title = "All";
-            EventReporter_1.default.experience(expID, ticks).ok((data) => {
-                section.left.data = data;
-            }).always(callback);
+            section.left.data = yield EventReporter_1.default.experience(expID, ticks);
             section.right = new BreakdownMeta();
             section.right.title = "Squad only";
-            EventReporter_1.default.experience(squadExpID, ticks).ok((data) => {
-                section.right.data = data;
-            }).always(callback);
-        }
-        else {
-            response.resolve({ code: 204, data: null });
-        }
-        return response;
+            section.right.data = yield EventReporter_1.default.experience(squadExpID, ticks);
+            return section;
+        });
     }
     static miscCollection(parameters) {
-        const response = new ApiWrapper_1.ApiResponse();
         const coll = {
             header: "Misc",
             metas: []
         };
-        let opsLeft = 1; // Deployabled destroyed
         const dep = IndividualReporter.deployableDestroyedBreakdown(parameters);
         if (dep != null) {
             coll.metas.push(dep);
         }
-        if (coll.metas.length > 0) {
-            response.resolveOk(coll);
-        }
-        else {
-            response.resolve({ code: 204, data: null });
-        }
-        return response;
+        return coll;
     }
     static supportedBy(parameters) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const coll = {
-            header: "Supported by",
-            metas: []
-        };
-        let opsLeft = 1 // Healed by
-            + 1 // Revived by
-            + 1 // Shield repaired by
-            + 1 // Resupplied by
-            + 1; // Repaired by
-        const add = (data) => {
-            coll.metas.push(data);
-        };
-        const callback = () => {
-            if (--opsLeft == 0) {
-                response.resolveOk(coll);
+        return __awaiter(this, void 0, void 0, function* () {
+            const coll = {
+                header: "Supported by",
+                metas: []
+            };
+            const metas = [];
+            metas.push(yield IndividualReporter.singleSupportedBy(parameters, "Healed by", [PsEvent_1.PsEvent.heal, PsEvent_1.PsEvent.squadHeal]));
+            metas.push(yield IndividualReporter.singleSupportedBy(parameters, "Healed by", [PsEvent_1.PsEvent.heal, PsEvent_1.PsEvent.squadHeal]));
+            metas.push(yield IndividualReporter.singleSupportedBy(parameters, "Revived by", [PsEvent_1.PsEvent.revive, PsEvent_1.PsEvent.squadRevive]));
+            metas.push(yield IndividualReporter.singleSupportedBy(parameters, "Shield repaired by", [PsEvent_1.PsEvent.shieldRepair, PsEvent_1.PsEvent.squadShieldRepair]));
+            metas.push(yield IndividualReporter.singleSupportedBy(parameters, "Resupplied by", [PsEvent_1.PsEvent.resupply, PsEvent_1.PsEvent.squadResupply]));
+            metas.push(yield IndividualReporter.singleSupportedBy(parameters, "Repaired by", [PsEvent_1.PsEvent.maxRepair, PsEvent_1.PsEvent.squadMaxRepair]));
+            for (const meta of metas) {
+                if (meta != null) {
+                    coll.metas.push(meta);
+                }
             }
-        };
-        IndividualReporter.singleSupportedBy(parameters, "Healed by", [PsEvent_1.PsEvent.heal, PsEvent_1.PsEvent.squadHeal]).ok(add).always(callback);
-        IndividualReporter.singleSupportedBy(parameters, "Revived by", [PsEvent_1.PsEvent.revive, PsEvent_1.PsEvent.squadRevive]).ok(add).always(callback);
-        IndividualReporter.singleSupportedBy(parameters, "Shield repaired by", [PsEvent_1.PsEvent.shieldRepair, PsEvent_1.PsEvent.squadShieldRepair]).ok(add).always(callback);
-        IndividualReporter.singleSupportedBy(parameters, "Resupplied by", [PsEvent_1.PsEvent.resupply, PsEvent_1.PsEvent.squadResupply]).ok(add).always(callback);
-        IndividualReporter.singleSupportedBy(parameters, "Repaired by", [PsEvent_1.PsEvent.maxRepair, PsEvent_1.PsEvent.squadMaxRepair]).ok(add).always(callback);
-        return response;
+            return coll;
+        });
     }
     static singleSupportedBy(parameters, name, ids) {
-        const response = new ApiWrapper_1.ApiResponse();
-        let found = false;
-        for (const ev of parameters.events) {
-            if (ev.type == "exp" && ids.indexOf(ev.expID) > -1 && ev.targetID == parameters.player.characterID) {
-                found = true;
-                break;
+        return __awaiter(this, void 0, void 0, function* () {
+            let found = false;
+            for (const ev of parameters.events) {
+                if (ev.type == "exp" && ids.indexOf(ev.expID) > -1 && ev.targetID == parameters.player.characterID) {
+                    found = true;
+                    break;
+                }
             }
-        }
-        if (found == false) {
-            response.resolve({ code: 204, data: null });
-        }
-        else {
+            if (found == false) {
+                return null;
+            }
             const meta = new BreakdownSingle();
             meta.title = name;
             meta.altTitle = "Player";
             meta.data = new EventReporter_1.BreakdownArray();
-            EventReporter_1.default.experienceSource(ids, parameters.player.characterID, parameters.events).ok((data) => {
-                meta.data = data;
-                log.trace(`Found [${data.data.map(iter => `${iter.display}:${iter.amount}`).join(", ")}] for [${ids.join(", ")}]`);
-                response.resolveOk(meta);
-            });
-        }
-        return response;
+            meta.data = yield EventReporter_1.default.experienceSource(ids, parameters.player.characterID, parameters.events);
+            return meta;
+        });
     }
     static deployableDestroyedBreakdown(parameters) {
         const expIDs = [
@@ -3584,7 +3521,7 @@ class IndividualReporter {
         return null;
     }
     static routerBreakdown(parameters) {
-        const rts = parameters.routers.filter(iter => iter.owner == parameters.player.characterID);
+        const rts = parameters.routers.filter(iter => iter.ownerID == parameters.player.characterID);
         return rts;
     }
     static calculatedStats(parameters, classKd) {
@@ -4079,10 +4016,19 @@ Logger.loggers = new Map();
 
 "use strict";
 
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Playback = exports.PlaybackOptions = void 0;
 const OutfitAPI_1 = __webpack_require__(/*! ./census/OutfitAPI */ "../topt-core/build/core/census/OutfitAPI.js");
-const ApiWrapper_1 = __webpack_require__(/*! ./census/ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
+const CharacterAPI_1 = __webpack_require__(/*! ./census/CharacterAPI */ "../topt-core/build/core/census/CharacterAPI.js");
 const Loggers_1 = __webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Loggers.js");
 const log = Loggers_1.Logger.getLogger("Playback");
 class PlaybackOptions {
@@ -4096,75 +4042,74 @@ class Playback {
         Playback._core = core;
     }
     static loadFile(file) {
-        if (Playback._core == null) {
-            throw `Cannot load file: Core has not been set. Did you forget to use Playback.setCore()?`;
-        }
-        const response = new ApiWrapper_1.ApiResponse();
-        if (typeof (file) == "string") {
-            log.debug(`using a string`);
-            this.process(file).ok(() => {
-                response.resolveOk();
-            });
-        }
-        else {
-            log.debug(`using a file`);
-            const reader = new FileReader();
-            reader.onload = ((ev) => {
-                this.process(reader.result).ok(() => {
-                    response.resolveOk();
-                });
-            });
-            reader.readAsText(file);
-        }
-        return response;
-    }
-    static process(str) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const data = JSON.parse(str);
-        if (!data.version) {
-            log.error(`Missing version from import`);
-            throw `Missing version from import`;
-        }
-        else if (data.version == "1") {
-            const nowMs = new Date().getTime();
-            log.debug(`Exported data uses version 1`);
-            const chars = data.players;
-            const outfits = data.outfits;
-            const events = data.events;
-            // Force online for squad tracking
-            this._core.subscribeToEvents(chars.map(iter => { iter.online = iter.secondsPlayed > 0; return iter; }));
-            if (events != undefined && events.length != 0) {
-                Playback._events = events;
-                const parsedData = events.map(iter => JSON.parse(iter));
-                Playback._parsed = parsedData;
+        return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+            if (Playback._core == null) {
+                return reject(`Cannot load file: Core has not been set. Did you forget to use Playback.setCore()?`);
             }
-            if (outfits.length > 0) {
-                const item = outfits[0];
-                let outfitIDs = [];
-                if (typeof (item) == "string") {
-                    outfitIDs = outfits;
-                }
-                else {
-                    outfitIDs = outfits.map(iter => iter.ID);
-                }
-                OutfitAPI_1.OutfitAPI.getByIDs(outfitIDs).ok((data) => {
-                    this._core.outfits = data;
-                    log.info(`From [${outfitIDs.join(", ")}] loaded: ${JSON.stringify(data)}`);
-                }).always(() => {
-                    log.debug(`Took ${new Date().getTime() - nowMs}ms to import data`);
-                    response.resolveOk();
-                });
+            if (typeof (file) == "string") {
+                log.debug(`using a string`);
+                yield this.process(file);
+                return resolve();
             }
             else {
-                log.debug(`Took ${new Date().getTime() - nowMs}ms to import data`);
-                response.resolveOk();
+                log.debug(`using a file`);
+                const reader = new FileReader();
+                reader.onload = ((ev) => __awaiter(this, void 0, void 0, function* () {
+                    yield this.process(reader.result);
+                    return resolve();
+                }));
+                reader.onabort = ((ev) => __awaiter(this, void 0, void 0, function* () {
+                    return reject(`reader aborted`);
+                }));
+                reader.onerror = ((ev) => __awaiter(this, void 0, void 0, function* () {
+                    return reject(`reader errored`);
+                }));
+                reader.readAsText(file);
             }
-        }
-        else {
-            log.error(`Unchecked version: ${data.version}`);
-            response.resolve({ code: 400, data: `` });
-        }
-        return response;
+        }));
+    }
+    static process(str) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const data = JSON.parse(str);
+            if (!data.version) {
+                log.error(`Missing version from import`);
+                throw `Missing version from import`;
+            }
+            else if (data.version == "1") {
+                const nowMs = new Date().getTime();
+                log.debug(`Exported data uses version 1`);
+                const chars = data.players;
+                const outfits = data.outfits;
+                const events = data.events;
+                if (data.characters != undefined) {
+                    CharacterAPI_1.CharacterAPI.setCache(data.characters);
+                }
+                // Force online for squad tracking
+                this._core.subscribeToEvents(chars.map(iter => { iter.online = iter.secondsPlayed > 0; return iter; }));
+                if (events != undefined && events.length != 0) {
+                    Playback._events = events;
+                    const parsedData = events.map(iter => JSON.parse(iter));
+                    Playback._parsed = parsedData;
+                }
+                if (outfits.length > 0) {
+                    const item = outfits[0];
+                    let outfitIDs = [];
+                    if (typeof (item) == "string") {
+                        outfitIDs = outfits;
+                    }
+                    else {
+                        outfitIDs = outfits.map(iter => iter.ID);
+                    }
+                    const data = yield OutfitAPI_1.OutfitAPI.getByIDs(outfitIDs);
+                    this._core.outfits = data;
+                    log.info(`From [${outfitIDs.join(", ")}] loaded: ${JSON.stringify(data)}`);
+                }
+                log.debug(`Took ${new Date().getTime() - nowMs}ms to import data`);
+            }
+            else {
+                log.error(`Unchecked version: ${data.version}`);
+            }
+        });
     }
     static start(parameters) {
         if (this._core == null) {
@@ -4238,6 +4183,20 @@ exports.Playback = Playback;
 Playback._core = null;
 Playback._events = [];
 Playback._parsed = [];
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/PromiseProgress.js":
+/*!**************************************************!*\
+  !*** ../topt-core/build/core/PromiseProgress.js ***!
+  \**************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
 
 
 /***/ }),
@@ -4322,7 +4281,10 @@ PsEvent.squadFlashAssist = "555";
 PsEvent.savior = "335";
 PsEvent.ribbon = "291";
 PsEvent.routerKill = "1409";
+PsEvent.constructionSpawn = "1410";
+PsEvent.sundySpawn = "233";
 PsEvent.beaconKill = "270";
+PsEvent.sundyDestroyed = "68";
 PsEvent.controlPointAttack = "16";
 PsEvent.controlPointDefend = "15";
 const remap = (expID, toID) => {
@@ -4500,7 +4462,7 @@ exports.PsEvents = new Map([
             track: true,
             alsoIncrement: PsEvent.squadSpawn
         }],
-    ["233", {
+    [PsEvent.sundySpawn, {
             name: "Sundy spawn",
             types: ["logistics"],
             track: true,
@@ -4742,10 +4704,18 @@ exports.default = StatMap;
 
 "use strict";
 
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AchievementAPI = exports.Achievement = void 0;
 const CensusAPI_1 = __webpack_require__(/*! ./CensusAPI */ "../topt-core/build/core/census/CensusAPI.js");
-const ApiWrapper_1 = __webpack_require__(/*! ./ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
 const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
 const log = Loggers_1.Logger.getLogger("AchievementAPI");
 class Achievement {
@@ -4758,7 +4728,7 @@ class Achievement {
 }
 exports.Achievement = Achievement;
 class AchievementAPI {
-    static parseCharacter(elem) {
+    static parse(elem) {
         var _a, _b;
         return {
             ID: elem.achievement_id,
@@ -4768,71 +4738,62 @@ class AchievementAPI {
         };
     }
     static getByID(achivID) {
-        const response = new ApiWrapper_1.ApiResponse();
-        if (AchievementAPI._cache.has(achivID)) {
-            response.resolveOk(AchievementAPI._cache.get(achivID));
-        }
-        else {
-            const request = CensusAPI_1.default.get(`achievement?item_id=${achivID}`);
-            request.ok((data) => {
-                if (data.returned != 1) {
-                    response.resolve({ code: 404, data: `No or multiple weapons returned from ${name}` });
+        const url = `achievement?item_id=${achivID}`;
+        return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+            if (AchievementAPI._cache.has(achivID)) {
+                return resolve(AchievementAPI._cache.get(achivID));
+            }
+            try {
+                const request = yield CensusAPI_1.default.get(url).promise();
+                if (request.code == 200) {
+                    if (request.data.returned != 1) {
+                        return resolve(null);
+                    }
+                    const ach = AchievementAPI.parse(request.data.achievement_list[0]);
+                    AchievementAPI._cache.set(achivID, ach);
+                    return resolve(ach);
                 }
                 else {
-                    const wep = AchievementAPI.parseCharacter(data.item_list[0]);
-                    if (!AchievementAPI._cache.has(wep.ID)) {
-                        AchievementAPI._cache.set(wep.ID, wep);
-                        log.trace(`Cached ${wep.ID}: ${JSON.stringify(wep)}`);
-                    }
-                    response.resolveOk(wep);
+                    return reject(`API call failed:\n\t${url}\n\t${request.code} ${request.data}`);
                 }
-            });
-        }
-        return response;
+            }
+            catch (err) {
+                return reject(err);
+            }
+        }));
     }
     static getByIDs(weaponIDs) {
-        const response = new ApiWrapper_1.ApiResponse();
-        if (weaponIDs.length == 0) {
-            response.resolveOk([]);
-            return response;
-        }
-        const weapons = [];
-        const requestIDs = [];
-        for (const weaponID of weaponIDs) {
-            if (AchievementAPI._cache.has(weaponID)) {
-                const wep = AchievementAPI._cache.get(weaponID);
-                weapons.push(wep);
+        return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+            if (weaponIDs.length == 0) {
+                return resolve([]);
             }
-            else {
-                requestIDs.push(weaponID);
+            const weapons = [];
+            const requestIDs = [];
+            for (const weaponID of weaponIDs) {
+                if (AchievementAPI._cache.has(weaponID)) {
+                    const wep = AchievementAPI._cache.get(weaponID);
+                    weapons.push(wep);
+                }
+                else {
+                    requestIDs.push(weaponID);
+                }
             }
-        }
-        if (requestIDs.length > 0) {
-            const request = CensusAPI_1.default.get(`achievement?achievement_id=${requestIDs.join(",")}`);
-            request.ok((data) => {
-                if (data.returned == 0) {
-                    if (weapons.length == 0) {
-                        response.resolve({ code: 404, data: `No or multiple weapons returned from ${name}` });
-                    }
-                    else {
-                        response.resolveOk(weapons);
+            if (requestIDs.length > 0) {
+                const url = `achievement?achievement_id=${requestIDs.join(",")}`;
+                const request = yield CensusAPI_1.default.get(url).promise();
+                if (request.code == 200) {
+                    for (const datum of request.data.achievement_list) {
+                        const ach = AchievementAPI.parse(datum);
+                        AchievementAPI._cache.set(ach.ID, ach);
+                        weapons.push(ach);
                     }
                 }
                 else {
-                    for (const datum of data.achievement_list) {
-                        const wep = AchievementAPI.parseCharacter(datum);
-                        weapons.push(wep);
-                        AchievementAPI._cache.set(wep.ID, wep);
-                        log.trace(`Cached ${wep.ID}`);
-                    }
-                    response.resolveOk(weapons);
+                    log.error(`API call failed:\n\t${url}\n\t${request.code} ${request.data}`);
                 }
-            });
-        }
-        else {
-            response.resolveOk(weapons);
-        }
-        return response;
+            }
+            return resolve(weapons);
+        }));
     }
 }
 exports.AchievementAPI = AchievementAPI;
@@ -4919,7 +4880,7 @@ class ApiResponse {
             //      ResponseContent. Maybe use a switch on localStatus?
             this.resolve({ code: localStatus, data: localData });
         }).catch((error) => {
-            throw `Don't expect this: ${error}`;
+            throw `Failed to call: ${error}`;
         });
     }
     isResolved() { return this._resolved; }
@@ -5088,13 +5049,25 @@ class ApiResponse {
         return new Promise((resolve, reject) => {
             this.always(() => {
                 if (this.status == 200) {
-                    resolve({ code: 200, data: this.data });
+                    return resolve({ code: 200, data: this.data });
                 }
                 else if (this.status == 500) {
-                    resolve({ code: 500, data: this.data });
+                    return resolve({ code: 500, data: this.data });
+                }
+                else if (this.status == 201) {
+                    return resolve({ code: 201, data: this.data });
+                }
+                else if (this.status == 204) {
+                    return resolve({ code: 204, data: null });
+                }
+                else if (this.status == 400) {
+                    return resolve({ code: 400, data: this.data });
+                }
+                else if (this.status == 404) {
+                    return resolve({ code: 404, data: this.data });
                 }
                 else {
-                    reject(`Unchecked status ${this.status}`);
+                    return reject(`Unchecked status ${this.status}`);
                 }
             });
         });
@@ -5262,7 +5235,7 @@ class APIWrapper {
         const promise = axios.default.request({
             url: url,
             data: JSON.stringify(data),
-            validateStatus: null,
+            validateStatus: () => true,
             method: "GET"
         });
         // Bind this to ensure that .readEntry by binding the inherited class instead of
@@ -5284,7 +5257,7 @@ class APIWrapper {
         const promise = axios.default.request({
             url: url,
             data: JSON.stringify(data),
-            validateStatus: null,
+            validateStatus: () => true,
             method: "GET"
         });
         let result = new ApiResponse(promise, this.readEntry);
@@ -5304,7 +5277,7 @@ class APIWrapper {
             url: url,
             responseType: "json",
             data: JSON.stringify(data),
-            validateStatus: null,
+            validateStatus: () => true,
             method: "POST"
         });
         let result = new ApiResponse(promise, null);
@@ -5322,7 +5295,7 @@ class APIWrapper {
         const promise = axios.default.request({
             url: url,
             data: JSON.stringify(data),
-            validateStatus: null,
+            validateStatus: () => true,
             method: "POST"
         });
         let result = new ApiResponse(promise, null);
@@ -5344,7 +5317,7 @@ class APIWrapper {
         const promise = axios.default.request({
             url: url,
             data: JSON.stringify(data),
-            validateStatus: null,
+            validateStatus: () => true,
             method: "PUT"
         });
         let result = new ApiResponse(promise, null);
@@ -5363,7 +5336,7 @@ class APIWrapper {
         const promise = axios.default.request({
             url: url,
             data: JSON.stringify(data),
-            validateStatus: null,
+            validateStatus: () => true,
             method: "DELETE"
         });
         let result = new ApiResponse(promise, null);
@@ -5432,10 +5405,18 @@ CensusAPI.requestCount = 0;
 
 "use strict";
 
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CharacterAPI = exports.Character = void 0;
 const CensusAPI_1 = __webpack_require__(/*! ./CensusAPI */ "../topt-core/build/core/census/CensusAPI.js");
-const ApiWrapper_1 = __webpack_require__(/*! ./ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
 const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
 const log = Loggers_1.Logger.getLogger("CharacterAPI");
 class Character {
@@ -5468,29 +5449,44 @@ class CharacterAPI {
         CharacterAPI._cache.set(char.ID, char);
         return char;
     }
+    static setCache(chars) {
+        for (const char of chars) {
+            CharacterAPI._cache.set(char.ID, char);
+        }
+    }
+    static getCache() {
+        return Array.from(CharacterAPI._cache.values())
+            .filter(iter => iter != null)
+            .map(iter => iter);
+    }
     static getByID(charID) {
         if (CharacterAPI._pending.has(charID)) {
             return CharacterAPI._pending.get(charID);
         }
-        const response = new ApiWrapper_1.ApiResponse();
-        CharacterAPI._pending.set(charID, response);
-        if (CharacterAPI._cache.has(charID)) {
-            response.resolveOk(CharacterAPI._cache.get(charID));
-        }
-        else {
-            const request = CensusAPI_1.default.get(`/character/?character_id=${charID}&c:resolve=outfit,online_status`);
-            request.ok((data) => {
-                if (data.returned != 1) {
-                    response.resolve({ code: 404, data: `No or multiple characters returned from ${name}` });
+        const url = `/character/?character_id=${charID}&c:resolve=outfit,online_status`;
+        const prom = new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+            if (CharacterAPI._cache.has(charID)) {
+                return resolve(CharacterAPI._cache.get(charID));
+            }
+            try {
+                const request = yield CensusAPI_1.default.get(url).promise();
+                if (request.code == 200) {
+                    if (request.data.returned != 1) {
+                        return resolve(null);
+                    }
+                    const char = CharacterAPI.parseCharacter(request.data.character_list[0]);
+                    return resolve(char);
                 }
                 else {
-                    response.resolveOk(CharacterAPI.parseCharacter(data.character_list[0]));
+                    return reject(`API call failed:\n\t${url}\n\t${request.code} ${request.data}`);
                 }
-            }).always(() => {
-                CharacterAPI._pending.delete(charID);
-            });
-        }
-        return response;
+            }
+            catch (err) {
+                return reject(err);
+            }
+        }));
+        CharacterAPI._pending.set(charID, prom);
+        return prom;
     }
     static cache(charID) {
         if (CharacterAPI._cache.has(charID)) {
@@ -5499,83 +5495,83 @@ class CharacterAPI {
         clearTimeout(CharacterAPI._pendingResolveID);
         CharacterAPI._pendingIDs.push(charID);
         if (CharacterAPI._pendingIDs.length > 9) {
-            CharacterAPI.getByIDs(CharacterAPI._pendingIDs).ok(() => { });
+            CharacterAPI.getByIDs(CharacterAPI._pendingIDs);
             CharacterAPI._pendingIDs = [];
         }
         else {
             CharacterAPI._pendingResolveID = setTimeout(() => {
-                CharacterAPI.getByIDs(CharacterAPI._pendingIDs).ok(() => { });
+                CharacterAPI.getByIDs(CharacterAPI._pendingIDs);
             }, 5000);
         }
     }
     static getByIDs(charIDs) {
-        const response = new ApiWrapper_1.ApiResponse();
-        if (charIDs.length == 0) {
-            response.resolveOk([]);
-            return response;
-        }
-        const chars = [];
-        const requestIDs = [];
-        for (const charID of charIDs) {
-            if (CharacterAPI._cache.has(charID)) {
-                const char = CharacterAPI._cache.get(charID);
-                chars.push(char);
+        return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+            if (charIDs.length == 0) {
+                return resolve([]);
             }
-            else {
-                requestIDs.push(charID);
+            const chars = [];
+            const requestIDs = [];
+            for (const charID of charIDs) {
+                if (CharacterAPI._cache.has(charID)) {
+                    const char = CharacterAPI._cache.get(charID);
+                    chars.push(char);
+                }
+                else {
+                    requestIDs.push(charID);
+                }
             }
-        }
-        if (requestIDs.length > 0) {
-            const sliceSize = 50;
-            let slicesLeft = Math.ceil(requestIDs.length / sliceSize);
-            //log.log(`Have ${slicesLeft} slices to do. size of ${sliceSize}, data of ${requestIDs.length}`);
-            for (let i = 0; i < requestIDs.length; i += sliceSize) {
-                const slice = requestIDs.slice(i, i + sliceSize);
-                //log.log(`Slice ${i}: ${i} - ${i + sliceSize - 1}: [${slice.join(",")}]`);
-                const request = CensusAPI_1.default.get(`/character/?character_id=${slice.join(",")}&c:resolve=outfit,online_status`);
-                request.ok((data) => {
-                    if (data.returned == 0) {
-                        if (chars.length == 0) {
-                            response.resolve({ code: 404, data: `Missing characters: ${charIDs.join(",")}` });
+            if (requestIDs.length > 0) {
+                const sliceSize = 50;
+                let slicesLeft = Math.ceil(requestIDs.length / sliceSize);
+                log.info(`Have ${slicesLeft} slices to do. size of ${sliceSize}, data of ${requestIDs.length}`);
+                for (let i = 0; i < requestIDs.length; i += sliceSize) {
+                    const slice = requestIDs.slice(i, i + sliceSize);
+                    log.info(`Slice ${i}: ${i} - ${i + sliceSize - 1}: [${slice.join(",")}]`);
+                    try {
+                        const url = `/character/?character_id=${slice.join(",")}&c:resolve=outfit,online_status`;
+                        const request = yield CensusAPI_1.default.get(url).promise();
+                        if (request.code == 200) {
+                            for (const datum of request.data.character_list) {
+                                const char = CharacterAPI.parseCharacter(datum);
+                                chars.push(char);
+                            }
                         }
                         else {
-                            response.resolveOk(chars);
+                            log.warn(`API call failed:\n\t${url}\n\t${request.code} ${request.data}`);
                         }
                     }
-                    else {
-                        for (const datum of data.character_list) {
-                            const char = CharacterAPI.parseCharacter(datum);
-                            chars.push(char);
-                        }
+                    catch (err) {
+                        log.error(err);
                     }
-                    --slicesLeft;
-                    if (slicesLeft == 0) {
-                        //log.log(`No more slices left, resolving`);
-                        response.resolveOk(chars);
-                    }
-                    else {
-                        //log.log(`${slicesLeft} slices left`);
-                    }
-                });
-            }
-        }
-        else {
-            response.resolveOk(chars);
-        }
-        return response;
-    }
-    static getByName(name) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const request = CensusAPI_1.default.get(`/character/?name.first_lower=${name.toLowerCase()}&c:resolve=outfit,online_status`);
-        request.ok((data) => {
-            if (data.returned != 1) {
-                response.resolve({ code: 404, data: `No or multiple characters returned from ${name}` });
+                }
+                log.info(`Did all slices`);
+                return resolve(chars);
             }
             else {
-                response.resolveOk(CharacterAPI.parseCharacter(data.character_list[0]));
+                return resolve(chars);
             }
-        });
-        return response;
+        }));
+    }
+    static getByName(name) {
+        const url = `/character/?name.first_lower=${name.toLowerCase()}&c:resolve=outfit,online_status`;
+        return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+            try {
+                const request = yield CensusAPI_1.default.get(url).promise();
+                if (request.code == 200) {
+                    if (request.data.returned != 1) {
+                        return resolve(null);
+                    }
+                    const char = CharacterAPI.parseCharacter(request.data.character_list[0]);
+                    return resolve(char);
+                }
+                else {
+                    return reject(`API call failed:\n\t${url}\n\t${request.code} ${request.data}`);
+                }
+            }
+            catch (err) {
+                return reject(err);
+            }
+        }));
     }
 }
 exports.CharacterAPI = CharacterAPI;
@@ -5618,10 +5614,18 @@ exports.EventAPI = EventAPI;
 
 "use strict";
 
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FacilityAPI = exports.Facility = void 0;
 const CensusAPI_1 = __webpack_require__(/*! ./CensusAPI */ "../topt-core/build/core/census/CensusAPI.js");
-const ApiWrapper_1 = __webpack_require__(/*! ./ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
 const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
 const log = Loggers_1.Logger.getLogger("FacilityAPI");
 class Facility {
@@ -5670,102 +5674,106 @@ class FacilityAPI {
             log.trace(`${facilityID} already has a pending request, using that one instead`);
             return FacilityAPI._pending.get(facilityID);
         }
-        const response = new ApiWrapper_1.ApiResponse();
-        if (FacilityAPI._cache.has(facilityID)) {
-            const facility = FacilityAPI._cache.get(facilityID);
-            if (facility == null) {
-                response.resolve({ code: 204, data: null });
+        const prom = new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+            const url = `/map_region?facility_id=${facilityID}`;
+            if (FacilityAPI._cache.has(facilityID)) {
+                return resolve(FacilityAPI._cache.get(facilityID));
             }
             else {
-                response.resolveOk(facility);
+                try {
+                    FacilityAPI._pending.set(facilityID, prom);
+                    const request = yield CensusAPI_1.default.get(url).promise();
+                    FacilityAPI._pending.delete(facilityID);
+                    if (request.code == 200) {
+                        if (request.data.returned != 1) {
+                            FacilityAPI._cache.set(facilityID, null);
+                            return resolve(null);
+                        }
+                        const facility = FacilityAPI.parse(request.data.map_region_list[0]);
+                        FacilityAPI._cache.set(facility.ID, facility);
+                        return resolve(facility);
+                    }
+                    else {
+                        return reject(`API call failed:\n\t${url}\n\t${request.code} ${request.data}`);
+                    }
+                }
+                catch (err) {
+                    return reject(err);
+                }
             }
-        }
-        else {
-            const request = CensusAPI_1.default.get(`/map_region?facility_id=${facilityID}`);
-            FacilityAPI._pending.set(facilityID, request);
-            request.ok((data) => {
-                if (data.returned == 0) {
-                    FacilityAPI._cache.set(facilityID, null);
-                    response.resolve({ code: 204, data: null });
-                }
-                else {
-                    const facility = FacilityAPI.parse(data.map_region_list[0]);
-                    FacilityAPI._cache.set(facility.ID, facility);
-                    response.resolveOk(facility);
-                }
-                FacilityAPI._pending.delete(facilityID);
-            });
-        }
-        return response;
+        }));
+        return prom;
     }
     static getByIDs(IDs) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const facilities = [];
-        const requestIDs = [];
-        for (const facID of IDs) {
-            if (FacilityAPI._cache.has(facID)) {
-                const fac = FacilityAPI._cache.get(facID);
-                facilities.push(fac);
+        return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+            if (IDs.length == 0) {
+                return resolve([]);
             }
-            else {
-                requestIDs.push(facID);
-            }
-        }
-        log.debug(`Getting ${requestIDs.join(", ")} from census`);
-        if (requestIDs.length > 0) {
-            const request = CensusAPI_1.default.get(`/map_region?facility_id=${requestIDs.join(",")}&c:limit=100`);
-            request.ok((data) => {
-                if (data.returned == 0) {
-                    log.warn(`Failed to get any of ${requestIDs.join(",")} from Census`);
-                    response.resolveOk(facilities);
+            const facilities = [];
+            const requestIDs = [];
+            for (const facID of IDs) {
+                if (FacilityAPI._cache.has(facID)) {
+                    const fac = FacilityAPI._cache.get(facID);
+                    facilities.push(fac);
                 }
                 else {
-                    const bases = [];
-                    for (const datum of data.map_region_list) {
-                        const fac = FacilityAPI.parse(datum);
-                        facilities.push(fac);
-                        bases.push(fac);
-                        FacilityAPI._cache.set(fac.ID, fac);
-                    }
-                    for (const facID of requestIDs) {
-                        const elem = bases.find(iter => iter.ID == facID);
-                        if (elem == undefined) {
-                            log.debug(`Failed to find Facility ID ${facID}, settings cache to null`);
-                            FacilityAPI._cache.set(facID, null);
+                    requestIDs.push(facID);
+                }
+            }
+            log.debug(`Getting ${requestIDs.join(", ")} from census`);
+            const url = `/map_region?facility_id=${requestIDs.join(",")}&c:limit=100`;
+            if (requestIDs.length > 0) {
+                try {
+                    const request = yield CensusAPI_1.default.get(url).promise();
+                    if (request.code == 200) {
+                        if (request.data.returned == 0) {
+                            log.warn(``);
+                        }
+                        else {
+                            const bases = [];
+                            for (const datum of request.data.map_region_list) {
+                                const fac = FacilityAPI.parse(datum);
+                                facilities.push(fac);
+                                bases.push(fac);
+                                FacilityAPI._cache.set(fac.ID, fac);
+                            }
+                            for (const facID of requestIDs) {
+                                const elem = bases.find(iter => iter.ID == facID);
+                                if (elem == undefined) {
+                                    log.debug(`Failed to find Facility ID ${facID}, settings cache to null`);
+                                    FacilityAPI._cache.set(facID, null);
+                                }
+                            }
                         }
                     }
-                    response.resolveOk(facilities);
+                    else {
+                        log.error(`API call failed:\n\t${url}`);
+                    }
                 }
-            }).internalError((err) => {
-                for (const wepID of requestIDs) {
-                    FacilityAPI._cache.set(wepID, null);
+                catch (err) {
+                    return reject(err);
                 }
-                if (facilities.length > 0) {
-                    response.resolveOk(facilities);
-                }
-                else {
-                    response.resolve({ code: 500, data: "" });
-                }
-                log.error(err);
-            });
-        }
-        else {
-            response.resolveOk(facilities);
-        }
-        return response;
+            }
+            return resolve(facilities);
+        }));
     }
     static getAll() {
-        const response = new ApiWrapper_1.ApiResponse();
-        const facilities = [];
-        const request = CensusAPI_1.default.get(`/map_region?&c:limit=10000`);
-        request.ok((data) => {
-            for (const datum of data.map_region_list) {
-                const fac = FacilityAPI.parse(datum);
-                facilities.push(fac);
+        return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+            const facilities = [];
+            try {
+                const request = yield CensusAPI_1.default.get(`/map_region?&c:limit=10000`).promise();
+                if (request.code == 200) {
+                    for (const datum of request.data.map_region_list) {
+                        const fac = FacilityAPI.parse(datum);
+                        facilities.push(fac);
+                    }
+                    return resolve(facilities);
+                }
             }
-            response.resolveOk(facilities);
-        });
-        return response;
+            catch (err) {
+                return reject(err);
+            }
+        }));
     }
 }
 exports.FacilityAPI = FacilityAPI;
@@ -5786,10 +5794,18 @@ FacilityAPI._timeoutID = -1;
 
 "use strict";
 
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.OutfitAPI = exports.Outfit = void 0;
 const CensusAPI_1 = __webpack_require__(/*! ./CensusAPI */ "../topt-core/build/core/census/CensusAPI.js");
-const ApiWrapper_1 = __webpack_require__(/*! ./ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
 const CharacterAPI_1 = __webpack_require__(/*! ./CharacterAPI */ "../topt-core/build/core/census/CharacterAPI.js");
 const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
 const log = Loggers_1.Logger.getLogger("OutfitAPI");
@@ -5813,95 +5829,124 @@ class OutfitAPI {
         };
     }
     static getByID(ID) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const request = CensusAPI_1.default.get(`/outfit/?outfit_id=${ID}&c:resolve=leader`);
-        request.ok((data) => {
-            if (data.returned != 1) {
-                response.resolve({ code: 404, data: `` });
+        const url = `/outfit/?outfit_id=${ID}&c:resolve=leader`;
+        return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+            try {
+                const request = yield CensusAPI_1.default.get(url).promise();
+                if (request.code == 200) {
+                    if (request.data.returned != 1) {
+                        return resolve(null);
+                    }
+                    const outfit = OutfitAPI.parse(request.data.outfit_list[0]);
+                    return resolve(outfit);
+                }
+                else {
+                    return reject(`API call failed>\n\t${url}\n\t${request.code} ${request.data}`);
+                }
             }
-            else {
-                const outfit = OutfitAPI.parse(data.outfit_list[0]);
-                response.resolveOk(outfit);
+            catch (err) {
+                return reject(err);
             }
-        });
-        return response;
+        }));
     }
     static getByIDs(IDs) {
-        const response = new ApiWrapper_1.ApiResponse();
-        if (IDs.length == 0) {
-            response.resolve({ code: 204, data: null });
-            return response;
-        }
-        IDs = IDs.filter(i => i.length > 0 && i != "0");
-        log.debug(`Loading outfits: [${IDs.join(", ")}]`);
-        const outfits = [];
-        const sliceSize = 50;
-        let slicesLeft = Math.ceil(IDs.length / sliceSize);
-        log.debug(`Have ${slicesLeft} slices to do. size of ${sliceSize}, data of ${IDs.length}`);
-        for (let i = 0; i < IDs.length; i += sliceSize) {
-            const slice = IDs.slice(i, i + sliceSize);
-            log.trace(`slice: [${slice.join(", ")}]`);
-            const url = `/outfit/?outfit_id=${slice.join(",")}&c:resolve=leader`;
-            const request = CensusAPI_1.default.get(url);
-            log.trace(`made request to: '${url}'`);
-            request.ok((data) => {
-                if (data.returned == 0) {
-                }
-                else {
-                    for (const datum of data.outfit_list) {
-                        const char = OutfitAPI.parse(datum);
-                        outfits.push(char);
+        return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+            if (IDs.length == 0) {
+                return resolve([]);
+            }
+            IDs = IDs.filter(i => i.length > 0 && i != "0");
+            log.debug(`Loading outfits: [${IDs.join(", ")}]`);
+            const outfits = [];
+            const sliceSize = 50;
+            let slicesLeft = Math.ceil(IDs.length / sliceSize);
+            log.debug(`Have ${slicesLeft} slices to do. size of ${sliceSize}, data of ${IDs.length}`);
+            let errors = [];
+            for (let i = 0; i < IDs.length; i += sliceSize) {
+                const slice = IDs.slice(i, i + sliceSize);
+                log.trace(`slice: [${slice.join(", ")}]`);
+                const url = `/outfit/?outfit_id=${slice.join(",")}&c:resolve=leader`;
+                try {
+                    const request = yield CensusAPI_1.default.get(url).promise();
+                    if (request.code == 200) {
+                        if (request.data.returned == 0) {
+                            log.warn(`Didn't get any outfits in slice [${slice.join(", ")}]`);
+                        }
+                        else {
+                            for (const datum of request.data.outfit_list) {
+                                const outfit = OutfitAPI.parse(datum);
+                                outfits.push(outfit);
+                            }
+                        }
+                    }
+                    else {
+                        log.warn(`API error:\n\t${url}\n\t${request.code} ${request.data}`);
                     }
                 }
-                --slicesLeft;
-                if (slicesLeft == 0) {
-                    log.debug(`No more slices left, resolving`);
-                    response.resolveOk(outfits);
+                catch (err) {
+                    errors.push(`Promise catch:\n\t${url}\n\t${err}`);
                 }
-                else {
-                    log.trace(`${slicesLeft} slices left`);
+            }
+            if (errors.length > 0) {
+                if (outfits.length == 0) {
+                    return reject(errors);
                 }
-            }).always(() => {
-                log.debug(`${request.status}`);
-            });
-        }
-        return response;
+                log.warn(`${errors}`);
+            }
+            return resolve(outfits);
+        }));
     }
     static getByTag(outfitTag) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const request = CensusAPI_1.default.get(`/outfit/?alias_lower=${outfitTag.toLocaleLowerCase()}&c:resolve=leader`);
-        request.ok((data) => {
-            if (data.returned != 1) {
-                response.resolve({ code: 404, data: `` });
+        const url = `/outfit/?alias_lower=${outfitTag.toLowerCase()}&c:resolve=leader`;
+        return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+            if (outfitTag.trim().length == 0) {
+                return resolve(null);
             }
-            else {
-                const outfit = OutfitAPI.parse(data.outfit_list[0]);
-                response.resolveOk(outfit);
+            try {
+                const request = yield CensusAPI_1.default.get(url).promise();
+                if (request.code == 200) {
+                    if (request.data.returned != 1) {
+                        return resolve(null);
+                    }
+                    const outfit = OutfitAPI.parse(request.data.outfit_list[0]);
+                    return resolve(outfit);
+                }
+                else {
+                    return reject(`API call failed>\n\t${url}\n\t${request.code} ${request.data}`);
+                }
             }
-        });
-        return response;
+            catch (err) {
+                return reject(err);
+            }
+        }));
     }
     static getCharactersByTag(outfitTag) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const request = CensusAPI_1.default.get(`/outfit/?alias_lower=${outfitTag.toLowerCase()}&c:resolve=member_character,member_online_status`);
-        request.ok((data) => {
-            if (data.returned != 1) {
-                response.resolve({ code: 404, data: `${outfitTag} did not return 1 entry` });
-            }
-            else {
-                // With really big outfits (3k+ members) somehow a character that doesn't exist
-                //      shows up in the query. They don't have a name, so filter them out
-                const chars = data.outfit_list[0].members
-                    .filter((elem) => elem.name != undefined)
-                    .map((elem) => {
-                    return CharacterAPI_1.CharacterAPI.parseCharacter(Object.assign({ outfit: {
-                            alias: data.outfit_list[0].alias
-                        } }, elem));
-                });
-                response.resolveOk(chars);
-            }
+        return __awaiter(this, void 0, void 0, function* () {
+            const url = `/outfit/?alias_lower=${outfitTag.toLowerCase()}&c:resolve=member_character,member_online_status`;
+            return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+                try {
+                    const request = yield CensusAPI_1.default.get(url).promise();
+                    if (request.code == 200) {
+                        if (request.data.returned != 1) {
+                            return reject(`Got ${request.data.returned} results when getting ${outfitTag}`);
+                        }
+                        const chars = request.data.outfit_list[0].members
+                            .filter((elem) => elem.name != undefined)
+                            .map((elem) => {
+                            return CharacterAPI_1.CharacterAPI.parseCharacter(Object.assign({ outfit: {
+                                    alias: request.data.outfit_list[0].alias
+                                } }, elem));
+                        });
+                        return resolve(chars);
+                    }
+                    else {
+                        return reject(`API call failed>\n\t${url}\n\t${request.code} ${request.data}`);
+                    }
+                }
+                catch (err) {
+                    return reject(err);
+                }
+            }));
         });
-        return response;
     }
 }
 exports.OutfitAPI = OutfitAPI;
@@ -6173,10 +6218,18 @@ exports.PsLoadouts = new Map([
 
 "use strict";
 
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.VehicleAPI = exports.Vehicles = exports.VehicleTypes = exports.Vehicle = void 0;
 const CensusAPI_1 = __webpack_require__(/*! ./CensusAPI */ "../topt-core/build/core/census/CensusAPI.js");
-const ApiWrapper_1 = __webpack_require__(/*! ./ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
 const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
 const log = Loggers_1.Logger.getLogger("VehicleAPI");
 class Vehicle {
@@ -6226,36 +6279,39 @@ class VehicleAPI {
         };
     }
     static getByID(vehicleID) {
-        const response = new ApiWrapper_1.ApiResponse();
-        VehicleAPI.getAll().ok((data) => {
-            let found = false;
-            for (const veh of data) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const vehicles = yield VehicleAPI.getAll();
+            for (const veh of vehicles) {
                 if (veh.ID == vehicleID) {
-                    response.resolveOk(veh);
-                    found = true;
-                    break;
+                    return veh;
                 }
             }
-            if (found == false) {
-                response.resolve({ code: 204, data: null });
-            }
+            return null;
         });
-        return response;
     }
     static getAll(ids = []) {
-        if (VehicleAPI._cache == null) {
-            VehicleAPI._cache = new ApiWrapper_1.ApiResponse();
-            const vehicles = [];
-            const response = CensusAPI_1.default.get(`vehicle?c:limit=100`);
-            response.ok((data) => {
-                for (const datum of data.vehicle_list) {
-                    vehicles.push(VehicleAPI.parse(datum));
-                }
-                VehicleAPI._cache.resolveOk(vehicles);
-                log.debug(`Cached ${vehicles.length} vehicles: [${vehicles.map(iter => iter.name).join(",")}]`);
-            });
-        }
-        return VehicleAPI._cache;
+        return __awaiter(this, void 0, void 0, function* () {
+            if (VehicleAPI._cache == null) {
+                VehicleAPI._cache = new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+                    const vehicles = [];
+                    try {
+                        const request = yield CensusAPI_1.default.get(`vehicle?c:limit=100`).promise();
+                        if (request.code == 200) {
+                            for (const datum of request.data.vehicle_list) {
+                                vehicles.push(VehicleAPI.parse(datum));
+                            }
+                        }
+                        else {
+                        }
+                        return resolve(vehicles);
+                    }
+                    catch (err) {
+                        return reject(err);
+                    }
+                }));
+            }
+            return VehicleAPI._cache;
+        });
     }
 }
 exports.VehicleAPI = VehicleAPI;
@@ -6273,10 +6329,18 @@ VehicleAPI._cache = null;
 
 "use strict";
 
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.WeaponAPI = exports.Weapon = void 0;
 const CensusAPI_1 = __webpack_require__(/*! ./CensusAPI */ "../topt-core/build/core/census/CensusAPI.js");
-const ApiWrapper_1 = __webpack_require__(/*! ./ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
 const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
 const log = Loggers_1.Logger.getLogger("WeaponAPI");
 class Weapon {
@@ -6303,7 +6367,7 @@ class WeaponAPI {
         }
         return name;
     }
-    static parseCharacter(elem) {
+    static parse(elem) {
         var _a, _b, _c, _d;
         return {
             ID: elem.item_id,
@@ -6337,87 +6401,76 @@ class WeaponAPI {
         if (WeaponAPI._pendingRequests.has(weaponID)) {
             return WeaponAPI._pendingRequests.get(weaponID);
         }
-        const response = new ApiWrapper_1.ApiResponse();
-        if (WeaponAPI._cache.has(weaponID)) {
-            response.resolveOk(WeaponAPI._cache.get(weaponID));
-        }
-        else {
-            const request = CensusAPI_1.default.get(`item?item_id=${weaponID}&c:hide=description,max_stack_size,image_path&c:lang=en&c:join=item_category^inject_at:category`);
-            WeaponAPI._pendingRequests.set(weaponID, response);
-            request.ok((data) => {
-                if (data.returned != 1) {
-                    response.resolve({ code: 404, data: `No or multiple weapons returned from ${name}` });
-                }
-                else {
-                    const wep = WeaponAPI.parseCharacter(data.item_list[0]);
-                    if (!WeaponAPI._cache.has(wep.ID)) {
-                        WeaponAPI._cache.set(wep.ID, wep);
-                    }
-                    response.resolveOk(wep);
-                }
-            }).internalError((err) => {
-                WeaponAPI._cache.set(weaponID, null);
-                log.error(err);
-            }).always(() => {
-                WeaponAPI._pendingRequests.delete(weaponID);
-            });
-        }
-        return response;
-    }
-    static getByIDs(weaponIDs) {
-        const response = new ApiWrapper_1.ApiResponse();
-        // Remove duplicates
-        weaponIDs = weaponIDs.filter((v, i, a) => a.indexOf(v) == i);
-        const weapons = [];
-        const requestIDs = [];
-        for (const weaponID of weaponIDs) {
+        const prom = new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
             if (WeaponAPI._cache.has(weaponID)) {
-                const wep = WeaponAPI._cache.get(weaponID);
-                if (wep != null) {
-                    weapons.push(wep);
-                }
+                return resolve(WeaponAPI._cache.get(weaponID));
             }
             else {
-                requestIDs.push(weaponID);
-            }
-        }
-        if (requestIDs.length > 0) {
-            const request = CensusAPI_1.default.get(`item?item_id=${requestIDs.join(",")}&c:hide=description,max_stack_size,image_path&c:lang=en&c:join=item_category^inject_at:category`);
-            request.ok((data) => {
-                if (data.returned == 0) {
-                    if (weapons.length == 0) {
-                        response.resolve({ code: 404, data: `No or multiple weapons returned from ${name}` });
+                const url = `item?item_id=${weaponID}&c:hide=description,max_stack_size,image_path&c:lang=en&c:join=item_category^inject_at:category`;
+                try {
+                    WeaponAPI._pendingRequests.set(weaponID, prom);
+                    const request = yield CensusAPI_1.default.get(url).promise();
+                    WeaponAPI._pendingRequests.delete(weaponID);
+                    if (request.code == 200) {
+                        if (request.data.returned != 1) {
+                            return resolve(null);
+                        }
+                        const wep = WeaponAPI.parse(request.data.item_list[0]);
+                        WeaponAPI._cache.set(wep.ID, wep);
+                        return resolve(wep);
                     }
                     else {
-                        response.resolveOk(weapons);
+                        return reject(`API call failed:\n\t${url}\n\t${request.code} ${request.data}`);
                     }
                 }
-                else {
-                    for (const datum of data.item_list) {
-                        const wep = WeaponAPI.parseCharacter(datum);
+                catch (err) {
+                    return reject(err);
+                }
+            }
+        }));
+        return prom;
+    }
+    static getByIDs(weaponIDs) {
+        return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+            // Remove duplicates
+            weaponIDs = weaponIDs.filter((v, i, a) => a.indexOf(v) == i);
+            if (weaponIDs.length == 0) {
+                return resolve([]);
+            }
+            const weapons = [];
+            const requestIDs = [];
+            for (const weaponID of weaponIDs) {
+                if (WeaponAPI._cache.has(weaponID)) {
+                    const wep = WeaponAPI._cache.get(weaponID);
+                    if (wep != null) {
                         weapons.push(wep);
-                        WeaponAPI._cache.set(wep.ID, wep);
                     }
-                    response.resolveOk(weapons);
-                }
-            }).internalError((err) => {
-                for (const wepID of requestIDs) {
-                    WeaponAPI._cache.set(wepID, null);
-                }
-                if (weapons.length > 0) {
-                    log.error(`API call failed, but some weapons were cached, so using that`);
-                    response.resolveOk(weapons);
                 }
                 else {
-                    response.resolve({ code: 500, data: "" });
+                    requestIDs.push(weaponID);
                 }
-                log.error(err);
-            });
-        }
-        else {
-            response.resolveOk(weapons);
-        }
-        return response;
+            }
+            if (requestIDs.length > 0) {
+                const url = `item?item_id=${requestIDs.join(",")}&c:hide=description,max_stack_size,image_path&c:lang=en&c:join=item_category^inject_at:category`;
+                try {
+                    const request = yield CensusAPI_1.default.get(url).promise();
+                    if (request.code == 200) {
+                        for (const datum of request.data.item_list) {
+                            const wep = WeaponAPI.parse(datum);
+                            WeaponAPI._cache.set(wep.ID, wep);
+                            weapons.push(wep);
+                        }
+                    }
+                    else {
+                        log.error(`API call failed:\n\t${url}\n\t${request.code} ${request.data}`);
+                    }
+                }
+                catch (err) {
+                    log.error(err);
+                }
+            }
+            return resolve(weapons);
+        }));
     }
 }
 exports.WeaponAPI = WeaponAPI;
@@ -6481,10 +6534,11 @@ __exportStar(__webpack_require__(/*! ./census/PsLoadout */ "../topt-core/build/c
 __exportStar(__webpack_require__(/*! ./census/VehicleAPI */ "../topt-core/build/core/census/VehicleAPI.js"), exports);
 __exportStar(__webpack_require__(/*! ./census/WeaponAPI */ "../topt-core/build/core/census/WeaponAPI.js"), exports);
 __exportStar(__webpack_require__(/*! ./objects/index */ "../topt-core/build/core/objects/index.js"), exports);
-__exportStar(__webpack_require__(/*! ./Playback */ "../topt-core/build/core/Playback.js"), exports);
 __exportStar(__webpack_require__(/*! ./events/index */ "../topt-core/build/core/events/index.js"), exports);
 __exportStar(__webpack_require__(/*! ./reports/OutfitReport */ "../topt-core/build/core/reports/OutfitReport.js"), exports);
 __exportStar(__webpack_require__(/*! ./reports/FightReport */ "../topt-core/build/core/reports/FightReport.js"), exports);
+__exportStar(__webpack_require__(/*! ./reports/DesoReport */ "../topt-core/build/core/reports/DesoReport.js"), exports);
+__exportStar(__webpack_require__(/*! ./winter/index */ "../topt-core/build/core/winter/index.js"), exports);
 __exportStar(__webpack_require__(/*! ./squad/Squad */ "../topt-core/build/core/squad/Squad.js"), exports);
 __exportStar(__webpack_require__(/*! ./squad/SquadMember */ "../topt-core/build/core/squad/SquadMember.js"), exports);
 __exportStar(__webpack_require__(/*! ./CoreSettings */ "../topt-core/build/core/CoreSettings.js"), exports);
@@ -6492,8 +6546,9 @@ __exportStar(__webpack_require__(/*! ./EventReporter */ "../topt-core/build/core
 __exportStar(__webpack_require__(/*! ./InvididualGenerator */ "../topt-core/build/core/InvididualGenerator.js"), exports);
 __exportStar(__webpack_require__(/*! ./PsEvent */ "../topt-core/build/core/PsEvent.js"), exports);
 __exportStar(__webpack_require__(/*! ./StatMap */ "../topt-core/build/core/StatMap.js"), exports);
-__exportStar(__webpack_require__(/*! ./winter/index */ "../topt-core/build/core/winter/index.js"), exports);
 __exportStar(__webpack_require__(/*! ./Loggers */ "../topt-core/build/core/Loggers.js"), exports);
+__exportStar(__webpack_require__(/*! ./Playback */ "../topt-core/build/core/Playback.js"), exports);
+__exportStar(__webpack_require__(/*! ./PromiseProgress */ "../topt-core/build/core/PromiseProgress.js"), exports);
 
 
 /***/ }),
@@ -6713,6 +6768,65 @@ exports.SquadStat = SquadStat;
 
 /***/ }),
 
+/***/ "../topt-core/build/core/objects/TrackedNpc.js":
+/*!*****************************************************!*\
+  !*** ../topt-core/build/core/objects/TrackedNpc.js ***!
+  \*****************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.TrackedNpc = void 0;
+/**
+ * An NPC that's being tracked
+ */
+class TrackedNpc {
+    constructor() {
+        /**
+         * ID of the NPC
+         */
+        this.ID = "";
+        /**
+         * What type of NPC is being tracked
+         */
+        this.type = "unknown";
+        /**
+         * Char ID of the owner of the NPC
+         */
+        this.ownerID = "";
+        /**
+         * MS timestamp of when the NPC was created
+         */
+        this.pulledAt = 0;
+        /**
+         * MS timestamp of when the first spawn from the NPC was done
+         */
+        this.firstSpawnAt = null;
+        /**
+         * MS timestamp of when the NPC was destroyed
+         */
+        this.destroyedAt = null;
+        /**
+         * Char ID of the character that destroyed the NPC
+         */
+        this.destroyedByID = null;
+        /**
+         * MS timestamps of when this NPC was used as a spawn
+         */
+        this.spawns = [];
+        /**
+         * How many spawns the NPC created
+         */
+        this.count = 0;
+    }
+}
+exports.TrackedNpc = TrackedNpc;
+
+
+/***/ }),
+
 /***/ "../topt-core/build/core/objects/TrackedPlayer.js":
 /*!********************************************************!*\
   !*** ../topt-core/build/core/objects/TrackedPlayer.js ***!
@@ -6795,7 +6909,7 @@ exports.TrackedPlayer = TrackedPlayer;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.BaseStatus = exports.BaseFightEncounter = exports.BaseFightEntry = exports.BaseOverview = exports.SquadStat = exports.TrackedPlayer = exports.BaseExchange = void 0;
+exports.TrackedNpc = exports.BaseStatus = exports.BaseFightEncounter = exports.BaseFightEntry = exports.BaseOverview = exports.SquadStat = exports.TrackedPlayer = exports.BaseExchange = void 0;
 const BaseExchange_1 = __webpack_require__(/*! ./BaseExchange */ "../topt-core/build/core/objects/BaseExchange.js");
 Object.defineProperty(exports, "BaseExchange", { enumerable: true, get: function () { return BaseExchange_1.BaseExchange; } });
 const TrackedPlayer_1 = __webpack_require__(/*! ./TrackedPlayer */ "../topt-core/build/core/objects/TrackedPlayer.js");
@@ -6810,6 +6924,570 @@ const BaseFightEncounter_1 = __webpack_require__(/*! ./BaseFightEncounter */ "..
 Object.defineProperty(exports, "BaseFightEncounter", { enumerable: true, get: function () { return BaseFightEncounter_1.BaseFightEncounter; } });
 const BaseStatus_1 = __webpack_require__(/*! ./BaseStatus */ "../topt-core/build/core/objects/BaseStatus.js");
 Object.defineProperty(exports, "BaseStatus", { enumerable: true, get: function () { return BaseStatus_1.BaseStatus; } });
+const TrackedNpc_1 = __webpack_require__(/*! ./TrackedNpc */ "../topt-core/build/core/objects/TrackedNpc.js");
+Object.defineProperty(exports, "TrackedNpc", { enumerable: true, get: function () { return TrackedNpc_1.TrackedNpc; } });
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/reports/DesoReport.js":
+/*!*****************************************************!*\
+  !*** ../topt-core/build/core/reports/DesoReport.js ***!
+  \*****************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.DesoReportGenerator = exports.DesoReportParameters = exports.DesoReport = exports.VehicleTable = exports.VehicleVersus = exports.VehicleVersusEntry = void 0;
+const EventReporter_1 = __webpack_require__(/*! ../EventReporter */ "../topt-core/build/core/EventReporter.js");
+const InvididualGenerator_1 = __webpack_require__(/*! ../InvididualGenerator */ "../topt-core/build/core/InvididualGenerator.js");
+const PsLoadout_1 = __webpack_require__(/*! ../census/PsLoadout */ "../topt-core/build/core/census/PsLoadout.js");
+const CharacterAPI_1 = __webpack_require__(/*! ../census/CharacterAPI */ "../topt-core/build/core/census/CharacterAPI.js");
+const VehicleAPI_1 = __webpack_require__(/*! ../census/VehicleAPI */ "../topt-core/build/core/census/VehicleAPI.js");
+const StatMap_1 = __webpack_require__(/*! ../StatMap */ "../topt-core/build/core/StatMap.js");
+const PsEvent_1 = __webpack_require__(/*! ../PsEvent */ "../topt-core/build/core/PsEvent.js");
+const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("DesoReport");
+class VehicleVersusEntry {
+    constructor() {
+        this.name = "";
+        this.kills = 0;
+        this.deaths = 0;
+    }
+}
+exports.VehicleVersusEntry = VehicleVersusEntry;
+class VehicleVersus {
+    constructor() {
+        this.flash = { name: "Flash", kills: 0, deaths: 0 };
+        this.sundy = { name: "Sunderer", kills: 0, deaths: 0 };
+        this.lightning = { name: "Lightning", kills: 0, deaths: 0 };
+        this.magrider = { name: "Magrider", kills: 0, deaths: 0 };
+        this.vanguard = { name: "Vanguard", kills: 0, deaths: 0 };
+        this.prowler = { name: "Prowler", kills: 0, deaths: 0 };
+        this.scythe = { name: "Scythe", kills: 0, deaths: 0 };
+        this.reaver = { name: "Reaver", kills: 0, deaths: 0 };
+        this.mossie = { name: "Mosquito", kills: 0, deaths: 0 };
+        this.lib = { name: "Liberator", kills: 0, deaths: 0 };
+        this.galaxy = { name: "Galaxy", kills: 0, deaths: 0 };
+        this.harasser = { name: "Harasser", kills: 0, deaths: 0 };
+        this.valk = { name: "Valkyrie", kills: 0, deaths: 0 };
+        this.ant = { name: "ANT", kills: 0, deaths: 0 };
+        this.colossus = { name: "Colussus", kills: 0, deaths: 0 };
+    }
+}
+exports.VehicleVersus = VehicleVersus;
+class VehicleTable {
+    constructor() {
+        this.flash = new VehicleVersus();
+        this.sundy = new VehicleVersus();
+        this.lightning = new VehicleVersus();
+        this.magrider = new VehicleVersus();
+        this.vanguard = new VehicleVersus();
+        this.prowler = new VehicleVersus();
+        this.scythe = new VehicleVersus();
+        this.reaver = new VehicleVersus();
+        this.mossie = new VehicleVersus();
+        this.lib = new VehicleVersus();
+        this.galaxy = new VehicleVersus();
+        this.harasser = new VehicleVersus();
+        this.valk = new VehicleVersus();
+        this.ant = new VehicleVersus();
+        this.colussus = new VehicleVersus();
+    }
+}
+exports.VehicleTable = VehicleTable;
+class DesoReport {
+    constructor() {
+        this.startTime = new Date();
+        this.endTime = new Date();
+        this.sundies = [];
+        this.routers = [];
+        this.spawnType = new EventReporter_1.BreakdownArray();
+        this.spawnProviders = new EventReporter_1.BreakdownArray();
+        this.versus = new VehicleTable();
+        this.baseCaptures = [];
+        this.classStats = new Map();
+        this.players = [];
+        this.vehicleKills = {
+            type: new EventReporter_1.BreakdownArray(),
+            players: new EventReporter_1.BreakdownArray()
+        };
+        this.vehicleDeaths = {
+            type: new EventReporter_1.BreakdownArray(),
+            players: new EventReporter_1.BreakdownArray()
+        };
+    }
+}
+exports.DesoReport = DesoReport;
+class DesoReportParameters {
+    constructor() {
+        this.events = [];
+        this.players = [];
+        this.npcs = [];
+        this.tracking = new InvididualGenerator_1.TimeTracking();
+    }
+}
+exports.DesoReportParameters = DesoReportParameters;
+class DesoReportGenerator {
+    static generate(parameters) {
+        var _a, _b, _c, _d;
+        return __awaiter(this, void 0, void 0, function* () {
+            const report = new DesoReport();
+            report.startTime = new Date(parameters.tracking.startTime);
+            report.endTime = new Date(parameters.tracking.endTime);
+            const npcCharIDs = parameters.npcs.filter(iter => iter.destroyedByID != null).map(iter => iter.destroyedByID);
+            npcCharIDs.push(...parameters.npcs.map(iter => iter.ownerID));
+            const npcChars = yield CharacterAPI_1.CharacterAPI.getByIDs(npcCharIDs);
+            for (const iter of parameters.npcs) {
+                const npc = Object.assign({}, iter);
+                npc.destroyedByID = (_b = (_a = npcChars.find(iter => iter.ID == npc.destroyedByID)) === null || _a === void 0 ? void 0 : _a.name) !== null && _b !== void 0 ? _b : ``;
+                npc.ownerID = (_d = (_c = npcChars.find(iter => iter.ID == npc.ownerID)) === null || _c === void 0 ? void 0 : _c.name) !== null && _d !== void 0 ? _d : ``;
+                if (npc.type == "sundy") {
+                    report.sundies.push(npc);
+                }
+                else if (npc.type == "router") {
+                    report.routers.push(npc);
+                }
+            }
+            report.sundies.sort((a, b) => a.pulledAt - b.pulledAt);
+            report.routers.sort((a, b) => a.pulledAt - b.pulledAt);
+            // Track how many headshots each class got
+            const headshots = EventReporter_1.classCollectionNumber();
+            for (const ev of parameters.events) {
+                if (ev.type != "kill" || ev.isHeadshot == false) {
+                    continue;
+                }
+                const loadout = PsLoadout_1.PsLoadouts.get(ev.loadoutID);
+                if (loadout == undefined) {
+                    continue;
+                }
+                if (loadout.type == "infil") {
+                    ++headshots.infil;
+                }
+                else if (loadout.type == "lightAssault") {
+                    ++headshots.lightAssault;
+                }
+                else if (loadout.type == "medic") {
+                    ++headshots.medic;
+                }
+                else if (loadout.type == "engineer") {
+                    ++headshots.engineer;
+                }
+                else if (loadout.type == "heavy") {
+                    ++headshots.heavy;
+                }
+                else if (loadout.type == "max") {
+                    ++headshots.max;
+                }
+                ++headshots.total;
+            }
+            report.classStats.set("Headshot", headshots);
+            for (const ev of parameters.events) {
+                let statName = "Other";
+                if (ev.type == "kill") {
+                    statName = "Kill";
+                }
+                else if (ev.type == "death") {
+                    statName = (ev.revived == true) ? "Revived" : "Death";
+                }
+                else if (ev.type == "exp") {
+                    const event = PsEvent_1.PsEvents.get(ev.expID);
+                    if (event != undefined) {
+                        if (event.track == false) {
+                            continue;
+                        }
+                        statName = event.name;
+                    }
+                }
+                else {
+                    continue;
+                }
+                if (!report.classStats.has(statName)) {
+                    //log.debug(`Added stats for '${statName}'`);
+                    report.classStats.set(statName, EventReporter_1.classCollectionNumber());
+                }
+                const classCollection = report.classStats.get(statName);
+                ++classCollection.total;
+                const loadout = PsLoadout_1.PsLoadouts.get(ev.loadoutID);
+                if (loadout == undefined) {
+                    continue;
+                }
+                if (loadout.type == "infil") {
+                    ++classCollection.infil;
+                }
+                else if (loadout.type == "lightAssault") {
+                    ++classCollection.lightAssault;
+                }
+                else if (loadout.type == "medic") {
+                    ++classCollection.medic;
+                }
+                else if (loadout.type == "engineer") {
+                    ++classCollection.engineer;
+                }
+                else if (loadout.type == "heavy") {
+                    ++classCollection.heavy;
+                }
+                else if (loadout.type == "max") {
+                    ++classCollection.max;
+                }
+            }
+            parameters.players.forEach((player) => {
+                if (player.events.length == 0) {
+                    return;
+                }
+                const playtime = InvididualGenerator_1.IndividualReporter.classUsage({
+                    player: player,
+                    events: [],
+                    routers: [],
+                    tracking: parameters.tracking
+                });
+                report.players.push(Object.assign({ name: `${(player.outfitTag != '' ? `[${player.outfitTag}] ` : '')}${player.name}` }, playtime));
+            });
+            report.spawnType = this.getSpawnTypeBreakdown(parameters);
+            report.spawnProviders = yield this.getSpawnProviderBreakdown(parameters);
+            report.vehicleKills.type = yield this.getVehicleKills(parameters);
+            report.vehicleKills.players = yield this.getPlayerVehicleKills(parameters);
+            report.vehicleDeaths.type = yield this.getVehicleDeaths(parameters);
+            report.vehicleDeaths.players = yield this.getPlayerVehicleDeaths(parameters);
+            report.versus = this.getVehicleVersus(parameters);
+            return report;
+        });
+    }
+    static getVehicleVersus(parameters) {
+        const table = new VehicleTable();
+        const players = parameters.players.map(iter => iter.characterID);
+        for (const ev of parameters.events) {
+            if (ev.type != "vehicle") {
+                continue;
+            }
+            if (ev.sourceID == ev.targetID) {
+                continue;
+            }
+            const isUs = players.indexOf(ev.sourceID) > -1;
+            let entry = null;
+            switch (ev.attackerVehicleID) {
+                case "0": break;
+                case VehicleAPI_1.Vehicles.flash:
+                    entry = table.flash;
+                    break;
+                case VehicleAPI_1.Vehicles.sunderer:
+                    entry = table.sundy;
+                    break;
+                case VehicleAPI_1.Vehicles.lightning:
+                    entry = table.lightning;
+                    break;
+                case VehicleAPI_1.Vehicles.magrider:
+                    entry = table.magrider;
+                    break;
+                case VehicleAPI_1.Vehicles.vanguard:
+                    entry = table.vanguard;
+                    break;
+                case VehicleAPI_1.Vehicles.prowler:
+                    entry = table.prowler;
+                    break;
+                case VehicleAPI_1.Vehicles.scythe:
+                    entry = table.scythe;
+                    break;
+                case VehicleAPI_1.Vehicles.reaver:
+                    entry = table.reaver;
+                    break;
+                case VehicleAPI_1.Vehicles.mosquito:
+                    entry = table.mossie;
+                    break;
+                case VehicleAPI_1.Vehicles.liberator:
+                    entry = table.lib;
+                    break;
+                case VehicleAPI_1.Vehicles.galaxy:
+                    entry = table.galaxy;
+                    break;
+                case VehicleAPI_1.Vehicles.harasser:
+                    entry = table.harasser;
+                    break;
+                case VehicleAPI_1.Vehicles.valkyrie:
+                    entry = table.valk;
+                    break;
+                case VehicleAPI_1.Vehicles.ant:
+                    entry = table.ant;
+                    break;
+                case "2007":
+                    entry = table.colussus;
+                    break;
+                default:
+                    log.warn(`Unchecked attackerVehicleID ${ev.attackerVehicleID}`);
+                    break;
+            }
+            if (entry == null) {
+                continue;
+            }
+            if (ev.vehicleID == VehicleAPI_1.Vehicles.flash) {
+                if (isUs == true) {
+                    ++entry.flash.kills;
+                }
+                else {
+                    ++entry.flash.deaths;
+                }
+            }
+            else if (ev.vehicleID == VehicleAPI_1.Vehicles.sunderer) {
+                if (isUs == true) {
+                    ++entry.sundy.kills;
+                }
+                else {
+                    ++entry.sundy.deaths;
+                }
+            }
+            else if (ev.vehicleID == VehicleAPI_1.Vehicles.lightning) {
+                if (isUs == true) {
+                    ++entry.lightning.kills;
+                }
+                else {
+                    ++entry.lightning.deaths;
+                }
+            }
+            else if (ev.vehicleID == VehicleAPI_1.Vehicles.magrider) {
+                if (isUs == true) {
+                    ++entry.magrider.kills;
+                }
+                else {
+                    ++entry.magrider.deaths;
+                }
+            }
+            else if (ev.vehicleID == VehicleAPI_1.Vehicles.vanguard) {
+                if (isUs == true) {
+                    ++entry.vanguard.kills;
+                }
+                else {
+                    ++entry.vanguard.deaths;
+                }
+            }
+            else if (ev.vehicleID == VehicleAPI_1.Vehicles.prowler) {
+                if (isUs == true) {
+                    ++entry.prowler.kills;
+                }
+                else {
+                    ++entry.prowler.deaths;
+                }
+            }
+            else if (ev.vehicleID == VehicleAPI_1.Vehicles.scythe) {
+                if (isUs == true) {
+                    ++entry.scythe.kills;
+                }
+                else {
+                    ++entry.scythe.deaths;
+                }
+            }
+            else if (ev.vehicleID == VehicleAPI_1.Vehicles.reaver) {
+                if (isUs == true) {
+                    ++entry.reaver.kills;
+                }
+                else {
+                    ++entry.reaver.deaths;
+                }
+            }
+            else if (ev.vehicleID == VehicleAPI_1.Vehicles.mosquito) {
+                if (isUs == true) {
+                    ++entry.mossie.kills;
+                }
+                else {
+                    ++entry.mossie.deaths;
+                }
+            }
+            else if (ev.vehicleID == VehicleAPI_1.Vehicles.liberator) {
+                if (isUs == true) {
+                    ++entry.lib.kills;
+                }
+                else {
+                    ++entry.lib.deaths;
+                }
+            }
+            else if (ev.vehicleID == VehicleAPI_1.Vehicles.galaxy) {
+                if (isUs == true) {
+                    ++entry.galaxy.kills;
+                }
+                else {
+                    ++entry.galaxy.deaths;
+                }
+            }
+            else if (ev.vehicleID == VehicleAPI_1.Vehicles.harasser) {
+                if (isUs == true) {
+                    ++entry.harasser.kills;
+                }
+                else {
+                    ++entry.harasser.deaths;
+                }
+            }
+            else if (ev.vehicleID == VehicleAPI_1.Vehicles.valkyrie) {
+                if (isUs == true) {
+                    ++entry.valk.kills;
+                }
+                else {
+                    ++entry.valk.deaths;
+                }
+            }
+            else if (ev.vehicleID == VehicleAPI_1.Vehicles.ant) {
+                if (isUs == true) {
+                    ++entry.ant.kills;
+                }
+                else {
+                    ++entry.ant.deaths;
+                }
+            }
+            else if (ev.vehicleID == "2007") {
+                if (isUs == true) {
+                    ++entry.colossus.kills;
+                }
+                else {
+                    ++entry.colossus.deaths;
+                }
+            }
+            else {
+                log.warn(`Unchecked vehicleID: ${ev.vehicleID}`);
+            }
+        }
+        return table;
+    }
+    static getVehicleDeaths(parameters) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const vehKills = new StatMap_1.default();
+            for (const event of parameters.events) {
+                if (event.type == "vehicle"
+                    && VehicleAPI_1.VehicleTypes.tracked.indexOf(event.vehicleID) > -1
+                    && event.weaponID != "0"
+                    && parameters.players.find(iter => iter.characterID == event.targetID) != null) {
+                    vehKills.increment(event.vehicleID);
+                }
+            }
+            return EventReporter_1.statMapToBreakdown(vehKills, VehicleAPI_1.VehicleAPI.getAll, (elem, ID) => elem.ID == ID, EventReporter_1.defaultVehicleMapper);
+        });
+    }
+    static getPlayerVehicleDeaths(parameters) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const vehKills = new StatMap_1.default();
+            for (const event of parameters.events) {
+                if (event.type == "vehicle"
+                    && VehicleAPI_1.VehicleTypes.tracked.indexOf(event.vehicleID) > -1
+                    && event.weaponID != "0"
+                    && parameters.players.find(iter => iter.characterID == event.targetID) != null) {
+                    vehKills.increment(event.sourceID);
+                }
+            }
+            return EventReporter_1.statMapToBreakdown(vehKills, CharacterAPI_1.CharacterAPI.getByIDs, (elem, charID) => elem.ID == charID, EventReporter_1.defaultCharacterMapper, EventReporter_1.defaultCharacterSortField);
+        });
+    }
+    static getVehicleKills(parameters) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const vehKills = new StatMap_1.default();
+            for (const event of parameters.events) {
+                if (event.type == "vehicle"
+                    && VehicleAPI_1.VehicleTypes.tracked.indexOf(event.vehicleID) > -1
+                    && event.weaponID != "0"
+                    && parameters.players.find(iter => iter.characterID == event.sourceID) != null) {
+                    vehKills.increment(event.vehicleID);
+                }
+            }
+            return EventReporter_1.statMapToBreakdown(vehKills, VehicleAPI_1.VehicleAPI.getAll, (elem, ID) => elem.ID == ID, EventReporter_1.defaultVehicleMapper);
+        });
+    }
+    static getPlayerVehicleKills(parameters) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const vehKills = new StatMap_1.default();
+            for (const event of parameters.events) {
+                if (event.type == "vehicle"
+                    && VehicleAPI_1.VehicleTypes.tracked.indexOf(event.vehicleID) > -1
+                    && event.weaponID != "0"
+                    && parameters.players.find(iter => iter.characterID == event.sourceID) != null) {
+                    vehKills.increment(event.sourceID);
+                }
+            }
+            return EventReporter_1.statMapToBreakdown(vehKills, CharacterAPI_1.CharacterAPI.getByIDs, (elem, charID) => elem.ID == charID, EventReporter_1.defaultCharacterMapper, EventReporter_1.defaultCharacterSortField);
+        });
+    }
+    static getSpawnProviderBreakdown(parameters) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const arr = new EventReporter_1.BreakdownArray();
+            const map = new StatMap_1.default();
+            for (const ev of parameters.events) {
+                if (ev.type != "exp") {
+                    continue;
+                }
+                if (ev.expID == PsEvent_1.PsEvent.squadSpawn) {
+                    map.increment(ev.sourceID);
+                }
+                else if (ev.expID == PsEvent_1.PsEvent.constructionSpawn) {
+                    map.increment(ev.sourceID);
+                }
+                else if (ev.expID == PsEvent_1.PsEvent.sundySpawn) {
+                    map.increment(ev.sourceID);
+                }
+                else if (ev.expID == PsEvent_1.PsEvent.galaxySpawn) {
+                    map.increment(ev.sourceID);
+                }
+            }
+            const charIDs = Array.from(map.getMap().keys());
+            const chars = yield CharacterAPI_1.CharacterAPI.getByIDs(charIDs);
+            map.getMap().forEach((count, charID) => {
+                var _a, _b;
+                const breakdown = new EventReporter_1.Breakdown();
+                breakdown.display = (_b = (_a = chars.find(iter => iter.ID == charID)) === null || _a === void 0 ? void 0 : _a.name) !== null && _b !== void 0 ? _b : `Bad ID ${charID}`;
+                breakdown.amount = count;
+                arr.data.push(breakdown);
+                arr.total += count;
+            });
+            arr.data.sort((a, b) => {
+                return b.amount - a.amount
+                    || b.display.localeCompare(a.display);
+            });
+            return arr;
+        });
+    }
+    static getSpawnTypeBreakdown(parameters) {
+        const arr = new EventReporter_1.BreakdownArray();
+        const gal = new EventReporter_1.Breakdown();
+        gal.display = "Galaxy spawns";
+        const sundy = new EventReporter_1.Breakdown();
+        sundy.display = "Sunderer spawns";
+        const router = new EventReporter_1.Breakdown();
+        router.display = "Router spawns";
+        const beacon = new EventReporter_1.Breakdown();
+        beacon.display = "Beacon spawns";
+        const squad = new EventReporter_1.Breakdown();
+        squad.display = "Squad vehicle spawns";
+        for (const ev of parameters.events) {
+            if (ev.type != "exp") {
+                continue;
+            }
+            if (ev.expID == PsEvent_1.PsEvent.squadSpawn) {
+                ++beacon.amount;
+            }
+            else if (ev.expID == PsEvent_1.PsEvent.constructionSpawn) {
+                ++router.amount;
+            }
+            else if (ev.expID == PsEvent_1.PsEvent.sundySpawn) {
+                ++sundy.amount;
+            }
+            else if (ev.expID == PsEvent_1.PsEvent.galaxySpawn) {
+                ++gal.amount;
+            }
+            else if (ev.expID == "355") {
+                ++squad.amount;
+            }
+        }
+        arr.total = gal.amount + sundy.amount + router.amount + beacon.amount + squad.amount;
+        arr.data.push(gal, sundy, router, beacon, squad);
+        return arr;
+    }
+}
+exports.DesoReportGenerator = DesoReportGenerator;
 
 
 /***/ }),
@@ -6823,9 +7501,17 @@ Object.defineProperty(exports, "BaseStatus", { enumerable: true, get: function (
 
 "use strict";
 
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FightReportGenerator = exports.FightReportPlayer = exports.FightReportEntry = exports.FightReportEncounter = exports.FightReport = exports.FightReportParameters = void 0;
-const ApiWrapper_1 = __webpack_require__(/*! ../census/ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
 const PsEvent_1 = __webpack_require__(/*! ../PsEvent */ "../topt-core/build/core/PsEvent.js");
 const EventReporter_1 = __webpack_require__(/*! ../EventReporter */ "../topt-core/build/core/EventReporter.js");
 const InvididualGenerator_1 = __webpack_require__(/*! ../InvididualGenerator */ "../topt-core/build/core/InvididualGenerator.js");
@@ -6992,33 +7678,32 @@ class FightReportPlayer {
 exports.FightReportPlayer = FightReportPlayer;
 class FightReportGenerator {
     static generate(parameters) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const report = new FightReport();
-        if (parameters.events.length == 0 || parameters.players.size == 0) {
-            response.resolveOk(report);
-            return response;
-        }
-        report.startTime = new Date(parameters.events[0].timestamp);
-        report.endTime = new Date(parameters.events[parameters.events.length - 1].timestamp);
-        const playerIDs = [];
-        parameters.players.forEach((player, charID) => {
-            playerIDs.push(charID);
-        });
-        log.debug(`Looking for these char IDs for capture/defend events: [${playerIDs.join(", ")}]`);
-        const facilityIDs = parameters.events.filter(iter => iter.type == "capture" || iter.type == "defend")
-            .map(iter => iter.facilityID)
-            .filter((v, i, a) => a.indexOf(v) == i);
-        // These events will contain the char ID of someone who is allied to the source,
-        //      which is useful in determining which base a fight took place at
-        const allyEventIDs = [
-            PsEvent_1.PsEvent.heal, PsEvent_1.PsEvent.squadHeal,
-            PsEvent_1.PsEvent.revive, PsEvent_1.PsEvent.squadRevive,
-            PsEvent_1.PsEvent.resupply, PsEvent_1.PsEvent.squadResupply,
-            PsEvent_1.PsEvent.maxRepair, PsEvent_1.PsEvent.squadMaxRepair,
-            PsEvent_1.PsEvent.shieldRepair, PsEvent_1.PsEvent.squadShieldRepair,
-        ];
-        FacilityAPI_1.FacilityAPI.getByIDs(facilityIDs).ok((facilities) => {
-            var _a, _b;
+        var _a, _b;
+        return __awaiter(this, void 0, void 0, function* () {
+            const report = new FightReport();
+            if (parameters.events.length == 0 || parameters.players.size == 0) {
+                return report;
+            }
+            report.startTime = new Date(parameters.events[0].timestamp);
+            report.endTime = new Date(parameters.events[parameters.events.length - 1].timestamp);
+            const playerIDs = [];
+            parameters.players.forEach((player, charID) => {
+                playerIDs.push(charID);
+            });
+            log.debug(`Looking for these char IDs for capture/defend events: [${playerIDs.join(", ")}]`);
+            const facilityIDs = parameters.events.filter(iter => iter.type == "capture" || iter.type == "defend")
+                .map(iter => iter.facilityID)
+                .filter((v, i, a) => a.indexOf(v) == i);
+            // These events will contain the char ID of someone who is allied to the source,
+            //      which is useful in determining which base a fight took place at
+            const allyEventIDs = [
+                PsEvent_1.PsEvent.heal, PsEvent_1.PsEvent.squadHeal,
+                PsEvent_1.PsEvent.revive, PsEvent_1.PsEvent.squadRevive,
+                PsEvent_1.PsEvent.resupply, PsEvent_1.PsEvent.squadResupply,
+                PsEvent_1.PsEvent.maxRepair, PsEvent_1.PsEvent.squadMaxRepair,
+                PsEvent_1.PsEvent.shieldRepair, PsEvent_1.PsEvent.squadShieldRepair,
+            ];
+            const facilities = yield FacilityAPI_1.FacilityAPI.getByIDs(facilityIDs);
             log.debug(`Loaded ${facilities.length} from ${facilityIDs.length} IDs`);
             let inFight = false;
             let entry = new FightReportEntry();
@@ -7111,9 +7796,8 @@ class FightReportGenerator {
                     }
                 }
             }
-            response.resolveOk(report);
+            return report;
         });
-        return response;
     }
     /**
      * Finalize the entry to be added to a report, such as getting the top contributers, kills over time, etc.
@@ -7368,9 +8052,17 @@ exports.FightReportGenerator = FightReportGenerator;
 
 "use strict";
 
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.OutfitReportGenerator = exports.OutfitReport = exports.OutfitReportParameters = exports.OutfitReportSettings = void 0;
-const ApiWrapper_1 = __webpack_require__(/*! ../census/ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
 const PsLoadout_1 = __webpack_require__(/*! ../census/PsLoadout */ "../topt-core/build/core/census/PsLoadout.js");
 const PsEvent_1 = __webpack_require__(/*! ../PsEvent */ "../topt-core/build/core/PsEvent.js");
 const EventReporter_1 = __webpack_require__(/*! ../EventReporter */ "../topt-core/build/core/EventReporter.js");
@@ -7588,54 +8280,57 @@ class OutfitReport {
 }
 exports.OutfitReport = OutfitReport;
 class OutfitReportGenerator {
-    static generate(parameters) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const report = new OutfitReport();
-        report.tracking = parameters.tracking;
-        response.addStep("Facility captures")
-            .addStep("Weapon kills")
-            .addStep("Weapon type kills")
-            .addStep("Teamkills")
-            .addStep("Faction kills")
-            .addStep("Faction deaths")
-            .addStep("Continent kills")
-            .addStep("Continent deaths")
-            .addStep("All weapon deaths")
-            .addStep("Unrevived weapon deaths")
-            .addStep("Revived weapon deaths")
-            .addStep("All weapon type deaths")
-            .addStep("Unrevived weapon type deaths")
-            .addStep("Revived weapon type deaths")
-            .addStep("Weapon death breakdown")
-            .addStep("Outfit KD")
-            .addStep("Vehicle kills")
-            .addStep("Vehicle weapon kills");
-        for (const clazz of ["Infil", "LA", "Medic", "Engineer", "Heavy", "MAX"]) {
-            response.addStep(`Weapon type kills for ${clazz}`);
-            response.addStep(`Weapon type deaths for ${clazz}`);
-        }
-        let opsLeft = response.getSteps().length;
-        const totalOps = opsLeft;
-        const callback = (step) => {
-            return () => {
-                log.debug(`Finished ${step}: Have ${opsLeft - 1} ops left outta ${totalOps}`);
-                response.finishStep(step);
-                if (--opsLeft == 0) {
-                    response.resolveOk(report);
+    static generate(parameters, progress) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const report = new OutfitReport();
+            report.tracking = parameters.tracking;
+            if (progress) {
+                const steps = [
+                    "Facility captures",
+                    "Weapon kills",
+                    "Teamkills",
+                    "Weapon deaths",
+                    "Deaths",
+                    "Outfit KD",
+                    "Vehicle kills",
+                    "Class kill breakdown",
+                    "Class death breakdown"
+                ];
+                progress({
+                    type: "steps",
+                    steps: steps
+                });
+            }
+            const startStep = (step) => {
+                if (progress) {
+                    progress({
+                        type: "update",
+                        step: step,
+                        state: "started"
+                    });
                 }
             };
-        };
-        const facilityIDs = parameters.captures.filter(iter => parameters.outfits.indexOf(iter.outfitID) > -1)
-            .map(iter => iter.facilityID)
-            .filter((value, index, arr) => arr.indexOf(value) == index);
-        FacilityAPI_1.FacilityAPI.getByIDs(facilityIDs).ok((data) => {
-            log.debug(`Got these facilities when loaded: [${facilityIDs.join(", ")}]:\n${JSON.stringify(data)}`);
+            const endStep = (step) => {
+                if (progress) {
+                    progress({
+                        type: "update",
+                        step: step,
+                        state: "done"
+                    });
+                }
+            };
+            startStep("Facility control");
+            const facilityIDs = parameters.captures.filter(iter => parameters.outfits.indexOf(iter.outfitID) > -1)
+                .map(iter => iter.facilityID)
+                .filter((value, index, arr) => arr.indexOf(value) == index);
+            const facilities = yield FacilityAPI_1.FacilityAPI.getByIDs(facilityIDs);
+            log.debug(`Got these facilities when loaded: [${facilityIDs.join(", ")}]:\n${JSON.stringify(facilities)}`);
             let missing = [];
             for (const capture of parameters.captures) {
                 if (parameters.outfits.indexOf(capture.outfitID) == -1) {
                     continue;
                 }
-                const facility = data.find(iter => iter.ID == capture.facilityID);
+                const facility = facilities.find(iter => iter.ID == capture.facilityID);
                 if (facility != undefined) {
                     const cap = {
                         facilityID: facility.ID,
@@ -7661,268 +8356,266 @@ class OutfitReportGenerator {
             report.facilityCaptures.sort((a, b) => {
                 return a.timestamp.getTime() - b.timestamp.getTime();
             });
-            EventReporter_1.default.facilityCaptures({
+            report.baseCaptures = yield EventReporter_1.default.facilityCaptures({
                 captures: report.facilityCaptures,
                 players: parameters.playerCaptures
-            }).ok(data => report.baseCaptures = data).always(callback("Facility captures"));
-        });
-        const chars = Array.from(parameters.players.values());
-        report.kpmBoxPlot = {
-            total: EventReporter_1.default.kpmBoxplot(chars, parameters.tracking),
-            infil: EventReporter_1.default.kpmBoxplot(chars, parameters.tracking, "infil"),
-            lightAssault: EventReporter_1.default.kpmBoxplot(chars, parameters.tracking, "lightAssault"),
-            medic: EventReporter_1.default.kpmBoxplot(chars, parameters.tracking, "medic"),
-            engineer: EventReporter_1.default.kpmBoxplot(chars, parameters.tracking, "engineer"),
-            heavy: EventReporter_1.default.kpmBoxplot(chars, parameters.tracking, "heavy"),
-            max: EventReporter_1.default.kpmBoxplot(chars, parameters.tracking, "max"),
-        };
-        report.kdBoxPlot = {
-            total: EventReporter_1.default.kdBoxplot(chars, parameters.tracking),
-            infil: EventReporter_1.default.kdBoxplot(chars, parameters.tracking, "infil"),
-            lightAssault: EventReporter_1.default.kdBoxplot(chars, parameters.tracking, "lightAssault"),
-            medic: EventReporter_1.default.kdBoxplot(chars, parameters.tracking, "medic"),
-            engineer: EventReporter_1.default.kdBoxplot(chars, parameters.tracking, "engineer"),
-            heavy: EventReporter_1.default.kdBoxplot(chars, parameters.tracking, "heavy"),
-            max: EventReporter_1.default.kdBoxplot(chars, parameters.tracking, "max")
-        };
-        parameters.players.forEach((player, charID) => {
-            player.stats.getMap().forEach((amount, expID) => {
-                var _a;
-                const event = PsEvent_1.PsEvents.get(expID);
-                if (event == undefined) {
+            });
+            endStep("Facility captures");
+            const chars = Array.from(parameters.players.values());
+            report.kpmBoxPlot = {
+                total: EventReporter_1.default.kpmBoxplot(chars, parameters.tracking),
+                infil: EventReporter_1.default.kpmBoxplot(chars, parameters.tracking, "infil"),
+                lightAssault: EventReporter_1.default.kpmBoxplot(chars, parameters.tracking, "lightAssault"),
+                medic: EventReporter_1.default.kpmBoxplot(chars, parameters.tracking, "medic"),
+                engineer: EventReporter_1.default.kpmBoxplot(chars, parameters.tracking, "engineer"),
+                heavy: EventReporter_1.default.kpmBoxplot(chars, parameters.tracking, "heavy"),
+                max: EventReporter_1.default.kpmBoxplot(chars, parameters.tracking, "max"),
+            };
+            report.kdBoxPlot = {
+                total: EventReporter_1.default.kdBoxplot(chars, parameters.tracking),
+                infil: EventReporter_1.default.kdBoxplot(chars, parameters.tracking, "infil"),
+                lightAssault: EventReporter_1.default.kdBoxplot(chars, parameters.tracking, "lightAssault"),
+                medic: EventReporter_1.default.kdBoxplot(chars, parameters.tracking, "medic"),
+                engineer: EventReporter_1.default.kdBoxplot(chars, parameters.tracking, "engineer"),
+                heavy: EventReporter_1.default.kdBoxplot(chars, parameters.tracking, "heavy"),
+                max: EventReporter_1.default.kdBoxplot(chars, parameters.tracking, "max")
+            };
+            parameters.players.forEach((player, charID) => {
+                player.stats.getMap().forEach((amount, expID) => {
+                    var _a;
+                    const event = PsEvent_1.PsEvents.get(expID);
+                    if (event == undefined) {
+                        return;
+                    }
+                    const reportAmount = (_a = report.stats.get(event.name)) !== null && _a !== void 0 ? _a : 0;
+                    report.stats.set(event.name, reportAmount + amount);
+                });
+            });
+            const playtimes = [];
+            parameters.players.forEach((player, charID) => {
+                if (player.events.length == 0) {
                     return;
                 }
-                const reportAmount = (_a = report.stats.get(event.name)) !== null && _a !== void 0 ? _a : 0;
-                report.stats.set(event.name, reportAmount + amount);
+                report.score += player.score;
+                report.events.push(...player.events);
+                const playtime = InvididualGenerator_1.IndividualReporter.classUsage({
+                    player: player,
+                    events: [],
+                    routers: [],
+                    tracking: parameters.tracking
+                });
+                playtimes.push(playtime);
+                report.players.push(Object.assign({ name: `${(player.outfitTag != '' ? `[${player.outfitTag}] ` : '')}${player.name}` }, playtime));
             });
-        });
-        const playtimes = [];
-        parameters.players.forEach((player, charID) => {
-            if (player.events.length == 0) {
-                return;
+            report.classPlaytimes = EventReporter_1.default.classPlaytimes(playtimes);
+            report.events = report.events.sort((a, b) => a.timestamp - b.timestamp);
+            // Track how many headshots each class got
+            const headshots = EventReporter_1.classCollectionNumber();
+            for (const ev of report.events) {
+                if (ev.type != "kill" || ev.isHeadshot == false) {
+                    continue;
+                }
+                const loadout = PsLoadout_1.PsLoadouts.get(ev.loadoutID);
+                if (loadout == undefined) {
+                    continue;
+                }
+                if (loadout.type == "infil") {
+                    ++headshots.infil;
+                }
+                else if (loadout.type == "lightAssault") {
+                    ++headshots.lightAssault;
+                }
+                else if (loadout.type == "medic") {
+                    ++headshots.medic;
+                }
+                else if (loadout.type == "engineer") {
+                    ++headshots.engineer;
+                }
+                else if (loadout.type == "heavy") {
+                    ++headshots.heavy;
+                }
+                else if (loadout.type == "max") {
+                    ++headshots.max;
+                }
+                ++headshots.total;
             }
-            report.score += player.score;
-            report.events.push(...player.events);
-            const playtime = InvididualGenerator_1.IndividualReporter.classUsage({
-                player: player,
-                events: [],
-                routers: [],
-                tracking: parameters.tracking
-            });
-            playtimes.push(playtime);
-            report.players.push(Object.assign({ name: `${(player.outfitTag != '' ? `[${player.outfitTag}] ` : '')}${player.name}` }, playtime));
-        });
-        EventReporter_1.default.classPlaytimes(playtimes).ok(data => report.classPlaytimes = data).always(() => callback("Class playtimes"));
-        report.events = report.events.sort((a, b) => a.timestamp - b.timestamp);
-        // Track how many headshots each class got
-        const headshots = EventReporter_1.classCollectionNumber();
-        for (const ev of report.events) {
-            if (ev.type != "kill" || ev.isHeadshot == false) {
-                continue;
-            }
-            const loadout = PsLoadout_1.PsLoadouts.get(ev.loadoutID);
-            if (loadout == undefined) {
-                continue;
-            }
-            if (loadout.type == "infil") {
-                ++headshots.infil;
-            }
-            else if (loadout.type == "lightAssault") {
-                ++headshots.lightAssault;
-            }
-            else if (loadout.type == "medic") {
-                ++headshots.medic;
-            }
-            else if (loadout.type == "engineer") {
-                ++headshots.engineer;
-            }
-            else if (loadout.type == "heavy") {
-                ++headshots.heavy;
-            }
-            else if (loadout.type == "max") {
-                ++headshots.max;
-            }
-            ++headshots.total;
-        }
-        report.classStats.set("Headshot", headshots);
-        for (const ev of report.events) {
-            let statName = "Other";
-            if (ev.type == "kill") {
-                statName = "Kill";
-            }
-            else if (ev.type == "death") {
-                statName = (ev.revived == true) ? "Revived" : "Death";
-            }
-            else if (ev.type == "exp") {
-                const event = PsEvent_1.PsEvents.get(ev.expID);
-                if (event != undefined) {
-                    if (event.track == false) {
-                        continue;
+            report.classStats.set("Headshot", headshots);
+            for (const ev of report.events) {
+                let statName = "Other";
+                if (ev.type == "kill") {
+                    statName = "Kill";
+                }
+                else if (ev.type == "death") {
+                    statName = (ev.revived == true) ? "Revived" : "Death";
+                }
+                else if (ev.type == "exp") {
+                    const event = PsEvent_1.PsEvents.get(ev.expID);
+                    if (event != undefined) {
+                        if (event.track == false) {
+                            continue;
+                        }
+                        statName = event.name;
                     }
-                    statName = event.name;
+                }
+                else {
+                    continue;
+                }
+                if (!report.classStats.has(statName)) {
+                    //log.debug(`Added stats for '${statName}'`);
+                    report.classStats.set(statName, EventReporter_1.classCollectionNumber());
+                }
+                const classCollection = report.classStats.get(statName);
+                ++classCollection.total;
+                const loadout = PsLoadout_1.PsLoadouts.get(ev.loadoutID);
+                if (loadout == undefined) {
+                    continue;
+                }
+                if (loadout.type == "infil") {
+                    ++classCollection.infil;
+                }
+                else if (loadout.type == "lightAssault") {
+                    ++classCollection.lightAssault;
+                }
+                else if (loadout.type == "medic") {
+                    ++classCollection.medic;
+                }
+                else if (loadout.type == "engineer") {
+                    ++classCollection.engineer;
+                }
+                else if (loadout.type == "heavy") {
+                    ++classCollection.heavy;
+                }
+                else if (loadout.type == "max") {
+                    ++classCollection.max;
                 }
             }
-            else {
-                continue;
-            }
-            if (!report.classStats.has(statName)) {
-                //log.debug(`Added stats for '${statName}'`);
-                report.classStats.set(statName, EventReporter_1.classCollectionNumber());
-            }
-            const classCollection = report.classStats.get(statName);
-            ++classCollection.total;
-            const loadout = PsLoadout_1.PsLoadouts.get(ev.loadoutID);
-            if (loadout == undefined) {
-                continue;
-            }
-            if (loadout.type == "infil") {
-                ++classCollection.infil;
-            }
-            else if (loadout.type == "lightAssault") {
-                ++classCollection.lightAssault;
-            }
-            else if (loadout.type == "medic") {
-                ++classCollection.medic;
-            }
-            else if (loadout.type == "engineer") {
-                ++classCollection.engineer;
-            }
-            else if (loadout.type == "heavy") {
-                ++classCollection.heavy;
-            }
-            else if (loadout.type == "max") {
-                ++classCollection.max;
-            }
-        }
-        EventReporter_1.default.weaponKills(report.events).ok(data => report.weaponKillBreakdown = data).always(callback("Weapon kills"));
-        EventReporter_1.default.weaponTypeKills(report.events).ok(data => report.weaponTypeKillBreakdown = data).always(callback("Weapon type kills"));
-        EventReporter_1.default.weaponTeamkills(report.events).ok(data => report.teamkillBreakdown = data).always(callback("Teamkills"));
-        EventReporter_1.default.factionKills(report.events).ok(data => report.factionKillBreakdown = data).always(callback("Faction kills"));
-        EventReporter_1.default.factionDeaths(report.events).ok(data => report.factionDeathBreakdown = data).always(callback("Faction deaths"));
-        EventReporter_1.default.continentKills(report.events).ok(data => report.continentKillBreakdown = data).always(callback("Continent kills"));
-        EventReporter_1.default.continentDeaths(report.events).ok(data => report.continentDeathBreakdown = data).always(callback("Continent deaths"));
-        EventReporter_1.default.weaponDeaths(report.events).ok(data => report.deathAllBreakdown = data).always(callback("All weapon deaths"));
-        EventReporter_1.default.weaponDeaths(report.events, true).ok(data => report.deathRevivedBreakdown = data).always(callback("Revived weapon deaths"));
-        EventReporter_1.default.weaponDeaths(report.events, false).ok(data => report.deathKilledBreakdown = data).always(callback("Unrevived weapon deaths"));
-        EventReporter_1.default.weaponTypeDeaths(report.events).ok(data => report.deathAllTypeBreakdown = data).always(callback("All weapon type deaths"));
-        EventReporter_1.default.weaponTypeDeaths(report.events, true).ok(data => report.deathRevivedTypeBreakdown = data).always(callback("Revived weapon type deaths"));
-        EventReporter_1.default.weaponTypeDeaths(report.events, false).ok(data => report.deathKilledTypeBreakdown = data).always(callback("Unrevived weapon type deaths"));
-        EventReporter_1.default.weaponDeathBreakdown(report.events).ok(data => report.weaponTypeDeathBreakdown = data).always(callback("Weapon death breakdown"));
-        /* Not super useful and take a long time to generate
-        report.timeUnrevived = IndividualReporter.unrevivedTime(report.events);
-        report.revivedLifeExpectance = IndividualReporter.reviveLifeExpectance(report.events);
-        report.kmLifeExpectance = IndividualReporter.lifeExpectanceRate(report.events);
-        report.kmTimeDead = IndividualReporter.timeUntilReviveRate(report.events);
-        */
-        const classFilter = (iter, type, loadouts) => {
-            if (iter.type == type) {
-                return loadouts.indexOf(iter.loadoutID) > -1;
-            }
-            return false;
-        };
-        EventReporter_1.default.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["1", "8", "15"])))
-            .ok(data => report.classTypeKills.infil = data).always(callback("Weapon type kills for Infil"));
-        EventReporter_1.default.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["3", "10", "17"])))
-            .ok(data => report.classTypeKills.lightAssault = data).always(callback("Weapon type kills for LA"));
-        EventReporter_1.default.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["4", "11", "18"])))
-            .ok(data => report.classTypeKills.medic = data).always(callback("Weapon type kills for Medic"));
-        EventReporter_1.default.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["5", "12", "19"])))
-            .ok(data => report.classTypeKills.engineer = data).always(callback("Weapon type kills for Engineer"));
-        EventReporter_1.default.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["6", "13", "20"])))
-            .ok(data => report.classTypeKills.heavy = data).always(callback("Weapon type kills for Heavy"));
-        EventReporter_1.default.weaponTypeKills(report.events.filter(iter => classFilter(iter, "kill", ["7", "14", "21"])))
-            .ok(data => report.classTypeKills.max = data).always(callback("Weapon type kills for MAX"));
-        EventReporter_1.default.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["1", "8", "15"])))
-            .ok(data => report.classTypeDeaths.infil = data).always(callback("Weapon type deaths for Infil"));
-        EventReporter_1.default.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["3", "10", "17"])))
-            .ok(data => report.classTypeDeaths.lightAssault = data).always(callback("Weapon type deaths for LA"));
-        EventReporter_1.default.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["4", "11", "18"])))
-            .ok(data => report.classTypeDeaths.medic = data).always(callback("Weapon type deaths for Medic"));
-        EventReporter_1.default.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["5", "12", "19"])))
-            .ok(data => report.classTypeDeaths.engineer = data).always(callback("Weapon type deaths for Engineer"));
-        EventReporter_1.default.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["6", "13", "20"])))
-            .ok(data => report.classTypeDeaths.heavy = data).always(callback("Weapon type deaths for Heavy"));
-        EventReporter_1.default.weaponTypeDeaths(report.events.filter(iter => classFilter(iter, "death", ["7", "14", "21"])))
-            .ok(data => report.classTypeDeaths.max = data).always(callback("Weapon type deaths for MAX"));
-        report.classKds.infil = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events, "infil");
-        report.classKds.lightAssault = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events, "lightAssault");
-        report.classKds.medic = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events, "medic");
-        report.classKds.engineer = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events, "engineer");
-        report.classKds.heavy = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events, "heavy");
-        report.classKds.max = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events, "max");
-        report.classKds.total = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events);
-        EventReporter_1.default.outfitVersusBreakdown(report.events).ok(data => report.outfitVersusBreakdown = data).always(callback("Outfit KD"));
-        EventReporter_1.default.vehicleKills(report.events).ok(data => report.vehicleKillBreakdown = data).always(callback("Vehicle kills"));
-        EventReporter_1.default.vehicleWeaponKills(report.events).ok(data => report.vehicleKillWeaponBreakdown = data).always(callback("Vehicle weapon kills"));
-        const getSquadStats = (squad, name) => {
-            const squadIDs = squad.members.map(iter => iter.charID);
-            return {
-                name: name,
-                members: squad.members.map(iter => iter.name),
-                kills: parameters.events.filter(iter => iter.type == "kill"
-                    && squadIDs.indexOf(iter.sourceID) > -1).length,
-                deaths: parameters.events.filter(iter => iter.type == "death" && iter.revived == false
-                    && squadIDs.indexOf(iter.sourceID) > -1).length,
-                revives: parameters.events.filter(iter => iter.type == "exp"
-                    && (iter.expID == PsEvent_1.PsEvent.revive || iter.expID == PsEvent_1.PsEvent.squadRevive)
-                    && squadIDs.indexOf(iter.sourceID) > -1).length,
-                heals: parameters.events.filter(iter => iter.type == "exp"
-                    && (iter.expID == PsEvent_1.PsEvent.heal || iter.expID == PsEvent_1.PsEvent.squadHeal)
-                    && squadIDs.indexOf(iter.sourceID) > -1).length,
-                resupplies: parameters.events.filter(iter => iter.type == "exp"
-                    && (iter.expID == PsEvent_1.PsEvent.resupply || iter.expID == PsEvent_1.PsEvent.squadResupply)
-                    && squadIDs.indexOf(iter.sourceID) > -1).length,
-                repairs: parameters.events.filter(iter => iter.type == "exp"
-                    && (iter.expID == PsEvent_1.PsEvent.maxRepair || iter.expID == PsEvent_1.PsEvent.squadMaxRepair)
-                    && squadIDs.indexOf(iter.sourceID) > -1).length,
-                vKills: parameters.events.filter(iter => iter.type == "vehicle"
-                    && squadIDs.indexOf(iter.sourceID) > -1).length,
+            startStep("Weapon kills");
+            report.weaponKillBreakdown = yield EventReporter_1.default.weaponKills(report.events);
+            report.weaponTypeKillBreakdown = yield EventReporter_1.default.weaponTypeKills(report.events);
+            endStep("Weapon kills");
+            startStep("Teamkills");
+            report.teamkillBreakdown = yield EventReporter_1.default.weaponTeamkills(report.events);
+            endStep("Teamkills");
+            report.continentKillBreakdown = EventReporter_1.default.continentKills(report.events);
+            report.continentDeathBreakdown = EventReporter_1.default.continentDeaths(report.events);
+            startStep("Weapon deaths");
+            report.weaponKillBreakdown = yield EventReporter_1.default.weaponDeaths(report.events);
+            report.weaponTypeDeathBreakdown = yield EventReporter_1.default.weaponDeathBreakdown(report.events);
+            endStep("Weapon deaths");
+            startStep("Deaths");
+            report.deathAllBreakdown = yield EventReporter_1.default.weaponDeaths(report.events);
+            report.deathRevivedBreakdown = yield EventReporter_1.default.weaponDeaths(report.events, true);
+            report.deathKilledBreakdown = yield EventReporter_1.default.weaponDeaths(report.events, false);
+            report.deathAllTypeBreakdown = yield EventReporter_1.default.weaponTypeDeaths(report.events, "all");
+            report.deathRevivedTypeBreakdown = yield EventReporter_1.default.weaponTypeDeaths(report.events, "revived");
+            report.deathKilledTypeBreakdown = yield EventReporter_1.default.weaponTypeDeaths(report.events, "unrevived");
+            endStep("Deaths");
+            /* Not super useful and take a long time to generate
+            report.timeUnrevived = IndividualReporter.unrevivedTime(report.events);
+            report.revivedLifeExpectance = IndividualReporter.reviveLifeExpectance(report.events);
+            report.kmLifeExpectance = IndividualReporter.lifeExpectanceRate(report.events);
+            report.kmTimeDead = IndividualReporter.timeUntilReviveRate(report.events);
+            */
+            startStep("Class kill breakdown");
+            report.classTypeKills.infil = yield EventReporter_1.default.weaponTypeKills(report.events, "infil");
+            report.classTypeKills.lightAssault = yield EventReporter_1.default.weaponTypeKills(report.events, "lightAssault");
+            report.classTypeKills.medic = yield EventReporter_1.default.weaponTypeKills(report.events, "medic");
+            report.classTypeKills.engineer = yield EventReporter_1.default.weaponTypeKills(report.events, "engineer");
+            report.classTypeKills.heavy = yield EventReporter_1.default.weaponTypeKills(report.events, "heavy");
+            report.classTypeKills.max = yield EventReporter_1.default.weaponTypeKills(report.events, "max");
+            endStep("Class kill breakdown");
+            startStep("Class death breakdown");
+            report.classTypeDeaths.infil = yield EventReporter_1.default.weaponTypeDeaths(report.events, "all", "infil");
+            report.classTypeDeaths.lightAssault = yield EventReporter_1.default.weaponTypeDeaths(report.events, "all", "lightAssault");
+            report.classTypeDeaths.medic = yield EventReporter_1.default.weaponTypeDeaths(report.events, "all", "medic");
+            report.classTypeDeaths.engineer = yield EventReporter_1.default.weaponTypeDeaths(report.events, "all", "engineer");
+            report.classTypeDeaths.heavy = yield EventReporter_1.default.weaponTypeDeaths(report.events, "all", "heavy");
+            report.classTypeDeaths.max = yield EventReporter_1.default.weaponTypeDeaths(report.events, "all", "max");
+            endStep("Class death breakdown");
+            report.classKds.infil = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events, "infil");
+            report.classKds.lightAssault = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events, "lightAssault");
+            report.classKds.medic = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events, "medic");
+            report.classKds.engineer = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events, "engineer");
+            report.classKds.heavy = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events, "heavy");
+            report.classKds.max = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events, "max");
+            report.classKds.total = InvididualGenerator_1.IndividualReporter.classVersusKd(report.events);
+            startStep("Outfit KD");
+            report.outfitVersusBreakdown = yield EventReporter_1.default.outfitVersusBreakdown(report.events);
+            endStep("Outfit KD");
+            startStep("Vehicle kills");
+            report.vehicleKillBreakdown = yield EventReporter_1.default.vehicleKills(report.events);
+            report.vehicleKillWeaponBreakdown = yield EventReporter_1.default.vehicleWeaponKills(report.events);
+            endStep("Vehicle kills");
+            const getSquadStats = (squad, name) => {
+                const squadIDs = squad.members.map(iter => iter.charID);
+                return {
+                    name: name,
+                    members: squad.members.map(iter => iter.name),
+                    kills: parameters.events.filter(iter => iter.type == "kill"
+                        && squadIDs.indexOf(iter.sourceID) > -1).length,
+                    deaths: parameters.events.filter(iter => iter.type == "death" && iter.revived == false
+                        && squadIDs.indexOf(iter.sourceID) > -1).length,
+                    revives: parameters.events.filter(iter => iter.type == "exp"
+                        && (iter.expID == PsEvent_1.PsEvent.revive || iter.expID == PsEvent_1.PsEvent.squadRevive)
+                        && squadIDs.indexOf(iter.sourceID) > -1).length,
+                    heals: parameters.events.filter(iter => iter.type == "exp"
+                        && (iter.expID == PsEvent_1.PsEvent.heal || iter.expID == PsEvent_1.PsEvent.squadHeal)
+                        && squadIDs.indexOf(iter.sourceID) > -1).length,
+                    resupplies: parameters.events.filter(iter => iter.type == "exp"
+                        && (iter.expID == PsEvent_1.PsEvent.resupply || iter.expID == PsEvent_1.PsEvent.squadResupply)
+                        && squadIDs.indexOf(iter.sourceID) > -1).length,
+                    repairs: parameters.events.filter(iter => iter.type == "exp"
+                        && (iter.expID == PsEvent_1.PsEvent.maxRepair || iter.expID == PsEvent_1.PsEvent.squadMaxRepair)
+                        && squadIDs.indexOf(iter.sourceID) > -1).length,
+                    vKills: parameters.events.filter(iter => iter.type == "vehicle"
+                        && squadIDs.indexOf(iter.sourceID) > -1).length,
+                };
             };
-        };
-        for (const squad of parameters.squads.perm) {
-            report.squadStats.data.push(getSquadStats(squad, squad.display || "Other"));
-        }
-        for (const squad of parameters.squads.guesses) {
-            report.squadStats.data.push(getSquadStats(squad, squad.display || "Other"));
-        }
-        const allSquad = new Squad_1.Squad();
-        for (const squad of [...parameters.squads.perm, ...parameters.squads.guesses]) {
-            allSquad.members.push(...squad.members);
-        }
-        report.squadStats.all = getSquadStats(allSquad, "All");
-        report.squadStats.data.push(report.squadStats.all);
-        let otherIDs = [];
-        const breakdown = new Map();
-        for (const event of report.events) {
-            if (event.type == "exp") {
-                const exp = PsEvent_1.PsEvents.get(event.expID) || PsEvent_1.PsEvent.other;
-                if (!breakdown.has(exp.name)) {
-                    breakdown.set(exp.name, new InvididualGenerator_1.ExpBreakdown());
-                }
-                const score = breakdown.get(exp.name);
-                score.name = exp.name;
-                score.score += event.amount;
-                score.amount += 1;
-                if (exp == PsEvent_1.PsEvent.other) {
-                    otherIDs.push(event.expID);
+            for (const squad of parameters.squads.perm) {
+                report.squadStats.data.push(getSquadStats(squad, squad.display || "Other"));
+            }
+            for (const squad of parameters.squads.guesses) {
+                report.squadStats.data.push(getSquadStats(squad, squad.display || "Other"));
+            }
+            const allSquad = new Squad_1.Squad();
+            for (const squad of [...parameters.squads.perm, ...parameters.squads.guesses]) {
+                allSquad.members.push(...squad.members);
+            }
+            report.squadStats.all = getSquadStats(allSquad, "All");
+            report.squadStats.data.push(report.squadStats.all);
+            let otherIDs = [];
+            const breakdown = new Map();
+            for (const event of report.events) {
+                if (event.type == "exp") {
+                    const exp = PsEvent_1.PsEvents.get(event.expID) || PsEvent_1.PsEvent.other;
+                    if (!breakdown.has(exp.name)) {
+                        breakdown.set(exp.name, new InvididualGenerator_1.ExpBreakdown());
+                    }
+                    const score = breakdown.get(exp.name);
+                    score.name = exp.name;
+                    score.score += event.amount;
+                    score.amount += 1;
+                    if (exp == PsEvent_1.PsEvent.other) {
+                        otherIDs.push(event.expID);
+                    }
                 }
             }
-        }
-        log.debug(`Untracked experience IDs: ${otherIDs.filter((v, i, a) => a.indexOf(v) == i).join(", ")}`);
-        // Sort all the entries by score, followed by amount, then lastly name
-        report.scoreBreakdown = [...breakdown.entries()].sort((a, b) => {
-            return (b[1].score - a[1].score)
-                || (b[1].amount - a[1].amount)
-                || (b[0].localeCompare(a[0]));
-        }).map((a) => a[1]); // Transform the tuple into the ExpBreakdown
-        report.overtimePer1.kpm = EventReporter_1.default.kpmOverTime(report.events, 60000);
-        report.overtimePer1.kd = EventReporter_1.default.kdOverTime(report.events, 60000);
-        report.overtimePer1.rpm = EventReporter_1.default.revivesOverTime(report.events, 60000);
-        report.overtimePer5.kpm = EventReporter_1.default.kpmOverTime(report.events);
-        report.overtimePer5.kd = EventReporter_1.default.kdOverTime(report.events);
-        report.overtimePer5.rpm = EventReporter_1.default.revivesOverTime(report.events);
-        report.perUpdate.kd = EventReporter_1.default.kdPerUpdate(report.events);
-        return response;
+            log.debug(`Untracked experience IDs: ${otherIDs.filter((v, i, a) => a.indexOf(v) == i).join(", ")}`);
+            // Sort all the entries by score, followed by amount, then lastly name
+            report.scoreBreakdown = [...breakdown.entries()].sort((a, b) => {
+                return (b[1].score - a[1].score)
+                    || (b[1].amount - a[1].amount)
+                    || (b[0].localeCompare(a[0]));
+            }).map((a) => a[1]); // Transform the tuple into the ExpBreakdown
+            report.overtimePer1.kpm = EventReporter_1.default.kpmOverTime(report.events, 60000);
+            report.overtimePer1.kd = EventReporter_1.default.kdOverTime(report.events, 60000);
+            report.overtimePer1.rpm = EventReporter_1.default.revivesOverTime(report.events, 60000);
+            report.overtimePer5.kpm = EventReporter_1.default.kpmOverTime(report.events);
+            report.overtimePer5.kd = EventReporter_1.default.kdOverTime(report.events);
+            report.overtimePer5.rpm = EventReporter_1.default.revivesOverTime(report.events);
+            report.perUpdate.kd = EventReporter_1.default.kdPerUpdate(report.events);
+            return report;
+        });
     }
 }
 exports.OutfitReportGenerator = OutfitReportGenerator;
@@ -8106,9 +8799,17 @@ exports.WinterReport = WinterReport;
 
 "use strict";
 
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.WinterReportGenerator = exports.WinterMetricIndex = void 0;
-const ApiWrapper_1 = __webpack_require__(/*! ../census/ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
 const WinterReport_1 = __webpack_require__(/*! ./WinterReport */ "../topt-core/build/core/winter/WinterReport.js");
 const WinterMetric_1 = __webpack_require__(/*! ./WinterMetric */ "../topt-core/build/core/winter/WinterMetric.js");
 const StatMap_1 = __webpack_require__(/*! ../StatMap */ "../topt-core/build/core/StatMap.js");
@@ -8131,77 +8832,69 @@ WinterMetricIndex.REPAIRS = 5;
 WinterMetricIndex.SHIELDS = 6;
 class WinterReportGenerator {
     static generate(parameters) {
-        const response = new ApiWrapper_1.ApiResponse();
-        parameters.events = parameters.events.sort((a, b) => a.timestamp - b.timestamp);
-        const report = new WinterReport_1.WinterReport();
-        report.start = new Date(parameters.events[0].timestamp);
-        report.end = new Date(parameters.events[parameters.events.length - 1].timestamp);
-        report.players = [...parameters.players.filter(iter => iter.events.length > 0)];
-        report.essential.length = 7;
-        report.essential[WinterMetricIndex.KILLS] = this.kills(parameters);
-        report.essential[WinterMetricIndex.KD] = this.kds(parameters);
-        report.essential[WinterMetricIndex.HEALS] = this.heals(parameters);
-        report.essential[WinterMetricIndex.REVIVES] = this.revives(parameters);
-        report.essential[WinterMetricIndex.REPAIRS] = this.repairs(parameters);
-        report.essential[WinterMetricIndex.RESUPPLIES] = this.resupplies(parameters);
-        report.essential[WinterMetricIndex.SHIELDS] = this.shieldRepairs(parameters);
-        log.debug(`Loaded ${report.essential.length} essential metrics`);
-        report.fun.push(this.mostRevived(parameters));
-        report.fun.push(this.mostTransportAssists(parameters));
-        report.fun.push(this.mostReconAssists(parameters));
-        //report.fun.push(this.mostConcAssists(parameters));
-        //report.fun.push(this.mostEMPAssist(parameters));
-        //report.fun.push(this.mostFlashAssists(parameters));
-        report.fun.push(this.mostSaviors(parameters));
-        report.fun.push(this.mostAssists(parameters));
-        report.fun.push(this.mostUniqueRevives(parameters));
-        report.fun.push(this.longestKillStreak(parameters));
-        report.fun.push(this.highestHSR(parameters));
-        report.fun.push(this.getDifferentWeapons(parameters));
-        if (parameters.settings.includeVehicles == true) {
-            report.fun.push(this.mostESFSKills(parameters));
-            report.fun.push(this.mostValkKills(parameters));
-            report.fun.push(this.mostLibKills(parameters));
-            report.fun.push(this.mostGalaxyKills(parameters));
-            report.fun.push(this.mostHarasserKills(parameters));
-            report.fun.push(this.mostSunderersKilled(parameters));
-            report.fun.push(this.mostLightningKills(parameters));
-            report.fun.push(this.mostMBTKills(parameters));
-        }
-        report.fun.push(this.mostRoadkills(parameters));
-        report.fun.push(this.mostUsefulRevives(parameters));
-        report.fun.push(this.highestAverageLifeExpectance(parameters));
-        report.fun.push(this.mostC4Kills(parameters));
-        report.fun.push(this.mostPercentRevive(parameters));
-        report.fun.push(this.mostDrawfireAssists(parameters));
-        report.fun.push(this.mostRouterKills(parameters));
-        report.fun.push(this.mostBeaconKills(parameters));
-        report.fun.push(this.mostMAXKills(parameters));
-        report.fun.push(this.mostSundySpawns(parameters));
-        report.fun.push(this.mostRouterSpawns(parameters));
-        report.fun.push(this.longestHealStreak(parameters));
-        let opsLeft = +1 // Knife kills
-            + 1 // Pistol kills
-            + 1 // Grenade kills
-        ;
-        const handler = () => {
-            if (--opsLeft == 0) {
-                if (parameters.settings.funMetricCount != -1) {
-                    // Shuffle array
-                    for (let i = report.fun.length - 1; i > 0; i--) {
-                        const elem = Math.floor(Math.random() * (i + 1));
-                        [report.fun[i], report.fun[elem]] = [report.fun[elem], report.fun[i]];
-                    }
-                    report.fun = report.fun.slice(0, parameters.settings.funMetricCount);
-                }
-                log.debug(`Loaded ${report.fun.length} fun metrics`);
-                response.resolveOk(report);
+        return __awaiter(this, void 0, void 0, function* () {
+            parameters.events = parameters.events.sort((a, b) => a.timestamp - b.timestamp);
+            const report = new WinterReport_1.WinterReport();
+            report.start = new Date(parameters.events[0].timestamp);
+            report.end = new Date(parameters.events[parameters.events.length - 1].timestamp);
+            report.players = [...parameters.players.filter(iter => iter.events.length > 0)];
+            report.essential.length = 7;
+            report.essential[WinterMetricIndex.KILLS] = this.kills(parameters);
+            report.essential[WinterMetricIndex.KD] = this.kds(parameters);
+            report.essential[WinterMetricIndex.HEALS] = this.heals(parameters);
+            report.essential[WinterMetricIndex.REVIVES] = this.revives(parameters);
+            report.essential[WinterMetricIndex.REPAIRS] = this.repairs(parameters);
+            report.essential[WinterMetricIndex.RESUPPLIES] = this.resupplies(parameters);
+            report.essential[WinterMetricIndex.SHIELDS] = this.shieldRepairs(parameters);
+            log.debug(`Loaded ${report.essential.length} essential metrics`);
+            report.fun.push(this.mostRevived(parameters));
+            report.fun.push(this.mostTransportAssists(parameters));
+            report.fun.push(this.mostReconAssists(parameters));
+            //report.fun.push(this.mostConcAssists(parameters));
+            //report.fun.push(this.mostEMPAssist(parameters));
+            //report.fun.push(this.mostFlashAssists(parameters));
+            report.fun.push(this.mostSaviors(parameters));
+            report.fun.push(this.mostAssists(parameters));
+            report.fun.push(this.mostUniqueRevives(parameters));
+            report.fun.push(this.longestKillStreak(parameters));
+            report.fun.push(this.highestHSR(parameters));
+            report.fun.push(this.getDifferentWeapons(parameters));
+            if (parameters.settings.includeVehicles == true) {
+                report.fun.push(this.mostESFSKills(parameters));
+                report.fun.push(this.mostValkKills(parameters));
+                report.fun.push(this.mostLibKills(parameters));
+                report.fun.push(this.mostGalaxyKills(parameters));
+                report.fun.push(this.mostHarasserKills(parameters));
+                report.fun.push(this.mostSunderersKilled(parameters));
+                report.fun.push(this.mostLightningKills(parameters));
+                report.fun.push(this.mostMBTKills(parameters));
             }
-        };
-        this.mostKnifeKills(parameters).ok(data => report.fun.push(data)).always(handler);
-        this.mostGrenadeKills(parameters).ok(data => report.fun.push(data)).always(handler);
-        this.mostPistolKills(parameters).ok(data => report.fun.push(data)).always(handler);
-        return response;
+            report.fun.push(this.mostRoadkills(parameters));
+            report.fun.push(this.mostUsefulRevives(parameters));
+            report.fun.push(this.highestAverageLifeExpectance(parameters));
+            report.fun.push(this.mostC4Kills(parameters));
+            report.fun.push(this.mostPercentRevive(parameters));
+            report.fun.push(this.mostDrawfireAssists(parameters));
+            report.fun.push(this.mostRouterKills(parameters));
+            report.fun.push(this.mostBeaconKills(parameters));
+            report.fun.push(this.mostMAXKills(parameters));
+            report.fun.push(this.mostSundySpawns(parameters));
+            report.fun.push(this.mostRouterSpawns(parameters));
+            report.fun.push(this.longestHealStreak(parameters));
+            report.fun.push(yield this.mostKnifeKills(parameters));
+            report.fun.push(yield this.mostGrenadeKills(parameters));
+            report.fun.push(yield this.mostPistolKills(parameters));
+            if (parameters.settings.funMetricCount != -1) {
+                // Shuffle array
+                for (let i = report.fun.length - 1; i > 0; i--) {
+                    const elem = Math.floor(Math.random() * (i + 1));
+                    [report.fun[i], report.fun[elem]] = [report.fun[elem], report.fun[i]];
+                }
+                report.fun = report.fun.slice(0, parameters.settings.funMetricCount);
+            }
+            log.debug(`Loaded ${report.fun.length} fun metrics`);
+            return report;
+        });
     }
     static revives(parameters) {
         return this.metric(parameters, [PsEvent_1.PsEvent.revive, PsEvent_1.PsEvent.squadResupply], {
@@ -8690,21 +9383,21 @@ class WinterReportGenerator {
         });
     }
     static weaponType(parameters, type, metric) {
-        const response = new ApiWrapper_1.ApiResponse();
-        const wepIDs = new Set();
-        for (const player of parameters.players) {
-            const IDs = player.events.filter(iter => iter.type == "kill")
-                .map(iter => iter.weaponID);
-            for (const id of IDs) {
-                wepIDs.add(id);
+        return __awaiter(this, void 0, void 0, function* () {
+            const wepIDs = new Set();
+            for (const player of parameters.players) {
+                const IDs = player.events.filter(iter => iter.type == "kill")
+                    .map(iter => iter.weaponID);
+                for (const id of IDs) {
+                    wepIDs.add(id);
+                }
             }
-        }
-        const amounts = new StatMap_1.default();
-        WeaponAPI_1.WeaponAPI.getByIDs(Array.from(wepIDs.keys())).ok((data) => {
+            const amounts = new StatMap_1.default();
+            const weapons = yield WeaponAPI_1.WeaponAPI.getByIDs(Array.from(wepIDs.keys()));
             for (const player of parameters.players) {
                 const kills = player.events.filter(iter => iter.type == "kill");
                 for (const kill of kills) {
-                    const weapon = data.find(iter => iter.ID == kill.weaponID);
+                    const weapon = weapons.find(iter => iter.ID == kill.weaponID);
                     if (weapon == undefined) {
                         continue;
                     }
@@ -8714,9 +9407,8 @@ class WinterReportGenerator {
                 }
             }
             metric.entries = this.statMapToEntires(parameters, amounts);
+            return metric;
         });
-        response.resolveOk(metric);
-        return response;
     }
     static weapon(parameters, ids, metric) {
         const amounts = new StatMap_1.default();
@@ -11304,10 +11996,10 @@ module.exports = __webpack_require__(/*! ../package.json */ "../topt-core/node_m
 /*!********************************************************!*\
   !*** ../topt-core/node_modules/websocket/package.json ***!
   \********************************************************/
-/*! exports provided: _from, _id, _inBundle, _integrity, _location, _phantomChildren, _requested, _requiredBy, _resolved, _shasum, _spec, _where, author, browser, bugs, bundleDependencies, config, contributors, dependencies, deprecated, description, devDependencies, directories, engines, homepage, keywords, license, main, name, repository, scripts, version, default */
+/*! exports provided: _args, _from, _id, _inBundle, _integrity, _location, _phantomChildren, _requested, _requiredBy, _resolved, _spec, _where, author, browser, bugs, config, contributors, dependencies, description, devDependencies, directories, engines, homepage, keywords, license, main, name, repository, scripts, version, default */
 /***/ (function(module) {
 
-module.exports = JSON.parse("{\"_from\":\"websocket\",\"_id\":\"websocket@1.0.32\",\"_inBundle\":false,\"_integrity\":\"sha512-i4yhcllSP4wrpoPMU2N0TQ/q0O94LRG/eUQjEAamRltjQ1oT1PFFKOG4i877OlJgCG8rw6LrrowJp+TYCEWF7Q==\",\"_location\":\"/websocket\",\"_phantomChildren\":{},\"_requested\":{\"type\":\"tag\",\"registry\":true,\"raw\":\"websocket\",\"name\":\"websocket\",\"escapedName\":\"websocket\",\"rawSpec\":\"\",\"saveSpec\":null,\"fetchSpec\":\"latest\"},\"_requiredBy\":[\"#USER\",\"/\"],\"_resolved\":\"https://registry.npmjs.org/websocket/-/websocket-1.0.32.tgz\",\"_shasum\":\"1f16ddab3a21a2d929dec1687ab21cfdc6d3dbb1\",\"_spec\":\"websocket\",\"_where\":\"C:\\\\Users\\\\Hdt\\\\Programming\\\\topt-core\",\"author\":{\"name\":\"Brian McKelvey\",\"email\":\"theturtle32@gmail.com\",\"url\":\"https://github.com/theturtle32\"},\"browser\":\"lib/browser.js\",\"bugs\":{\"url\":\"https://github.com/theturtle32/WebSocket-Node/issues\"},\"bundleDependencies\":false,\"config\":{\"verbose\":false},\"contributors\":[{\"name\":\"Iñaki Baz Castillo\",\"email\":\"ibc@aliax.net\",\"url\":\"http://dev.sipdoc.net\"}],\"dependencies\":{\"bufferutil\":\"^4.0.1\",\"debug\":\"^2.2.0\",\"es5-ext\":\"^0.10.50\",\"typedarray-to-buffer\":\"^3.1.5\",\"utf-8-validate\":\"^5.0.2\",\"yaeti\":\"^0.0.6\"},\"deprecated\":false,\"description\":\"Websocket Client & Server Library implementing the WebSocket protocol as specified in RFC 6455.\",\"devDependencies\":{\"buffer-equal\":\"^1.0.0\",\"gulp\":\"^4.0.2\",\"gulp-jshint\":\"^2.0.4\",\"jshint\":\"^2.0.0\",\"jshint-stylish\":\"^2.2.1\",\"tape\":\"^4.9.1\"},\"directories\":{\"lib\":\"./lib\"},\"engines\":{\"node\":\">=4.0.0\"},\"homepage\":\"https://github.com/theturtle32/WebSocket-Node\",\"keywords\":[\"websocket\",\"websockets\",\"socket\",\"networking\",\"comet\",\"push\",\"RFC-6455\",\"realtime\",\"server\",\"client\"],\"license\":\"Apache-2.0\",\"main\":\"index\",\"name\":\"websocket\",\"repository\":{\"type\":\"git\",\"url\":\"git+https://github.com/theturtle32/WebSocket-Node.git\"},\"scripts\":{\"gulp\":\"gulp\",\"test\":\"tape test/unit/*.js\"},\"version\":\"1.0.32\"}");
+module.exports = JSON.parse("{\"_args\":[[\"websocket@1.0.32\",\"C:\\\\Users\\\\Hdt\\\\Programming\\\\topt-core\"]],\"_from\":\"websocket@1.0.32\",\"_id\":\"websocket@1.0.32\",\"_inBundle\":false,\"_integrity\":\"sha512-i4yhcllSP4wrpoPMU2N0TQ/q0O94LRG/eUQjEAamRltjQ1oT1PFFKOG4i877OlJgCG8rw6LrrowJp+TYCEWF7Q==\",\"_location\":\"/websocket\",\"_phantomChildren\":{},\"_requested\":{\"type\":\"version\",\"registry\":true,\"raw\":\"websocket@1.0.32\",\"name\":\"websocket\",\"escapedName\":\"websocket\",\"rawSpec\":\"1.0.32\",\"saveSpec\":null,\"fetchSpec\":\"1.0.32\"},\"_requiredBy\":[\"/\"],\"_resolved\":\"https://registry.npmjs.org/websocket/-/websocket-1.0.32.tgz\",\"_spec\":\"1.0.32\",\"_where\":\"C:\\\\Users\\\\Hdt\\\\Programming\\\\topt-core\",\"author\":{\"name\":\"Brian McKelvey\",\"email\":\"theturtle32@gmail.com\",\"url\":\"https://github.com/theturtle32\"},\"browser\":\"lib/browser.js\",\"bugs\":{\"url\":\"https://github.com/theturtle32/WebSocket-Node/issues\"},\"config\":{\"verbose\":false},\"contributors\":[{\"name\":\"Iñaki Baz Castillo\",\"email\":\"ibc@aliax.net\",\"url\":\"http://dev.sipdoc.net\"}],\"dependencies\":{\"bufferutil\":\"^4.0.1\",\"debug\":\"^2.2.0\",\"es5-ext\":\"^0.10.50\",\"typedarray-to-buffer\":\"^3.1.5\",\"utf-8-validate\":\"^5.0.2\",\"yaeti\":\"^0.0.6\"},\"description\":\"Websocket Client & Server Library implementing the WebSocket protocol as specified in RFC 6455.\",\"devDependencies\":{\"buffer-equal\":\"^1.0.0\",\"gulp\":\"^4.0.2\",\"gulp-jshint\":\"^2.0.4\",\"jshint\":\"^2.0.0\",\"jshint-stylish\":\"^2.2.1\",\"tape\":\"^4.9.1\"},\"directories\":{\"lib\":\"./lib\"},\"engines\":{\"node\":\">=4.0.0\"},\"homepage\":\"https://github.com/theturtle32/WebSocket-Node\",\"keywords\":[\"websocket\",\"websockets\",\"socket\",\"networking\",\"comet\",\"push\",\"RFC-6455\",\"realtime\",\"server\",\"client\"],\"license\":\"Apache-2.0\",\"main\":\"index\",\"name\":\"websocket\",\"repository\":{\"type\":\"git\",\"url\":\"git+https://github.com/theturtle32/WebSocket-Node.git\"},\"scripts\":{\"gulp\":\"gulp\",\"test\":\"tape test/unit/*.js\"},\"version\":\"1.0.32\"}");
 
 /***/ }),
 
@@ -71470,6 +72162,15 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var tcore__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(tcore__WEBPACK_IMPORTED_MODULE_0__);
 /* harmony import */ var axios__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! axios */ "./node_modules/axios/index.js");
 /* harmony import */ var axios__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(axios__WEBPACK_IMPORTED_MODULE_1__);
+var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 
 
 /**
@@ -71492,8 +72193,15 @@ class PersonalReportGenerator {
      * Get an ApiResponse that will contain the HTML template when resolved OK
      */
     static getTemplate() {
-        const page = new tcore__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"](axios__WEBPACK_IMPORTED_MODULE_1___default.a.get(`./personal/index.html?q=${new Date().getTime()}`), (iter) => iter);
-        return page;
+        return __awaiter(this, void 0, void 0, function* () {
+            const page = yield new tcore__WEBPACK_IMPORTED_MODULE_0__["ApiResponse"](axios__WEBPACK_IMPORTED_MODULE_1___default.a.get(`./personal/index.html?q=${new Date().getTime()}`), (iter) => iter).promise();
+            if (page.code == 200) {
+                return page.data;
+            }
+            else {
+                throw ``;
+            }
+        });
     }
 }
 
@@ -71654,6 +72362,45 @@ window.StorageHelper = StorageHelper;
 
 /***/ }),
 
+/***/ "./src/VehicleVersusEntry.ts":
+/*!***********************************!*\
+  !*** ./src/VehicleVersusEntry.ts ***!
+  \***********************************/
+/*! no exports provided */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var vue__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! vue */ "./node_modules/vue/dist/vue.esm.js");
+
+vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("vehicle-versus-entry", {
+    props: {
+        name: { type: String, required: true },
+        entry: { type: Object, required: true },
+    },
+    template: `
+        <tr>
+            <td>{{name}}</td>
+            <td v-for="(value, name) in entry">
+                {{entry[name].kills}} /
+                {{entry[name].deaths}}
+            </td>
+        </tr>
+    `,
+    data: function () {
+        return {};
+    },
+    created: function () {
+    },
+    mounted: function () {
+    },
+    methods: {},
+    watch: {}
+});
+
+
+/***/ }),
+
 /***/ "./src/addons/SquadAddon.ts":
 /*!**********************************!*\
   !*** ./src/addons/SquadAddon.ts ***!
@@ -71773,11 +72520,21 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var MomentFilter__WEBPACK_IMPORTED_MODULE_18__ = __webpack_require__(/*! MomentFilter */ "./src/MomentFilter.ts");
 /* harmony import */ var KillfeedSquad__WEBPACK_IMPORTED_MODULE_19__ = __webpack_require__(/*! KillfeedSquad */ "./src/KillfeedSquad.ts");
 /* harmony import */ var FightReportTop__WEBPACK_IMPORTED_MODULE_20__ = __webpack_require__(/*! FightReportTop */ "./src/FightReportTop.ts");
-/* harmony import */ var tcore__WEBPACK_IMPORTED_MODULE_21__ = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
-/* harmony import */ var tcore__WEBPACK_IMPORTED_MODULE_21___default = /*#__PURE__*/__webpack_require__.n(tcore__WEBPACK_IMPORTED_MODULE_21__);
-/* harmony import */ var PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_22__ = __webpack_require__(/*! PersonalReportGenerator */ "./src/PersonalReportGenerator.ts");
-/* harmony import */ var addons_SquadAddon__WEBPACK_IMPORTED_MODULE_23__ = __webpack_require__(/*! addons/SquadAddon */ "./src/addons/SquadAddon.ts");
-/* harmony import */ var Storage__WEBPACK_IMPORTED_MODULE_24__ = __webpack_require__(/*! Storage */ "./src/Storage.ts");
+/* harmony import */ var VehicleVersusEntry__WEBPACK_IMPORTED_MODULE_21__ = __webpack_require__(/*! VehicleVersusEntry */ "./src/VehicleVersusEntry.ts");
+/* harmony import */ var tcore__WEBPACK_IMPORTED_MODULE_22__ = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
+/* harmony import */ var tcore__WEBPACK_IMPORTED_MODULE_22___default = /*#__PURE__*/__webpack_require__.n(tcore__WEBPACK_IMPORTED_MODULE_22__);
+/* harmony import */ var PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_23__ = __webpack_require__(/*! PersonalReportGenerator */ "./src/PersonalReportGenerator.ts");
+/* harmony import */ var addons_SquadAddon__WEBPACK_IMPORTED_MODULE_24__ = __webpack_require__(/*! addons/SquadAddon */ "./src/addons/SquadAddon.ts");
+/* harmony import */ var Storage__WEBPACK_IMPORTED_MODULE_25__ = __webpack_require__(/*! Storage */ "./src/Storage.ts");
+var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 
 
 
@@ -71807,13 +72564,14 @@ chart_js__WEBPACK_IMPORTED_MODULE_10__["Chart"].plugins.unregister(_node_modules
 
 
 
-window.CharacterAPI = tcore__WEBPACK_IMPORTED_MODULE_21__["CharacterAPI"];
-window.Playback = tcore__WEBPACK_IMPORTED_MODULE_21__["Playback"];
-window.Logger = tcore__WEBPACK_IMPORTED_MODULE_21__["Logger"];
-window.PsEvent = tcore__WEBPACK_IMPORTED_MODULE_21__["PsEvent"];
+
+window.CharacterAPI = tcore__WEBPACK_IMPORTED_MODULE_22__["CharacterAPI"];
+window.Playback = tcore__WEBPACK_IMPORTED_MODULE_22__["Playback"];
+window.Logger = tcore__WEBPACK_IMPORTED_MODULE_22__["Logger"];
+window.PsEvent = tcore__WEBPACK_IMPORTED_MODULE_22__["PsEvent"];
 window.moment = moment__WEBPACK_IMPORTED_MODULE_5__;
 window.$ = jquery__WEBPACK_IMPORTED_MODULE_6__;
-const log = tcore__WEBPACK_IMPORTED_MODULE_21__["Logger"].getLogger("UI");
+const log = tcore__WEBPACK_IMPORTED_MODULE_22__["Logger"].getLogger("UI");
 log.enableAll();
 const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
     el: "#app",
@@ -71864,13 +72622,22 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
         ],
         winter: {
             report: Loadable__WEBPACK_IMPORTED_MODULE_4__["Loadable"].idle(),
-            settings: new tcore__WEBPACK_IMPORTED_MODULE_21__["WinterReportSettings"](),
+            settings: new tcore__WEBPACK_IMPORTED_MODULE_22__["WinterReportSettings"](),
             ignoredPlayers: ""
         },
-        battleReport: new tcore__WEBPACK_IMPORTED_MODULE_21__["FightReport"](),
-        outfitReport: new tcore__WEBPACK_IMPORTED_MODULE_21__["OutfitReport"](),
-        opsReportSettings: new tcore__WEBPACK_IMPORTED_MODULE_21__["OutfitReportSettings"](),
-        outfitReportResponse: null,
+        deso: {
+            report: Loadable__WEBPACK_IMPORTED_MODULE_4__["Loadable"].idle()
+        },
+        battle: {
+            report: Loadable__WEBPACK_IMPORTED_MODULE_4__["Loadable"].idle()
+        },
+        outfit: {
+            report: Loadable__WEBPACK_IMPORTED_MODULE_4__["Loadable"].idle(),
+            steps: []
+        },
+        battleReport: new tcore__WEBPACK_IMPORTED_MODULE_22__["FightReport"](),
+        outfitReport: new tcore__WEBPACK_IMPORTED_MODULE_22__["OutfitReport"](),
+        opsReportSettings: new tcore__WEBPACK_IMPORTED_MODULE_22__["OutfitReportSettings"](),
         refreshIntervalID: -1,
         loadingOutfit: false,
         loggers: [],
@@ -71879,18 +72646,18 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
     },
     created: function () {
         this.refreshIntervalID = setInterval(this.updateDisplay, this.settings.updateRate * 1000);
-        this.storage.enabled = Storage__WEBPACK_IMPORTED_MODULE_24__["StorageHelper"].isEnabled();
-        new tcore__WEBPACK_IMPORTED_MODULE_21__["ApiResponse"](axios__WEBPACK_IMPORTED_MODULE_8___default.a.get(`/data/weapons.json`)).ok((data) => {
+        this.storage.enabled = Storage__WEBPACK_IMPORTED_MODULE_25__["StorageHelper"].isEnabled();
+        new tcore__WEBPACK_IMPORTED_MODULE_22__["ApiResponse"](axios__WEBPACK_IMPORTED_MODULE_8___default.a.get(`/data/weapons.json`)).ok((data) => {
             console.log(`Loaded ${data.length} weapons`);
-            tcore__WEBPACK_IMPORTED_MODULE_21__["WeaponAPI"].setCache(data);
+            tcore__WEBPACK_IMPORTED_MODULE_22__["WeaponAPI"].setCache(data);
         });
-        new tcore__WEBPACK_IMPORTED_MODULE_21__["ApiResponse"](axios__WEBPACK_IMPORTED_MODULE_8___default.a.get(`/data/bases.json`)).ok((data) => {
+        new tcore__WEBPACK_IMPORTED_MODULE_22__["ApiResponse"](axios__WEBPACK_IMPORTED_MODULE_8___default.a.get(`/data/bases.json`)).ok((data) => {
             console.log(`Loaded ${data.length} facilities`);
-            tcore__WEBPACK_IMPORTED_MODULE_21__["FacilityAPI"].setCache(data);
+            tcore__WEBPACK_IMPORTED_MODULE_22__["FacilityAPI"].setCache(data);
         });
         this.settings.fromStorage = false;
         if (this.storage.enabled == true) {
-            const settings = Storage__WEBPACK_IMPORTED_MODULE_24__["StorageHelper"].getSettings();
+            const settings = Storage__WEBPACK_IMPORTED_MODULE_25__["StorageHelper"].getSettings();
             if (settings != null) {
                 this.settings.darkMode = settings.darkMode;
                 this.settings.serverID = settings.serverID;
@@ -71899,12 +72666,12 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 this.settings.fromStorage = true;
                 this.connect();
             }
-            const loggerMeta = Storage__WEBPACK_IMPORTED_MODULE_24__["StorageHelper"].getLoggers();
+            const loggerMeta = Storage__WEBPACK_IMPORTED_MODULE_25__["StorageHelper"].getLoggers();
             if (loggerMeta != null) {
-                const existingLoggers = tcore__WEBPACK_IMPORTED_MODULE_21__["Logger"].getLoggerNames();
+                const existingLoggers = tcore__WEBPACK_IMPORTED_MODULE_22__["Logger"].getLoggerNames();
                 for (const meta of loggerMeta) {
                     if (existingLoggers.indexOf(meta.name) > -1) {
-                        tcore__WEBPACK_IMPORTED_MODULE_21__["Logger"].getLogger(meta.name).setLevel(meta.level);
+                        tcore__WEBPACK_IMPORTED_MODULE_22__["Logger"].getLogger(meta.name).setLevel(meta.level);
                         console.log(`Loaded logger ${meta.name} to ${meta.level}`);
                     }
                     else {
@@ -71931,7 +72698,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 this.coreObject.disconnect();
                 this.coreObject = null;
             }
-            this.coreObject = new tcore__WEBPACK_IMPORTED_MODULE_21___default.a(this.settings.serviceToken, this.settings.serverID);
+            this.coreObject = new tcore__WEBPACK_IMPORTED_MODULE_22___default.a(this.settings.serviceToken, this.settings.serverID);
             this.coreObject.connect().ok(() => {
                 this.view = "realtime";
             });
@@ -71985,26 +72752,30 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             if (input.files.length == 0) {
                 return console.warn(`Cannot import data, no file selected`);
             }
-            tcore__WEBPACK_IMPORTED_MODULE_21__["Playback"].setCore(this.core);
+            tcore__WEBPACK_IMPORTED_MODULE_22__["Playback"].setCore(this.core);
+            log.info(`loading ${input.files.length} files`);
             for (let i = 0; i < input.files.length; ++i) {
                 const file = input.files[i];
-                tcore__WEBPACK_IMPORTED_MODULE_21__["Playback"].loadFile(file).ok(() => {
-                    tcore__WEBPACK_IMPORTED_MODULE_21__["Playback"].start({ speed: 0.0 });
+                tcore__WEBPACK_IMPORTED_MODULE_22__["Playback"].loadFile(file).then(() => {
+                    log.debug(`Playing back ${file.name}`);
+                    tcore__WEBPACK_IMPORTED_MODULE_22__["Playback"].start({ speed: 0.0 });
                 });
             }
         },
         exportData: function () {
+            log.debug(`Including ${tcore__WEBPACK_IMPORTED_MODULE_22__["CharacterAPI"].getCache().length} cached characters in export`);
             const json = {
                 version: "1",
                 events: this.core.rawData,
                 players: this.core.characters,
-                outfits: this.core.outfits
+                outfits: this.core.outfits,
+                characters: tcore__WEBPACK_IMPORTED_MODULE_22__["CharacterAPI"].getCache()
             };
             const file = new File([JSON.stringify(json)], "data.json", { type: "text/json" });
             _node_modules_file_saver_dist_FileSaver_js__WEBPACK_IMPORTED_MODULE_9__["saveAs"](file);
         },
         exportOpsReport: function () {
-            this.generateOutfitReport().ok(() => {
+            this.generateOutfitReport().then(() => {
                 const json = JSON.stringify(this.outfitReport, null, 2);
                 const file = new File([json], "report.json", { type: "text/json" });
                 _node_modules_file_saver_dist_FileSaver_js__WEBPACK_IMPORTED_MODULE_9__["saveAs"](file);
@@ -72020,27 +72791,31 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 darkMode: this.settings.darkMode,
                 debug: this.settings.debug
             };
-            Storage__WEBPACK_IMPORTED_MODULE_24__["StorageHelper"].setSettings(settings);
+            Storage__WEBPACK_IMPORTED_MODULE_25__["StorageHelper"].setSettings(settings);
             this.connect();
         },
         clearSettings: function () {
             if (this.storage.enabled == false) {
                 return;
             }
-            Storage__WEBPACK_IMPORTED_MODULE_24__["StorageHelper"].setSettings(null);
+            Storage__WEBPACK_IMPORTED_MODULE_25__["StorageHelper"].setSettings(null);
         },
         debugLoadfile: function (reportType) {
-            const response = new tcore__WEBPACK_IMPORTED_MODULE_21__["ApiResponse"](axios__WEBPACK_IMPORTED_MODULE_8___default.a.get(`/test-data/2020-12-12-T1DE.json`)).ok((data) => {
+            const response = new tcore__WEBPACK_IMPORTED_MODULE_22__["ApiResponse"](axios__WEBPACK_IMPORTED_MODULE_8___default.a.get(`/test-data/OW3-DPSO.json`)).ok((data) => {
                 const type = typeof (data);
-                tcore__WEBPACK_IMPORTED_MODULE_21__["Playback"].setCore(this.core);
+                tcore__WEBPACK_IMPORTED_MODULE_22__["Playback"].setCore(this.core);
                 if (type == "string") {
-                    tcore__WEBPACK_IMPORTED_MODULE_21__["Playback"].loadFile(data).ok(() => {
-                        tcore__WEBPACK_IMPORTED_MODULE_21__["Playback"].start({ speed: 0 });
+                    tcore__WEBPACK_IMPORTED_MODULE_22__["Playback"].loadFile(data).then(() => {
+                        tcore__WEBPACK_IMPORTED_MODULE_22__["Playback"].start({ speed: 0 });
+                        if (reportType != undefined) {
+                            this.parameters.report = reportType;
+                            this.generateReport();
+                        }
                     });
                 }
                 else if (type == "object") {
-                    tcore__WEBPACK_IMPORTED_MODULE_21__["Playback"].loadFile(JSON.stringify(data)).ok(() => {
-                        tcore__WEBPACK_IMPORTED_MODULE_21__["Playback"].start({ speed: 0 });
+                    tcore__WEBPACK_IMPORTED_MODULE_22__["Playback"].loadFile(JSON.stringify(data)).then(() => {
+                        tcore__WEBPACK_IMPORTED_MODULE_22__["Playback"].start({ speed: 0 });
                         if (reportType != undefined) {
                             this.parameters.report = reportType;
                             this.generateReport();
@@ -72076,7 +72851,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 if (char.stats.size() == 0) {
                     return;
                 }
-                const collection = new tcore__WEBPACK_IMPORTED_MODULE_21__["TrackedPlayer"]();
+                const collection = new tcore__WEBPACK_IMPORTED_MODULE_22__["TrackedPlayer"]();
                 collection.name = char.name;
                 collection.outfitTag = char.outfitTag;
                 collection.characterID = char.characterID;
@@ -72088,7 +72863,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 }
                 let containsType = false;
                 char.stats.getMap().forEach((value, key) => {
-                    const psEvent = tcore__WEBPACK_IMPORTED_MODULE_21__["PsEvents"].get(key) || tcore__WEBPACK_IMPORTED_MODULE_21__["PsEvent"].default;
+                    const psEvent = tcore__WEBPACK_IMPORTED_MODULE_22__["PsEvents"].get(key) || tcore__WEBPACK_IMPORTED_MODULE_22__["PsEvent"].default;
                     // Is this stat one of the ones being displayed?
                     if (psEvent.types.indexOf(this.settings.eventType) > -1) {
                         //console.log(`Needed ${this.settings.eventType} to display ${char.name}, found from ${key}`);
@@ -72132,27 +72907,27 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             if (this.view != "killfeed") {
                 return;
             }
-            const whatHovered = addons_SquadAddon__WEBPACK_IMPORTED_MODULE_23__["SquadAddon"].getHovered();
-            if (whatHovered == "squad" && addons_SquadAddon__WEBPACK_IMPORTED_MODULE_23__["SquadAddon"].selectedSquadName != null) {
+            const whatHovered = addons_SquadAddon__WEBPACK_IMPORTED_MODULE_24__["SquadAddon"].getHovered();
+            if (whatHovered == "squad" && addons_SquadAddon__WEBPACK_IMPORTED_MODULE_24__["SquadAddon"].selectedSquadName != null) {
                 const squad = this.core.getSquad(ev.key);
                 if (squad == null) {
                     console.log(`Squad ${ev.key} does not exist`);
                     return;
                 }
-                const selectedSquad = this.core.getSquad(addons_SquadAddon__WEBPACK_IMPORTED_MODULE_23__["SquadAddon"].selectedSquadName);
+                const selectedSquad = this.core.getSquad(addons_SquadAddon__WEBPACK_IMPORTED_MODULE_24__["SquadAddon"].selectedSquadName);
                 if (selectedSquad == null) {
-                    console.warn(`Failed to find squad ${addons_SquadAddon__WEBPACK_IMPORTED_MODULE_23__["SquadAddon"].selectedSquadName}`);
+                    console.warn(`Failed to find squad ${addons_SquadAddon__WEBPACK_IMPORTED_MODULE_24__["SquadAddon"].selectedSquadName}`);
                     return;
                 }
                 this.core.mergeSquads(squad, selectedSquad);
                 this.updateDisplay();
             }
-            else if (whatHovered == "member" && addons_SquadAddon__WEBPACK_IMPORTED_MODULE_23__["SquadAddon"].selectedMemberID != null) {
+            else if (whatHovered == "member" && addons_SquadAddon__WEBPACK_IMPORTED_MODULE_24__["SquadAddon"].selectedMemberID != null) {
                 if (ev.key == "Delete") {
-                    this.core.removeMemberFromSquad(addons_SquadAddon__WEBPACK_IMPORTED_MODULE_23__["SquadAddon"].selectedMemberID);
+                    this.core.removeMemberFromSquad(addons_SquadAddon__WEBPACK_IMPORTED_MODULE_24__["SquadAddon"].selectedMemberID);
                 }
                 else {
-                    this.core.addMemberToSquad(addons_SquadAddon__WEBPACK_IMPORTED_MODULE_23__["SquadAddon"].selectedMemberID, ev.key);
+                    this.core.addMemberToSquad(addons_SquadAddon__WEBPACK_IMPORTED_MODULE_24__["SquadAddon"].selectedMemberID, ev.key);
                 }
                 this.updateDisplay();
             }
@@ -72160,256 +72935,253 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             }
         },
         generateReport: function () {
-            if (this.parameters.report == "ops") {
-                this.generateOutfitReport().ok(() => {
+            return __awaiter(this, void 0, void 0, function* () {
+                if (this.parameters.report == "ops") {
+                    yield this.generateOutfitReport();
                     jquery__WEBPACK_IMPORTED_MODULE_6__("#report-modal").modal("hide");
                     this.parameters.report = "";
                     console.log(`Report generated`);
-                });
-            }
-            else if (this.parameters.report == "winter") {
-                this.generateWinterReport();
-                jquery__WEBPACK_IMPORTED_MODULE_6__("#report-modal").modal("hide");
-                this.parameters.report = "";
-            }
-            else if (this.parameters.report == "personal") {
-                this.generateAllReports();
-                jquery__WEBPACK_IMPORTED_MODULE_6__("#report-modal").modal("hide");
-                this.parameters.report = "";
-            }
-            else if (this.parameters.report == "battle") {
-                this.generateBattleReport();
-                jquery__WEBPACK_IMPORTED_MODULE_6__("#report-modal").modal("hide");
-                this.parameters.report = "";
-            }
+                }
+                else if (this.parameters.report == "winter") {
+                    this.generateWinterReport();
+                    jquery__WEBPACK_IMPORTED_MODULE_6__("#report-modal").modal("hide");
+                    this.parameters.report = "";
+                }
+                else if (this.parameters.report == "personal") {
+                    this.generateAllReports();
+                    jquery__WEBPACK_IMPORTED_MODULE_6__("#report-modal").modal("hide");
+                    this.parameters.report = "";
+                }
+                else if (this.parameters.report == "battle") {
+                    this.generateBattleReport();
+                }
+                else if (this.parameters.report == "deso") {
+                    this.generateDesoReport().then(() => {
+                        jquery__WEBPACK_IMPORTED_MODULE_6__("#report-modal").modal("hide");
+                        this.parameters.report = "";
+                    });
+                }
+            });
         },
         generateOutfitReport: function () {
-            const response = new tcore__WEBPACK_IMPORTED_MODULE_21__["ApiResponse"]();
-            let events = [];
-            this.core.stats.forEach((player, charID) => {
-                events.push(...player.events);
-            });
-            events.push(...this.core.miscEvents);
-            events = events.sort((a, b) => a.timestamp - b.timestamp);
-            let players = this.core.stats;
-            if (this.parameters.squadForReport != null) {
-                const squad = this.core.getSquadByID(this.parameters.squadForReport);
-                log.info(`Building outfit report with squad ID ${this.parameters.squadForReport}`);
-                if (squad == null) {
-                    log.error(`Failed to find squad ID ${this.parameters.squadForReport}`);
-                }
-                else {
-                    log.debug(`Found squad ${squad.name}/#${squad.ID}. Members: ${squad.members.map(i => i.name).join(", ")}`);
-                    players = new Map();
-                    for (const player of squad.members) {
-                        const entry = this.core.stats.get(player.charID);
-                        if (entry == undefined) {
-                            log.warn(`Failed to find char ${player.name}/${player.charID} in squad ${squad.name}/${squad.ID}`);
-                        }
-                        else {
-                            players.set(player.charID, entry);
+            return __awaiter(this, void 0, void 0, function* () {
+                let events = [];
+                this.core.stats.forEach((player, charID) => {
+                    events.push(...player.events);
+                });
+                events.push(...this.core.miscEvents);
+                events = events.sort((a, b) => a.timestamp - b.timestamp);
+                let players = this.core.stats;
+                if (this.parameters.squadForReport != null) {
+                    const squad = this.core.getSquadByID(this.parameters.squadForReport);
+                    log.info(`Building outfit report with squad ID ${this.parameters.squadForReport}`);
+                    if (squad == null) {
+                        log.error(`Failed to find squad ID ${this.parameters.squadForReport}`);
+                    }
+                    else {
+                        log.debug(`Found squad ${squad.name}/#${squad.ID}. Members: ${squad.members.map(i => i.name).join(", ")}`);
+                        players = new Map();
+                        for (const player of squad.members) {
+                            const entry = this.core.stats.get(player.charID);
+                            if (entry == undefined) {
+                                log.warn(`Failed to find char ${player.name}/${player.charID} in squad ${squad.name}/${squad.ID}`);
+                            }
+                            else {
+                                players.set(player.charID, entry);
+                            }
                         }
                     }
                 }
-            }
-            const outfitResponse = tcore__WEBPACK_IMPORTED_MODULE_21__["OutfitReportGenerator"].generate({
-                settings: {
-                    zoneID: null,
-                    showSquadStats: this.opsReportSettings.showSquadStats
-                },
-                captures: this.core.captures,
-                playerCaptures: this.core.playerCaptures,
-                players: players,
-                outfits: this.core.outfits.map(iter => iter.ID),
-                events: events,
-                tracking: this.core.tracking,
-                squads: {
-                    perm: this.core.squad.perm,
-                    guesses: this.core.squad.guesses
-                }
-            });
-            this.outfitReportResponse = outfitResponse;
-            console.log(`Have ${this.outfitReportResponse.getSteps().length} steps to complete`);
-            outfitResponse.ok((data) => {
-                this.outfitReport = data;
+                const outfitReport = yield tcore__WEBPACK_IMPORTED_MODULE_22__["OutfitReportGenerator"].generate({
+                    settings: {
+                        zoneID: null,
+                        showSquadStats: this.opsReportSettings.showSquadStats
+                    },
+                    captures: this.core.captures,
+                    playerCaptures: this.core.playerCaptures,
+                    players: players,
+                    outfits: this.core.outfits.map(iter => iter.ID),
+                    events: events,
+                    tracking: this.core.tracking,
+                    squads: {
+                        perm: this.core.squad.perm,
+                        guesses: this.core.squad.guesses
+                    }
+                }, (ev) => {
+                    if (ev.type == "steps") {
+                        log.info(`Steps: ${ev.steps.join(", ")}`);
+                        this.outfit.steps = ev.steps.map(iter => {
+                            return {
+                                name: iter,
+                                state: "pending"
+                            };
+                        });
+                    }
+                    else if (ev.type == "update") {
+                        const step = this.outfit.steps.find(iter => iter.name == ev.step);
+                        if (step) {
+                            if (ev.state == "started") {
+                                step.state = "In progress";
+                            }
+                            else if (ev.state == "done") {
+                                step.state = "Done";
+                            }
+                            else if (ev.state == "errored") {
+                                step.state = "Errored!";
+                            }
+                        }
+                    }
+                });
+                this.outfitReport = outfitReport;
                 this.view = "ops";
-                response.resolveOk();
-                this.outfitReportResponse = null;
             });
-            return response;
         },
         generateBattleReport: function () {
-            const params = new tcore__WEBPACK_IMPORTED_MODULE_21__["FightReportParameters"]();
-            this.core.stats.forEach((player, charID) => {
-                if (player.events.length == 0) {
-                    return;
-                }
-                params.events.push(...player.events);
-            });
-            params.events.push(...this.core.miscEvents);
-            params.events.push(...this.core.playerCaptures);
-            params.events = params.events.sort((a, b) => a.timestamp - b.timestamp);
-            params.players = this.core.stats;
-            tcore__WEBPACK_IMPORTED_MODULE_21__["FightReportGenerator"].generate(params).ok((data) => {
-                this.battleReport = data;
+            return __awaiter(this, void 0, void 0, function* () {
+                const params = new tcore__WEBPACK_IMPORTED_MODULE_22__["FightReportParameters"]();
+                this.core.stats.forEach((player, charID) => {
+                    if (player.events.length == 0) {
+                        return;
+                    }
+                    params.events.push(...player.events);
+                });
+                params.events.push(...this.core.miscEvents);
+                params.events.push(...this.core.playerCaptures);
+                params.events = params.events.sort((a, b) => a.timestamp - b.timestamp);
+                params.players = this.core.stats;
+                this.battleReport = yield tcore__WEBPACK_IMPORTED_MODULE_22__["FightReportGenerator"].generate(params);
                 this.view = "battle";
             });
         },
         generateWinterReport: function () {
-            const playerNames = this.winter.ignoredPlayers.split(" ")
-                .map(iter => iter.toLowerCase());
-            if (this.parameters.squadForReport != null) {
-                const squad = this.core.getSquadByID(this.parameters.squadForReport);
-                if (squad == null) {
-                    log.warn(`Failed to find squad #${this.parameters.squadForReport}`);
-                }
-                else {
-                    for (const player of Array.from(this.core.stats.values())) {
-                        const playerSquad = this.core.getSquadOfMember(player.characterID);
-                        if (playerSquad == null || playerSquad.ID != squad.ID) {
-                            playerNames.push(player.name.toLowerCase());
+            return __awaiter(this, void 0, void 0, function* () {
+                const playerNames = this.winter.ignoredPlayers.split(" ")
+                    .map(iter => iter.toLowerCase());
+                if (this.parameters.squadForReport != null) {
+                    const squad = this.core.getSquadByID(this.parameters.squadForReport);
+                    if (squad == null) {
+                        log.warn(`Failed to find squad #${this.parameters.squadForReport}`);
+                    }
+                    else {
+                        for (const player of Array.from(this.core.stats.values())) {
+                            const playerSquad = this.core.getSquadOfMember(player.characterID);
+                            if (playerSquad == null || playerSquad.ID != squad.ID) {
+                                playerNames.push(player.name.toLowerCase());
+                            }
                         }
                     }
                 }
-            }
-            const players = Array.from(this.core.stats.values())
-                .filter(iter => playerNames.indexOf(iter.name.toLowerCase()) == -1);
-            console.log(`Making a winter report with: ${players.map(iter => iter.name).join(", ")}`);
-            const params = new tcore__WEBPACK_IMPORTED_MODULE_21__["WinterReportParameters"]();
-            params.players = players;
-            params.timeTracking = this.core.tracking;
-            params.settings = this.winter.settings;
-            this.core.stats.forEach((player, charID) => {
-                if (player.events.length == 0) {
-                    return;
-                }
-                if (playerNames.indexOf(player.name.toLowerCase()) != -1) {
-                    return;
-                }
-                params.events.push(...player.events);
-            });
-            this.winter.report = Loadable__WEBPACK_IMPORTED_MODULE_4__["Loadable"].loading();
-            tcore__WEBPACK_IMPORTED_MODULE_21__["WinterReportGenerator"].generate(params).ok((data) => {
-                this.winter.report = Loadable__WEBPACK_IMPORTED_MODULE_4__["Loadable"].loaded(data);
+                const players = Array.from(this.core.stats.values())
+                    .filter(iter => playerNames.indexOf(iter.name.toLowerCase()) == -1);
+                console.log(`Making a winter report with: ${players.map(iter => iter.name).join(", ")}`);
+                const params = new tcore__WEBPACK_IMPORTED_MODULE_22__["WinterReportParameters"]();
+                params.players = players;
+                params.timeTracking = this.core.tracking;
+                params.settings = this.winter.settings;
+                this.core.stats.forEach((player, charID) => {
+                    if (player.events.length == 0) {
+                        return;
+                    }
+                    if (playerNames.indexOf(player.name.toLowerCase()) != -1) {
+                        return;
+                    }
+                    params.events.push(...player.events);
+                });
+                this.winter.report = Loadable__WEBPACK_IMPORTED_MODULE_4__["Loadable"].loading();
+                this.winter.report = Loadable__WEBPACK_IMPORTED_MODULE_4__["Loadable"].loaded(yield tcore__WEBPACK_IMPORTED_MODULE_22__["WinterReportGenerator"].generate(params));
                 this.view = "winter";
             });
         },
-        generatePersonalReport: function (charID) {
-            let opsLeft = 2;
-            let html = "";
-            let report = new tcore__WEBPACK_IMPORTED_MODULE_21__["Report"]();
-            const personalTemplate = PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_22__["PersonalReportGenerator"].getTemplate().ok((type) => {
-                html = type;
-                if (--opsLeft == 0) {
-                    done();
-                }
-                else {
-                    console.log(`Template loaded, waiting on player report`);
-                }
-            }).always(() => {
-                console.log(`Report return ${personalTemplate.status}`);
-            });
-            this.generatePlayerReport(charID).ok((data) => {
-                report = data;
-                console.log(`Made report`, report);
-                if (--opsLeft == 0) {
-                    done();
-                }
-                else {
-                    console.log(`Report loaded, waiting on template`);
-                }
-            });
-            const done = () => {
-                var _a;
-                const str = PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_22__["PersonalReportGenerator"].generate(html, report);
-                console.log(`Saving report for ${charID}`);
-                _node_modules_file_saver_dist_FileSaver_js__WEBPACK_IMPORTED_MODULE_9__["saveAs"](new File([str], `topt-${(_a = report.player) === null || _a === void 0 ? void 0 : _a.name}.html`, { type: "text/html" }));
-            };
-        },
-        generatePlayerReport: function (charID) {
-            const response = new tcore__WEBPACK_IMPORTED_MODULE_21__["ApiResponse"]();
-            const player = this.core.stats.get(charID);
-            if (player == undefined) {
-                response.resolve({ code: 404, data: `` });
-            }
-            else {
-                const events = [...player.events];
-                this.core.stats.forEach((player, _) => {
-                    if (charID == player.characterID) { // Don't add the characters's events twice
+        generateDesoReport: function () {
+            return __awaiter(this, void 0, void 0, function* () {
+                const params = new tcore__WEBPACK_IMPORTED_MODULE_22__["DesoReportParameters"]();
+                this.core.stats.forEach((player, charID) => {
+                    if (player.events.length == 0) {
                         return;
                     }
-                    events.push(...player.events);
+                    params.events.push(...player.events);
                 });
-                events.push(...this.core.miscEvents);
-                events.sort((a, b) => a.timestamp - b.timestamp);
-                const parameters = {
-                    player: player,
-                    events: events,
-                    tracking: Object.assign({}, this.core.tracking),
-                    routers: [...this.core.routerTracking.routers]
-                };
-                tcore__WEBPACK_IMPORTED_MODULE_21__["IndividualReporter"].generatePersonalReport(parameters).ok(data => {
-                    response.resolveOk(data);
-                });
-            }
-            return response;
-        },
-        generateAllReports: function () {
-            let left = [];
-            this.core.stats.forEach((player, charID) => {
-                if (player.events.length > 0) {
-                    left.push(player);
-                }
+                params.events.push(...this.core.miscEvents);
+                params.npcs = [...this.core.npcs.all];
+                params.players = [...Array.from(this.core.stats.values())];
+                params.tracking = this.core.tracking;
+                this.deso.report = Loadable__WEBPACK_IMPORTED_MODULE_4__["Loadable"].loading();
+                this.deso.report = Loadable__WEBPACK_IMPORTED_MODULE_4__["Loadable"].loaded(yield tcore__WEBPACK_IMPORTED_MODULE_22__["DesoReportGenerator"].generate(params));
+                this.view = "deso";
             });
-            let reports = [];
-            let html = "";
-            let opsLeft = 2;
-            this.generation.names = left.map(iter => iter.name);
-            this.generation.state = left.map(iter => "Pending");
-            jquery__WEBPACK_IMPORTED_MODULE_6__("#generation-modal").modal("show");
-            const generateReport = () => {
-                if (left.length == 0) {
-                    if (--opsLeft == 0) {
-                        console.log(`opsLeft is 0, performing done`);
-                        done();
-                    }
-                    console.log(`No reports left`);
+        },
+        generatePersonalReport: function (charID) {
+            var _a;
+            return __awaiter(this, void 0, void 0, function* () {
+                let html = yield PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_23__["PersonalReportGenerator"].getTemplate();
+                let report = yield this.generatePlayerReport(charID);
+                if (report == null) {
                     return;
                 }
-                const char = left.shift();
-                console.log(`Generating report for ${char.name}: Have ${left.length} left`);
-                const index = this.generation.names.findIndex(iter => iter == char.name);
-                this.generation.state[index] = "Generating...";
-                try {
-                    this.generatePlayerReport(char.characterID).ok((report) => {
-                        if (report.player == null) {
-                            console.warn(`Missing player for report ${char.characterID}`);
+                const str = PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_23__["PersonalReportGenerator"].generate(html, report);
+                console.log(`Saving report for ${charID}`);
+                _node_modules_file_saver_dist_FileSaver_js__WEBPACK_IMPORTED_MODULE_9__["saveAs"](new File([str], `topt-${(_a = report.player) === null || _a === void 0 ? void 0 : _a.name}.html`, { type: "text/html" }));
+            });
+        },
+        generatePlayerReport: function (charID) {
+            return __awaiter(this, void 0, void 0, function* () {
+                const player = this.core.stats.get(charID);
+                if (player == undefined) {
+                    return null;
+                }
+                else {
+                    const events = [...player.events];
+                    this.core.stats.forEach((player, _) => {
+                        if (charID == player.characterID) { // Don't add the characters's events twice
+                            return;
                         }
-                        reports.push(report);
-                        this.generation.state[index] = "Done";
-                        generateReport();
-                    }).always(() => {
-                        console.log(`Finished ${char.name} generation`);
+                        events.push(...player.events);
                     });
-                }
-                catch (_a) {
-                    this.generation.state[index] = "Error";
-                    generateReport();
-                }
-            };
-            PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_22__["PersonalReportGenerator"].getTemplate().ok((type) => {
-                html = type;
-                if (--opsLeft == 0) {
-                    done();
+                    events.push(...this.core.miscEvents);
+                    events.sort((a, b) => a.timestamp - b.timestamp);
+                    const parameters = {
+                        player: player,
+                        events: events,
+                        tracking: Object.assign({}, this.core.tracking),
+                        routers: [...this.core.npcs.all.filter(iter => iter.type == "router")]
+                    };
+                    return tcore__WEBPACK_IMPORTED_MODULE_22__["IndividualReporter"].generatePersonalReport(parameters);
                 }
             });
-            const done = () => {
-                var _a, _b;
+        },
+        generateAllReports: function () {
+            var _a, _b;
+            return __awaiter(this, void 0, void 0, function* () {
+                let left = [];
+                this.core.stats.forEach((player, charID) => {
+                    if (player.events.length > 0) {
+                        left.push(player);
+                    }
+                });
+                let reports = [];
+                const html = yield PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_23__["PersonalReportGenerator"].getTemplate();
+                this.generation.names = left.map(iter => iter.name);
+                this.generation.state = left.map(iter => "Pending");
+                jquery__WEBPACK_IMPORTED_MODULE_6__("#generation-modal").modal("show");
+                for (const char of left) {
+                    const index = this.generation.names.findIndex(iter => iter == char.name);
+                    this.generation.state[index] = "Generating...";
+                    try {
+                        const report = yield this.generatePlayerReport(char.characterID);
+                        if (report != null) {
+                            reports.push(report);
+                        }
+                        this.generation.state[index] = "Done";
+                    }
+                    catch (_c) {
+                        this.generation.state[index] = "Error";
+                    }
+                }
                 jquery__WEBPACK_IMPORTED_MODULE_6__("#generation-modal").modal("hide");
                 const zip = new jszip__WEBPACK_IMPORTED_MODULE_7__();
                 const timestamp = moment__WEBPACK_IMPORTED_MODULE_5__(new Date()).format("YYYY-MM-DD");
                 for (const report of reports) {
-                    const str = PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_22__["PersonalReportGenerator"].generate(html, report);
+                    const str = PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_23__["PersonalReportGenerator"].generate(html, report);
                     zip.file(`topt_report_${(_a = report.player) === null || _a === void 0 ? void 0 : _a.name}_${timestamp}.html`, str);
                     console.log(`Added ${(_b = report.player) === null || _b === void 0 ? void 0 : _b.name} to zip file`);
                 }
@@ -72421,8 +73193,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                     _node_modules_file_saver_dist_FileSaver_js__WEBPACK_IMPORTED_MODULE_9__["saveAs"](content, `topt_ops_${timestamp}_all.zip`);
                     console.log(`FileSaver performed save of zip`);
                 });
-            };
-            generateReport();
+            });
         },
         removeMostRecentPermSquad: function () {
             if (this.core.squad.perm.length == 1) {
@@ -72450,15 +73221,15 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             }
         },
         addOutfit: function () {
-            if (this.parameters.outfitTag.trim().length == 0) {
-                return;
-            }
-            if (["fooi", "fiji", "g0bs"].indexOf(this.parameters.outfitTag.toLowerCase()) > -1) {
-                this.showFrog = true;
-            }
-            this.loadingOutfit = true;
-            this.core.addOutfit(this.parameters.outfitTag).ok(() => {
-                console.log(`Loaded ${this.parameters.outfitTag}`);
+            return __awaiter(this, void 0, void 0, function* () {
+                if (this.parameters.outfitTag.trim().length == 0) {
+                    return;
+                }
+                if (["fooi", "fiji", "g0bs"].indexOf(this.parameters.outfitTag.toLowerCase()) > -1) {
+                    this.showFrog = true;
+                }
+                this.loadingOutfit = true;
+                yield this.core.addOutfit(this.parameters.outfitTag);
                 this.loadingOutfit = false;
                 this.parameters.outfitTag = "";
             });
@@ -72470,7 +73241,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             this.core.addPlayer(this.parameters.playerName);
         },
         updateLoggers: function () {
-            const loggers = tcore__WEBPACK_IMPORTED_MODULE_21__["Logger"].getLoggerNames();
+            const loggers = tcore__WEBPACK_IMPORTED_MODULE_22__["Logger"].getLoggerNames();
             const levelLookup = new Map([
                 [0, "TRACE"],
                 [1, "DEBUG"],
@@ -72481,21 +73252,21 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             ]);
             this.loggers = [];
             for (const loggerName of loggers) {
-                const logger = tcore__WEBPACK_IMPORTED_MODULE_21__["Logger"].getLogger(loggerName);
+                const logger = tcore__WEBPACK_IMPORTED_MODULE_22__["Logger"].getLogger(loggerName);
                 this.loggers.push({
                     name: loggerName,
                     level: levelLookup.get(logger.getLevel())
                 });
             }
             this.loggers.sort((a, b) => a.name.localeCompare(b.name));
-            Storage__WEBPACK_IMPORTED_MODULE_24__["StorageHelper"].setLoggers(this.loggers);
+            Storage__WEBPACK_IMPORTED_MODULE_25__["StorageHelper"].setLoggers(this.loggers);
         },
         openLoggerModal: function () {
             this.updateLoggers();
             jquery__WEBPACK_IMPORTED_MODULE_6__("#logger-modal").modal("show");
         },
         updateLogger: function (name, mod) {
-            const logger = tcore__WEBPACK_IMPORTED_MODULE_21__["Logger"].getLogger(name);
+            const logger = tcore__WEBPACK_IMPORTED_MODULE_22__["Logger"].getLogger(name);
             mod(logger);
             this.updateLoggers();
         },
@@ -72510,7 +73281,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             }
         },
         exportWeaponData: function () {
-            const weapons = tcore__WEBPACK_IMPORTED_MODULE_21__["WeaponAPI"].getEntires();
+            const weapons = tcore__WEBPACK_IMPORTED_MODULE_22__["WeaponAPI"].getEntires();
             const lines = weapons.map((iter) => {
                 return {
                     item_id: iter.ID,
