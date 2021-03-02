@@ -1,6 +1,7 @@
 import { Report } from "tcore";
 import { ApiResponse } from "tcore";
 import * as axios from "axios";
+import { ResponseContent } from "../../topt-core/build/core/index";
 
 /**
  * Helper class for generating personal reports
@@ -25,12 +26,17 @@ export class PersonalReportGenerator {
     /**
      * Get an ApiResponse that will contain the HTML template when resolved OK
      */
-    public static getTemplate(): ApiResponse<string> {
-        const page: ApiResponse<string> = new ApiResponse(
+    public static async getTemplate(): Promise<string> {
+        const page: ResponseContent<string> = await new ApiResponse(
             axios.default.get(`./personal/index.html?q=${new Date().getTime()}`),
             (iter: any) => iter as string
-        );
-        return page;
+        ).promise();
+
+        if (page.code == 200) {
+            return page.data;
+        } else {
+            throw ``;
+        }
     }
 
 }
