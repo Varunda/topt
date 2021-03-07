@@ -945,15 +945,19 @@ Core_1.Core.prototype.processMessage = function (input, override = false) {
                 const npcID = Number.parseInt(targetID);
                 if (type == "router") {
                     const npcs = Array.from(self.npcs.active.values());
+                    /*
                     for (const npc of npcs) {
                         if (npc.ownerID == charID && npc.ID != targetID) {
                             log.debug(`Router replaced, adding to destroyed`);
+
                             npc.destroyedAt = timestamp;
                             npc.destroyedByID = charID;
+
                             self.npcs.all.push(npc);
                             self.npcs.active.delete(npc.ID);
                         }
                     }
+                    */
                 }
                 if (self.npcs.active.has(targetID) == false) {
                     const npc = {
@@ -1207,6 +1211,21 @@ Core_1.Core.prototype.processMessage = function (input, override = false) {
             const charID = msg.payload.character_id;
             if (itemID == "6003551") {
                 if (self.stats.get(charID) != undefined) {
+                    /*
+                    const npcs: TrackedNpc[] = Array.from(self.npcs.active.values());
+
+                    for (const npc of npcs) {
+                        if (npc.ownerID == charID && npc.type == "router") {
+                            log.debug(`Router replaced, adding to destroyed`);
+
+                            npc.destroyedAt = timestamp;
+                            npc.destroyedByID = charID;
+
+                            self.npcs.all.push(npc);
+                            self.npcs.active.delete(npc.ID);
+                        }
+                    }
+                    */
                     /* Turned off cause it's not actually that useful and making tracking harder
                     //log.debug(`${charID} pulled a new router`);
 
@@ -3556,7 +3575,7 @@ class IndividualReporter {
                 score.score += event.amount;
                 score.amount += 1;
                 if (exp == PsEvent_1.PsEvent.other) {
-                    //log.log(`Other: ${JSON.stringify(event)}`);
+                    log.log(`Other: ${JSON.stringify(event)}`);
                 }
             }
         }
@@ -7452,8 +7471,6 @@ class DesoReportGenerator {
     }
     static getSpawnTypeBreakdown(parameters) {
         const arr = new EventReporter_1.BreakdownArray();
-        const gal = new EventReporter_1.Breakdown();
-        gal.display = "Galaxy spawns";
         const sundy = new EventReporter_1.Breakdown();
         sundy.display = "Sunderer spawns";
         const router = new EventReporter_1.Breakdown();
@@ -7475,15 +7492,12 @@ class DesoReportGenerator {
             else if (ev.expID == PsEvent_1.PsEvent.sundySpawn) {
                 ++sundy.amount;
             }
-            else if (ev.expID == PsEvent_1.PsEvent.galaxySpawn) {
-                ++gal.amount;
-            }
             else if (ev.expID == "355") {
                 ++squad.amount;
             }
         }
-        arr.total = gal.amount + sundy.amount + router.amount + beacon.amount + squad.amount;
-        arr.data.push(gal, sundy, router, beacon, squad);
+        arr.total = sundy.amount + router.amount + beacon.amount + squad.amount;
+        arr.data.push(sundy, router, beacon, squad);
         return arr;
     }
 }
@@ -8498,8 +8512,9 @@ class OutfitReportGenerator {
             endStep("Teamkills");
             report.continentKillBreakdown = EventReporter_1.default.continentKills(report.events);
             report.continentDeathBreakdown = EventReporter_1.default.continentDeaths(report.events);
+            report.factionKillBreakdown = EventReporter_1.default.factionKills(report.events);
+            report.factionDeathBreakdown = EventReporter_1.default.factionDeaths(report.events);
             startStep("Weapon deaths");
-            report.weaponKillBreakdown = yield EventReporter_1.default.weaponDeaths(report.events);
             report.weaponTypeDeathBreakdown = yield EventReporter_1.default.weaponDeathBreakdown(report.events);
             endStep("Weapon deaths");
             startStep("Deaths");
@@ -73326,9 +73341,9 @@ window.vm = vm;
 /***/ }),
 
 /***/ 0:
-/*!*****************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
-  !*** multi ./src/addons/SquadAddon.ts ./src/app/App.ts ./src/app/AppRealtime.ts ./src/BreakdownBar.ts ./src/BreakdownBox.ts ./src/BreakdownChart.ts ./src/BreakdownInterval.ts ./src/BreakdownList.ts ./src/ColorHelper.ts ./src/FightReportTop.ts ./src/index.ts ./src/KillfeedSquad.ts ./src/Loadable.ts ./src/LoggerMetadata.ts ./src/MomentFilter.ts ./src/OutfitTrends.ts ./src/PersonalReportGenerator.ts ./src/Quartile.ts ./src/Storage.ts ***!
-  \*****************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+/*!*********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** multi ./src/addons/SquadAddon.ts ./src/app/App.ts ./src/app/AppRealtime.ts ./src/BreakdownBar.ts ./src/BreakdownBox.ts ./src/BreakdownChart.ts ./src/BreakdownInterval.ts ./src/BreakdownList.ts ./src/ColorHelper.ts ./src/FightReportTop.ts ./src/index.ts ./src/KillfeedSquad.ts ./src/Loadable.ts ./src/LoggerMetadata.ts ./src/MomentFilter.ts ./src/OutfitTrends.ts ./src/PersonalReportGenerator.ts ./src/Quartile.ts ./src/Storage.ts ./src/VehicleVersusEntry.ts ***!
+  \*********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -73350,7 +73365,8 @@ __webpack_require__(/*! ./src/MomentFilter.ts */"./src/MomentFilter.ts");
 __webpack_require__(/*! ./src/OutfitTrends.ts */"./src/OutfitTrends.ts");
 __webpack_require__(/*! ./src/PersonalReportGenerator.ts */"./src/PersonalReportGenerator.ts");
 __webpack_require__(/*! ./src/Quartile.ts */"./src/Quartile.ts");
-module.exports = __webpack_require__(/*! ./src/Storage.ts */"./src/Storage.ts");
+__webpack_require__(/*! ./src/Storage.ts */"./src/Storage.ts");
+module.exports = __webpack_require__(/*! ./src/VehicleVersusEntry.ts */"./src/VehicleVersusEntry.ts");
 
 
 /***/ })
