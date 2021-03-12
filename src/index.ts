@@ -134,6 +134,14 @@ export const vm = new Vue({
             zoneID: "" as string,
             serverID: "" as string,
 
+            warnings: {
+                badZone: false as boolean,
+            },
+
+            vs_rate: 0 as number,
+            nc_rate: 0 as number,
+            tr_rate: 0 as number,
+
             N_WG: RELIC_N_WG_ID,
             SE_WG: RELIC_SE_WG_ID,
             SW_WG: RELIC_SW_WG_ID,
@@ -410,6 +418,14 @@ export const vm = new Vue({
             }
             const regions: Region[] = await MapAPI.getMap(this.relic.serverID, this.relic.zoneID);
 
+            if (regions.length == 0) {
+                this.relic.warnings.badZone = true;
+                //log.warn(`Failed to get regions, is zone ID and server ID correct?`);
+                return;
+            }
+
+            this.relic.warnings.badZone = false;
+
             for (const map of regions) {
                 if (this.relic.regions.has(map.regionID)) {
                     const region: Relic = this.relic.regions.get(map.regionID)!;
@@ -427,6 +443,29 @@ export const vm = new Vue({
                     }
                 }
             }
+
+            // Don't count warpgates
+            this.relic.vs_rate = 0;
+            this.relic.nc_rate = 0;
+            this.relic.tr_rate = 0;
+
+            this.relic.regions.forEach((relic: Relic, regionID: string) => {
+                if (relic.cutoff == true) {
+                    return;
+                }
+
+                if (relic.adjacent.length = 0) {
+                    return;
+                }
+
+                if (relic.faction == "VS") {
+                    this.relic.vs_rate += 6;
+                } else if (relic.faction == "NC") {
+                    this.relic.nc_rate += 6;
+                } else if (relic.faction == "TR") {
+                    this.relic.tr_rate += 6;
+                }
+            });
 
             this.$forceUpdate();
             for (const child of this.$children) {

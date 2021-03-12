@@ -72750,6 +72750,12 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             connected: true,
             zoneID: "",
             serverID: "",
+            warnings: {
+                badZone: false,
+            },
+            vs_rate: 0,
+            nc_rate: 0,
+            tr_rate: 0,
             N_WG: RELIC_N_WG_ID,
             SE_WG: RELIC_SE_WG_ID,
             SW_WG: RELIC_SW_WG_ID,
@@ -72970,6 +72976,12 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                     return;
                 }
                 const regions = yield tcore__WEBPACK_IMPORTED_MODULE_23__["MapAPI"].getMap(this.relic.serverID, this.relic.zoneID);
+                if (regions.length == 0) {
+                    this.relic.warnings.badZone = true;
+                    //log.warn(`Failed to get regions, is zone ID and server ID correct?`);
+                    return;
+                }
+                this.relic.warnings.badZone = false;
                 for (const map of regions) {
                     if (this.relic.regions.has(map.regionID)) {
                         const region = this.relic.regions.get(map.regionID);
@@ -72986,6 +72998,27 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                         }
                     }
                 }
+                // Don't count warpgates
+                this.relic.vs_rate = 0;
+                this.relic.nc_rate = 0;
+                this.relic.tr_rate = 0;
+                this.relic.regions.forEach((relic, regionID) => {
+                    if (relic.cutoff == true) {
+                        return;
+                    }
+                    if (relic.adjacent.length = 0) {
+                        return;
+                    }
+                    if (relic.faction == "VS") {
+                        this.relic.vs_rate += 6;
+                    }
+                    else if (relic.faction == "NC") {
+                        this.relic.nc_rate += 6;
+                    }
+                    else if (relic.faction == "TR") {
+                        this.relic.tr_rate += 6;
+                    }
+                });
                 this.$forceUpdate();
                 for (const child of this.$children) {
                     child.$forceUpdate();

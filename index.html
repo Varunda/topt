@@ -217,11 +217,28 @@
 
                 <small class="text-muted">If using a browser source, use this URL</small>
 
+                <button @click="view = 'setup'" type="button" class="btn btn-secondary">
+                    Back
+                </button>
+
             </div>
         </div>
 
         <div v-else-if="view == 'map'" class="row">
             <img src="./data/relics/relic_overlay_base.png" style="position: absolute; top: 0;">
+
+            <div style="position: absolute; top: 0; width: 562px; height: 469px; font-size: 24pt">
+                <span style="position: absolute; top: 95px; left: 175px">A</span>
+                <span style="position: absolute; top: 95px; left: 372px">B</span>
+                <span style="position: absolute; top: 220px; left: 460px">C</span>
+                <span style="position: absolute; top: 395px; left: 375px">D</span>
+                <span style="position: absolute; top: 395px; left: 175px">E</span>
+                <span style="position: absolute; top: 225px; left: 93px">F</span>
+                <span style="position: absolute; top: 203px; left: 214px">G</span>
+                <span style="position: absolute; top: 203px; left: 311px">H</span>
+                <span style="position: absolute; top: 289px; left: 270px">I</span>
+            </div>
+
             <template v-if="relic.connected == true">
                 <relic-image :relic-id="relic.A" :map="relic.regions" img="A_"></relic-image>
                 <relic-image :relic-id="relic.B" :map="relic.regions" img="B_"></relic-image>
@@ -237,6 +254,26 @@
                 <relic-image :relic-id="relic.SW_WG" :map="relic.regions" img="SW_WG_"></relic-image>
             </template>
 
+            <div style="position: absolute; top: 480px; width: 562px;">
+                <div class="row mx-0">
+                    <div class="col-4 p-0">
+                        <button class="btn w-100" style="background-color: purple; font-size: 24px">
+                            VS: {{relic.vs_rate}} pt/min
+                        </button>
+                    </div>
+                    <div class="col-4 p-0">
+                        <button class="btn w-100" style="background-color: blue; font-size: 24px">
+                            NC: {{relic.nc_rate}} pt/min
+                        </button>
+                    </div>
+                    <div class="col-4 p-0">
+                        <button class="btn w-100" style="background-color: red; font-size: 24px">
+                            TR: {{relic.tr_rate}} pt/min
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <div style="position: absolute; top: 570">
                 <input v-model="relic.zoneID" type="number" class="form-control" placeholder="Zone ID">
 
@@ -249,6 +286,10 @@
                     <option value="19">Jaeger</option>
                     <option value="40">SolTech</option>
                 </select>
+
+                <div v-if="relic.warnings.badZone == true" class="text-warning">
+                    No regions returned from API!
+                </div>
             </div>
         </div>
 
