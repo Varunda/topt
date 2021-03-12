@@ -194,7 +194,7 @@
         <div v-else-if="view == 'map_setup'" class="row">
             <div class="col-4">
                 <input v-model="relic.zoneID" type="number" class="form-control" placeholder="Zone ID">
-                <text class="text-muted">When you use the command to get into an OW match, put in that ID<br>It's a 6 digit number</text>
+                <small class="text-muted">When you use the command to get into an OW match, put in that ID<br>It's a 6 digit number</small>
 
                 <select v-model="relic.serverID" class="form-control">
                     <option value="" disabled>Select a server</option>
@@ -215,7 +215,7 @@
                     </button>
                 </div>
 
-                <text class="text-muted">If using a browser source, use this URL</text>
+                <small class="text-muted">If using a browser source, use this URL</small>
 
             </div>
         </div>
