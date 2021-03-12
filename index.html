@@ -165,6 +165,11 @@
                     Save these settings and load them next time instead of inputing them, saving seconds
                 </span>
 
+                <hr>
+
+                <button @click="startMap" type="button" class="btn btn-success w-100">
+                    Desolation map
+                </button>
                 <button @click="view = 'map_setup'" type="button" class="btn btn-secondary w-100">
                     Setup desolation map
                 </button>
@@ -189,6 +194,7 @@
         <div v-else-if="view == 'map_setup'" class="row">
             <div class="col-4">
                 <input v-model="relic.zoneID" type="number" class="form-control" placeholder="Zone ID">
+                <text class="text-muted">When you use the command to get into an OW match, put in that ID<br>It's a 6 digit number</text>
 
                 <select v-model="relic.serverID" class="form-control">
                     <option value="" disabled>Select a server</option>
@@ -208,6 +214,8 @@
                         Copy
                     </button>
                 </div>
+
+                <text class="text-muted">If using a browser source, use this URL</text>
 
             </div>
         </div>
