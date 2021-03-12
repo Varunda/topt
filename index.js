@@ -72750,8 +72750,14 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             connected: true,
             zoneID: "",
             serverID: "",
+            showUI: true,
             warnings: {
                 badZone: false,
+            },
+            outfits: {
+                tr: "",
+                nc: "",
+                vs: ""
             },
             vs_rate: 0,
             nc_rate: 0,
@@ -72851,15 +72857,20 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
         });
         this.settings.fromStorage = false;
         if (this.storage.enabled == true) {
-            const settings = Storage__WEBPACK_IMPORTED_MODULE_26__["StorageHelper"].getSettings();
+            /*
+            const settings: CoreSettings | null = StorageHelper.getSettings();
+
             if (settings != null) {
                 this.settings.darkMode = settings.darkMode;
                 this.settings.serverID = settings.serverID;
                 this.settings.serviceToken = settings.serviceID;
                 this.settings.debug = settings.debug;
+
                 this.settings.fromStorage = true;
+
                 this.connect();
             }
+            */
             const loggerMeta = Storage__WEBPACK_IMPORTED_MODULE_26__["StorageHelper"].getLoggers();
             if (loggerMeta != null) {
                 const existingLoggers = tcore__WEBPACK_IMPORTED_MODULE_23__["Logger"].getLoggerNames();
@@ -72882,14 +72893,41 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
         // Disconnect to be polite
         window.onunload = () => { this.core.disconnect(); };
         document.addEventListener("keyup", this.squadKeyEvent);
+        this.settings.fromStorage = false;
         const params = new URLSearchParams(location.search);
         const showMap = params.get("deso");
         const serverID = params.get("serverID");
         const zoneID = params.get("zoneID");
         if (showMap && serverID && zoneID) {
+            this.relic.showUI = false;
             this.relic.zoneID = zoneID;
             this.relic.serverID = serverID;
+            const vsTag = params.get("vs_tag");
+            if (vsTag) {
+                this.relic.outfits.vs = vsTag;
+            }
+            const ncTag = params.get("nc_tag");
+            if (ncTag) {
+                this.relic.outfits.nc = ncTag;
+            }
+            const trTag = params.get("tr_tag");
+            if (trTag) {
+                this.relic.outfits.tr = trTag;
+            }
             this.startMap();
+        }
+        else {
+            if (this.storage.enabled == true) {
+                const settings = Storage__WEBPACK_IMPORTED_MODULE_26__["StorageHelper"].getSettings();
+                if (settings != null) {
+                    this.settings.darkMode = settings.darkMode;
+                    this.settings.serverID = settings.serverID;
+                    this.settings.serviceToken = settings.serviceID;
+                    this.settings.debug = settings.debug;
+                    this.settings.fromStorage = true;
+                    this.connect();
+                }
+            }
         }
     },
     methods: {
@@ -72972,7 +73010,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
         updateDesoMap: function () {
             return __awaiter(this, void 0, void 0, function* () {
                 if (this.relic.zoneID == "" || this.relic.serverID == "") {
-                    log.debug(`${this.relic.zoneID} or ${this.relic.serverID} is blank`);
+                    log.debug(`zoneID ${this.relic.zoneID} or serverID ${this.relic.serverID} is blank`);
                     return;
                 }
                 const regions = yield tcore__WEBPACK_IMPORTED_MODULE_23__["MapAPI"].getMap(this.relic.serverID, this.relic.zoneID);
@@ -72996,17 +73034,21 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                             }
                             region.cutoff = isCutoff;
                         }
+                        else {
+                            region.cutoff = false;
+                        }
                     }
                 }
-                // Don't count warpgates
                 this.relic.vs_rate = 0;
                 this.relic.nc_rate = 0;
                 this.relic.tr_rate = 0;
                 this.relic.regions.forEach((relic, regionID) => {
-                    if (relic.cutoff == true) {
+                    log.debug(`${JSON.stringify(relic)}`);
+                    if (relic.adjacent.length == 0) { // Skip warpgate bases
+                        log.debug(`skipping ${relic.regionID}`);
                         return;
                     }
-                    if (relic.adjacent.length = 0) {
+                    if (relic.cutoff == true) {
                         return;
                     }
                     if (relic.faction == "VS") {
@@ -73598,6 +73640,20 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
     computed: {
         canConnect: function () {
             return this.settings.serviceToken.trim().length > 0;
+        },
+        desoUrl: function () {
+            //:value="'tide-op-tracker.ddns.net?deso=true&zoneID=' + relic.zoneID + '&serverID=' + relic.serverID">
+            let url = `tide-op-tracker.ddns.net?deso=true&zoneID=${this.relic.zoneID}&serverID=${this.relic.serverID}`;
+            if (this.relic.outfits.vs) {
+                url += `&vs_tag=${this.relic.outfits.vs}`;
+            }
+            if (this.relic.outfits.nc) {
+                url += `&nc_tag=${this.relic.outfits.nc}`;
+            }
+            if (this.relic.outfits.tr) {
+                url += `&tr_tag=${this.relic.outfits.tr}`;
+            }
+            return url;
         },
         core: function () {
             if (this.coreObject == null) {

@@ -61,6 +61,11 @@
             margin-left: 0.25rem;
         }
 
+        .ow-score {
+            font-size: 24px !important;
+            white-space: nowrap;
+        }
+
         @-moz-keyframes spin {
             from { -moz-transform: rotate(0deg); }
             to { -moz-transform: rotate(360deg); }
@@ -207,8 +212,23 @@
                 </select>
 
                 <div class="input-group">
+                    <span class="input-group-text input-group-prepend">VS Tag:</span>
+                    <input v-model="relic.outfits.vs" type="text" class="form-control">
+                </div>
+
+                <div class="input-group">
+                    <span class="input-group-text input-group-prepend">NC Tag:</span>
+                    <input v-model="relic.outfits.nc" type="text" class="form-control">
+                </div>
+
+                <div class="input-group">
+                    <span class="input-group-text input-group-prepend">TR Tag:</span>
+                    <input v-model="relic.outfits.tr" type="text" class="form-control">
+                </div>
+
+                <div class="input-group">
                     <input id="deso_setup_url" readonly type="text" class="form-control"
-                        :value="'tide-op-tracker.ddns.net?deso=true&zoneID=' + relic.zoneID + '&serverID=' + relic.serverID">
+                        :value="desoUrl">
 
                     <button type="button" @click="copyDesoUrl" class="btn btn-primary">
                         Copy
@@ -257,24 +277,27 @@
             <div style="position: absolute; top: 480px; width: 562px;">
                 <div class="row mx-0">
                     <div class="col-4 p-0">
-                        <button class="btn w-100" style="background-color: purple; font-size: 24px">
-                            VS: {{relic.vs_rate}} pt/min
+                        <button class="btn w-100 px-0 ow-score" style="background-color: purple">
+                            {{relic.outfits.vs != '' ? relic.outfits.vs : "VS"}}:
+                            {{relic.vs_rate}} pt/min
                         </button>
                     </div>
                     <div class="col-4 p-0">
-                        <button class="btn w-100" style="background-color: blue; font-size: 24px">
-                            NC: {{relic.nc_rate}} pt/min
+                        <button class="btn w-100 px-0 ow-score" style="background-color: blue">
+                            {{relic.outfits.nc != '' ? relic.outfits.nc : "NC"}}:
+                            {{relic.nc_rate}} pt/min
                         </button>
                     </div>
                     <div class="col-4 p-0">
-                        <button class="btn w-100" style="background-color: red; font-size: 24px">
-                            TR: {{relic.tr_rate}} pt/min
+                        <button class="btn w-100 px-0 ow-score" style="background-color: red">
+                            {{relic.outfits.tr != '' ? relic.outfits.tr : "TR"}}:
+                            {{relic.tr_rate}} pt/min
                         </button>
                     </div>
                 </div>
             </div>
 
-            <div style="position: absolute; top: 570">
+            <div v-if="relic.showUI == true" style="position: absolute; top: 570">
                 <input v-model="relic.zoneID" type="number" class="form-control" placeholder="Zone ID">
 
                 <select v-model="relic.serverID" class="form-control">
@@ -286,6 +309,21 @@
                     <option value="19">Jaeger</option>
                     <option value="40">SolTech</option>
                 </select>
+
+                <div class="input-group">
+                    <span class="input-group-text input-group-prepend">VS Tag:</span>
+                    <input v-model="relic.outfits.vs" type="text" class="form-control">
+                </div>
+
+                <div class="input-group">
+                    <span class="input-group-text input-group-prepend">NC Tag:</span>
+                    <input v-model="relic.outfits.nc" type="text" class="form-control">
+                </div>
+
+                <div class="input-group">
+                    <span class="input-group-text input-group-prepend">TR Tag:</span>
+                    <input v-model="relic.outfits.tr" type="text" class="form-control">
+                </div>
 
                 <div v-if="relic.warnings.badZone == true" class="text-warning">
                     No regions returned from API!

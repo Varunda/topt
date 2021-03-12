@@ -134,8 +134,16 @@ export const vm = new Vue({
             zoneID: "" as string,
             serverID: "" as string,
 
+            showUI: true as boolean,
+
             warnings: {
                 badZone: false as boolean,
+            },
+
+            outfits: {
+                tr: "" as string,
+                nc: "" as string,
+                vs: "" as string
             },
 
             vs_rate: 0 as number,
@@ -265,6 +273,7 @@ export const vm = new Vue({
         this.settings.fromStorage = false;
 
         if (this.storage.enabled == true) {
+            /*
             const settings: CoreSettings | null = StorageHelper.getSettings();
 
             if (settings != null) {
@@ -277,6 +286,7 @@ export const vm = new Vue({
 
                 this.connect();
             }
+            */
 
             const loggerMeta: LoggerMetadata[] | null = StorageHelper.getLoggers();
             if (loggerMeta != null) {
@@ -305,15 +315,41 @@ export const vm = new Vue({
 
         document.addEventListener("keyup", this.squadKeyEvent);
 
+        this.settings.fromStorage = false;
+
         const params: URLSearchParams = new URLSearchParams(location.search);
         const showMap: string | null = params.get("deso");
         const serverID: string | null = params.get("serverID");
         const zoneID: string | null = params.get("zoneID");
 
         if (showMap && serverID && zoneID) {
+            this.relic.showUI = false;
             this.relic.zoneID = zoneID;
             this.relic.serverID = serverID;
+
+            const vsTag: string | null = params.get("vs_tag");
+            if (vsTag) { this.relic.outfits.vs = vsTag; }
+            const ncTag: string | null = params.get("nc_tag");
+            if (ncTag) { this.relic.outfits.nc = ncTag; }
+            const trTag: string | null = params.get("tr_tag");
+            if (trTag) { this.relic.outfits.tr = trTag; }
+
             this.startMap();
+        } else {
+            if (this.storage.enabled == true) {
+                const settings: CoreSettings | null = StorageHelper.getSettings();
+
+                if (settings != null) {
+                    this.settings.darkMode = settings.darkMode;
+                    this.settings.serverID = settings.serverID;
+                    this.settings.serviceToken = settings.serviceID;
+                    this.settings.debug = settings.debug;
+
+                    this.settings.fromStorage = true;
+
+                    this.connect();
+                }
+            }
         }
     },
 
@@ -413,7 +449,7 @@ export const vm = new Vue({
 
         updateDesoMap: async function(): Promise<void> {
             if (this.relic.zoneID == "" || this.relic.serverID == "") {
-                log.debug(`${this.relic.zoneID} or ${this.relic.serverID} is blank`);
+                log.debug(`zoneID ${this.relic.zoneID} or serverID ${this.relic.serverID} is blank`);
                 return;
             }
             const regions: Region[] = await MapAPI.getMap(this.relic.serverID, this.relic.zoneID);
@@ -440,21 +476,24 @@ export const vm = new Vue({
                             }
                         }
                         region.cutoff = isCutoff;
+                    } else {
+                        region.cutoff = false;
                     }
                 }
             }
 
-            // Don't count warpgates
             this.relic.vs_rate = 0;
             this.relic.nc_rate = 0;
             this.relic.tr_rate = 0;
 
             this.relic.regions.forEach((relic: Relic, regionID: string) => {
-                if (relic.cutoff == true) {
+                log.debug(`${JSON.stringify(relic)}`);
+                if (relic.adjacent.length == 0) { // Skip warpgate bases
+                    log.debug(`skipping ${relic.regionID}`);
                     return;
                 }
 
-                if (relic.adjacent.length = 0) {
+                if (relic.cutoff == true) {
                     return;
                 }
 
@@ -1111,6 +1150,22 @@ export const vm = new Vue({
     computed: {
         canConnect: function(): boolean {
             return this.settings.serviceToken.trim().length > 0
+        },
+
+        desoUrl: function(): string {
+            //:value="'tide-op-tracker.ddns.net?deso=true&zoneID=' + relic.zoneID + '&serverID=' + relic.serverID">
+            let url: string = `tide-op-tracker.ddns.net?deso=true&zoneID=${this.relic.zoneID}&serverID=${this.relic.serverID}`;
+            if (this.relic.outfits.vs) {
+                url += `&vs_tag=${this.relic.outfits.vs}`;
+            }
+            if (this.relic.outfits.nc) {
+                url += `&nc_tag=${this.relic.outfits.nc}`;
+            }
+            if (this.relic.outfits.tr) {
+                url += `&tr_tag=${this.relic.outfits.tr}`;
+            }
+
+            return url;
         },
 
         core: function(): Core {
