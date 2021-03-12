@@ -165,6 +165,10 @@
                     Save these settings and load them next time instead of inputing them, saving seconds
                 </span>
 
+                <button @click="view = 'map_setup'" type="button" class="btn btn-secondary w-100">
+                    Setup desolation map
+                </button>
+
                 <hr>
 
                 <div class="btn-group w-100 mt-2">
@@ -179,6 +183,64 @@
                 </div>
 
                 <hr>
+            </div>
+        </div>
+
+        <div v-else-if="view == 'map_setup'" class="row">
+            <div class="col-4">
+                <input v-model="relic.zoneID" type="number" class="form-control" placeholder="Zone ID">
+
+                <select v-model="relic.serverID" class="form-control">
+                    <option value="" disabled>Select a server</option>
+                    <option value="1">Connery</option>
+                    <option value="10">Miller</option>
+                    <option value="13">Cobalt</option>
+                    <option value="17">Emerald</option>
+                    <option value="19">Jaeger</option>
+                    <option value="40">SolTech</option>
+                </select>
+
+                <div class="input-group">
+                    <input id="deso_setup_url" readonly type="text" class="form-control"
+                        :value="'tide-op-tracker.ddns.net?deso=true&zoneID=' + relic.zoneID + '&serverID=' + relic.serverID">
+
+                    <button type="button" @click="copyDesoUrl" class="btn btn-primary">
+                        Copy
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+        <div v-else-if="view == 'map'" class="row">
+            <img src="./data/relics/relic_overlay_base.png" style="position: absolute; top: 0;">
+            <template v-if="relic.connected == true">
+                <relic-image :relic-id="relic.A" :map="relic.regions" img="A_"></relic-image>
+                <relic-image :relic-id="relic.B" :map="relic.regions" img="B_"></relic-image>
+                <relic-image :relic-id="relic.C" :map="relic.regions" img="C_"></relic-image>
+                <relic-image :relic-id="relic.D" :map="relic.regions" img="D_"></relic-image>
+                <relic-image :relic-id="relic.E" :map="relic.regions" img="E_"></relic-image>
+                <relic-image :relic-id="relic.F" :map="relic.regions" img="F_"></relic-image>
+                <relic-image :relic-id="relic.G" :map="relic.regions" img="G_"></relic-image>
+                <relic-image :relic-id="relic.H" :map="relic.regions" img="H_"></relic-image>
+                <relic-image :relic-id="relic.I" :map="relic.regions" img="I_"></relic-image>
+                <relic-image :relic-id="relic.N_WG" :map="relic.regions" img="N_WG_"></relic-image>
+                <relic-image :relic-id="relic.SE_WG" :map="relic.regions" img="SE_WG_"></relic-image>
+                <relic-image :relic-id="relic.SW_WG" :map="relic.regions" img="SW_WG_"></relic-image>
+            </template>
+
+            <div style="position: absolute; top: 570">
+                <input v-model="relic.zoneID" type="number" class="form-control" placeholder="Zone ID">
+
+                <select v-model="relic.serverID" class="form-control">
+                    <option value="" disabled>Select a server</option>
+                    <option value="1">Connery</option>
+                    <option value="10">Miller</option>
+                    <option value="13">Cobalt</option>
+                    <option value="17">Emerald</option>
+                    <option value="19">Jaeger</option>
+                    <option value="40">SolTech</option>
+                </select>
             </div>
         </div>
 

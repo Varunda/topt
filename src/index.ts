@@ -32,6 +32,7 @@ import "MomentFilter";
 import "KillfeedSquad";
 import "FightReportTop";
 import "VehicleVersusEntry";
+import "RelicImage";
 
 import Core, {
     ApiResponse,
@@ -47,6 +48,7 @@ import Core, {
     Playback, Logger,
     CharacterAPI,
     Weapon, WeaponAPI,
+    Region, MapAPI,
     Facility, FacilityAPI,
     TEvent,
     PsEvent, PsEventType, PsEvents
@@ -71,13 +73,48 @@ import { OutfitReportParameters } from "../../topt-core/build/core/index.js";
 const log = Logger.getLogger("UI");
 log.enableAll();
 
+type Relic = {
+    regionID: string;
+    faction: string;
+    cutoff: boolean;
+    adjacent: string[];
+}
+
+const RELIC_A_ID: string = "18221";
+const RELIC_B_ID: string = "18222";
+const RELIC_C_ID: string = "18224";
+const RELIC_D_ID: string = "18226";
+const RELIC_E_ID: string = "18227";
+const RELIC_F_ID: string = "18228";
+const RELIC_G_ID: string = "18228";
+const RELIC_H_ID: string = "18229";
+const RELIC_I_ID: string = "18230";
+const RELIC_N_WG_ID: string = "2101";
+const RELIC_SE_WG_ID: string = "18216";
+const RELIC_SW_WG_ID: string = "18217";
+
+/*
+const RELIC_A_ID: string = "18221";
+const RELIC_B_ID: string = "18222";
+const RELIC_C_ID: string = "18224";
+const RELIC_D_ID: string = "18226";
+const RELIC_E_ID: string = "18227";
+const RELIC_F_ID: string = "18228";
+const RELIC_G_ID: string = "18228";
+const RELIC_H_ID: string = "18229";
+const RELIC_I_ID: string = "18230";
+const RELIC_N_WG_ID: string = "18215";
+const RELIC_SE_WG_ID: string = "18216";
+const RELIC_SW_WG_ID: string = "18217";
+*/
+
 export const vm = new Vue({
     el: "#app" as string,
 
     data: {
         coreObject: null as (Core | null),
 
-        view: "setup" as "setup" | "realtime" | "ops" | "killfeed" | "winter" | "example" | "battle" | "deso",
+        view: "setup" as "setup" | "realtime" | "ops" | "killfeed" | "winter" | "example" | "battle" | "deso" | "map",
 
         // Field related to settings about how TOPT runs
         settings: {
@@ -90,6 +127,41 @@ export const vm = new Vue({
             serverID: "1" as string,
             darkMode: false as boolean,
             debug: false as boolean
+        },
+
+        relic: {
+            connected: true as boolean,
+            zoneID: "" as string,
+            serverID: "" as string,
+
+            N_WG: RELIC_N_WG_ID,
+            SE_WG: RELIC_SE_WG_ID,
+            SW_WG: RELIC_SW_WG_ID,
+
+            A: RELIC_A_ID,
+            B: RELIC_B_ID,
+            C: RELIC_C_ID,
+            D: RELIC_D_ID,
+            E: RELIC_E_ID,
+            F: RELIC_F_ID,
+            G: RELIC_G_ID,
+            H: RELIC_H_ID,
+            I: RELIC_I_ID,
+
+            regions: new Map([
+                [RELIC_A_ID, { regionID: RELIC_A_ID, faction: "", cutoff: false, adjacent: [RELIC_F_ID, RELIC_G_ID, RELIC_N_WG_ID] }],
+                [RELIC_B_ID, { regionID: RELIC_B_ID, faction: "", cutoff: false, adjacent: [RELIC_H_ID, RELIC_C_ID, RELIC_N_WG_ID] }],
+                [RELIC_C_ID, { regionID: RELIC_C_ID, faction: "", cutoff: false, adjacent: [RELIC_B_ID, RELIC_G_ID, RELIC_SE_WG_ID] }],
+                [RELIC_D_ID, { regionID: RELIC_D_ID, faction: "", cutoff: false, adjacent: [RELIC_I_ID, RELIC_E_ID, RELIC_SE_WG_ID] }],
+                [RELIC_E_ID, { regionID: RELIC_E_ID, faction: "", cutoff: false, adjacent: [RELIC_I_ID, RELIC_D_ID, RELIC_SW_WG_ID] }],
+                [RELIC_F_ID, { regionID: RELIC_F_ID, faction: "", cutoff: false, adjacent: [RELIC_A_ID, RELIC_G_ID, RELIC_SW_WG_ID] }],
+                [RELIC_G_ID, { regionID: RELIC_H_ID, faction: "", cutoff: false, adjacent: [RELIC_A_ID, RELIC_F_ID, RELIC_H_ID, RELIC_I_ID] }],
+                [RELIC_H_ID, { regionID: RELIC_I_ID, faction: "", cutoff: false, adjacent: [RELIC_B_ID, RELIC_C_ID, RELIC_G_ID, RELIC_I_ID] }],
+                [RELIC_I_ID, { regionID: RELIC_B_ID, faction: "", cutoff: false, adjacent: [RELIC_E_ID, RELIC_D_ID, RELIC_G_ID, RELIC_H_ID] }],
+                [RELIC_N_WG_ID, { regionID: RELIC_N_WG_ID, faction: "", cutoff: false, adjacent: [] }],
+                [RELIC_SE_WG_ID, { regionID: RELIC_SE_WG_ID, faction: "", cutoff: false, adjacent: [] }],
+                [RELIC_SW_WG_ID, { regionID: RELIC_SW_WG_ID, faction: "", cutoff: false, adjacent: [] }]
+            ]) as Map<string, Relic>,
         },
 
         // Field related to filtering or adding data
@@ -224,6 +296,17 @@ export const vm = new Vue({
         window.onunload = () => { this.core.disconnect(); }
 
         document.addEventListener("keyup", this.squadKeyEvent);
+
+        const params: URLSearchParams = new URLSearchParams(location.search);
+        const showMap: string | null = params.get("deso");
+        const serverID: string | null = params.get("serverID");
+        const zoneID: string | null = params.get("zoneID");
+
+        if (showMap && serverID && zoneID) {
+            this.relic.zoneID = zoneID;
+            this.relic.serverID = serverID;
+            this.startMap();
+        }
     },
 
     methods: {
@@ -241,6 +324,37 @@ export const vm = new Vue({
             this.coreObject.connect().ok(() => {
                 this.view = "realtime";
             });
+        },
+
+        startMap: function(): void {
+            if (this.coreObject != null) {
+                this.coreObject.disconnect();
+                this.coreObject = null;
+            }
+
+            this.settings.darkMode = true;
+
+            this.coreObject = new Core("asdf", this.settings.serverID);
+            this.coreObject.connect().ok(() => {
+                this.view = "map";
+            });
+
+            setInterval(async () => {
+                this.updateDesoMap();
+            }, 5000);
+        },
+
+        copyDesoUrl: function(): void {
+            const elem: any = document.getElementById("deso_setup_url");
+            if (!elem) {
+                return;
+            }
+
+            elem.select();
+            if (document.execCommand("copy") == false) {
+                log.warn(`failed to copy URL`);
+            }
+            window.getSelection()?.removeAllRanges();
         },
 
         validateStartTime: function(ev: InputEvent): void {
@@ -287,6 +401,48 @@ export const vm = new Vue({
             } else {
                 --this.parameters.startTimeLeft;
             }
+        },
+
+        updateDesoMap: async function(): Promise<void> {
+            if (this.relic.zoneID == "" || this.relic.serverID == "") {
+                log.debug(`${this.relic.zoneID} or ${this.relic.serverID} is blank`);
+                return;
+            }
+            const regions: Region[] = await MapAPI.getMap(this.relic.serverID, this.relic.zoneID);
+
+            for (const map of regions) {
+                if (this.relic.regions.has(map.regionID)) {
+                    const region: Relic = this.relic.regions.get(map.regionID)!;
+                    region.faction = this.getFactionName(map.factionID);
+
+                    if (region.adjacent.length != 0) {
+                        let isCutoff: boolean = true;
+                        for (const adj of region.adjacent) {
+                            const adjRelic = this.relic.regions.get(adj);
+                            if (adjRelic && adjRelic.faction == region.faction) {
+                                isCutoff = false;
+                            }
+                        }
+                        region.cutoff = isCutoff;
+                    }
+                }
+            }
+
+            this.$forceUpdate();
+            for (const child of this.$children) {
+                child.$forceUpdate();
+            }
+        },
+
+        getFactionName: function(factionID: string): string {
+            if (factionID == "1") {
+                return "VS";
+            } else if (factionID == "2") {
+                return "NC";
+            } else if (factionID == "3") {
+                return "TR";
+            }
+            return "";
         },
 
         importData: function(): void {
@@ -942,3 +1098,4 @@ export const vm = new Vue({
     }
 });
 (window as any).vm = vm;
+(window as any).MapAPI = MapAPI;

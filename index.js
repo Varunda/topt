@@ -5804,6 +5804,74 @@ FacilityAPI._timeoutID = -1;
 
 /***/ }),
 
+/***/ "../topt-core/build/core/census/MapAPI.js":
+/*!************************************************!*\
+  !*** ../topt-core/build/core/census/MapAPI.js ***!
+  \************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.MapAPI = exports.Region = void 0;
+const CensusAPI_1 = __webpack_require__(/*! ./CensusAPI */ "../topt-core/build/core/census/CensusAPI.js");
+const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("MapAPI");
+class Region {
+    constructor() {
+        this.regionID = "";
+        this.factionID = "";
+    }
+}
+exports.Region = Region;
+class MapAPI {
+    static parse(elem) {
+        return {
+            regionID: elem.RowData.RegionId,
+            factionID: elem.RowData.FactionId
+        };
+    }
+    static getMap(serverID, zoneID) {
+        const url = `/map/?world_id=${serverID}&zone_ids=${zoneID}`;
+        return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+            try {
+                const request = yield CensusAPI_1.default.get(url).promise();
+                if (request.code == 200) {
+                    if (request.data.returned != 1) {
+                        return resolve([]);
+                    }
+                    const maps = [];
+                    for (const datum of request.data.map_list[0].Regions.Row) {
+                        const map = MapAPI.parse(datum);
+                        maps.push(map);
+                    }
+                    return resolve(maps);
+                }
+                else {
+                    return reject(`API call failed>\n\t${url}\n\t${request.code} ${request.data}`);
+                }
+            }
+            catch (err) {
+                return reject(err);
+            }
+        }));
+    }
+}
+exports.MapAPI = MapAPI;
+
+
+/***/ }),
+
 /***/ "../topt-core/build/core/census/OutfitAPI.js":
 /*!***************************************************!*\
   !*** ../topt-core/build/core/census/OutfitAPI.js ***!
@@ -6552,6 +6620,7 @@ __exportStar(__webpack_require__(/*! ./census/OutfitAPI */ "../topt-core/build/c
 __exportStar(__webpack_require__(/*! ./census/PsLoadout */ "../topt-core/build/core/census/PsLoadout.js"), exports);
 __exportStar(__webpack_require__(/*! ./census/VehicleAPI */ "../topt-core/build/core/census/VehicleAPI.js"), exports);
 __exportStar(__webpack_require__(/*! ./census/WeaponAPI */ "../topt-core/build/core/census/WeaponAPI.js"), exports);
+__exportStar(__webpack_require__(/*! ./census/MapAPI */ "../topt-core/build/core/census/MapAPI.js"), exports);
 __exportStar(__webpack_require__(/*! ./objects/index */ "../topt-core/build/core/objects/index.js"), exports);
 __exportStar(__webpack_require__(/*! ./events/index */ "../topt-core/build/core/events/index.js"), exports);
 __exportStar(__webpack_require__(/*! ./reports/OutfitReport */ "../topt-core/build/core/reports/OutfitReport.js"), exports);
@@ -72302,6 +72371,51 @@ window.Quartile = Quartile;
 
 /***/ }),
 
+/***/ "./src/RelicImage.ts":
+/*!***************************!*\
+  !*** ./src/RelicImage.ts ***!
+  \***************************/
+/*! no exports provided */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var vue__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! vue */ "./node_modules/vue/dist/vue.esm.js");
+
+vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("relic-image", {
+    props: {
+        RelicId: { type: String, required: true },
+        map: { required: true },
+        img: { type: String, required: true }
+    },
+    template: `
+        <span style="position: absolute; top: 0; width: 562px; height: 469px;">
+            <img v-if="relic.faction != ''" :src="'./data/relics/' + img + relic.faction + '.png'" style="position: absolute; top: 0">
+            <img v-if="relic.faction != '' && relic.cutoff == true" :src="'./data/relics/' + img + 'cutoff.png'" style="position: absolute; top: 0;">
+        </span>
+    `,
+    data: function () {
+        return {};
+    },
+    created: function () {
+    },
+    mounted: function () {
+    },
+    computed: {
+        relic: function () {
+            return this.map.get(this.RelicId);
+        },
+        showImage: function () {
+            return this.relic.faction != '';
+        }
+    },
+    methods: {},
+    watch: {}
+});
+
+
+/***/ }),
+
 /***/ "./src/Storage.ts":
 /*!************************!*\
   !*** ./src/Storage.ts ***!
@@ -72536,11 +72650,12 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var KillfeedSquad__WEBPACK_IMPORTED_MODULE_19__ = __webpack_require__(/*! KillfeedSquad */ "./src/KillfeedSquad.ts");
 /* harmony import */ var FightReportTop__WEBPACK_IMPORTED_MODULE_20__ = __webpack_require__(/*! FightReportTop */ "./src/FightReportTop.ts");
 /* harmony import */ var VehicleVersusEntry__WEBPACK_IMPORTED_MODULE_21__ = __webpack_require__(/*! VehicleVersusEntry */ "./src/VehicleVersusEntry.ts");
-/* harmony import */ var tcore__WEBPACK_IMPORTED_MODULE_22__ = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
-/* harmony import */ var tcore__WEBPACK_IMPORTED_MODULE_22___default = /*#__PURE__*/__webpack_require__.n(tcore__WEBPACK_IMPORTED_MODULE_22__);
-/* harmony import */ var PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_23__ = __webpack_require__(/*! PersonalReportGenerator */ "./src/PersonalReportGenerator.ts");
-/* harmony import */ var addons_SquadAddon__WEBPACK_IMPORTED_MODULE_24__ = __webpack_require__(/*! addons/SquadAddon */ "./src/addons/SquadAddon.ts");
-/* harmony import */ var Storage__WEBPACK_IMPORTED_MODULE_25__ = __webpack_require__(/*! Storage */ "./src/Storage.ts");
+/* harmony import */ var RelicImage__WEBPACK_IMPORTED_MODULE_22__ = __webpack_require__(/*! RelicImage */ "./src/RelicImage.ts");
+/* harmony import */ var tcore__WEBPACK_IMPORTED_MODULE_23__ = __webpack_require__(/*! tcore */ "../topt-core/build/core/index.js");
+/* harmony import */ var tcore__WEBPACK_IMPORTED_MODULE_23___default = /*#__PURE__*/__webpack_require__.n(tcore__WEBPACK_IMPORTED_MODULE_23__);
+/* harmony import */ var PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_24__ = __webpack_require__(/*! PersonalReportGenerator */ "./src/PersonalReportGenerator.ts");
+/* harmony import */ var addons_SquadAddon__WEBPACK_IMPORTED_MODULE_25__ = __webpack_require__(/*! addons/SquadAddon */ "./src/addons/SquadAddon.ts");
+/* harmony import */ var Storage__WEBPACK_IMPORTED_MODULE_26__ = __webpack_require__(/*! Storage */ "./src/Storage.ts");
 var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -72580,14 +72695,41 @@ chart_js__WEBPACK_IMPORTED_MODULE_10__["Chart"].plugins.unregister(_node_modules
 
 
 
-window.CharacterAPI = tcore__WEBPACK_IMPORTED_MODULE_22__["CharacterAPI"];
-window.Playback = tcore__WEBPACK_IMPORTED_MODULE_22__["Playback"];
-window.Logger = tcore__WEBPACK_IMPORTED_MODULE_22__["Logger"];
-window.PsEvent = tcore__WEBPACK_IMPORTED_MODULE_22__["PsEvent"];
+
+window.CharacterAPI = tcore__WEBPACK_IMPORTED_MODULE_23__["CharacterAPI"];
+window.Playback = tcore__WEBPACK_IMPORTED_MODULE_23__["Playback"];
+window.Logger = tcore__WEBPACK_IMPORTED_MODULE_23__["Logger"];
+window.PsEvent = tcore__WEBPACK_IMPORTED_MODULE_23__["PsEvent"];
 window.moment = moment__WEBPACK_IMPORTED_MODULE_5__;
 window.$ = jquery__WEBPACK_IMPORTED_MODULE_6__;
-const log = tcore__WEBPACK_IMPORTED_MODULE_22__["Logger"].getLogger("UI");
+const log = tcore__WEBPACK_IMPORTED_MODULE_23__["Logger"].getLogger("UI");
 log.enableAll();
+const RELIC_A_ID = "18221";
+const RELIC_B_ID = "18222";
+const RELIC_C_ID = "18224";
+const RELIC_D_ID = "18226";
+const RELIC_E_ID = "18227";
+const RELIC_F_ID = "18228";
+const RELIC_G_ID = "18228";
+const RELIC_H_ID = "18229";
+const RELIC_I_ID = "18230";
+const RELIC_N_WG_ID = "2101";
+const RELIC_SE_WG_ID = "18216";
+const RELIC_SW_WG_ID = "18217";
+/*
+const RELIC_A_ID: string = "18221";
+const RELIC_B_ID: string = "18222";
+const RELIC_C_ID: string = "18224";
+const RELIC_D_ID: string = "18226";
+const RELIC_E_ID: string = "18227";
+const RELIC_F_ID: string = "18228";
+const RELIC_G_ID: string = "18228";
+const RELIC_H_ID: string = "18229";
+const RELIC_I_ID: string = "18230";
+const RELIC_N_WG_ID: string = "18215";
+const RELIC_SE_WG_ID: string = "18216";
+const RELIC_SW_WG_ID: string = "18217";
+*/
 const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
     el: "#app",
     data: {
@@ -72603,6 +72745,37 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             serverID: "1",
             darkMode: false,
             debug: false
+        },
+        relic: {
+            connected: true,
+            zoneID: "",
+            serverID: "",
+            N_WG: RELIC_N_WG_ID,
+            SE_WG: RELIC_SE_WG_ID,
+            SW_WG: RELIC_SW_WG_ID,
+            A: RELIC_A_ID,
+            B: RELIC_B_ID,
+            C: RELIC_C_ID,
+            D: RELIC_D_ID,
+            E: RELIC_E_ID,
+            F: RELIC_F_ID,
+            G: RELIC_G_ID,
+            H: RELIC_H_ID,
+            I: RELIC_I_ID,
+            regions: new Map([
+                [RELIC_A_ID, { regionID: RELIC_A_ID, faction: "", cutoff: false, adjacent: [RELIC_F_ID, RELIC_G_ID, RELIC_N_WG_ID] }],
+                [RELIC_B_ID, { regionID: RELIC_B_ID, faction: "", cutoff: false, adjacent: [RELIC_H_ID, RELIC_C_ID, RELIC_N_WG_ID] }],
+                [RELIC_C_ID, { regionID: RELIC_C_ID, faction: "", cutoff: false, adjacent: [RELIC_B_ID, RELIC_G_ID, RELIC_SE_WG_ID] }],
+                [RELIC_D_ID, { regionID: RELIC_D_ID, faction: "", cutoff: false, adjacent: [RELIC_I_ID, RELIC_E_ID, RELIC_SE_WG_ID] }],
+                [RELIC_E_ID, { regionID: RELIC_E_ID, faction: "", cutoff: false, adjacent: [RELIC_I_ID, RELIC_D_ID, RELIC_SW_WG_ID] }],
+                [RELIC_F_ID, { regionID: RELIC_F_ID, faction: "", cutoff: false, adjacent: [RELIC_A_ID, RELIC_G_ID, RELIC_SW_WG_ID] }],
+                [RELIC_G_ID, { regionID: RELIC_H_ID, faction: "", cutoff: false, adjacent: [RELIC_A_ID, RELIC_F_ID, RELIC_H_ID, RELIC_I_ID] }],
+                [RELIC_H_ID, { regionID: RELIC_I_ID, faction: "", cutoff: false, adjacent: [RELIC_B_ID, RELIC_C_ID, RELIC_G_ID, RELIC_I_ID] }],
+                [RELIC_I_ID, { regionID: RELIC_B_ID, faction: "", cutoff: false, adjacent: [RELIC_E_ID, RELIC_D_ID, RELIC_G_ID, RELIC_H_ID] }],
+                [RELIC_N_WG_ID, { regionID: RELIC_N_WG_ID, faction: "", cutoff: false, adjacent: [] }],
+                [RELIC_SE_WG_ID, { regionID: RELIC_SE_WG_ID, faction: "", cutoff: false, adjacent: [] }],
+                [RELIC_SW_WG_ID, { regionID: RELIC_SW_WG_ID, faction: "", cutoff: false, adjacent: [] }]
+            ]),
         },
         // Field related to filtering or adding data
         parameters: {
@@ -72637,7 +72810,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
         ],
         winter: {
             report: Loadable__WEBPACK_IMPORTED_MODULE_4__["Loadable"].idle(),
-            settings: new tcore__WEBPACK_IMPORTED_MODULE_22__["WinterReportSettings"](),
+            settings: new tcore__WEBPACK_IMPORTED_MODULE_23__["WinterReportSettings"](),
             ignoredPlayers: ""
         },
         deso: {
@@ -72650,9 +72823,9 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             report: Loadable__WEBPACK_IMPORTED_MODULE_4__["Loadable"].idle(),
             steps: []
         },
-        battleReport: new tcore__WEBPACK_IMPORTED_MODULE_22__["FightReport"](),
-        outfitReport: new tcore__WEBPACK_IMPORTED_MODULE_22__["OutfitReport"](),
-        opsReportSettings: new tcore__WEBPACK_IMPORTED_MODULE_22__["OutfitReportSettings"](),
+        battleReport: new tcore__WEBPACK_IMPORTED_MODULE_23__["FightReport"](),
+        outfitReport: new tcore__WEBPACK_IMPORTED_MODULE_23__["OutfitReport"](),
+        opsReportSettings: new tcore__WEBPACK_IMPORTED_MODULE_23__["OutfitReportSettings"](),
         refreshIntervalID: -1,
         loadingOutfit: false,
         loggers: [],
@@ -72661,18 +72834,18 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
     },
     created: function () {
         this.refreshIntervalID = setInterval(this.updateDisplay, this.settings.updateRate * 1000);
-        this.storage.enabled = Storage__WEBPACK_IMPORTED_MODULE_25__["StorageHelper"].isEnabled();
-        new tcore__WEBPACK_IMPORTED_MODULE_22__["ApiResponse"](axios__WEBPACK_IMPORTED_MODULE_8___default.a.get(`/data/weapons.json`)).ok((data) => {
+        this.storage.enabled = Storage__WEBPACK_IMPORTED_MODULE_26__["StorageHelper"].isEnabled();
+        new tcore__WEBPACK_IMPORTED_MODULE_23__["ApiResponse"](axios__WEBPACK_IMPORTED_MODULE_8___default.a.get(`/data/weapons.json`)).ok((data) => {
             console.log(`Loaded ${data.length} weapons`);
-            tcore__WEBPACK_IMPORTED_MODULE_22__["WeaponAPI"].setCache(data);
+            tcore__WEBPACK_IMPORTED_MODULE_23__["WeaponAPI"].setCache(data);
         });
-        new tcore__WEBPACK_IMPORTED_MODULE_22__["ApiResponse"](axios__WEBPACK_IMPORTED_MODULE_8___default.a.get(`/data/bases.json`)).ok((data) => {
+        new tcore__WEBPACK_IMPORTED_MODULE_23__["ApiResponse"](axios__WEBPACK_IMPORTED_MODULE_8___default.a.get(`/data/bases.json`)).ok((data) => {
             console.log(`Loaded ${data.length} facilities`);
-            tcore__WEBPACK_IMPORTED_MODULE_22__["FacilityAPI"].setCache(data);
+            tcore__WEBPACK_IMPORTED_MODULE_23__["FacilityAPI"].setCache(data);
         });
         this.settings.fromStorage = false;
         if (this.storage.enabled == true) {
-            const settings = Storage__WEBPACK_IMPORTED_MODULE_25__["StorageHelper"].getSettings();
+            const settings = Storage__WEBPACK_IMPORTED_MODULE_26__["StorageHelper"].getSettings();
             if (settings != null) {
                 this.settings.darkMode = settings.darkMode;
                 this.settings.serverID = settings.serverID;
@@ -72681,12 +72854,12 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 this.settings.fromStorage = true;
                 this.connect();
             }
-            const loggerMeta = Storage__WEBPACK_IMPORTED_MODULE_25__["StorageHelper"].getLoggers();
+            const loggerMeta = Storage__WEBPACK_IMPORTED_MODULE_26__["StorageHelper"].getLoggers();
             if (loggerMeta != null) {
-                const existingLoggers = tcore__WEBPACK_IMPORTED_MODULE_22__["Logger"].getLoggerNames();
+                const existingLoggers = tcore__WEBPACK_IMPORTED_MODULE_23__["Logger"].getLoggerNames();
                 for (const meta of loggerMeta) {
                     if (existingLoggers.indexOf(meta.name) > -1) {
-                        tcore__WEBPACK_IMPORTED_MODULE_22__["Logger"].getLogger(meta.name).setLevel(meta.level);
+                        tcore__WEBPACK_IMPORTED_MODULE_23__["Logger"].getLogger(meta.name).setLevel(meta.level);
                         console.log(`Loaded logger ${meta.name} to ${meta.level}`);
                     }
                     else {
@@ -72703,6 +72876,15 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
         // Disconnect to be polite
         window.onunload = () => { this.core.disconnect(); };
         document.addEventListener("keyup", this.squadKeyEvent);
+        const params = new URLSearchParams(location.search);
+        const showMap = params.get("deso");
+        const serverID = params.get("serverID");
+        const zoneID = params.get("zoneID");
+        if (showMap && serverID && zoneID) {
+            this.relic.zoneID = zoneID;
+            this.relic.serverID = serverID;
+            this.startMap();
+        }
     },
     methods: {
         connect: function () {
@@ -72713,10 +72895,36 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 this.coreObject.disconnect();
                 this.coreObject = null;
             }
-            this.coreObject = new tcore__WEBPACK_IMPORTED_MODULE_22___default.a(this.settings.serviceToken, this.settings.serverID);
+            this.coreObject = new tcore__WEBPACK_IMPORTED_MODULE_23___default.a(this.settings.serviceToken, this.settings.serverID);
             this.coreObject.connect().ok(() => {
                 this.view = "realtime";
             });
+        },
+        startMap: function () {
+            if (this.coreObject != null) {
+                this.coreObject.disconnect();
+                this.coreObject = null;
+            }
+            this.settings.darkMode = true;
+            this.coreObject = new tcore__WEBPACK_IMPORTED_MODULE_23___default.a("asdf", this.settings.serverID);
+            this.coreObject.connect().ok(() => {
+                this.view = "map";
+            });
+            setInterval(() => __awaiter(this, void 0, void 0, function* () {
+                this.updateDesoMap();
+            }), 5000);
+        },
+        copyDesoUrl: function () {
+            var _a;
+            const elem = document.getElementById("deso_setup_url");
+            if (!elem) {
+                return;
+            }
+            elem.select();
+            if (document.execCommand("copy") == false) {
+                log.warn(`failed to copy URL`);
+            }
+            (_a = window.getSelection()) === null || _a === void 0 ? void 0 : _a.removeAllRanges();
         },
         validateStartTime: function (ev) {
             const value = ev.target.value;
@@ -72755,6 +72963,47 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 --this.parameters.startTimeLeft;
             }
         },
+        updateDesoMap: function () {
+            return __awaiter(this, void 0, void 0, function* () {
+                if (this.relic.zoneID == "" || this.relic.serverID == "") {
+                    log.debug(`${this.relic.zoneID} or ${this.relic.serverID} is blank`);
+                    return;
+                }
+                const regions = yield tcore__WEBPACK_IMPORTED_MODULE_23__["MapAPI"].getMap(this.relic.serverID, this.relic.zoneID);
+                for (const map of regions) {
+                    if (this.relic.regions.has(map.regionID)) {
+                        const region = this.relic.regions.get(map.regionID);
+                        region.faction = this.getFactionName(map.factionID);
+                        if (region.adjacent.length != 0) {
+                            let isCutoff = true;
+                            for (const adj of region.adjacent) {
+                                const adjRelic = this.relic.regions.get(adj);
+                                if (adjRelic && adjRelic.faction == region.faction) {
+                                    isCutoff = false;
+                                }
+                            }
+                            region.cutoff = isCutoff;
+                        }
+                    }
+                }
+                this.$forceUpdate();
+                for (const child of this.$children) {
+                    child.$forceUpdate();
+                }
+            });
+        },
+        getFactionName: function (factionID) {
+            if (factionID == "1") {
+                return "VS";
+            }
+            else if (factionID == "2") {
+                return "NC";
+            }
+            else if (factionID == "3") {
+                return "TR";
+            }
+            return "";
+        },
         importData: function () {
             const elem = document.getElementById("data-import-input");
             if (elem == null) {
@@ -72767,24 +73016,24 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             if (input.files.length == 0) {
                 return console.warn(`Cannot import data, no file selected`);
             }
-            tcore__WEBPACK_IMPORTED_MODULE_22__["Playback"].setCore(this.core);
+            tcore__WEBPACK_IMPORTED_MODULE_23__["Playback"].setCore(this.core);
             log.info(`loading ${input.files.length} files`);
             for (let i = 0; i < input.files.length; ++i) {
                 const file = input.files[i];
-                tcore__WEBPACK_IMPORTED_MODULE_22__["Playback"].loadFile(file).then(() => {
+                tcore__WEBPACK_IMPORTED_MODULE_23__["Playback"].loadFile(file).then(() => {
                     log.debug(`Playing back ${file.name}`);
-                    tcore__WEBPACK_IMPORTED_MODULE_22__["Playback"].start({ speed: 0.0 });
+                    tcore__WEBPACK_IMPORTED_MODULE_23__["Playback"].start({ speed: 0.0 });
                 });
             }
         },
         exportData: function () {
-            log.debug(`Including ${tcore__WEBPACK_IMPORTED_MODULE_22__["CharacterAPI"].getCache().length} cached characters in export`);
+            log.debug(`Including ${tcore__WEBPACK_IMPORTED_MODULE_23__["CharacterAPI"].getCache().length} cached characters in export`);
             const json = {
                 version: "1",
                 events: this.core.rawData,
                 players: this.core.characters,
                 outfits: this.core.outfits,
-                characters: tcore__WEBPACK_IMPORTED_MODULE_22__["CharacterAPI"].getCache()
+                characters: tcore__WEBPACK_IMPORTED_MODULE_23__["CharacterAPI"].getCache()
             };
             const file = new File([JSON.stringify(json)], "data.json", { type: "text/json" });
             _node_modules_file_saver_dist_FileSaver_js__WEBPACK_IMPORTED_MODULE_9__["saveAs"](file);
@@ -72806,22 +73055,22 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 darkMode: this.settings.darkMode,
                 debug: this.settings.debug
             };
-            Storage__WEBPACK_IMPORTED_MODULE_25__["StorageHelper"].setSettings(settings);
+            Storage__WEBPACK_IMPORTED_MODULE_26__["StorageHelper"].setSettings(settings);
             this.connect();
         },
         clearSettings: function () {
             if (this.storage.enabled == false) {
                 return;
             }
-            Storage__WEBPACK_IMPORTED_MODULE_25__["StorageHelper"].setSettings(null);
+            Storage__WEBPACK_IMPORTED_MODULE_26__["StorageHelper"].setSettings(null);
         },
         debugLoadfile: function (reportType) {
-            const response = new tcore__WEBPACK_IMPORTED_MODULE_22__["ApiResponse"](axios__WEBPACK_IMPORTED_MODULE_8___default.a.get(`/test-data/OW3-DPSO.json`)).ok((data) => {
+            const response = new tcore__WEBPACK_IMPORTED_MODULE_23__["ApiResponse"](axios__WEBPACK_IMPORTED_MODULE_8___default.a.get(`/test-data/OW3-DPSO.json`)).ok((data) => {
                 const type = typeof (data);
-                tcore__WEBPACK_IMPORTED_MODULE_22__["Playback"].setCore(this.core);
+                tcore__WEBPACK_IMPORTED_MODULE_23__["Playback"].setCore(this.core);
                 if (type == "string") {
-                    tcore__WEBPACK_IMPORTED_MODULE_22__["Playback"].loadFile(data).then(() => {
-                        tcore__WEBPACK_IMPORTED_MODULE_22__["Playback"].start({ speed: 0 });
+                    tcore__WEBPACK_IMPORTED_MODULE_23__["Playback"].loadFile(data).then(() => {
+                        tcore__WEBPACK_IMPORTED_MODULE_23__["Playback"].start({ speed: 0 });
                         if (reportType != undefined) {
                             this.parameters.report = reportType;
                             this.generateReport();
@@ -72829,8 +73078,8 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                     });
                 }
                 else if (type == "object") {
-                    tcore__WEBPACK_IMPORTED_MODULE_22__["Playback"].loadFile(JSON.stringify(data)).then(() => {
-                        tcore__WEBPACK_IMPORTED_MODULE_22__["Playback"].start({ speed: 0 });
+                    tcore__WEBPACK_IMPORTED_MODULE_23__["Playback"].loadFile(JSON.stringify(data)).then(() => {
+                        tcore__WEBPACK_IMPORTED_MODULE_23__["Playback"].start({ speed: 0 });
                         if (reportType != undefined) {
                             this.parameters.report = reportType;
                             this.generateReport();
@@ -72866,7 +73115,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 if (char.stats.size() == 0) {
                     return;
                 }
-                const collection = new tcore__WEBPACK_IMPORTED_MODULE_22__["TrackedPlayer"]();
+                const collection = new tcore__WEBPACK_IMPORTED_MODULE_23__["TrackedPlayer"]();
                 collection.name = char.name;
                 collection.outfitTag = char.outfitTag;
                 collection.characterID = char.characterID;
@@ -72878,7 +73127,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 }
                 let containsType = false;
                 char.stats.getMap().forEach((value, key) => {
-                    const psEvent = tcore__WEBPACK_IMPORTED_MODULE_22__["PsEvents"].get(key) || tcore__WEBPACK_IMPORTED_MODULE_22__["PsEvent"].default;
+                    const psEvent = tcore__WEBPACK_IMPORTED_MODULE_23__["PsEvents"].get(key) || tcore__WEBPACK_IMPORTED_MODULE_23__["PsEvent"].default;
                     // Is this stat one of the ones being displayed?
                     if (psEvent.types.indexOf(this.settings.eventType) > -1) {
                         //console.log(`Needed ${this.settings.eventType} to display ${char.name}, found from ${key}`);
@@ -72922,27 +73171,27 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             if (this.view != "killfeed") {
                 return;
             }
-            const whatHovered = addons_SquadAddon__WEBPACK_IMPORTED_MODULE_24__["SquadAddon"].getHovered();
-            if (whatHovered == "squad" && addons_SquadAddon__WEBPACK_IMPORTED_MODULE_24__["SquadAddon"].selectedSquadName != null) {
+            const whatHovered = addons_SquadAddon__WEBPACK_IMPORTED_MODULE_25__["SquadAddon"].getHovered();
+            if (whatHovered == "squad" && addons_SquadAddon__WEBPACK_IMPORTED_MODULE_25__["SquadAddon"].selectedSquadName != null) {
                 const squad = this.core.getSquad(ev.key);
                 if (squad == null) {
                     console.log(`Squad ${ev.key} does not exist`);
                     return;
                 }
-                const selectedSquad = this.core.getSquad(addons_SquadAddon__WEBPACK_IMPORTED_MODULE_24__["SquadAddon"].selectedSquadName);
+                const selectedSquad = this.core.getSquad(addons_SquadAddon__WEBPACK_IMPORTED_MODULE_25__["SquadAddon"].selectedSquadName);
                 if (selectedSquad == null) {
-                    console.warn(`Failed to find squad ${addons_SquadAddon__WEBPACK_IMPORTED_MODULE_24__["SquadAddon"].selectedSquadName}`);
+                    console.warn(`Failed to find squad ${addons_SquadAddon__WEBPACK_IMPORTED_MODULE_25__["SquadAddon"].selectedSquadName}`);
                     return;
                 }
                 this.core.mergeSquads(squad, selectedSquad);
                 this.updateDisplay();
             }
-            else if (whatHovered == "member" && addons_SquadAddon__WEBPACK_IMPORTED_MODULE_24__["SquadAddon"].selectedMemberID != null) {
+            else if (whatHovered == "member" && addons_SquadAddon__WEBPACK_IMPORTED_MODULE_25__["SquadAddon"].selectedMemberID != null) {
                 if (ev.key == "Delete") {
-                    this.core.removeMemberFromSquad(addons_SquadAddon__WEBPACK_IMPORTED_MODULE_24__["SquadAddon"].selectedMemberID);
+                    this.core.removeMemberFromSquad(addons_SquadAddon__WEBPACK_IMPORTED_MODULE_25__["SquadAddon"].selectedMemberID);
                 }
                 else {
-                    this.core.addMemberToSquad(addons_SquadAddon__WEBPACK_IMPORTED_MODULE_24__["SquadAddon"].selectedMemberID, ev.key);
+                    this.core.addMemberToSquad(addons_SquadAddon__WEBPACK_IMPORTED_MODULE_25__["SquadAddon"].selectedMemberID, ev.key);
                 }
                 this.updateDisplay();
             }
@@ -73007,7 +73256,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                         }
                     }
                 }
-                const outfitReport = yield tcore__WEBPACK_IMPORTED_MODULE_22__["OutfitReportGenerator"].generate({
+                const outfitReport = yield tcore__WEBPACK_IMPORTED_MODULE_23__["OutfitReportGenerator"].generate({
                     settings: {
                         zoneID: null,
                         showSquadStats: this.opsReportSettings.showSquadStats
@@ -73053,7 +73302,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
         },
         generateBattleReport: function () {
             return __awaiter(this, void 0, void 0, function* () {
-                const params = new tcore__WEBPACK_IMPORTED_MODULE_22__["FightReportParameters"]();
+                const params = new tcore__WEBPACK_IMPORTED_MODULE_23__["FightReportParameters"]();
                 this.core.stats.forEach((player, charID) => {
                     if (player.events.length == 0) {
                         return;
@@ -73064,7 +73313,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 params.events.push(...this.core.playerCaptures);
                 params.events = params.events.sort((a, b) => a.timestamp - b.timestamp);
                 params.players = this.core.stats;
-                this.battleReport = yield tcore__WEBPACK_IMPORTED_MODULE_22__["FightReportGenerator"].generate(params);
+                this.battleReport = yield tcore__WEBPACK_IMPORTED_MODULE_23__["FightReportGenerator"].generate(params);
                 this.view = "battle";
             });
         },
@@ -73089,7 +73338,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 const players = Array.from(this.core.stats.values())
                     .filter(iter => playerNames.indexOf(iter.name.toLowerCase()) == -1);
                 console.log(`Making a winter report with: ${players.map(iter => iter.name).join(", ")}`);
-                const params = new tcore__WEBPACK_IMPORTED_MODULE_22__["WinterReportParameters"]();
+                const params = new tcore__WEBPACK_IMPORTED_MODULE_23__["WinterReportParameters"]();
                 params.players = players;
                 params.timeTracking = this.core.tracking;
                 params.settings = this.winter.settings;
@@ -73103,13 +73352,13 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                     params.events.push(...player.events);
                 });
                 this.winter.report = Loadable__WEBPACK_IMPORTED_MODULE_4__["Loadable"].loading();
-                this.winter.report = Loadable__WEBPACK_IMPORTED_MODULE_4__["Loadable"].loaded(yield tcore__WEBPACK_IMPORTED_MODULE_22__["WinterReportGenerator"].generate(params));
+                this.winter.report = Loadable__WEBPACK_IMPORTED_MODULE_4__["Loadable"].loaded(yield tcore__WEBPACK_IMPORTED_MODULE_23__["WinterReportGenerator"].generate(params));
                 this.view = "winter";
             });
         },
         generateDesoReport: function () {
             return __awaiter(this, void 0, void 0, function* () {
-                const params = new tcore__WEBPACK_IMPORTED_MODULE_22__["DesoReportParameters"]();
+                const params = new tcore__WEBPACK_IMPORTED_MODULE_23__["DesoReportParameters"]();
                 this.core.stats.forEach((player, charID) => {
                     if (player.events.length == 0) {
                         return;
@@ -73121,19 +73370,19 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 params.players = [...Array.from(this.core.stats.values())];
                 params.tracking = this.core.tracking;
                 this.deso.report = Loadable__WEBPACK_IMPORTED_MODULE_4__["Loadable"].loading();
-                this.deso.report = Loadable__WEBPACK_IMPORTED_MODULE_4__["Loadable"].loaded(yield tcore__WEBPACK_IMPORTED_MODULE_22__["DesoReportGenerator"].generate(params));
+                this.deso.report = Loadable__WEBPACK_IMPORTED_MODULE_4__["Loadable"].loaded(yield tcore__WEBPACK_IMPORTED_MODULE_23__["DesoReportGenerator"].generate(params));
                 this.view = "deso";
             });
         },
         generatePersonalReport: function (charID) {
             var _a;
             return __awaiter(this, void 0, void 0, function* () {
-                let html = yield PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_23__["PersonalReportGenerator"].getTemplate();
+                let html = yield PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_24__["PersonalReportGenerator"].getTemplate();
                 let report = yield this.generatePlayerReport(charID);
                 if (report == null) {
                     return;
                 }
-                const str = PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_23__["PersonalReportGenerator"].generate(html, report);
+                const str = PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_24__["PersonalReportGenerator"].generate(html, report);
                 console.log(`Saving report for ${charID}`);
                 _node_modules_file_saver_dist_FileSaver_js__WEBPACK_IMPORTED_MODULE_9__["saveAs"](new File([str], `topt-${(_a = report.player) === null || _a === void 0 ? void 0 : _a.name}.html`, { type: "text/html" }));
             });
@@ -73160,7 +73409,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                         tracking: Object.assign({}, this.core.tracking),
                         routers: [...this.core.npcs.all.filter(iter => iter.type == "router")]
                     };
-                    return tcore__WEBPACK_IMPORTED_MODULE_22__["IndividualReporter"].generatePersonalReport(parameters);
+                    return tcore__WEBPACK_IMPORTED_MODULE_23__["IndividualReporter"].generatePersonalReport(parameters);
                 }
             });
         },
@@ -73174,7 +73423,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                     }
                 });
                 let reports = [];
-                const html = yield PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_23__["PersonalReportGenerator"].getTemplate();
+                const html = yield PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_24__["PersonalReportGenerator"].getTemplate();
                 this.generation.names = left.map(iter => iter.name);
                 this.generation.state = left.map(iter => "Pending");
                 jquery__WEBPACK_IMPORTED_MODULE_6__("#generation-modal").modal("show");
@@ -73196,7 +73445,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 const zip = new jszip__WEBPACK_IMPORTED_MODULE_7__();
                 const timestamp = moment__WEBPACK_IMPORTED_MODULE_5__(new Date()).format("YYYY-MM-DD");
                 for (const report of reports) {
-                    const str = PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_23__["PersonalReportGenerator"].generate(html, report);
+                    const str = PersonalReportGenerator__WEBPACK_IMPORTED_MODULE_24__["PersonalReportGenerator"].generate(html, report);
                     zip.file(`topt_report_${(_a = report.player) === null || _a === void 0 ? void 0 : _a.name}_${timestamp}.html`, str);
                     console.log(`Added ${(_b = report.player) === null || _b === void 0 ? void 0 : _b.name} to zip file`);
                 }
@@ -73256,7 +73505,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             this.core.addPlayer(this.parameters.playerName);
         },
         updateLoggers: function () {
-            const loggers = tcore__WEBPACK_IMPORTED_MODULE_22__["Logger"].getLoggerNames();
+            const loggers = tcore__WEBPACK_IMPORTED_MODULE_23__["Logger"].getLoggerNames();
             const levelLookup = new Map([
                 [0, "TRACE"],
                 [1, "DEBUG"],
@@ -73267,21 +73516,21 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             ]);
             this.loggers = [];
             for (const loggerName of loggers) {
-                const logger = tcore__WEBPACK_IMPORTED_MODULE_22__["Logger"].getLogger(loggerName);
+                const logger = tcore__WEBPACK_IMPORTED_MODULE_23__["Logger"].getLogger(loggerName);
                 this.loggers.push({
                     name: loggerName,
                     level: levelLookup.get(logger.getLevel())
                 });
             }
             this.loggers.sort((a, b) => a.name.localeCompare(b.name));
-            Storage__WEBPACK_IMPORTED_MODULE_25__["StorageHelper"].setLoggers(this.loggers);
+            Storage__WEBPACK_IMPORTED_MODULE_26__["StorageHelper"].setLoggers(this.loggers);
         },
         openLoggerModal: function () {
             this.updateLoggers();
             jquery__WEBPACK_IMPORTED_MODULE_6__("#logger-modal").modal("show");
         },
         updateLogger: function (name, mod) {
-            const logger = tcore__WEBPACK_IMPORTED_MODULE_22__["Logger"].getLogger(name);
+            const logger = tcore__WEBPACK_IMPORTED_MODULE_23__["Logger"].getLogger(name);
             mod(logger);
             this.updateLoggers();
         },
@@ -73296,7 +73545,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             }
         },
         exportWeaponData: function () {
-            const weapons = tcore__WEBPACK_IMPORTED_MODULE_22__["WeaponAPI"].getEntires();
+            const weapons = tcore__WEBPACK_IMPORTED_MODULE_23__["WeaponAPI"].getEntires();
             const lines = weapons.map((iter) => {
                 return {
                     item_id: iter.ID,
@@ -73336,6 +73585,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
     }
 });
 window.vm = vm;
+window.MapAPI = tcore__WEBPACK_IMPORTED_MODULE_23__["MapAPI"];
 
 
 /***/ }),
