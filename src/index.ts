@@ -83,23 +83,23 @@ type Relic = {
 const RELIC_A_ID: string = "18221";
 const RELIC_B_ID: string = "18222";
 const RELIC_C_ID: string = "18224";
-const RELIC_D_ID: string = "18226";
-const RELIC_E_ID: string = "18227";
-const RELIC_F_ID: string = "18228";
+const RELIC_D_ID: string = "18225";
+const RELIC_E_ID: string = "18226";
+const RELIC_F_ID: string = "18227";
 const RELIC_G_ID: string = "18228";
 const RELIC_H_ID: string = "18229";
 const RELIC_I_ID: string = "18230";
 const RELIC_N_WG_ID: string = "18215";
-const RELIC_SE_WG_ID: string = "18216";
-const RELIC_SW_WG_ID: string = "18217";
+const RELIC_SW_WG_ID: string = "18216";
+const RELIC_SE_WG_ID: string = "18217";
 
 /*
 const RELIC_A_ID: string = "18221";
 const RELIC_B_ID: string = "18222";
 const RELIC_C_ID: string = "18224";
-const RELIC_D_ID: string = "18226";
-const RELIC_E_ID: string = "18227";
-const RELIC_F_ID: string = "18228";
+const RELIC_D_ID: string = "18225";
+const RELIC_E_ID: string = "18226";
+const RELIC_F_ID: string = "18227";
 const RELIC_G_ID: string = "18228";
 const RELIC_H_ID: string = "18229";
 const RELIC_I_ID: string = "18230";
@@ -456,7 +456,6 @@ export const vm = new Vue({
 
             if (regions.length == 0) {
                 this.relic.warnings.badZone = true;
-                //log.warn(`Failed to get regions, is zone ID and server ID correct?`);
                 return;
             }
 
@@ -487,9 +486,7 @@ export const vm = new Vue({
             this.relic.tr_rate = 0;
 
             this.relic.regions.forEach((relic: Relic, regionID: string) => {
-                log.debug(`${JSON.stringify(relic)}`);
                 if (relic.adjacent.length == 0) { // Skip warpgate bases
-                    log.debug(`skipping ${relic.regionID}`);
                     return;
                 }
 

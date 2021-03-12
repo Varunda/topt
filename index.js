@@ -72707,22 +72707,22 @@ log.enableAll();
 const RELIC_A_ID = "18221";
 const RELIC_B_ID = "18222";
 const RELIC_C_ID = "18224";
-const RELIC_D_ID = "18226";
-const RELIC_E_ID = "18227";
-const RELIC_F_ID = "18228";
+const RELIC_D_ID = "18225";
+const RELIC_E_ID = "18226";
+const RELIC_F_ID = "18227";
 const RELIC_G_ID = "18228";
 const RELIC_H_ID = "18229";
 const RELIC_I_ID = "18230";
 const RELIC_N_WG_ID = "18215";
-const RELIC_SE_WG_ID = "18216";
-const RELIC_SW_WG_ID = "18217";
+const RELIC_SW_WG_ID = "18216";
+const RELIC_SE_WG_ID = "18217";
 /*
 const RELIC_A_ID: string = "18221";
 const RELIC_B_ID: string = "18222";
 const RELIC_C_ID: string = "18224";
-const RELIC_D_ID: string = "18226";
-const RELIC_E_ID: string = "18227";
-const RELIC_F_ID: string = "18228";
+const RELIC_D_ID: string = "18225";
+const RELIC_E_ID: string = "18226";
+const RELIC_F_ID: string = "18227";
 const RELIC_G_ID: string = "18228";
 const RELIC_H_ID: string = "18229";
 const RELIC_I_ID: string = "18230";
@@ -73016,7 +73016,6 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 const regions = yield tcore__WEBPACK_IMPORTED_MODULE_23__["MapAPI"].getMap(this.relic.serverID, this.relic.zoneID);
                 if (regions.length == 0) {
                     this.relic.warnings.badZone = true;
-                    //log.warn(`Failed to get regions, is zone ID and server ID correct?`);
                     return;
                 }
                 this.relic.warnings.badZone = false;
@@ -73043,9 +73042,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 this.relic.nc_rate = 0;
                 this.relic.tr_rate = 0;
                 this.relic.regions.forEach((relic, regionID) => {
-                    log.debug(`${JSON.stringify(relic)}`);
                     if (relic.adjacent.length == 0) { // Skip warpgate bases
-                        log.debug(`skipping ${relic.regionID}`);
                         return;
                     }
                     if (relic.cutoff == true) {
