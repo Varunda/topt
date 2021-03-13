@@ -72704,18 +72704,38 @@ window.moment = moment__WEBPACK_IMPORTED_MODULE_5__;
 window.$ = jquery__WEBPACK_IMPORTED_MODULE_6__;
 const log = tcore__WEBPACK_IMPORTED_MODULE_23__["Logger"].getLogger("UI");
 log.enableAll();
-const RELIC_A_ID = "18221";
-const RELIC_B_ID = "18222";
-const RELIC_C_ID = "18224";
-const RELIC_D_ID = "18225";
-const RELIC_E_ID = "18226";
-const RELIC_F_ID = "18227";
-const RELIC_G_ID = "18228";
-const RELIC_H_ID = "18229";
-const RELIC_I_ID = "18230";
-const RELIC_N_WG_ID = "18215";
-const RELIC_SW_WG_ID = "18216";
-const RELIC_SE_WG_ID = "18217";
+const RELIC_A_ID = "6101"; // Kwahtee
+const RELIC_B_ID = "6102"; // Ikanam Bio
+const RELIC_C_ID = "6111"; // Sungrey
+const RELIC_D_ID = "6113"; // Onatha
+const RELIC_E_ID = "6123"; // Xelas
+const RELIC_F_ID = "6121"; // Wokuk
+const RELIC_G_ID = "6205"; // Bastion
+const RELIC_H_ID = "6204"; // Crux HQ
+const RELIC_I_ID = "6206"; // AFC
+const RELIC_N_WG_ID = "6001";
+const RELIC_SW_WG_ID = "6003";
+const RELIC_SE_WG_ID = "6002";
+const RELIC_A_REGION = "204000";
+const RELIC_B_REGION = "205000";
+const RELIC_C_REGION = "207000";
+const RELIC_D_REGION = "209000";
+const RELIC_E_REGION = "212000";
+const RELIC_F_REGION = "210001";
+const RELIC_G_REGION = "217000";
+const RELIC_H_REGION = "216000";
+const RELIC_I_REGION = "218000";
+const facilityToRegion = new Map([
+    [RELIC_A_REGION, RELIC_A_ID],
+    [RELIC_B_REGION, RELIC_B_ID],
+    [RELIC_C_REGION, RELIC_C_ID],
+    [RELIC_D_REGION, RELIC_D_ID],
+    [RELIC_E_REGION, RELIC_E_ID],
+    [RELIC_F_REGION, RELIC_F_ID],
+    [RELIC_G_REGION, RELIC_G_ID],
+    [RELIC_H_REGION, RELIC_H_ID],
+    [RELIC_I_REGION, RELIC_I_ID],
+]);
 /*
 const RELIC_A_ID: string = "18221";
 const RELIC_B_ID: string = "18222";
@@ -72781,9 +72801,9 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 [RELIC_D_ID, { regionID: RELIC_D_ID, faction: "", cutoff: false, adjacent: [RELIC_I_ID, RELIC_E_ID, RELIC_SE_WG_ID] }],
                 [RELIC_E_ID, { regionID: RELIC_E_ID, faction: "", cutoff: false, adjacent: [RELIC_I_ID, RELIC_D_ID, RELIC_SW_WG_ID] }],
                 [RELIC_F_ID, { regionID: RELIC_F_ID, faction: "", cutoff: false, adjacent: [RELIC_A_ID, RELIC_G_ID, RELIC_SW_WG_ID] }],
-                [RELIC_G_ID, { regionID: RELIC_H_ID, faction: "", cutoff: false, adjacent: [RELIC_A_ID, RELIC_F_ID, RELIC_H_ID, RELIC_I_ID] }],
-                [RELIC_H_ID, { regionID: RELIC_I_ID, faction: "", cutoff: false, adjacent: [RELIC_B_ID, RELIC_C_ID, RELIC_G_ID, RELIC_I_ID] }],
-                [RELIC_I_ID, { regionID: RELIC_B_ID, faction: "", cutoff: false, adjacent: [RELIC_E_ID, RELIC_D_ID, RELIC_G_ID, RELIC_H_ID] }],
+                [RELIC_G_ID, { regionID: RELIC_G_ID, faction: "", cutoff: false, adjacent: [RELIC_A_ID, RELIC_F_ID, RELIC_H_ID, RELIC_I_ID] }],
+                [RELIC_H_ID, { regionID: RELIC_H_ID, faction: "", cutoff: false, adjacent: [RELIC_B_ID, RELIC_C_ID, RELIC_G_ID, RELIC_I_ID] }],
+                [RELIC_I_ID, { regionID: RELIC_I_ID, faction: "", cutoff: false, adjacent: [RELIC_E_ID, RELIC_D_ID, RELIC_G_ID, RELIC_H_ID] }],
                 [RELIC_N_WG_ID, { regionID: RELIC_N_WG_ID, faction: "", cutoff: false, adjacent: [] }],
                 [RELIC_SE_WG_ID, { regionID: RELIC_SE_WG_ID, faction: "", cutoff: false, adjacent: [] }],
                 [RELIC_SW_WG_ID, { regionID: RELIC_SW_WG_ID, faction: "", cutoff: false, adjacent: [] }]
@@ -72857,20 +72877,6 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
         });
         this.settings.fromStorage = false;
         if (this.storage.enabled == true) {
-            /*
-            const settings: CoreSettings | null = StorageHelper.getSettings();
-
-            if (settings != null) {
-                this.settings.darkMode = settings.darkMode;
-                this.settings.serverID = settings.serverID;
-                this.settings.serviceToken = settings.serviceID;
-                this.settings.debug = settings.debug;
-
-                this.settings.fromStorage = true;
-
-                this.connect();
-            }
-            */
             const loggerMeta = Storage__WEBPACK_IMPORTED_MODULE_26__["StorageHelper"].getLoggers();
             if (loggerMeta != null) {
                 const existingLoggers = tcore__WEBPACK_IMPORTED_MODULE_23__["Logger"].getLoggerNames();
@@ -72953,9 +72959,33 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             this.coreObject = new tcore__WEBPACK_IMPORTED_MODULE_23___default.a("asdf", this.settings.serverID);
             this.coreObject.connect().ok(() => {
                 this.view = "map";
+                this.core.start();
+                setTimeout(() => {
+                    this.core.subscribe({
+                        worlds: ["all"],
+                        events: ["FacilityControl"],
+                        socket: "tracked"
+                    });
+                }, 1000);
+                this.core.on("base", (ev) => {
+                    var _a;
+                    if (this.relic.zoneID == "" || this.relic.serverID == "") {
+                        return;
+                    }
+                    if (ev.zoneID != this.relic.zoneID || ev.worldID != this.relic.serverID) {
+                        return;
+                    }
+                    const regionID = (_a = facilityToRegion.get(ev.facilityID)) !== null && _a !== void 0 ? _a : ev.facilityID;
+                    if (this.relic.regions.has(regionID)) {
+                        const region = this.relic.regions.get(regionID);
+                        region.faction = this.getFactionName(ev.factionID);
+                        log.debug(`${region.regionID} captured by ${ev.factionID}`);
+                        this.updateDesoMap();
+                    }
+                });
             });
             setInterval(() => __awaiter(this, void 0, void 0, function* () {
-                this.updateDesoMap();
+                this.refreshDesoMap();
             }), 5000);
         },
         copyDesoUrl: function () {
@@ -73007,7 +73037,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 --this.parameters.startTimeLeft;
             }
         },
-        updateDesoMap: function () {
+        refreshDesoMap: function () {
             return __awaiter(this, void 0, void 0, function* () {
                 if (this.relic.zoneID == "" || this.relic.serverID == "") {
                     log.debug(`zoneID ${this.relic.zoneID} or serverID ${this.relic.serverID} is blank`);
@@ -73023,46 +73053,80 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                     if (this.relic.regions.has(map.regionID)) {
                         const region = this.relic.regions.get(map.regionID);
                         region.faction = this.getFactionName(map.factionID);
-                        if (region.adjacent.length != 0) {
-                            let isCutoff = true;
-                            for (const adj of region.adjacent) {
-                                const adjRelic = this.relic.regions.get(adj);
-                                if (adjRelic && adjRelic.faction == region.faction) {
-                                    isCutoff = false;
-                                }
-                            }
-                            region.cutoff = isCutoff;
+                    }
+                }
+                this.updateDesoMap();
+            });
+        },
+        updateDesoMap: function () {
+            this.relic.vs_rate = 0;
+            this.relic.nc_rate = 0;
+            this.relic.tr_rate = 0;
+            this.relic.regions.forEach((relic, regionID) => {
+                if (relic.adjacent.length == 0) { // Skip warpgate bases
+                    return;
+                }
+                const queue = [];
+                queue.push(regionID);
+                const visited = [];
+                let iterFallback = 0;
+                let cutoff = true;
+                let iter = queue.shift();
+                //log.debug(`Checking cutoff of ${regionID}:`);
+                while (iter != undefined) {
+                    const ir = this.relic.regions.get(iter);
+                    if (ir == undefined) {
+                        throw `Relic ${iter} must exist`;
+                    }
+                    if (iterFallback > 100) {
+                        log.error(`Failed to find valid connection within 100 iterations, breaking`);
+                        break;
+                    }
+                    //log.debug(`\tProcessing region ${iter}`);
+                    if (ir.adjacent.length == 0) {
+                        //log.debug(`\t${ir.regionID} is a warpgate, is connected`);
+                        cutoff = false;
+                        break;
+                    }
+                    for (const adj of ir.adjacent) {
+                        const adjR = this.relic.regions.get(adj);
+                        if (adjR == undefined) {
+                            throw `Adjacent relic ${adj} must exist`;
+                        }
+                        if (adjR.faction != relic.faction) {
+                            //log.debug(`\tNot adding adjacent ${adjR.regionID}, different faction ID`);
+                            continue;
+                        }
+                        if (visited.find(iter => iter == adj) == null) {
+                            //log.debug(`\tAdding new region to check: ${adj}`);
+                            queue.push(adj);
                         }
                         else {
-                            region.cutoff = false;
+                            //log.debug(`\tSkipping ${adj}, already visited`);
                         }
+                        visited.push(adj);
                     }
+                    ++iterFallback;
+                    iter = queue.shift();
                 }
-                this.relic.vs_rate = 0;
-                this.relic.nc_rate = 0;
-                this.relic.tr_rate = 0;
-                this.relic.regions.forEach((relic, regionID) => {
-                    if (relic.adjacent.length == 0) { // Skip warpgate bases
-                        return;
-                    }
-                    if (relic.cutoff == true) {
-                        return;
-                    }
-                    if (relic.faction == "VS") {
-                        this.relic.vs_rate += 6;
-                    }
-                    else if (relic.faction == "NC") {
-                        this.relic.nc_rate += 6;
-                    }
-                    else if (relic.faction == "TR") {
-                        this.relic.tr_rate += 6;
-                    }
-                });
-                this.$forceUpdate();
-                for (const child of this.$children) {
-                    child.$forceUpdate();
+                relic.cutoff = cutoff;
+                if (relic.cutoff == true) {
+                    return;
+                }
+                if (relic.faction == "VS") {
+                    this.relic.vs_rate += 6;
+                }
+                else if (relic.faction == "NC") {
+                    this.relic.nc_rate += 6;
+                }
+                else if (relic.faction == "TR") {
+                    this.relic.tr_rate += 6;
                 }
             });
+            this.$forceUpdate();
+            for (const child of this.$children) {
+                child.$forceUpdate();
+            }
         },
         getFactionName: function (factionID) {
             if (factionID == "1") {
@@ -73677,9 +73741,9 @@ window.MapAPI = tcore__WEBPACK_IMPORTED_MODULE_23__["MapAPI"];
 /***/ }),
 
 /***/ 0:
-/*!*********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
-  !*** multi ./src/addons/SquadAddon.ts ./src/app/App.ts ./src/app/AppRealtime.ts ./src/BreakdownBar.ts ./src/BreakdownBox.ts ./src/BreakdownChart.ts ./src/BreakdownInterval.ts ./src/BreakdownList.ts ./src/ColorHelper.ts ./src/FightReportTop.ts ./src/index.ts ./src/KillfeedSquad.ts ./src/Loadable.ts ./src/LoggerMetadata.ts ./src/MomentFilter.ts ./src/OutfitTrends.ts ./src/PersonalReportGenerator.ts ./src/Quartile.ts ./src/Storage.ts ./src/VehicleVersusEntry.ts ***!
-  \*********************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
+/*!*****************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************!*\
+  !*** multi ./src/addons/SquadAddon.ts ./src/app/App.ts ./src/app/AppRealtime.ts ./src/BreakdownBar.ts ./src/BreakdownBox.ts ./src/BreakdownChart.ts ./src/BreakdownInterval.ts ./src/BreakdownList.ts ./src/ColorHelper.ts ./src/FightReportTop.ts ./src/index.ts ./src/KillfeedSquad.ts ./src/Loadable.ts ./src/LoggerMetadata.ts ./src/MomentFilter.ts ./src/OutfitTrends.ts ./src/PersonalReportGenerator.ts ./src/Quartile.ts ./src/RelicImage.ts ./src/Storage.ts ./src/VehicleVersusEntry.ts ***!
+  \*****************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************************/
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
@@ -73701,6 +73765,7 @@ __webpack_require__(/*! ./src/MomentFilter.ts */"./src/MomentFilter.ts");
 __webpack_require__(/*! ./src/OutfitTrends.ts */"./src/OutfitTrends.ts");
 __webpack_require__(/*! ./src/PersonalReportGenerator.ts */"./src/PersonalReportGenerator.ts");
 __webpack_require__(/*! ./src/Quartile.ts */"./src/Quartile.ts");
+__webpack_require__(/*! ./src/RelicImage.ts */"./src/RelicImage.ts");
 __webpack_require__(/*! ./src/Storage.ts */"./src/Storage.ts");
 module.exports = __webpack_require__(/*! ./src/VehicleVersusEntry.ts */"./src/VehicleVersusEntry.ts");
 

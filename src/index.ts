@@ -50,7 +50,7 @@ import Core, {
     Weapon, WeaponAPI,
     Region, MapAPI,
     Facility, FacilityAPI,
-    TEvent,
+    TEvent, TBaseEvent,
     PsEvent, PsEventType, PsEvents
 } from "tcore";
 
@@ -60,7 +60,7 @@ import { SquadAddon } from "addons/SquadAddon";
 import { StorageHelper } from "Storage";
 import { LoggerMetadata, LoggerMetadataLevel } from "LoggerMetadata";
 import * as loglevel from "loglevel";
-import { param } from "jquery";
+import { map, param } from "jquery";
 import { OutfitReportParameters } from "../../topt-core/build/core/index.js";
 
 (window as any).CharacterAPI = CharacterAPI;
@@ -80,18 +80,40 @@ type Relic = {
     adjacent: string[];
 }
 
-const RELIC_A_ID: string = "18221";
-const RELIC_B_ID: string = "18222";
-const RELIC_C_ID: string = "18224";
-const RELIC_D_ID: string = "18225";
-const RELIC_E_ID: string = "18226";
-const RELIC_F_ID: string = "18227";
-const RELIC_G_ID: string = "18228";
-const RELIC_H_ID: string = "18229";
-const RELIC_I_ID: string = "18230";
-const RELIC_N_WG_ID: string = "18215";
-const RELIC_SW_WG_ID: string = "18216";
-const RELIC_SE_WG_ID: string = "18217";
+const RELIC_A_ID: string = "6101"; // Kwahtee
+const RELIC_B_ID: string = "6102"; // Ikanam Bio
+const RELIC_C_ID: string = "6111"; // Sungrey
+const RELIC_D_ID: string = "6113"; // Onatha
+const RELIC_E_ID: string = "6123"; // Xelas
+const RELIC_F_ID: string = "6121"; // Wokuk
+const RELIC_G_ID: string = "6205"; // Bastion
+const RELIC_H_ID: string = "6204"; // Crux HQ
+const RELIC_I_ID: string = "6206"; // AFC
+const RELIC_N_WG_ID: string = "6001";
+const RELIC_SW_WG_ID: string = "6003";
+const RELIC_SE_WG_ID: string = "6002";
+
+const RELIC_A_REGION: string = "204000";
+const RELIC_B_REGION: string = "205000";
+const RELIC_C_REGION: string = "207000";
+const RELIC_D_REGION: string = "209000";
+const RELIC_E_REGION: string = "212000";
+const RELIC_F_REGION: string = "210001";
+const RELIC_G_REGION: string = "217000";
+const RELIC_H_REGION: string = "216000";
+const RELIC_I_REGION: string = "218000";
+
+const facilityToRegion: Map<string, string> = new Map([
+    [RELIC_A_REGION, RELIC_A_ID],
+    [RELIC_B_REGION, RELIC_B_ID],
+    [RELIC_C_REGION, RELIC_C_ID],
+    [RELIC_D_REGION, RELIC_D_ID],
+    [RELIC_E_REGION, RELIC_E_ID],
+    [RELIC_F_REGION, RELIC_F_ID],
+    [RELIC_G_REGION, RELIC_G_ID],
+    [RELIC_H_REGION, RELIC_H_ID],
+    [RELIC_I_REGION, RELIC_I_ID],
+]);
 
 /*
 const RELIC_A_ID: string = "18221";
@@ -171,9 +193,9 @@ export const vm = new Vue({
                 [RELIC_D_ID, { regionID: RELIC_D_ID, faction: "", cutoff: false, adjacent: [RELIC_I_ID, RELIC_E_ID, RELIC_SE_WG_ID] }],
                 [RELIC_E_ID, { regionID: RELIC_E_ID, faction: "", cutoff: false, adjacent: [RELIC_I_ID, RELIC_D_ID, RELIC_SW_WG_ID] }],
                 [RELIC_F_ID, { regionID: RELIC_F_ID, faction: "", cutoff: false, adjacent: [RELIC_A_ID, RELIC_G_ID, RELIC_SW_WG_ID] }],
-                [RELIC_G_ID, { regionID: RELIC_H_ID, faction: "", cutoff: false, adjacent: [RELIC_A_ID, RELIC_F_ID, RELIC_H_ID, RELIC_I_ID] }],
-                [RELIC_H_ID, { regionID: RELIC_I_ID, faction: "", cutoff: false, adjacent: [RELIC_B_ID, RELIC_C_ID, RELIC_G_ID, RELIC_I_ID] }],
-                [RELIC_I_ID, { regionID: RELIC_B_ID, faction: "", cutoff: false, adjacent: [RELIC_E_ID, RELIC_D_ID, RELIC_G_ID, RELIC_H_ID] }],
+                [RELIC_G_ID, { regionID: RELIC_G_ID, faction: "", cutoff: false, adjacent: [RELIC_A_ID, RELIC_F_ID, RELIC_H_ID, RELIC_I_ID] }],
+                [RELIC_H_ID, { regionID: RELIC_H_ID, faction: "", cutoff: false, adjacent: [RELIC_B_ID, RELIC_C_ID, RELIC_G_ID, RELIC_I_ID] }],
+                [RELIC_I_ID, { regionID: RELIC_I_ID, faction: "", cutoff: false, adjacent: [RELIC_E_ID, RELIC_D_ID, RELIC_G_ID, RELIC_H_ID] }],
                 [RELIC_N_WG_ID, { regionID: RELIC_N_WG_ID, faction: "", cutoff: false, adjacent: [] }],
                 [RELIC_SE_WG_ID, { regionID: RELIC_SE_WG_ID, faction: "", cutoff: false, adjacent: [] }],
                 [RELIC_SW_WG_ID, { regionID: RELIC_SW_WG_ID, faction: "", cutoff: false, adjacent: [] }]
@@ -273,21 +295,6 @@ export const vm = new Vue({
         this.settings.fromStorage = false;
 
         if (this.storage.enabled == true) {
-            /*
-            const settings: CoreSettings | null = StorageHelper.getSettings();
-
-            if (settings != null) {
-                this.settings.darkMode = settings.darkMode;
-                this.settings.serverID = settings.serverID;
-                this.settings.serviceToken = settings.serviceID;
-                this.settings.debug = settings.debug;
-
-                this.settings.fromStorage = true;
-
-                this.connect();
-            }
-            */
-
             const loggerMeta: LoggerMetadata[] | null = StorageHelper.getLoggers();
             if (loggerMeta != null) {
                 const existingLoggers: string[] = Logger.getLoggerNames();
@@ -381,10 +388,39 @@ export const vm = new Vue({
             this.coreObject = new Core("asdf", this.settings.serverID);
             this.coreObject.connect().ok(() => {
                 this.view = "map";
+
+                this.core.start();
+
+                setTimeout(() => {
+                    this.core.subscribe({
+                        worlds: [ "all" ],
+                        events: [ "FacilityControl" ],
+                        socket: "tracked"
+                    });
+                }, 1000);
+
+                this.core.on("base", (ev: TBaseEvent) => {
+                    if (this.relic.zoneID == "" || this.relic.serverID == "") {
+                        return;
+                    }
+
+                    if (ev.zoneID != this.relic.zoneID || ev.worldID != this.relic.serverID) {
+                        return;
+                    }
+
+                    const regionID: string = facilityToRegion.get(ev.facilityID) ?? ev.facilityID;
+
+                    if (this.relic.regions.has(regionID)) {
+                        const region: Relic = this.relic.regions.get(regionID)!;
+                        region.faction = this.getFactionName(ev.factionID);
+                        log.debug(`${region.regionID} captured by ${ev.factionID}`);
+                        this.updateDesoMap();
+                    }
+                });
             });
 
             setInterval(async () => {
-                this.updateDesoMap();
+                this.refreshDesoMap();
             }, 5000);
         },
 
@@ -447,7 +483,7 @@ export const vm = new Vue({
             }
         },
 
-        updateDesoMap: async function(): Promise<void> {
+        refreshDesoMap: async function(): Promise<void> {
             if (this.relic.zoneID == "" || this.relic.serverID == "") {
                 log.debug(`zoneID ${this.relic.zoneID} or serverID ${this.relic.serverID} is blank`);
                 return;
@@ -465,22 +501,13 @@ export const vm = new Vue({
                 if (this.relic.regions.has(map.regionID)) {
                     const region: Relic = this.relic.regions.get(map.regionID)!;
                     region.faction = this.getFactionName(map.factionID);
-
-                    if (region.adjacent.length != 0) {
-                        let isCutoff: boolean = true;
-                        for (const adj of region.adjacent) {
-                            const adjRelic = this.relic.regions.get(adj);
-                            if (adjRelic && adjRelic.faction == region.faction) {
-                                isCutoff = false;
-                            }
-                        }
-                        region.cutoff = isCutoff;
-                    } else {
-                        region.cutoff = false;
-                    }
                 }
             }
 
+            this.updateDesoMap();
+        },
+
+        updateDesoMap: function(): void {
             this.relic.vs_rate = 0;
             this.relic.nc_rate = 0;
             this.relic.tr_rate = 0;
@@ -489,6 +516,60 @@ export const vm = new Vue({
                 if (relic.adjacent.length == 0) { // Skip warpgate bases
                     return;
                 }
+
+                const queue: string[] = [];
+                queue.push(regionID);
+                const visited: string[] = [];
+
+                let iterFallback: number = 0;
+
+                let cutoff: boolean = true;
+                let iter: string | undefined =  queue.shift();
+                //log.debug(`Checking cutoff of ${regionID}:`);
+                while (iter != undefined) {
+                    const ir: Relic | undefined = this.relic.regions.get(iter);
+                    if (ir == undefined) {
+                        throw `Relic ${iter} must exist`;
+                    }
+
+                    if (iterFallback > 100) {
+                        log.error(`Failed to find valid connection within 100 iterations, breaking`);
+                        break;
+                    }
+
+                    //log.debug(`\tProcessing region ${iter}`);
+
+                    if (ir.adjacent.length == 0) {
+                        //log.debug(`\t${ir.regionID} is a warpgate, is connected`);
+                        cutoff = false;
+                        break;
+                    }
+
+                    for (const adj of ir.adjacent) {
+                        const adjR: Relic | undefined = this.relic.regions.get(adj);
+                        if (adjR == undefined) {
+                            throw `Adjacent relic ${adj} must exist`;
+                        }
+                        if (adjR.faction != relic.faction) {
+                            //log.debug(`\tNot adding adjacent ${adjR.regionID}, different faction ID`);
+                            continue;
+                        }
+
+                        if (visited.find(iter => iter == adj) == null) {
+                            //log.debug(`\tAdding new region to check: ${adj}`);
+                            queue.push(adj);
+                        } else {
+                            //log.debug(`\tSkipping ${adj}, already visited`);
+                        }
+                        visited.push(adj);
+                    }
+
+                    ++iterFallback;
+
+                    iter = queue.shift();
+                }
+
+                relic.cutoff = cutoff;
 
                 if (relic.cutoff == true) {
                     return;

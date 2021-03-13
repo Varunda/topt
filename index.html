@@ -245,36 +245,7 @@
         </div>
 
         <div v-else-if="view == 'map'" class="row">
-            <img src="./data/relics/relic_overlay_base.png" style="position: absolute; top: 0;">
-
-            <div style="position: absolute; top: 0; width: 562px; height: 469px; font-size: 24pt; z-index: 1000">
-                <span style="position: absolute; top: 95px; left: 175px">A</span>
-                <span style="position: absolute; top: 95px; left: 372px">B</span>
-                <span style="position: absolute; top: 220px; left: 460px">C</span>
-                <span style="position: absolute; top: 395px; left: 375px">D</span>
-                <span style="position: absolute; top: 395px; left: 175px">E</span>
-                <span style="position: absolute; top: 225px; left: 93px">F</span>
-                <span style="position: absolute; top: 203px; left: 214px">G</span>
-                <span style="position: absolute; top: 203px; left: 311px">H</span>
-                <span style="position: absolute; top: 289px; left: 270px">I</span>
-            </div>
-
-            <template v-if="relic.connected == true">
-                <relic-image :relic-id="relic.A" :map="relic.regions" img="A_"></relic-image>
-                <relic-image :relic-id="relic.B" :map="relic.regions" img="B_"></relic-image>
-                <relic-image :relic-id="relic.C" :map="relic.regions" img="C_"></relic-image>
-                <relic-image :relic-id="relic.D" :map="relic.regions" img="D_"></relic-image>
-                <relic-image :relic-id="relic.E" :map="relic.regions" img="E_"></relic-image>
-                <relic-image :relic-id="relic.F" :map="relic.regions" img="F_"></relic-image>
-                <relic-image :relic-id="relic.G" :map="relic.regions" img="G_"></relic-image>
-                <relic-image :relic-id="relic.H" :map="relic.regions" img="H_"></relic-image>
-                <relic-image :relic-id="relic.I" :map="relic.regions" img="I_"></relic-image>
-                <relic-image :relic-id="relic.N_WG" :map="relic.regions" img="N_WG_"></relic-image>
-                <relic-image :relic-id="relic.SE_WG" :map="relic.regions" img="SE_WG_"></relic-image>
-                <relic-image :relic-id="relic.SW_WG" :map="relic.regions" img="SW_WG_"></relic-image>
-            </template>
-
-            <div style="position: absolute; top: 480px; width: 562px;">
+            <div style="position: absolute; width: 562px;">
                 <div class="row mx-0">
                     <div class="col-4 p-0">
                         <button class="btn w-100 px-0 ow-score" style="background-color: purple">
@@ -294,6 +265,35 @@
                             {{relic.tr_rate}} pt/min
                         </button>
                     </div>
+                </div>
+            </div>
+
+            <div style="position: absolute; top: 52px; left: 0; width: 562px; height: 519px;">
+                <div style="position: absolute; width: 562px; height: 469px; font-size: 24pt; z-index: 1000">
+                    <span style="position: absolute; top: 95px; left: 175px">A</span>
+                    <span style="position: absolute; top: 95px; left: 372px">B</span>
+                    <span style="position: absolute; top: 220px; left: 460px">C</span>
+                    <span style="position: absolute; top: 395px; left: 375px">D</span>
+                    <span style="position: absolute; top: 395px; left: 175px">E</span>
+                    <span style="position: absolute; top: 225px; left: 93px">F</span>
+                    <span style="position: absolute; top: 203px; left: 214px">G</span>
+                    <span style="position: absolute; top: 203px; left: 311px">H</span>
+                    <span style="position: absolute; top: 289px; left: 270px">I</span>
+                </div>
+                <img src="./data/relics/relic_overlay_base.png" style="position: absolute;">
+                <div v-if="relic.connected == true">
+                    <relic-image :relic-id="relic.A" :map="relic.regions" img="A_"></relic-image>
+                    <relic-image :relic-id="relic.B" :map="relic.regions" img="B_"></relic-image>
+                    <relic-image :relic-id="relic.C" :map="relic.regions" img="C_"></relic-image>
+                    <relic-image :relic-id="relic.D" :map="relic.regions" img="D_"></relic-image>
+                    <relic-image :relic-id="relic.E" :map="relic.regions" img="E_"></relic-image>
+                    <relic-image :relic-id="relic.F" :map="relic.regions" img="F_"></relic-image>
+                    <relic-image :relic-id="relic.G" :map="relic.regions" img="G_"></relic-image>
+                    <relic-image :relic-id="relic.H" :map="relic.regions" img="H_"></relic-image>
+                    <relic-image :relic-id="relic.I" :map="relic.regions" img="I_"></relic-image>
+                    <relic-image :relic-id="relic.N_WG" :map="relic.regions" img="N_WG_"></relic-image>
+                    <relic-image :relic-id="relic.SE_WG" :map="relic.regions" img="SE_WG_"></relic-image>
+                    <relic-image :relic-id="relic.SW_WG" :map="relic.regions" img="SW_WG_"></relic-image>
                 </div>
             </div>
 
