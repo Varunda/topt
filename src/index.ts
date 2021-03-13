@@ -80,6 +80,7 @@ type Relic = {
     adjacent: string[];
 }
 
+/*
 const RELIC_A_ID: string = "6101"; // Kwahtee
 const RELIC_B_ID: string = "6102"; // Ikanam Bio
 const RELIC_C_ID: string = "6111"; // Sungrey
@@ -102,20 +103,8 @@ const RELIC_F_REGION: string = "210001";
 const RELIC_G_REGION: string = "217000";
 const RELIC_H_REGION: string = "216000";
 const RELIC_I_REGION: string = "218000";
+*/
 
-const facilityToRegion: Map<string, string> = new Map([
-    [RELIC_A_REGION, RELIC_A_ID],
-    [RELIC_B_REGION, RELIC_B_ID],
-    [RELIC_C_REGION, RELIC_C_ID],
-    [RELIC_D_REGION, RELIC_D_ID],
-    [RELIC_E_REGION, RELIC_E_ID],
-    [RELIC_F_REGION, RELIC_F_ID],
-    [RELIC_G_REGION, RELIC_G_ID],
-    [RELIC_H_REGION, RELIC_H_ID],
-    [RELIC_I_REGION, RELIC_I_ID],
-]);
-
-/*
 const RELIC_A_ID: string = "18221";
 const RELIC_B_ID: string = "18222";
 const RELIC_C_ID: string = "18224";
@@ -128,7 +117,28 @@ const RELIC_I_ID: string = "18230";
 const RELIC_N_WG_ID: string = "18215";
 const RELIC_SE_WG_ID: string = "18216";
 const RELIC_SW_WG_ID: string = "18217";
-*/
+
+const RELIC_A_REGION: string = "400284";
+const RELIC_B_REGION: string = "400285";
+const RELIC_C_REGION: string = "400287";
+const RELIC_D_REGION: string = "400288";
+const RELIC_E_REGION: string = "400289";
+const RELIC_F_REGION: string = "400290";
+const RELIC_G_REGION: string = "400291";
+const RELIC_H_REGION: string = "400292";
+const RELIC_I_REGION: string = "400293";
+
+const facilityToRegion: Map<string, string> = new Map([
+    [RELIC_A_REGION, RELIC_A_ID],
+    [RELIC_B_REGION, RELIC_B_ID],
+    [RELIC_C_REGION, RELIC_C_ID],
+    [RELIC_D_REGION, RELIC_D_ID],
+    [RELIC_E_REGION, RELIC_E_ID],
+    [RELIC_F_REGION, RELIC_F_ID],
+    [RELIC_G_REGION, RELIC_G_ID],
+    [RELIC_H_REGION, RELIC_H_ID],
+    [RELIC_I_REGION, RELIC_I_ID],
+]);
 
 export const vm = new Vue({
     el: "#app" as string,
