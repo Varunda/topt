@@ -115,8 +115,8 @@ const RELIC_G_ID: string = "18228";
 const RELIC_H_ID: string = "18229";
 const RELIC_I_ID: string = "18230";
 const RELIC_N_WG_ID: string = "18215";
-const RELIC_SE_WG_ID: string = "18216";
-const RELIC_SW_WG_ID: string = "18217";
+const RELIC_SE_WG_ID: string = "18217";
+const RELIC_SW_WG_ID: string = "18216";
 
 const RELIC_A_REGION: string = "400284";
 const RELIC_B_REGION: string = "400285";
