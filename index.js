@@ -72921,14 +72921,17 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             const vsTag = params.get("vs_tag");
             if (vsTag) {
                 this.relic.outfits.vs = vsTag;
+                this.core.addOutfit(vsTag);
             }
             const ncTag = params.get("nc_tag");
             if (ncTag) {
                 this.relic.outfits.nc = ncTag;
+                this.core.addOutfit(ncTag);
             }
             const trTag = params.get("tr_tag");
             if (trTag) {
                 this.relic.outfits.tr = trTag;
+                this.core.addOutfit(trTag);
             }
             this.startMap();
         }

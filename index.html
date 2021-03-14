@@ -85,34 +85,34 @@
             animation-iteration-count: infinite;
         }
 
-        .scoreboardborder{
-            width: 29.48vw;
+        .scoreboardborder {
+            width: 37.95%;
             border-left: 4.17vw solid transparent;
             border-right: 4.17vw solid transparent;
             border-top: 7.22vh solid rgb(218, 194, 166);
             position: absolute;
-            left: 31.04vw;
+            left: 31%;
         }
 
         .scoreboardbackhalf1 {
-            width: 23%;
-            height: 6.80%;
+            width: 23vw;
+            height: 6.80vh;
             background: linear-gradient(rgb(50, 50, 50), black 70%);
             transform: skewX(-45deg);
             position: absolute;
-            left: 43.45%
+            left: 43.45vw;
         }
 
         .scoreboardbackhalf2 {
-            width: 23%;
+            width: 23vw;
             height: 6.80%;
             background: linear-gradient(rgb(50, 50, 50), black 70%);
             transform: skewX(45deg);
             position: absolute;
-            left: 33.45vw
+            left: 33.45vw;
         }
 
-        .gradientNC {
+        .gradientNC{
             width: 17.02vw;
             height: 11.26vh;
             background: radial-gradient(ellipse at center, rgba(23, 54, 118, 1), rgba(0, 0, 0, 0) 50%);
@@ -121,7 +121,7 @@
             top: -4.5vh;
         }
 
-        .gradientVS {
+        .gradientVS{
             width: 17.02vw;
             height: 11.26vh;
             background: radial-gradient(ellipse at center, rgba(62, 24, 99, 1), rgba(0, 0, 0, 0) 50%);
@@ -130,7 +130,7 @@
             top: -4.5vh;
         }
 
-        .gradientTR {
+        .gradientTR{
             width: 17.02vw;
             height: 11.26vh;
             background: radial-gradient(ellipse at center, rgba(102, 10, 0, 1), rgba(0, 0, 0, 0) 50%);
@@ -139,31 +139,31 @@
             top: -4.5vh;
         }
 
-        .ratetextVS {
-            position: absolute;
-            left: 49.78vw;
-            top: 4.55vh;
-            color: white;
-            font-size: 0.91vw;
-            font-family: "Bahnschrift"
+        .ratetextVS{
+        position: absolute;
+        left: 49.78vw;
+        top: 4.55vh;
+        color: white;
+        font-size: 0.91vw;
+        font-family: "Bahnschrift"
         }
 
-        .ratetextTR {
-            position: absolute;
-            left: 40.40vw;
-            top: 4.55vh;
-            color: white;
-            font-size: 0.91vw;
-            font-family: "Bahnschrift"
+        .ratetextTR{
+        position: absolute;
+        left: 40.40vw;
+        top: 4.55vh;
+        color: white;
+        font-size: 0.91vw;
+        font-family: "Bahnschrift"
         }
 
-        .ratetextNC {
-            position: absolute;
-            left: 59.15vw;
-            top: 4.55vh;
-            color: white;
-            font-size: 0.91vw;
-            font-family: "Bahnschrift"
+        .ratetextNC{
+        position: absolute;
+        left: 59.15vw;
+        top: 4.55vh;
+        color: white;
+        font-size: 0.91vw;
+        font-family: "Bahnschrift"
         }
     </style>
 </head>
@@ -327,18 +327,26 @@
 
         <div v-else-if="view == 'map'" class="row">
 
-            <!--
             <div class="scoreboardborder"></div>
             <div class='scoreboardbackhalf1'></div>
             <div class='scoreboardbackhalf2'></div>
             <div class="gradientTR"></div>
             <div class="gradientNC"></div>
             <div class="gradientVS"></div>
-            <div class='ratetextVS'>{{relic.tr_rate}} pt/min</div>
-            <div class='ratetextNC'>{{relic.vs_rate}} pt/min</div>
-            <div class='ratetextTR'>{{relic.nc_rate}} pt/min</div>
-            -->
+            <div class='ratetextTR'>
+                {{relic.outfits.tr != '' ? relic.outfits.tr : "TR"}}:
+                {{relic.tr_rate}} pt/min
+            </div>
+            <div class='ratetextVS'>
+                {{relic.outfits.vs != '' ? relic.outfits.vs : "VS"}}:
+                {{relic.vs_rate}} pt/min
+            </div>
+            <div class='ratetextNC'>
+                {{relic.outfits.nc != '' ? relic.outfits.nc : "NC"}}:
+                {{relic.nc_rate}} pt/min
+            </div>
 
+            <!--
             <div style="position: absolute; width: 562px;">
                 <div class="row mx-0">
                     <div class="col-4 p-0">
@@ -361,8 +369,9 @@
                     </div>
                 </div>
             </div>
+            -->
 
-            <div style="position: absolute; top: 52px; left: 0; width: 562px; height: 519px;">
+            <div style="position: absolute; bottom: 0; right: 0; width: 562px; height: 519px;">
                 <div style="position: absolute; width: 562px; height: 469px; font-size: 24pt; z-index: 1000">
                     <span style="position: absolute; top: 95px; left: 175px">A</span>
                     <span style="position: absolute; top: 95px; left: 372px">B</span>

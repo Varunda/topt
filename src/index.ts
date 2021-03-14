@@ -140,6 +140,19 @@ const facilityToRegion: Map<string, string> = new Map([
     [RELIC_I_REGION, RELIC_I_ID],
 ]);
 
+type DesoOutfit = {
+    tag: string;
+    count: number;
+    kills: number;
+    deaths: number;
+    revives: number;
+    armorKills: number;
+    airKills: number;
+    sundySpawns: number;
+    constructionSpawns: number;
+    squadSpawns: number;
+};
+
 export const vm = new Vue({
     el: "#app" as string,
 
@@ -345,11 +358,20 @@ export const vm = new Vue({
             this.relic.serverID = serverID;
 
             const vsTag: string | null = params.get("vs_tag");
-            if (vsTag) { this.relic.outfits.vs = vsTag; }
+            if (vsTag) {
+                this.relic.outfits.vs = vsTag;
+                this.core.addOutfit(vsTag);
+            }
             const ncTag: string | null = params.get("nc_tag");
-            if (ncTag) { this.relic.outfits.nc = ncTag; }
+            if (ncTag) {
+                this.relic.outfits.nc = ncTag;
+                this.core.addOutfit(ncTag);
+            }
             const trTag: string | null = params.get("tr_tag");
-            if (trTag) { this.relic.outfits.tr = trTag; }
+            if (trTag) {
+                this.relic.outfits.tr = trTag;
+                this.core.addOutfit(trTag);
+            }
 
             this.startMap();
         } else {
