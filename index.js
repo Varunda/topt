@@ -73007,6 +73007,9 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                     });
                 }, 1000);
                 this.core.on("kill", (ev) => {
+                    if (ev.zoneID != this.relic.zoneID) {
+                        return;
+                    }
                     const char = this.core.characters.find(i => i.ID == ev.sourceID);
                     if (!char) {
                         return;
@@ -73022,6 +73025,9 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                     }
                 });
                 this.core.on("death", (ev) => {
+                    if (ev.zoneID != this.relic.zoneID) {
+                        return;
+                    }
                     const char = this.core.characters.find(i => i.ID == ev.sourceID);
                     if (!char) {
                         return;
@@ -73037,6 +73043,9 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                     }
                 });
                 this.core.on("exp", (ev) => {
+                    if (ev.zoneID != this.relic.zoneID) {
+                        return;
+                    }
                     const char = this.core.characters.find(i => i.ID == ev.sourceID);
                     if (!char) {
                         return;
