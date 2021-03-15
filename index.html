@@ -31,6 +31,11 @@
             display: none;
         }
 
+        .tbl-icon {
+            width: 20px;
+            height: 20px;
+        }
+
         .header {
             margin-left: -15px;
             margin-right: -15px;
@@ -85,34 +90,34 @@
             animation-iteration-count: infinite;
         }
 
-        .scoreboardborder{
-            width: 29.48vw;
+        .scoreboardborder {
+            width: 37.95%;
             border-left: 4.17vw solid transparent;
             border-right: 4.17vw solid transparent;
             border-top: 7.22vh solid rgb(218, 194, 166);
             position: absolute;
-            left: 31.04vw;
+            left: 31%;
         }
 
         .scoreboardbackhalf1 {
-            width: 23%;
-            height: 6.80%;
+            width: 23vw;
+            height: 6.80vh;
             background: linear-gradient(rgb(50, 50, 50), black 70%);
             transform: skewX(-45deg);
             position: absolute;
-            left: 43.45%
+            left: 43.45vw;
         }
 
         .scoreboardbackhalf2 {
-            width: 23%;
+            width: 23vw;
             height: 6.80%;
             background: linear-gradient(rgb(50, 50, 50), black 70%);
             transform: skewX(45deg);
             position: absolute;
-            left: 33.45vw
+            left: 33.45vw;
         }
 
-        .gradientNC {
+        .gradientNC{
             width: 17.02vw;
             height: 11.26vh;
             background: radial-gradient(ellipse at center, rgba(23, 54, 118, 1), rgba(0, 0, 0, 0) 50%);
@@ -121,7 +126,7 @@
             top: -4.5vh;
         }
 
-        .gradientVS {
+        .gradientVS{
             width: 17.02vw;
             height: 11.26vh;
             background: radial-gradient(ellipse at center, rgba(62, 24, 99, 1), rgba(0, 0, 0, 0) 50%);
@@ -130,7 +135,7 @@
             top: -4.5vh;
         }
 
-        .gradientTR {
+        .gradientTR{
             width: 17.02vw;
             height: 11.26vh;
             background: radial-gradient(ellipse at center, rgba(102, 10, 0, 1), rgba(0, 0, 0, 0) 50%);
@@ -139,31 +144,31 @@
             top: -4.5vh;
         }
 
-        .ratetextVS {
-            position: absolute;
-            left: 49.78vw;
-            top: 4.55vh;
-            color: white;
-            font-size: 0.91vw;
-            font-family: "Bahnschrift"
+        .ratetextVS{
+        position: absolute;
+        left: 49.78vw;
+        top: 4.55vh;
+        color: white;
+        font-size: 0.91vw;
+        font-family: "Bahnschrift"
         }
 
-        .ratetextTR {
-            position: absolute;
-            left: 40.40vw;
-            top: 4.55vh;
-            color: white;
-            font-size: 0.91vw;
-            font-family: "Bahnschrift"
+        .ratetextTR{
+        position: absolute;
+        left: 40.40vw;
+        top: 4.55vh;
+        color: white;
+        font-size: 0.91vw;
+        font-family: "Bahnschrift"
         }
 
-        .ratetextNC {
-            position: absolute;
-            left: 59.15vw;
-            top: 4.55vh;
-            color: white;
-            font-size: 0.91vw;
-            font-family: "Bahnschrift"
+        .ratetextNC{
+        position: absolute;
+        left: 59.15vw;
+        top: 4.55vh;
+        color: white;
+        font-size: 0.91vw;
+        font-family: "Bahnschrift"
         }
     </style>
 </head>
@@ -176,113 +181,115 @@
         </template>
 
         <div v-if="view == 'setup'" class="d-flex" style="flex-direction: column;">
-            <div class="w-25 align-self-center pt-5">
-                <div class="input-group">
-                    <div class="input-group-prepend">
-                        <span class="input-group-text">
-                            Server
-                        </span>
+            <div v-if="relic.showUI != false">
+                <div class="w-25 align-self-center pt-5">
+                    <div class="input-group">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text">
+                                Server
+                            </span>
+                        </div>
+
+                        <select v-model="settings.serverID" class="form-control">
+                            <option value="1">Connery</option>
+                            <option value="17">Emerald</option>
+                            <option value="10">Miller</option>
+                            <option value="13">Cobalt</option>
+                            <option value="40">SolTech</option>
+                            <option value="19">Jaeger</option>
+                        </select>
                     </div>
 
-                    <select v-model="settings.serverID" class="form-control">
-                        <option value="1">Connery</option>
-                        <option value="17">Emerald</option>
-                        <option value="10">Miller</option>
-                        <option value="13">Cobalt</option>
-                        <option value="40">SolTech</option>
-                        <option value="19">Jaeger</option>
-                    </select>
-                </div>
+                    <small class="text-muted">
+                        Used to track logins, facility captures and router kills
+                    </small>
 
-                <small class="text-muted">
-                    Used to track logins, facility captures and router kills
-                </small>
+                    <hr/>
 
-                <hr/>
-
-                <div>
-                    Enter your Service ID:
-                </div>
-
-                <div class="input-group">
-                    <div class="input-group-prepend">
-                        <span class="input-group-text">
-                            s:
-                        </span>
+                    <div>
+                        Enter your Service ID:
                     </div>
-                    <input v-model="settings.serviceToken"
-                        class="form-control"
-                        autofocus
-                        type="text"
-                        @keyup.enter="connect"
-                        placeholder="Service token"
-                    >
-                </div>
 
-                <small class="text-muted d-block">
-                    Do not include the leading s:
-                </small>
+                    <div class="input-group">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text">
+                                s:
+                            </span>
+                        </div>
+                        <input v-model="settings.serviceToken"
+                            class="form-control"
+                            autofocus
+                            type="text"
+                            @keyup.enter="connect"
+                            placeholder="Service token"
+                        >
+                    </div>
 
-                <small class="text-muted">
-                    Don't have one?
-                    <a href="http://census.daybreakgames.com/#devSignup" target="_blank">
-                        Sign up
-                    </a>
-                </small>
+                    <small class="text-muted d-block">
+                        Do not include the leading s:
+                    </small>
 
-                <hr>
+                    <small class="text-muted">
+                        Don't have one?
+                        <a href="http://census.daybreakgames.com/#devSignup" target="_blank">
+                            Sign up
+                        </a>
+                    </small>
 
-                <button @click="connect" type="button" class="btn btn-primary w-100"
-                    :disabled="canConnect == false">
-                    Connect
-                </button>
+                    <hr>
 
-                <small class="text-muted">
-                    You can also hit enter while in the service ID field to connect
-                </small>
-
-                <hr>
-
-                <button v-if="storage.enabled" @click="saveSettings" type="button" class="btn btn-success w-100">
-                    Save and connect
-                </button>
-
-                <span class="text-muted">
-                    Save these settings and load them next time instead of inputing them, saving seconds
-                </span>
-
-                <hr>
-
-                <button @click="startMap" type="button" class="btn btn-success w-100">
-                    Desolation map
-                </button>
-                <button @click="view = 'map_setup'" type="button" class="btn btn-secondary w-100">
-                    Setup desolation map
-                </button>
-
-                <hr>
-
-                <div class="btn-group w-100 mt-2">
-                    <button type="button" class="btn btn-success" data-toggle="modal" data-target="#contact-modal">
-                        Info/Contact
+                    <button @click="connect" type="button" class="btn btn-primary w-100"
+                        :disabled="canConnect == false">
+                        Connect
                     </button>
-                    <button type="button" class="btn" :class="[ settings.darkMode == true ? 'btn-dark' : 'btn-light' ]"
-                            @click="settings.darkMode = !settings.darkMode">
 
-                        {{settings.darkMode == false ? 'Use dark mode' : 'Use light mode'}}
+                    <small class="text-muted">
+                        You can also hit enter while in the service ID field to connect
+                    </small>
+
+                    <hr>
+
+                    <button v-if="storage.enabled" @click="saveSettings" type="button" class="btn btn-success w-100">
+                        Save and connect
                     </button>
-                </div>
 
-                <hr>
+                    <span class="text-muted">
+                        Save these settings and load them next time instead of inputing them, saving seconds
+                    </span>
+
+                    <hr>
+
+                    <button @click="view = 'map_setup'" type="button" class="btn btn-secondary w-100">
+                        Setup desolation map
+                    </button>
+
+                    <hr>
+
+                    <div class="btn-group w-100 mt-2">
+                        <button type="button" class="btn btn-success" data-toggle="modal" data-target="#contact-modal">
+                            Info/Contact
+                        </button>
+                        <button type="button" class="btn" :class="[ settings.darkMode == true ? 'btn-dark' : 'btn-light' ]"
+                                @click="settings.darkMode = !settings.darkMode">
+
+                            {{settings.darkMode == false ? 'Use dark mode' : 'Use light mode'}}
+                        </button>
+                    </div>
+
+                    <hr>
+                </div>
             </div>
         </div>
 
-        <div v-else-if="view == 'map_setup'" class="row">
+        <div v-else-if="view == 'map_setup'" class="row d-flex" style="flex-direction: column; align-items: center;">
+            <h2>OBS Browser source setup</h2>
             <div class="col-4">
+                <label class="col-form-label"><b>Zone ID:</b></label>
                 <input v-model="relic.zoneID" type="number" class="form-control" placeholder="Zone ID">
-                <small class="text-muted">When you use the command to get into an OW match, put in that ID<br>It's a 6 digit number</small>
+                <small class="text-muted d-block mb-3">You can get the zone ID from the <code>/ow observematch #</code> command</small>
 
-                <select v-model="relic.serverID" class="form-control">
+                <label class="col-form-label"><b>Server:</b></label>
+                <select v-model="relic.serverID" class="form-control mb-3">
                     <option value="" disabled>Select a server</option>
                     <option value="1">Connery</option>
                     <option value="10">Miller</option>
@@ -292,6 +299,7 @@
                     <option value="40">SolTech</option>
                 </select>
 
+                <label class="col-form-label"><b>Outfit tags:</b></label>
                 <div class="input-group">
                     <span class="input-group-text input-group-prepend">VS Tag:</span>
                     <input v-model="relic.outfits.vs" type="text" class="form-control">
@@ -302,12 +310,13 @@
                     <input v-model="relic.outfits.nc" type="text" class="form-control">
                 </div>
 
-                <div class="input-group">
+                <div class="input-group mb-3">
                     <span class="input-group-text input-group-prepend">TR Tag:</span>
                     <input v-model="relic.outfits.tr" type="text" class="form-control">
                 </div>
 
-                <div class="input-group">
+                <label class="col-form-label"><b>URL:</b></label>
+                <div class="input-group mb-3">
                     <input id="deso_setup_url" readonly type="text" class="form-control"
                         :value="desoUrl">
 
@@ -316,53 +325,107 @@
                     </button>
                 </div>
 
-                <small class="text-muted">If using a browser source, use this URL</small>
-
                 <button @click="view = 'setup'" type="button" class="btn btn-secondary">
                     Back
                 </button>
-
             </div>
         </div>
 
         <div v-else-if="view == 'map'" class="row">
-
-            <!--
             <div class="scoreboardborder"></div>
             <div class='scoreboardbackhalf1'></div>
             <div class='scoreboardbackhalf2'></div>
             <div class="gradientTR"></div>
             <div class="gradientNC"></div>
             <div class="gradientVS"></div>
-            <div class='ratetextVS'>{{relic.tr_rate}} pt/min</div>
-            <div class='ratetextNC'>{{relic.vs_rate}} pt/min</div>
-            <div class='ratetextTR'>{{relic.nc_rate}} pt/min</div>
-            -->
-
-            <div style="position: absolute; width: 562px;">
-                <div class="row mx-0">
-                    <div class="col-4 p-0">
-                        <button class="btn w-100 px-0 ow-score" style="background-color: purple">
-                            {{relic.outfits.vs != '' ? relic.outfits.vs : "VS"}}:
-                            {{relic.vs_rate}} pt/min
-                        </button>
-                    </div>
-                    <div class="col-4 p-0">
-                        <button class="btn w-100 px-0 ow-score" style="background-color: blue">
-                            {{relic.outfits.nc != '' ? relic.outfits.nc : "NC"}}:
-                            {{relic.nc_rate}} pt/min
-                        </button>
-                    </div>
-                    <div class="col-4 p-0">
-                        <button class="btn w-100 px-0 ow-score" style="background-color: red">
-                            {{relic.outfits.tr != '' ? relic.outfits.tr : "TR"}}:
-                            {{relic.tr_rate}} pt/min
-                        </button>
-                    </div>
-                </div>
+            <div class='ratetextTR'>
+                <!--{{relic.outfits.tr != '' ? relic.outfits.tr : "TR"}}:-->
+                {{relic.tr_rate}} pt/min
+            </div>
+            <div class='ratetextVS'>
+                <!--{{relic.outfits.vs != '' ? relic.outfits.vs : "VS"}}:-->
+                {{relic.vs_rate}} pt/min
+            </div>
+            <div class='ratetextNC'>
+                <!--{{relic.outfits.nc != '' ? relic.outfits.nc : "NC"}}:-->
+                {{relic.nc_rate}} pt/min
             </div>
 
-            <div style="position: absolute; top: 52px; left: 0; width: 562px; height: 519px;">
+            <div style="position: absolute; left: 0; top: 20%;">
+                <table class="table table-sm bg-dark">
+                    <tr class="table-secondary">
+                        <th></th>
+                        <th>{{relic.outfits.vs}}</th>
+                        <th>{{relic.outfits.nc}}</th>
+                        <th>{{relic.outfits.tr}}</th>
+                    </tr>
+
+                    <tr>
+                        <td>Kills</td>
+                        <td>{{relic.vs_stats.kills}}</td>
+                        <td>{{relic.nc_stats.kills}}</td>
+                        <td>{{relic.tr_stats.kills}}</td>
+                    </tr>
+                    <tr>
+                        <td>Deaths</td>
+                        <td>{{relic.vs_stats.deaths}}</td>
+                        <td>{{relic.nc_stats.deaths}}</td>
+                        <td>{{relic.tr_stats.deaths}}</td>
+                    </tr>
+                    <tr>
+                        <td>Revives</td>
+                        <td>{{relic.vs_stats.revives}}</td>
+                        <td>{{relic.nc_stats.revives}}</td>
+                        <td>{{relic.tr_stats.revives}}</td>
+                    </tr>
+
+                    <tr class="table-secondary">
+                        <td colspan="4">Spawns</td>
+                    </tr>
+                    <tr>
+                        <td>Sundy</td>
+                        <td>{{relic.vs_stats.sundySpawns}}</td>
+                        <td>{{relic.nc_stats.sundySpawns}}</td>
+                        <td>{{relic.tr_stats.sundySpawns}}</td>
+                    </tr>
+                    <tr>
+                        <td>Beacon</td>
+                        <td>{{relic.vs_stats.beaconSpawns}}</td>
+                        <td>{{relic.nc_stats.beaconSpawns}}</td>
+                        <td>{{relic.tr_stats.beaconSpawns}}</td>
+                    </tr>
+                    <tr>
+                        <td>Squad</td>
+                        <td>{{relic.vs_stats.squadSpawns}}</td>
+                        <td>{{relic.nc_stats.squadSpawns}}</td>
+                        <td>{{relic.tr_stats.squadSpawns}}</td>
+                    </tr>
+                    <tr>
+                        <td>Router</td>
+                        <td>{{relic.vs_stats.constructionSpawns}}</td>
+                        <td>{{relic.nc_stats.constructionSpawns}}</td>
+                        <td>{{relic.tr_stats.constructionSpawns}}</td>
+                    </tr>
+
+                    <tr class="table-secondary">
+                        <td colspan="4">Vehicle kills</td>
+                    </tr>
+                    <tr>
+                        <td>Armor</td>
+                        <td>{{relic.vs_stats.armorKills}}</td>
+                        <td>{{relic.nc_stats.armorKills}}</td>
+                        <td>{{relic.tr_stats.armorKills}}</td>
+                    </tr>
+                    <tr>
+                        <td>Air</td>
+                        <td>{{relic.vs_stats.airKills}}</td>
+                        <td>{{relic.nc_stats.airKills}}</td>
+                        <td>{{relic.tr_stats.airKills}}</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div style="position: absolute; bottom: 0; right: 0; width: 562px; height: 469px;">
                 <div style="position: absolute; width: 562px; height: 469px; font-size: 24pt; z-index: 1000">
                     <span style="position: absolute; top: 95px; left: 175px">A</span>
                     <span style="position: absolute; top: 95px; left: 372px">B</span>
@@ -388,39 +451,6 @@
                     <relic-image :relic-id="relic.N_WG" :map="relic.regions" img="N_WG_"></relic-image>
                     <relic-image :relic-id="relic.SE_WG" :map="relic.regions" img="SE_WG_"></relic-image>
                     <relic-image :relic-id="relic.SW_WG" :map="relic.regions" img="SW_WG_"></relic-image>
-                </div>
-            </div>
-
-            <div v-if="relic.showUI == true" style="position: absolute; top: 570">
-                <input v-model="relic.zoneID" type="number" class="form-control" placeholder="Zone ID">
-
-                <select v-model="relic.serverID" class="form-control">
-                    <option value="" disabled>Select a server</option>
-                    <option value="1">Connery</option>
-                    <option value="10">Miller</option>
-                    <option value="13">Cobalt</option>
-                    <option value="17">Emerald</option>
-                    <option value="19">Jaeger</option>
-                    <option value="40">SolTech</option>
-                </select>
-
-                <div class="input-group">
-                    <span class="input-group-text input-group-prepend">VS Tag:</span>
-                    <input v-model="relic.outfits.vs" type="text" class="form-control">
-                </div>
-
-                <div class="input-group">
-                    <span class="input-group-text input-group-prepend">NC Tag:</span>
-                    <input v-model="relic.outfits.nc" type="text" class="form-control">
-                </div>
-
-                <div class="input-group">
-                    <span class="input-group-text input-group-prepend">TR Tag:</span>
-                    <input v-model="relic.outfits.tr" type="text" class="form-control">
-                </div>
-
-                <div v-if="relic.warnings.badZone == true" class="text-warning">
-                    No regions returned from API!
                 </div>
             </div>
         </div>
