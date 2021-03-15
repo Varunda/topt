@@ -80,7 +80,6 @@ type Relic = {
     adjacent: string[];
 }
 
-/*
 const RELIC_A_ID: string = "6101"; // Kwahtee
 const RELIC_B_ID: string = "6102"; // Ikanam Bio
 const RELIC_C_ID: string = "6111"; // Sungrey
@@ -103,8 +102,8 @@ const RELIC_F_REGION: string = "210001";
 const RELIC_G_REGION: string = "217000";
 const RELIC_H_REGION: string = "216000";
 const RELIC_I_REGION: string = "218000";
-*/
 
+/*
 const RELIC_A_ID: string = "18221";
 const RELIC_B_ID: string = "18222";
 const RELIC_C_ID: string = "18224";
@@ -127,6 +126,7 @@ const RELIC_F_REGION: string = "400290";
 const RELIC_G_REGION: string = "400291";
 const RELIC_H_REGION: string = "400292";
 const RELIC_I_REGION: string = "400293";
+*/
 
 const facilityToRegion: Map<string, string> = new Map([
     [RELIC_A_REGION, RELIC_A_ID],
