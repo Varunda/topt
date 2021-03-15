@@ -181,110 +181,115 @@
         </template>
 
         <div v-if="view == 'setup'" class="d-flex" style="flex-direction: column;">
-            <div class="w-25 align-self-center pt-5">
-                <div class="input-group">
-                    <div class="input-group-prepend">
-                        <span class="input-group-text">
-                            Server
-                        </span>
+            <div v-if="relic.showUI != false">
+                <div class="w-25 align-self-center pt-5">
+                    <div class="input-group">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text">
+                                Server
+                            </span>
+                        </div>
+
+                        <select v-model="settings.serverID" class="form-control">
+                            <option value="1">Connery</option>
+                            <option value="17">Emerald</option>
+                            <option value="10">Miller</option>
+                            <option value="13">Cobalt</option>
+                            <option value="40">SolTech</option>
+                            <option value="19">Jaeger</option>
+                        </select>
                     </div>
 
-                    <select v-model="settings.serverID" class="form-control">
-                        <option value="1">Connery</option>
-                        <option value="17">Emerald</option>
-                        <option value="10">Miller</option>
-                        <option value="13">Cobalt</option>
-                        <option value="40">SolTech</option>
-                        <option value="19">Jaeger</option>
-                    </select>
-                </div>
+                    <small class="text-muted">
+                        Used to track logins, facility captures and router kills
+                    </small>
 
-                <small class="text-muted">
-                    Used to track logins, facility captures and router kills
-                </small>
+                    <hr/>
 
-                <hr/>
-
-                <div>
-                    Enter your Service ID:
-                </div>
-
-                <div class="input-group">
-                    <div class="input-group-prepend">
-                        <span class="input-group-text">
-                            s:
-                        </span>
+                    <div>
+                        Enter your Service ID:
                     </div>
-                    <input v-model="settings.serviceToken"
-                        class="form-control"
-                        autofocus
-                        type="text"
-                        @keyup.enter="connect"
-                        placeholder="Service token"
-                    >
-                </div>
 
-                <small class="text-muted d-block">
-                    Do not include the leading s:
-                </small>
+                    <div class="input-group">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text">
+                                s:
+                            </span>
+                        </div>
+                        <input v-model="settings.serviceToken"
+                            class="form-control"
+                            autofocus
+                            type="text"
+                            @keyup.enter="connect"
+                            placeholder="Service token"
+                        >
+                    </div>
 
-                <small class="text-muted">
-                    Don't have one?
-                    <a href="http://census.daybreakgames.com/#devSignup" target="_blank">
-                        Sign up
-                    </a>
-                </small>
+                    <small class="text-muted d-block">
+                        Do not include the leading s:
+                    </small>
 
-                <hr>
+                    <small class="text-muted">
+                        Don't have one?
+                        <a href="http://census.daybreakgames.com/#devSignup" target="_blank">
+                            Sign up
+                        </a>
+                    </small>
 
-                <button @click="connect" type="button" class="btn btn-primary w-100"
-                    :disabled="canConnect == false">
-                    Connect
-                </button>
+                    <hr>
 
-                <small class="text-muted">
-                    You can also hit enter while in the service ID field to connect
-                </small>
-
-                <hr>
-
-                <button v-if="storage.enabled" @click="saveSettings" type="button" class="btn btn-success w-100">
-                    Save and connect
-                </button>
-
-                <span class="text-muted">
-                    Save these settings and load them next time instead of inputing them, saving seconds
-                </span>
-
-                <hr>
-
-                <button @click="view = 'map_setup'" type="button" class="btn btn-secondary w-100">
-                    Setup desolation map
-                </button>
-
-                <hr>
-
-                <div class="btn-group w-100 mt-2">
-                    <button type="button" class="btn btn-success" data-toggle="modal" data-target="#contact-modal">
-                        Info/Contact
+                    <button @click="connect" type="button" class="btn btn-primary w-100"
+                        :disabled="canConnect == false">
+                        Connect
                     </button>
-                    <button type="button" class="btn" :class="[ settings.darkMode == true ? 'btn-dark' : 'btn-light' ]"
-                            @click="settings.darkMode = !settings.darkMode">
 
-                        {{settings.darkMode == false ? 'Use dark mode' : 'Use light mode'}}
+                    <small class="text-muted">
+                        You can also hit enter while in the service ID field to connect
+                    </small>
+
+                    <hr>
+
+                    <button v-if="storage.enabled" @click="saveSettings" type="button" class="btn btn-success w-100">
+                        Save and connect
                     </button>
-                </div>
 
-                <hr>
+                    <span class="text-muted">
+                        Save these settings and load them next time instead of inputing them, saving seconds
+                    </span>
+
+                    <hr>
+
+                    <button @click="view = 'map_setup'" type="button" class="btn btn-secondary w-100">
+                        Setup desolation map
+                    </button>
+
+                    <hr>
+
+                    <div class="btn-group w-100 mt-2">
+                        <button type="button" class="btn btn-success" data-toggle="modal" data-target="#contact-modal">
+                            Info/Contact
+                        </button>
+                        <button type="button" class="btn" :class="[ settings.darkMode == true ? 'btn-dark' : 'btn-light' ]"
+                                @click="settings.darkMode = !settings.darkMode">
+
+                            {{settings.darkMode == false ? 'Use dark mode' : 'Use light mode'}}
+                        </button>
+                    </div>
+
+                    <hr>
+                </div>
             </div>
         </div>
 
-        <div v-else-if="view == 'map_setup'" class="row">
+        <div v-else-if="view == 'map_setup'" class="row d-flex" style="flex-direction: column; align-items: center;">
+            <h2>OBS Browser source setup</h2>
             <div class="col-4">
+                <label class="col-form-label"><b>Zone ID:</b></label>
                 <input v-model="relic.zoneID" type="number" class="form-control" placeholder="Zone ID">
-                <small class="text-muted">When you use the command to get into an OW match, put in that ID<br>It's a 6 digit number</small>
+                <small class="text-muted d-block mb-3">You can get the zone ID from the <code>/ow observematch #</code> command</small>
 
-                <select v-model="relic.serverID" class="form-control">
+                <label class="col-form-label"><b>Server:</b></label>
+                <select v-model="relic.serverID" class="form-control mb-3">
                     <option value="" disabled>Select a server</option>
                     <option value="1">Connery</option>
                     <option value="10">Miller</option>
@@ -294,6 +299,7 @@
                     <option value="40">SolTech</option>
                 </select>
 
+                <label class="col-form-label"><b>Outfit tags:</b></label>
                 <div class="input-group">
                     <span class="input-group-text input-group-prepend">VS Tag:</span>
                     <input v-model="relic.outfits.vs" type="text" class="form-control">
@@ -304,12 +310,13 @@
                     <input v-model="relic.outfits.nc" type="text" class="form-control">
                 </div>
 
-                <div class="input-group">
+                <div class="input-group mb-3">
                     <span class="input-group-text input-group-prepend">TR Tag:</span>
                     <input v-model="relic.outfits.tr" type="text" class="form-control">
                 </div>
 
-                <div class="input-group">
+                <label class="col-form-label"><b>URL:</b></label>
+                <div class="input-group mb-3">
                     <input id="deso_setup_url" readonly type="text" class="form-control"
                         :value="desoUrl">
 
@@ -318,8 +325,6 @@
                     </button>
                 </div>
 
-                <small class="text-muted">If using a browser source, use this URL</small>
-
                 <button @click="view = 'setup'" type="button" class="btn btn-secondary">
                     Back
                 </button>
@@ -327,7 +332,6 @@
         </div>
 
         <div v-else-if="view == 'map'" class="row">
-
             <div class="scoreboardborder"></div>
             <div class='scoreboardbackhalf1'></div>
             <div class='scoreboardbackhalf2'></div>
@@ -346,31 +350,6 @@
                 <!--{{relic.outfits.nc != '' ? relic.outfits.nc : "NC"}}:-->
                 {{relic.nc_rate}} pt/min
             </div>
-
-            <!--
-            <div style="position: absolute; width: 562px;">
-                <div class="row mx-0">
-                    <div class="col-4 p-0">
-                        <button class="btn w-100 px-0 ow-score" style="background-color: purple">
-                            {{relic.outfits.vs != '' ? relic.outfits.vs : "VS"}}:
-                            {{relic.vs_rate}} pt/min
-                        </button>
-                    </div>
-                    <div class="col-4 p-0">
-                        <button class="btn w-100 px-0 ow-score" style="background-color: blue">
-                            {{relic.outfits.nc != '' ? relic.outfits.nc : "NC"}}:
-                            {{relic.nc_rate}} pt/min
-                        </button>
-                    </div>
-                    <div class="col-4 p-0">
-                        <button class="btn w-100 px-0 ow-score" style="background-color: red">
-                            {{relic.outfits.tr != '' ? relic.outfits.tr : "TR"}}:
-                            {{relic.tr_rate}} pt/min
-                        </button>
-                    </div>
-                </div>
-            </div>
-            -->
 
             <div style="position: absolute; left: 0; top: 20%;">
                 <table class="table table-sm bg-dark">

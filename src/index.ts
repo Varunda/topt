@@ -342,18 +342,6 @@ export const vm = new Vue({
                 this.updateLoggers();
             }
         }
-    },
-
-    mounted: function(): void {
-        // Confirm exiting the page
-        window.onbeforeunload = (ev: BeforeUnloadEvent) => { return false; };
-
-        // Disconnect to be polite
-        window.onunload = () => { this.core.disconnect(); }
-
-        document.addEventListener("keyup", this.squadKeyEvent);
-
-        this.settings.fromStorage = false;
 
         const params: URLSearchParams = new URLSearchParams(location.search);
         const showMap: string | null = params.get("deso");
@@ -374,6 +362,22 @@ export const vm = new Vue({
             const trTag: string | null = params.get("tr_tag");
             if (trTag) { this.relic.outfits.tr = trTag; }
 
+            this.startMap();
+        }
+    },
+
+    mounted: function(): void {
+        // Confirm exiting the page
+        window.onbeforeunload = (ev: BeforeUnloadEvent) => { return false; };
+
+        // Disconnect to be polite
+        window.onunload = () => { this.core.disconnect(); }
+
+        document.addEventListener("keyup", this.squadKeyEvent);
+
+        this.settings.fromStorage = false;
+
+        if (this.relic.showUI == false) {
             this.startMap();
         } else {
             if (this.storage.enabled == true) {
