@@ -72696,6 +72696,7 @@ chart_js__WEBPACK_IMPORTED_MODULE_10__["Chart"].plugins.unregister(_node_modules
 
 
 
+
 window.CharacterAPI = tcore__WEBPACK_IMPORTED_MODULE_23__["CharacterAPI"];
 window.Playback = tcore__WEBPACK_IMPORTED_MODULE_23__["Playback"];
 window.Logger = tcore__WEBPACK_IMPORTED_MODULE_23__["Logger"];
@@ -72760,6 +72761,22 @@ const facilityToRegion = new Map([
     [RELIC_H_REGION, RELIC_H_ID],
     [RELIC_I_REGION, RELIC_I_ID],
 ]);
+class DesoOutfit {
+    constructor() {
+        this.tag = "";
+        this.count = 0;
+        this.kills = 0;
+        this.deaths = 0;
+        this.revives = 0;
+        this.armorKills = 0;
+        this.airKills = 0;
+        this.sundySpawns = 0;
+        this.constructionSpawns = 0;
+        this.squadSpawns = 0;
+        this.beaconSpawns = 0;
+    }
+}
+;
 const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
     el: "#app",
     data: {
@@ -72784,6 +72801,9 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             warnings: {
                 badZone: false,
             },
+            tr_stats: new DesoOutfit(),
+            nc_stats: new DesoOutfit(),
+            vs_stats: new DesoOutfit(),
             outfits: {
                 tr: "",
                 nc: "",
@@ -72921,17 +72941,14 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             const vsTag = params.get("vs_tag");
             if (vsTag) {
                 this.relic.outfits.vs = vsTag;
-                this.core.addOutfit(vsTag);
             }
             const ncTag = params.get("nc_tag");
             if (ncTag) {
                 this.relic.outfits.nc = ncTag;
-                this.core.addOutfit(ncTag);
             }
             const trTag = params.get("tr_tag");
             if (trTag) {
                 this.relic.outfits.tr = trTag;
-                this.core.addOutfit(trTag);
             }
             this.startMap();
         }
@@ -72973,6 +72990,15 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             this.coreObject.connect().ok(() => {
                 this.view = "map";
                 this.core.start();
+                if (this.relic.outfits.vs != "") {
+                    this.core.addOutfit(this.relic.outfits.vs);
+                }
+                if (this.relic.outfits.nc != "") {
+                    this.core.addOutfit(this.relic.outfits.nc);
+                }
+                if (this.relic.outfits.tr != "") {
+                    this.core.addOutfit(this.relic.outfits.tr);
+                }
                 setTimeout(() => {
                     this.core.subscribe({
                         worlds: ["all"],
@@ -72980,6 +73006,100 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                         socket: "tracked"
                     });
                 }, 1000);
+                this.core.on("kill", (ev) => {
+                    const char = this.core.characters.find(i => i.ID == ev.sourceID);
+                    if (!char) {
+                        return;
+                    }
+                    if (char.faction == "1") {
+                        ++this.relic.vs_stats.kills;
+                    }
+                    else if (char.faction == "2") {
+                        ++this.relic.nc_stats.kills;
+                    }
+                    else if (char.faction == "3") {
+                        ++this.relic.tr_stats.kills;
+                    }
+                });
+                this.core.on("death", (ev) => {
+                    const char = this.core.characters.find(i => i.ID == ev.sourceID);
+                    if (!char) {
+                        return;
+                    }
+                    if (char.faction == "1") {
+                        ++this.relic.vs_stats.deaths;
+                    }
+                    else if (char.faction == "2") {
+                        ++this.relic.nc_stats.deaths;
+                    }
+                    else if (char.faction == "3") {
+                        ++this.relic.tr_stats.deaths;
+                    }
+                });
+                this.core.on("exp", (ev) => {
+                    const char = this.core.characters.find(i => i.ID == ev.sourceID);
+                    if (!char) {
+                        return;
+                    }
+                    let stats;
+                    if (char.faction == "1") {
+                        stats = this.relic.vs_stats;
+                    }
+                    else if (char.faction == "2") {
+                        stats = this.relic.nc_stats;
+                    }
+                    else if (char.faction == "3") {
+                        stats = this.relic.tr_stats;
+                    }
+                    else {
+                        return;
+                    }
+                    if (ev.expID == tcore__WEBPACK_IMPORTED_MODULE_23__["PsEvent"].revive || ev.expID == tcore__WEBPACK_IMPORTED_MODULE_23__["PsEvent"].squadRevive) {
+                        ++stats.revives;
+                    }
+                    else if (ev.expID == tcore__WEBPACK_IMPORTED_MODULE_23__["PsEvent"].sundySpawn) {
+                        ++stats.sundySpawns;
+                    }
+                    else if (ev.expID == tcore__WEBPACK_IMPORTED_MODULE_23__["PsEvent"].squadSpawn) {
+                        ++stats.beaconSpawns;
+                    }
+                    else if (ev.expID == tcore__WEBPACK_IMPORTED_MODULE_23__["PsEvent"].constructionSpawn) {
+                        ++stats.constructionSpawns;
+                    }
+                    else if (ev.expID == "355") {
+                        ++stats.squadSpawns;
+                    }
+                });
+                this.core.on("vehicle", (ev) => {
+                    const char = this.core.characters.find(i => i.ID == ev.sourceID);
+                    if (!char) {
+                        return;
+                    }
+                    let stats;
+                    if (char.faction == "1") {
+                        stats = this.relic.vs_stats;
+                    }
+                    else if (char.faction == "2") {
+                        stats = this.relic.nc_stats;
+                    }
+                    else if (char.faction == "3") {
+                        stats = this.relic.tr_stats;
+                    }
+                    else {
+                        return;
+                    }
+                    if (ev.targetID != "0") {
+                    }
+                    if (ev.vehicleID == tcore__WEBPACK_IMPORTED_MODULE_23__["Vehicles"].mosquito || ev.vehicleID == tcore__WEBPACK_IMPORTED_MODULE_23__["Vehicles"].reaver || ev.vehicleID == tcore__WEBPACK_IMPORTED_MODULE_23__["Vehicles"].scythe
+                        || ev.vehicleID == tcore__WEBPACK_IMPORTED_MODULE_23__["Vehicles"].valkyrie || ev.vehicleID == tcore__WEBPACK_IMPORTED_MODULE_23__["Vehicles"].galaxy || ev.vehicleID == tcore__WEBPACK_IMPORTED_MODULE_23__["Vehicles"].liberator) {
+                        ++stats.airKills;
+                    }
+                    else if (ev.vehicleID == tcore__WEBPACK_IMPORTED_MODULE_23__["Vehicles"].lightning
+                        || ev.vehicleID == tcore__WEBPACK_IMPORTED_MODULE_23__["Vehicles"].vanguard || ev.vehicleID == tcore__WEBPACK_IMPORTED_MODULE_23__["Vehicles"].magrider || ev.vehicleID == tcore__WEBPACK_IMPORTED_MODULE_23__["Vehicles"].prowler
+                        || ev.vehicleID == tcore__WEBPACK_IMPORTED_MODULE_23__["Vehicles"].flash || ev.vehicleID == tcore__WEBPACK_IMPORTED_MODULE_23__["Vehicles"].harasser) {
+                        ++stats.armorKills;
+                    }
+                });
                 this.core.on("base", (ev) => {
                     var _a;
                     if (this.relic.zoneID == "" || this.relic.serverID == "") {
@@ -73731,7 +73851,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
         },
         core: function () {
             if (this.coreObject == null) {
-                throw ``;
+                throw `Cannot get core, not connected`;
             }
             return this.coreObject;
         }

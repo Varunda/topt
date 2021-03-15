@@ -31,6 +31,11 @@
             display: none;
         }
 
+        .tbl-icon {
+            width: 20px;
+            height: 20px;
+        }
+
         .header {
             margin-left: -15px;
             margin-right: -15px;
@@ -321,7 +326,6 @@
                 <button @click="view = 'setup'" type="button" class="btn btn-secondary">
                     Back
                 </button>
-
             </div>
         </div>
 
@@ -334,15 +338,15 @@
             <div class="gradientNC"></div>
             <div class="gradientVS"></div>
             <div class='ratetextTR'>
-                {{relic.outfits.tr != '' ? relic.outfits.tr : "TR"}}:
+                <!--{{relic.outfits.tr != '' ? relic.outfits.tr : "TR"}}:-->
                 {{relic.tr_rate}} pt/min
             </div>
             <div class='ratetextVS'>
-                {{relic.outfits.vs != '' ? relic.outfits.vs : "VS"}}:
+                <!--{{relic.outfits.vs != '' ? relic.outfits.vs : "VS"}}:-->
                 {{relic.vs_rate}} pt/min
             </div>
             <div class='ratetextNC'>
-                {{relic.outfits.nc != '' ? relic.outfits.nc : "NC"}}:
+                <!--{{relic.outfits.nc != '' ? relic.outfits.nc : "NC"}}:-->
                 {{relic.nc_rate}} pt/min
             </div>
 
@@ -371,7 +375,81 @@
             </div>
             -->
 
-            <div style="position: absolute; bottom: 0; right: 0; width: 562px; height: 519px;">
+            <div style="position: absolute; left: 0; top: 30%;">
+                <table class="table table-sm">
+                    <tr class="table-secondary">
+                        <th></th>
+                        <th>{{relic.outfits.vs}}</th>
+                        <th>{{relic.outfits.nc}}</th>
+                        <th>{{relic.outfits.tr}}</th>
+                    </tr>
+
+                    <tr>
+                        <td>Kills</td>
+                        <td>{{relic.vs_stats.kills}}</td>
+                        <td>{{relic.nc_stats.kills}}</td>
+                        <td>{{relic.tr_stats.kills}}</td>
+                    </tr>
+                    <tr>
+                        <td>Deaths</td>
+                        <td>{{relic.vs_stats.deaths}}</td>
+                        <td>{{relic.nc_stats.deaths}}</td>
+                        <td>{{relic.tr_stats.deaths}}</td>
+                    </tr>
+                    <tr>
+                        <td>Revives</td>
+                        <td>{{relic.vs_stats.revives}}</td>
+                        <td>{{relic.nc_stats.revives}}</td>
+                        <td>{{relic.tr_stats.revives}}</td>
+                    </tr>
+
+                    <tr class="table-secondary">
+                        <td colspan="4">Spawns</td>
+                    </tr>
+                    <tr>
+                        <td>Sundy</td>
+                        <td>{{relic.vs_stats.sundySpawns}}</td>
+                        <td>{{relic.nc_stats.sundySpawns}}</td>
+                        <td>{{relic.tr_stats.sundySpawns}}</td>
+                    </tr>
+                    <tr>
+                        <td>Beacon</td>
+                        <td>{{relic.vs_stats.beaconSpawns}}</td>
+                        <td>{{relic.nc_stats.beaconSpawns}}</td>
+                        <td>{{relic.tr_stats.beaconSpawns}}</td>
+                    </tr>
+                    <tr>
+                        <td>Squad</td>
+                        <td>{{relic.vs_stats.squadSpawns}}</td>
+                        <td>{{relic.nc_stats.squadSpawns}}</td>
+                        <td>{{relic.tr_stats.squadSpawns}}</td>
+                    </tr>
+                    <tr>
+                        <td>Router</td>
+                        <td>{{relic.vs_stats.constructionSpawns}}</td>
+                        <td>{{relic.nc_stats.constructionSpawns}}</td>
+                        <td>{{relic.tr_stats.constructionSpawns}}</td>
+                    </tr>
+
+                    <tr class="table-secondary">
+                        <td colspan="4">Vehicle kills</td>
+                    </tr>
+                    <tr>
+                        <td>Armor</td>
+                        <td>{{relic.vs_stats.armorKills}}</td>
+                        <td>{{relic.nc_stats.armorKills}}</td>
+                        <td>{{relic.tr_stats.armorKills}}</td>
+                    </tr>
+                    <tr>
+                        <td>Air</td>
+                        <td>{{relic.vs_stats.airKills}}</td>
+                        <td>{{relic.nc_stats.airKills}}</td>
+                        <td>{{relic.tr_stats.airKills}}</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div style="position: absolute; bottom: 0; right: 0; width: 562px; height: 469px;">
                 <div style="position: absolute; width: 562px; height: 469px; font-size: 24pt; z-index: 1000">
                     <span style="position: absolute; top: 95px; left: 175px">A</span>
                     <span style="position: absolute; top: 95px; left: 372px">B</span>
@@ -397,39 +475,6 @@
                     <relic-image :relic-id="relic.N_WG" :map="relic.regions" img="N_WG_"></relic-image>
                     <relic-image :relic-id="relic.SE_WG" :map="relic.regions" img="SE_WG_"></relic-image>
                     <relic-image :relic-id="relic.SW_WG" :map="relic.regions" img="SW_WG_"></relic-image>
-                </div>
-            </div>
-
-            <div v-if="relic.showUI == true" style="position: absolute; top: 570">
-                <input v-model="relic.zoneID" type="number" class="form-control" placeholder="Zone ID">
-
-                <select v-model="relic.serverID" class="form-control">
-                    <option value="" disabled>Select a server</option>
-                    <option value="1">Connery</option>
-                    <option value="10">Miller</option>
-                    <option value="13">Cobalt</option>
-                    <option value="17">Emerald</option>
-                    <option value="19">Jaeger</option>
-                    <option value="40">SolTech</option>
-                </select>
-
-                <div class="input-group">
-                    <span class="input-group-text input-group-prepend">VS Tag:</span>
-                    <input v-model="relic.outfits.vs" type="text" class="form-control">
-                </div>
-
-                <div class="input-group">
-                    <span class="input-group-text input-group-prepend">NC Tag:</span>
-                    <input v-model="relic.outfits.nc" type="text" class="form-control">
-                </div>
-
-                <div class="input-group">
-                    <span class="input-group-text input-group-prepend">TR Tag:</span>
-                    <input v-model="relic.outfits.tr" type="text" class="form-control">
-                </div>
-
-                <div v-if="relic.warnings.badZone == true" class="text-warning">
-                    No regions returned from API!
                 </div>
             </div>
         </div>

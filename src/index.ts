@@ -46,7 +46,7 @@ import Core, {
     CoreSettings,
     Squad,
     Playback, Logger,
-    CharacterAPI,
+    Character, CharacterAPI,
     Weapon, WeaponAPI,
     Region, MapAPI,
     Facility, FacilityAPI,
@@ -61,7 +61,7 @@ import { StorageHelper } from "Storage";
 import { LoggerMetadata, LoggerMetadataLevel } from "LoggerMetadata";
 import * as loglevel from "loglevel";
 import { map, param } from "jquery";
-import { OutfitReportParameters } from "../../topt-core/build/core/index.js";
+import { OutfitReportParameters, TDeathEvent, TExpEvent, TKillEvent, TVehicleKillEvent, Vehicle, Vehicles } from "../../topt-core/build/core/index.js";
 
 (window as any).CharacterAPI = CharacterAPI;
 (window as any).Playback = Playback;
@@ -140,17 +140,21 @@ const facilityToRegion: Map<string, string> = new Map([
     [RELIC_I_REGION, RELIC_I_ID],
 ]);
 
-type DesoOutfit = {
-    tag: string;
-    count: number;
-    kills: number;
-    deaths: number;
-    revives: number;
-    armorKills: number;
-    airKills: number;
-    sundySpawns: number;
-    constructionSpawns: number;
-    squadSpawns: number;
+class DesoOutfit {
+    public tag: string = "";
+    public count: number = 0;
+
+    public kills: number = 0;
+    public deaths: number = 0;
+    public revives: number = 0;
+
+    public armorKills: number = 0;
+    public airKills: number = 0;
+
+    public sundySpawns: number = 0;
+    public constructionSpawns: number = 0;
+    public squadSpawns: number = 0;
+    public beaconSpawns: number = 0;
 };
 
 export const vm = new Vue({
@@ -184,6 +188,10 @@ export const vm = new Vue({
             warnings: {
                 badZone: false as boolean,
             },
+
+            tr_stats: new DesoOutfit() as DesoOutfit,
+            nc_stats: new DesoOutfit() as DesoOutfit,
+            vs_stats: new DesoOutfit() as DesoOutfit,
 
             outfits: {
                 tr: "" as string,
@@ -358,20 +366,13 @@ export const vm = new Vue({
             this.relic.serverID = serverID;
 
             const vsTag: string | null = params.get("vs_tag");
-            if (vsTag) {
-                this.relic.outfits.vs = vsTag;
-                this.core.addOutfit(vsTag);
-            }
+            if (vsTag) { this.relic.outfits.vs = vsTag; }
+
             const ncTag: string | null = params.get("nc_tag");
-            if (ncTag) {
-                this.relic.outfits.nc = ncTag;
-                this.core.addOutfit(ncTag);
-            }
+            if (ncTag) { this.relic.outfits.nc = ncTag; }
+
             const trTag: string | null = params.get("tr_tag");
-            if (trTag) {
-                this.relic.outfits.tr = trTag;
-                this.core.addOutfit(trTag);
-            }
+            if (trTag) { this.relic.outfits.tr = trTag; }
 
             this.startMap();
         } else {
@@ -423,6 +424,16 @@ export const vm = new Vue({
 
                 this.core.start();
 
+                if (this.relic.outfits.vs != "") {
+                    this.core.addOutfit(this.relic.outfits.vs);
+                }
+                if (this.relic.outfits.nc != "") {
+                    this.core.addOutfit(this.relic.outfits.nc);
+                }
+                if (this.relic.outfits.tr != "") {
+                    this.core.addOutfit(this.relic.outfits.tr);
+                }
+
                 setTimeout(() => {
                     this.core.subscribe({
                         worlds: [ "all" ],
@@ -430,6 +441,99 @@ export const vm = new Vue({
                         socket: "tracked"
                     });
                 }, 1000);
+
+                this.core.on("kill", (ev: TKillEvent) => {
+                    if (ev.zoneID != this.relic.zoneID) { return; }
+
+                    const char: Character | undefined = this.core.characters.find(i => i.ID == ev.sourceID);
+                    if (!char) { return; }
+
+                    if (char.faction == "1") {
+                        ++this.relic.vs_stats.kills;
+                    } else if (char.faction == "2") {
+                        ++this.relic.nc_stats.kills;
+                    } else if (char.faction == "3") {
+                        ++this.relic.tr_stats.kills;
+                    }
+                });
+
+                this.core.on("death", (ev: TDeathEvent) => {
+                    if (ev.zoneID != this.relic.zoneID) { return; }
+
+                    const char: Character | undefined = this.core.characters.find(i => i.ID == ev.sourceID);
+                    if (!char) { return; }
+
+                    if (char.faction == "1") {
+                        ++this.relic.vs_stats.deaths;
+                    } else if (char.faction == "2") {
+                        ++this.relic.nc_stats.deaths;
+                    } else if (char.faction == "3") {
+                        ++this.relic.tr_stats.deaths;
+                    }
+                });
+
+                this.core.on("exp", (ev: TExpEvent) => {
+                    if (ev.zoneID != this.relic.zoneID) { return; }
+
+                    const char: Character | undefined = this.core.characters.find(i => i.ID == ev.sourceID);
+                    if (!char) { return; }
+
+                    let stats: DesoOutfit;
+
+                    if (char.faction == "1") {
+                        stats = this.relic.vs_stats;
+                    } else if (char.faction == "2") {
+                        stats = this.relic.nc_stats;
+                    } else if (char.faction == "3") {
+                        stats = this.relic.tr_stats;
+                    } else {
+                        return;
+                    }
+
+                    if (ev.expID == PsEvent.revive || ev.expID == PsEvent.squadRevive) {
+                        ++stats.revives;
+                    } else if (ev.expID == PsEvent.sundySpawn) {
+                        ++stats.sundySpawns;
+                    } else if (ev.expID == PsEvent.squadSpawn) {
+                        ++stats.beaconSpawns;
+                    } else if (ev.expID == PsEvent.constructionSpawn) {
+                        ++stats.constructionSpawns;
+                    } else if (ev.expID == "355") {
+                        ++stats.squadSpawns;
+                    }
+                });
+
+                this.core.on("vehicle", (ev: TVehicleKillEvent) => {
+                    const char: Character | undefined = this.core.characters.find(i => i.ID == ev.sourceID);
+                    if (!char) { return; }
+
+                    let stats: DesoOutfit;
+
+                    if (char.faction == "1") {
+                        stats = this.relic.vs_stats;
+                    } else if (char.faction == "2") {
+                        stats = this.relic.nc_stats;
+                    } else if (char.faction == "3") {
+                        stats = this.relic.tr_stats;
+                    } else {
+                        return;
+                    }
+
+                    if (ev.targetID != "0") {
+
+                    }
+
+                    if (ev.vehicleID == Vehicles.mosquito || ev.vehicleID == Vehicles.reaver || ev.vehicleID == Vehicles.scythe
+                        || ev.vehicleID == Vehicles.valkyrie || ev.vehicleID == Vehicles.galaxy || ev.vehicleID == Vehicles.liberator) {
+                        
+                        ++stats.airKills;
+                    } else if (ev.vehicleID == Vehicles.lightning
+                        || ev.vehicleID == Vehicles.vanguard || ev.vehicleID == Vehicles.magrider || ev.vehicleID == Vehicles.prowler
+                        || ev.vehicleID == Vehicles.flash || ev.vehicleID == Vehicles.harasser) {
+
+                        ++stats.armorKills;
+                    }
+                });
 
                 this.core.on("base", (ev: TBaseEvent) => {
                     if (this.relic.zoneID == "" || this.relic.serverID == "") {
@@ -1280,7 +1384,7 @@ export const vm = new Vue({
 
         core: function(): Core {
             if (this.coreObject == null) {
-                throw ``;
+                throw `Cannot get core, not connected`;
             }
             return this.coreObject;
         }
