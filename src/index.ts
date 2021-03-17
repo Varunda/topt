@@ -59,17 +59,17 @@ import { PersonalReportGenerator } from "PersonalReportGenerator";
 import { SquadAddon } from "addons/SquadAddon";
 import { StorageHelper } from "Storage";
 import { LoggerMetadata, LoggerMetadataLevel } from "LoggerMetadata";
-import * as loglevel from "loglevel";
-import { map, param } from "jquery";
-import { OutfitReportParameters, TDeathEvent, TExpEvent, TKillEvent, TVehicleKillEvent, Vehicle, Vehicles } from "../../topt-core/build/core/index.js";
+import { OutfitReportParameters, PsLoadouts, TDeathEvent, TExpEvent, TKillEvent, TVehicleKillEvent, Vehicle, Vehicles } from "../../topt-core/build/core/index.js";
 
 (window as any).CharacterAPI = CharacterAPI;
 (window as any).Playback = Playback;
 (window as any).Logger = Logger;
 (window as any).PsEvent = PsEvent;
 (window as any).moment = moment;
+(window as any).PsLoadouts = PsLoadouts;
 (window as any).$ = $;
 
+import * as loglevel from "loglevel";
 const log = Logger.getLogger("UI");
 log.enableAll();
 

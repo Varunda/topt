@@ -72702,6 +72702,7 @@ window.Playback = tcore__WEBPACK_IMPORTED_MODULE_23__["Playback"];
 window.Logger = tcore__WEBPACK_IMPORTED_MODULE_23__["Logger"];
 window.PsEvent = tcore__WEBPACK_IMPORTED_MODULE_23__["PsEvent"];
 window.moment = moment__WEBPACK_IMPORTED_MODULE_5__;
+window.PsLoadouts = tcore__WEBPACK_IMPORTED_MODULE_23__["PsLoadouts"];
 window.$ = jquery__WEBPACK_IMPORTED_MODULE_6__;
 const log = tcore__WEBPACK_IMPORTED_MODULE_23__["Logger"].getLogger("UI");
 log.enableAll();
@@ -72922,14 +72923,6 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 this.updateLoggers();
             }
         }
-    },
-    mounted: function () {
-        // Confirm exiting the page
-        window.onbeforeunload = (ev) => { return false; };
-        // Disconnect to be polite
-        window.onunload = () => { this.core.disconnect(); };
-        document.addEventListener("keyup", this.squadKeyEvent);
-        this.settings.fromStorage = false;
         const params = new URLSearchParams(location.search);
         const showMap = params.get("deso");
         const serverID = params.get("serverID");
@@ -72950,6 +72943,17 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             if (trTag) {
                 this.relic.outfits.tr = trTag;
             }
+            this.startMap();
+        }
+    },
+    mounted: function () {
+        // Confirm exiting the page
+        window.onbeforeunload = (ev) => { return false; };
+        // Disconnect to be polite
+        window.onunload = () => { this.core.disconnect(); };
+        document.addEventListener("keyup", this.squadKeyEvent);
+        this.settings.fromStorage = false;
+        if (this.relic.showUI == false) {
             this.startMap();
         }
         else {
