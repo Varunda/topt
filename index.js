@@ -72799,8 +72799,14 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             zoneID: "",
             serverID: "",
             showUI: true,
+            elements: {
+                stats: true,
+                map: true,
+                scoreboard: true
+            },
             warnings: {
-                badZone: false,
+                missingZone: false,
+                missingServer: false
             },
             tr_stats: new DesoOutfit(),
             nc_stats: new DesoOutfit(),
@@ -72925,12 +72931,26 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
         }
         const params = new URLSearchParams(location.search);
         const showMap = params.get("deso");
-        const serverID = params.get("serverID");
-        const zoneID = params.get("zoneID");
-        if (showMap && serverID && zoneID) {
+        if (showMap) {
             this.relic.showUI = false;
-            this.relic.zoneID = zoneID;
-            this.relic.serverID = serverID;
+            const serverID = params.get("serverID");
+            if (serverID != null && serverID != "") {
+                this.relic.serverID = serverID;
+            }
+            else {
+                this.relic.warnings.missingServer = true;
+            }
+            const zoneID = params.get("zoneID");
+            if (zoneID != null && zoneID != "") {
+                this.relic.zoneID = zoneID;
+            }
+            else {
+                this.relic.warnings.missingZone = true;
+            }
+            setTimeout(() => {
+                this.relic.warnings.missingZone = false;
+                this.relic.warnings.missingServer = false;
+            }, 20 * 1000);
             const vsTag = params.get("vs_tag");
             if (vsTag) {
                 this.relic.outfits.vs = vsTag;
@@ -72943,6 +72963,9 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             if (trTag) {
                 this.relic.outfits.tr = trTag;
             }
+            this.relic.elements.stats = params.get("el_stats") != null;
+            this.relic.elements.map = params.get("el_map") != null;
+            this.relic.elements.scoreboard = params.get("el_scoreboard") != null;
             this.startMap();
         }
     },
@@ -73084,6 +73107,9 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                     }
                 });
                 this.core.on("vehicle", (ev) => {
+                    if (ev.zoneID != this.relic.zoneID) {
+                        return;
+                    }
                     const char = this.core.characters.find(i => i.ID == ev.sourceID);
                     if (!char) {
                         return;
@@ -73188,11 +73214,6 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                     return;
                 }
                 const regions = yield tcore__WEBPACK_IMPORTED_MODULE_23__["MapAPI"].getMap(this.relic.serverID, this.relic.zoneID);
-                if (regions.length == 0) {
-                    this.relic.warnings.badZone = true;
-                    return;
-                }
-                this.relic.warnings.badZone = false;
                 for (const map of regions) {
                     if (this.relic.regions.has(map.regionID)) {
                         const region = this.relic.regions.get(map.regionID);
@@ -73857,6 +73878,15 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             }
             if (this.relic.outfits.tr) {
                 url += `&tr_tag=${this.relic.outfits.tr}`;
+            }
+            if (this.relic.elements.stats == true) {
+                url += `&el_stats=true`;
+            }
+            if (this.relic.elements.map == true) {
+                url += `&el_map=true`;
+            }
+            if (this.relic.elements.scoreboard == true) {
+                url += `&el_scoreboard=true`;
             }
             return url;
         },

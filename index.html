@@ -315,6 +315,32 @@
                     <input v-model="relic.outfits.tr" type="text" class="form-control">
                 </div>
 
+                <div>
+                    <label class="col-form-label"><b>Show stats</b></label>
+                    <select v-model="relic.elements.stats" class="form-control">
+                        <option :value="false">No</option>
+                        <option :value="true">Yes</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="col-form-label"><b>Show map</b></label>
+                    <select v-model="relic.elements.map" class="form-control">
+                        <option :value="false">No</option>
+                        <option :value="true">Yes</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="col-form-label"><b>Show scoreboard</b></label>
+                    <select v-model="relic.elements.scoreboard" class="form-control">
+                        <option :value="false">No</option>
+                        <option :value="true">Yes</option>
+                    </select>
+                </div>
+
+                <hr>
+
                 <label class="col-form-label"><b>URL:</b></label>
                 <div class="input-group mb-3">
                     <input id="deso_setup_url" readonly type="text" class="form-control"
@@ -332,26 +358,43 @@
         </div>
 
         <div v-else-if="view == 'map'" class="row">
-            <div class="scoreboardborder"></div>
-            <div class='scoreboardbackhalf1'></div>
-            <div class='scoreboardbackhalf2'></div>
-            <div class="gradientTR"></div>
-            <div class="gradientNC"></div>
-            <div class="gradientVS"></div>
-            <div class='ratetextTR'>
-                <!--{{relic.outfits.tr != '' ? relic.outfits.tr : "TR"}}:-->
-                {{relic.tr_rate}} pt/min
-            </div>
-            <div class='ratetextVS'>
-                <!--{{relic.outfits.vs != '' ? relic.outfits.vs : "VS"}}:-->
-                {{relic.vs_rate}} pt/min
-            </div>
-            <div class='ratetextNC'>
-                <!--{{relic.outfits.nc != '' ? relic.outfits.nc : "NC"}}:-->
-                {{relic.nc_rate}} pt/min
+
+            <div v-if="relic.warnings.missingZone == true || relic.warnings.missingServer == true" style="position: absolute; top: 50%; left: 50%">
+                <div v-if="relic.warnings.missingZone == true" class="text-danger" style="font-size: xx-large">
+                    No zone ID given
+                </div>
+
+                <div v-if="relic.warnings.missingServer == true" class="text-danger" style="font-size: xx-large">
+                    No server given
+                </div>
+
+                <div class="text-warning">
+                    Hiding after 20 seconds
+                </div>
             </div>
 
-            <div style="position: absolute; left: 0; top: 20%;">
+            <template v-if="relic.elements.scoreboard == true">
+                <div class="scoreboardborder"></div>
+                <div class='scoreboardbackhalf1'></div>
+                <div class='scoreboardbackhalf2'></div>
+                <div class="gradientTR"></div>
+                <div class="gradientNC"></div>
+                <div class="gradientVS"></div>
+                <div class='ratetextTR'>
+                    <!--{{relic.outfits.tr != '' ? relic.outfits.tr : "TR"}}:-->
+                    {{relic.tr_rate}} pt/min
+                </div>
+                <div class='ratetextVS'>
+                    <!--{{relic.outfits.vs != '' ? relic.outfits.vs : "VS"}}:-->
+                    {{relic.vs_rate}} pt/min
+                </div>
+                <div class='ratetextNC'>
+                    <!--{{relic.outfits.nc != '' ? relic.outfits.nc : "NC"}}:-->
+                    {{relic.nc_rate}} pt/min
+                </div>
+            </template>
+
+            <div v-if="relic.elements.stats == true" style="position: absolute; left: 0; top: 20%;">
                 <table class="table table-sm bg-dark">
                     <tr class="table-secondary">
                         <th></th>
@@ -425,7 +468,7 @@
                 </table>
             </div>
 
-            <div style="position: absolute; bottom: 0; right: 0; width: 562px; height: 469px;">
+            <div v-if="relic.elements.map == true" style="position: absolute; bottom: 0; right: 0; width: 562px; height: 469px;">
                 <div style="position: absolute; width: 562px; height: 469px; font-size: 24pt; z-index: 1000">
                     <span style="position: absolute; top: 95px; left: 175px">A</span>
                     <span style="position: absolute; top: 95px; left: 372px">B</span>

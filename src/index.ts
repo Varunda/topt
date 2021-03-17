@@ -185,8 +185,15 @@ export const vm = new Vue({
 
             showUI: true as boolean,
 
+            elements: {
+                stats: true as boolean,
+                map: true as boolean,
+                scoreboard: true as boolean
+            },
+
             warnings: {
-                badZone: false as boolean,
+                missingZone: false as boolean,
+                missingServer: false as boolean
             },
 
             tr_stats: new DesoOutfit() as DesoOutfit,
@@ -345,13 +352,28 @@ export const vm = new Vue({
 
         const params: URLSearchParams = new URLSearchParams(location.search);
         const showMap: string | null = params.get("deso");
-        const serverID: string | null = params.get("serverID");
-        const zoneID: string | null = params.get("zoneID");
 
-        if (showMap && serverID && zoneID) {
+        if (showMap) {
             this.relic.showUI = false;
-            this.relic.zoneID = zoneID;
-            this.relic.serverID = serverID;
+
+            const serverID: string | null = params.get("serverID");
+            if (serverID != null && serverID != "") {
+                this.relic.serverID = serverID;
+            } else {
+                this.relic.warnings.missingServer = true;
+            }
+
+            const zoneID: string | null = params.get("zoneID");
+            if (zoneID != null && zoneID != "") {
+                this.relic.zoneID = zoneID;
+            } else {
+                this.relic.warnings.missingZone = true;
+            }
+
+            setTimeout(() => {
+                this.relic.warnings.missingZone = false;
+                this.relic.warnings.missingServer = false;
+            }, 20 * 1000);
 
             const vsTag: string | null = params.get("vs_tag");
             if (vsTag) { this.relic.outfits.vs = vsTag; }
@@ -361,6 +383,10 @@ export const vm = new Vue({
 
             const trTag: string | null = params.get("tr_tag");
             if (trTag) { this.relic.outfits.tr = trTag; }
+
+            this.relic.elements.stats = params.get("el_stats") != null;
+            this.relic.elements.map = params.get("el_map") != null;
+            this.relic.elements.scoreboard = params.get("el_scoreboard") != null;
 
             this.startMap();
         }
@@ -508,6 +534,8 @@ export const vm = new Vue({
                 });
 
                 this.core.on("vehicle", (ev: TVehicleKillEvent) => {
+                    if (ev.zoneID != this.relic.zoneID) { return; }
+
                     const char: Character | undefined = this.core.characters.find(i => i.ID == ev.sourceID);
                     if (!char) { return; }
 
@@ -625,13 +653,6 @@ export const vm = new Vue({
                 return;
             }
             const regions: Region[] = await MapAPI.getMap(this.relic.serverID, this.relic.zoneID);
-
-            if (regions.length == 0) {
-                this.relic.warnings.badZone = true;
-                return;
-            }
-
-            this.relic.warnings.badZone = false;
 
             for (const map of regions) {
                 if (this.relic.regions.has(map.regionID)) {
@@ -1377,6 +1398,16 @@ export const vm = new Vue({
             }
             if (this.relic.outfits.tr) {
                 url += `&tr_tag=${this.relic.outfits.tr}`;
+            }
+
+            if (this.relic.elements.stats == true) {
+                url += `&el_stats=true`;
+            }
+            if (this.relic.elements.map == true) {
+                url += `&el_map=true`;
+            }
+            if (this.relic.elements.scoreboard == true) {
+                url += `&el_scoreboard=true`;
             }
 
             return url;
