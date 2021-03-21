@@ -238,8 +238,15 @@
                 <hr>
 
                 <button @click="connect" type="button" class="btn btn-primary w-100"
-                    :disabled="canConnect == false">
-                    Connect
+                    :disabled="canConnect == false || connecting == true">
+
+                    <span v-if="connecting == true">
+                        Connecting...
+                    </span>
+
+                    <span v-else>
+                        Connect
+                    </span>
                 </button>
 
                 <small class="text-muted">
@@ -302,41 +309,53 @@
                 <label class="col-form-label"><b>Outfit tags:</b></label>
                 <div class="input-group">
                     <span class="input-group-text input-group-prepend">VS Tag:</span>
-                    <input v-model="relic.outfits.vs" type="text" class="form-control">
+                    <input v-model="relic.vs_stats.tag" type="text" class="form-control">
                 </div>
 
                 <div class="input-group">
                     <span class="input-group-text input-group-prepend">NC Tag:</span>
-                    <input v-model="relic.outfits.nc" type="text" class="form-control">
+                    <input v-model="relic.nc_stats.tag" type="text" class="form-control">
                 </div>
 
                 <div class="input-group mb-3">
                     <span class="input-group-text input-group-prepend">TR Tag:</span>
-                    <input v-model="relic.outfits.tr" type="text" class="form-control">
+                    <input v-model="relic.tr_stats.tag" type="text" class="form-control">
                 </div>
 
                 <div>
                     <label class="col-form-label"><b>Show stats</b></label>
                     <select v-model="relic.elements.stats" class="form-control">
-                        <option :value="false">No</option>
                         <option :value="true">Yes</option>
+                        <option :value="false">No</option>
                     </select>
                 </div>
 
                 <div>
                     <label class="col-form-label"><b>Show map</b></label>
                     <select v-model="relic.elements.map" class="form-control">
-                        <option :value="false">No</option>
                         <option :value="true">Yes</option>
+                        <option :value="false">No</option>
                     </select>
                 </div>
 
                 <div>
                     <label class="col-form-label"><b>Show scoreboard</b></label>
                     <select v-model="relic.elements.scoreboard" class="form-control">
-                        <option :value="false">No</option>
                         <option :value="true">Yes</option>
+                        <option :value="false">No</option>
                     </select>
+
+                    <small class="text-muted">If using the PSB setup, you'll want to use this one</small>
+                </div>
+
+                <div>
+                    <label class="col-form-label"><b>Show table scoreboard</b></label>
+                    <select v-model="relic.elements.table_scoreboard" class="form-control">
+                        <option :value="true">Yes</option>
+                        <option :value="false">No</option>
+                    </select>
+
+                    <small class="text-muted">If <b>not</b> using the PSB setup, you'll want to turn this on</small>
                 </div>
 
                 <hr>
@@ -358,7 +377,6 @@
         </div>
 
         <div v-else-if="view == 'map'" class="row">
-
             <div v-if="relic.warnings.missingZone == true || relic.warnings.missingServer == true" style="position: absolute; top: 50%; left: 50%">
                 <div v-if="relic.warnings.missingZone == true" class="text-danger" style="font-size: xx-large">
                     No zone ID given
@@ -394,13 +412,27 @@
                 </div>
             </template>
 
-            <div v-if="relic.elements.stats == true" style="position: absolute; left: 0; top: 20%;">
+            <div v-if="relic.elements.stats == true" style="position: absolute; right: 0; top: 20%;">
                 <table class="table table-sm bg-dark">
                     <tr class="table-secondary">
                         <th></th>
-                        <th>{{relic.outfits.tr}}</th>
-                        <th>{{relic.outfits.vs}}</th>
-                        <th>{{relic.outfits.nc}}</th>
+                        <th>{{relic.tr_stats.tag}}</th>
+                        <th>{{relic.vs_stats.tag}}</th>
+                        <th>{{relic.nc_stats.tag}}</th>
+                    </tr>
+
+                    <tr>
+                        <td>Players</td>
+                        <td>{{relic.tr_stats.players.length}}</td>
+                        <td>{{relic.vs_stats.players.length}}</td>
+                        <td>{{relic.nc_stats.players.length}}</td>
+                    </tr>
+
+                    <tr v-if="relic.elements.table_scoreboard == true">
+                        <td>Points</td>
+                        <td>{{relic.tr_rate}}</td>
+                        <td>{{relic.vs_rate}}</td>
+                        <td>{{relic.nc_rate}}</td>
                     </tr>
 
                     <tr>
@@ -543,6 +575,13 @@
                                     class="btn btn-primary"
                                     type="button">
                                     Add
+                                </button>
+
+                                <button @click="addOutfitByPlayer"
+                                    :disabled="parameters.playerName.trim().length == 0"
+                                    class="btn btn-secondary"
+                                    type="button">
+                                    Add outfit
                                 </button>
                             </div>
                         </div>

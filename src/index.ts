@@ -143,6 +143,7 @@ const facilityToRegion: Map<string, string> = new Map([
 class DesoOutfit {
     public tag: string = "";
     public count: number = 0;
+    public players: string[] = [];
 
     public kills: number = 0;
     public deaths: number = 0;
@@ -165,6 +166,8 @@ export const vm = new Vue({
 
         view: "setup" as "setup" | "realtime" | "ops" | "killfeed" | "winter" | "example" | "battle" | "deso" | "map",
 
+        connecting: false as boolean,
+
         // Field related to settings about how TOPT runs
         settings: {
             serviceToken: "" as string,
@@ -180,15 +183,17 @@ export const vm = new Vue({
 
         relic: {
             connected: true as boolean,
+            showUI: true as boolean,
+            loadPrevious: false as boolean,
+
             zoneID: "" as string,
             serverID: "" as string,
-
-            showUI: true as boolean,
 
             elements: {
                 stats: true as boolean,
                 map: true as boolean,
-                scoreboard: true as boolean
+                scoreboard: true as boolean,
+                table_scoreboard: false as boolean
             },
 
             warnings: {
@@ -199,12 +204,6 @@ export const vm = new Vue({
             tr_stats: new DesoOutfit() as DesoOutfit,
             nc_stats: new DesoOutfit() as DesoOutfit,
             vs_stats: new DesoOutfit() as DesoOutfit,
-
-            outfits: {
-                tr: "" as string,
-                nc: "" as string,
-                vs: "" as string
-            },
 
             vs_rate: 0 as number,
             nc_rate: 0 as number,
@@ -376,17 +375,23 @@ export const vm = new Vue({
             }, 20 * 1000);
 
             const vsTag: string | null = params.get("vs_tag");
-            if (vsTag) { this.relic.outfits.vs = vsTag; }
+            if (vsTag) { this.relic.vs_stats.tag = vsTag; }
 
             const ncTag: string | null = params.get("nc_tag");
-            if (ncTag) { this.relic.outfits.nc = ncTag; }
+            if (ncTag) { this.relic.nc_stats.tag = ncTag; }
 
             const trTag: string | null = params.get("tr_tag");
-            if (trTag) { this.relic.outfits.tr = trTag; }
+            if (trTag) { this.relic.tr_stats.tag = trTag; }
 
             this.relic.elements.stats = params.get("el_stats") != null;
             this.relic.elements.map = params.get("el_map") != null;
             this.relic.elements.scoreboard = params.get("el_scoreboard") != null;
+            this.relic.elements.table_scoreboard = params.get("el_table_scoreboard") != null;
+
+            this.relic.loadPrevious = (params.get("skip_load") || "true") == "false";
+            if (this.relic.loadPrevious == false) {
+                log.debug(`Loading previous stats stored`);
+            }
 
             this.startMap();
         }
@@ -429,6 +434,8 @@ export const vm = new Vue({
                 return console.warn(`Cannot connect: service ID is empty`);
             }
 
+            this.connecting = true;
+
             if (this.coreObject != null) {
                 this.coreObject.disconnect();
                 this.coreObject = null;
@@ -436,6 +443,7 @@ export const vm = new Vue({
 
             this.coreObject = new Core(this.settings.serviceToken, this.settings.serverID);
             this.coreObject.connect().ok(() => {
+                this.connecting = false;
                 this.view = "realtime";
             });
         },
@@ -454,14 +462,24 @@ export const vm = new Vue({
 
                 this.core.start();
 
-                if (this.relic.outfits.vs != "") {
-                    this.core.addOutfit(this.relic.outfits.vs);
+                if (this.relic.loadPrevious == true && this.storage.enabled == true) {
+                    //this.loadDesoStats();
                 }
-                if (this.relic.outfits.nc != "") {
-                    this.core.addOutfit(this.relic.outfits.nc);
+
+                if (this.relic.vs_stats.tag != "") {
+                    this.core.addOutfitByTag(this.relic.vs_stats.tag).then(() => {
+                        log.debug(`Successfully subscribed to VS ${this.relic.vs_stats.tag}`);
+                    });
                 }
-                if (this.relic.outfits.tr != "") {
-                    this.core.addOutfit(this.relic.outfits.tr);
+                if (this.relic.nc_stats.tag != "") {
+                    this.core.addOutfitByTag(this.relic.nc_stats.tag).then(() => {
+                        log.debug(`Successfully subscribed to NC ${this.relic.nc_stats.tag}`);
+                    });
+                }
+                if (this.relic.tr_stats.tag != "") {
+                    this.core.addOutfitByTag(this.relic.tr_stats.tag).then(() => {
+                        log.debug(`Successfully subscribed to TR ${this.relic.tr_stats.tag}`);
+                    });
                 }
 
                 setTimeout(() => {
@@ -473,17 +491,29 @@ export const vm = new Vue({
                 }, 1000);
 
                 this.core.on("kill", (ev: TKillEvent) => {
-                    if (ev.zoneID != this.relic.zoneID) { return; }
+                    if (ev.zoneID != this.relic.zoneID) {
+                        log.debug(`skipping kill in zone ${ev.zoneID}, didn't match ${this.relic.zoneID}`);
+                        return;
+                    }
 
                     const char: Character | undefined = this.core.characters.find(i => i.ID == ev.sourceID);
                     if (!char) { return; }
 
+                    let stats;
                     if (char.faction == "1") {
-                        ++this.relic.vs_stats.kills;
+                        stats = this.relic.vs_stats;
                     } else if (char.faction == "2") {
-                        ++this.relic.nc_stats.kills;
+                        stats = this.relic.nc_stats;
                     } else if (char.faction == "3") {
-                        ++this.relic.tr_stats.kills;
+                        stats = this.relic.tr_stats;
+                    } else {
+                        return;
+                    }
+
+                    ++stats.kills;
+
+                    if (stats.players.find(iter => iter == char.name) == null) {
+                        stats.players.push(char.name);
                     }
                 });
 
@@ -493,12 +523,21 @@ export const vm = new Vue({
                     const char: Character | undefined = this.core.characters.find(i => i.ID == ev.sourceID);
                     if (!char) { return; }
 
+                    let stats;
                     if (char.faction == "1") {
-                        ++this.relic.vs_stats.deaths;
+                        stats = this.relic.vs_stats;
                     } else if (char.faction == "2") {
-                        ++this.relic.nc_stats.deaths;
+                        stats = this.relic.nc_stats;
                     } else if (char.faction == "3") {
-                        ++this.relic.tr_stats.deaths;
+                        stats = this.relic.tr_stats;
+                    } else {
+                        return;
+                    }
+
+                    ++stats.deaths;
+
+                    if (stats.players.find(iter => iter == char.name) == null) {
+                        stats.players.push(char.name);
                     }
                 });
 
@@ -520,6 +559,10 @@ export const vm = new Vue({
                         return;
                     }
 
+                    if (stats.players.find(iter => iter == char.name) == null) {
+                        stats.players.push(char.name);
+                    }
+
                     if (ev.expID == PsEvent.revive || ev.expID == PsEvent.squadRevive) {
                         ++stats.revives;
                     } else if (ev.expID == PsEvent.sundySpawn) {
@@ -536,6 +579,10 @@ export const vm = new Vue({
                 this.core.on("vehicle", (ev: TVehicleKillEvent) => {
                     if (ev.zoneID != this.relic.zoneID) { return; }
 
+                    if (ev.sourceID == "" || (ev.sourceID == ev.targetID)) {
+                        return;
+                    }
+
                     const char: Character | undefined = this.core.characters.find(i => i.ID == ev.sourceID);
                     if (!char) { return; }
 
@@ -549,6 +596,10 @@ export const vm = new Vue({
                         stats = this.relic.tr_stats;
                     } else {
                         return;
+                    }
+
+                    if (stats.players.find(iter => iter == char.name) == null) {
+                        stats.players.push(char.name);
                     }
 
                     if (ev.vehicleID == Vehicles.mosquito || ev.vehicleID == Vehicles.reaver || ev.vehicleID == Vehicles.scythe
@@ -585,7 +636,37 @@ export const vm = new Vue({
 
             setInterval(async () => {
                 this.refreshDesoMap();
+                //this.saveDesoStats();
             }, 5000);
+        },
+
+        processDesoElements: function(): void {
+            const params: URLSearchParams = new URLSearchParams(location.search);
+
+            const stats: string | null = params.get("el_stats");
+            if (stats) {
+                const parts: string[] = stats.split(';');
+                for (const part of parts) {
+                    const comp: string[] = part.split("=");
+                    if (comp.length != 2) {
+                        log.warn(`Invalid componenet ${part} from ${stats}`);
+                        continue;
+                    }
+
+                    const opt: string = comp[0];
+                    const val: string = comp[1];
+
+                    if (opt == "show") {
+
+                    } else if (opt == "pos") {
+
+                    }
+                }
+            }
+
+            this.relic.elements.stats = params.get("el_stats") != null;
+            this.relic.elements.map = params.get("el_map") != null;
+            this.relic.elements.scoreboard = params.get("el_scoreboard") != null;
         },
 
         copyDesoUrl: function(): void {
@@ -599,6 +680,43 @@ export const vm = new Vue({
                 log.warn(`failed to copy URL`);
             }
             window.getSelection()?.removeAllRanges();
+        },
+
+        saveDesoStats: function(): void {
+            if (this.storage.enabled == true) {
+                localStorage.setItem(`deso-match-stats-${this.relic.zoneID}-${this.relic.serverID}`, JSON.stringify({
+                    tr: this.relic.tr_stats,
+                    nc: this.relic.nc_stats,
+                    vs: this.relic.vs_stats
+                }));
+            }
+        },
+
+        loadDesoStats: function(): void {
+            const itemStr: string = `deso-match-stats-${this.relic.zoneID}-${this.relic.serverID}`;
+            log.debug(`loading match stats from ${itemStr}`);
+            const desoStatsStr: string | null = localStorage.getItem(itemStr);
+            if (desoStatsStr != null) {
+                try {
+                    const desoStats: any = JSON.parse(desoStatsStr);
+
+                    log.debug(desoStats);
+                    if (desoStats.vs && desoStats.vs.tag && desoStats.vs.tag == this.relic.vs_stats.tag) {
+                        log.debug(`Copied vs stats`);
+                        this.relic.vs_stats = desoStats.vs;
+                    }
+                    if (desoStats.nc && desoStats.nc.tag && desoStats.nc.tag == this.relic.nc_stats.tag) {
+                        log.debug(`Copied nc stats`);
+                        this.relic.nc_stats = desoStats.nc;
+                    }
+                    if (desoStats.tr && desoStats.tr.tag && desoStats.tr.tag == this.relic.tr_stats.tag) {
+                        log.debug(`Copied tr stats`);
+                        this.relic.tr_stats = desoStats.tr;
+                    }
+                } catch (err) {
+                    log.error(`Failed to parse desolation stats: ${err}`);
+                }
+            }
         },
 
         validateStartTime: function(ev: InputEvent): void {
@@ -1294,17 +1412,40 @@ export const vm = new Vue({
             }
 
             this.loadingOutfit = true;
-            await this.core.addOutfit(this.parameters.outfitTag);
+            await this.core.addOutfitByTag(this.parameters.outfitTag);
             this.loadingOutfit = false;
             this.parameters.outfitTag = "";
         },
 
-        addPlayer: function(): void {
+        addOutfitByPlayer: async function(): Promise<void> {
             if (this.parameters.playerName.trim().length == 0) {
                 return;
             }
 
-            this.core.addPlayer(this.parameters.playerName);
+            const player: Character | null = await CharacterAPI.getByName(this.parameters.playerName);
+            if (player == null) {
+                log.warn(`Cannot add outfit by players: player ${this.parameters.playerName} returned null`);
+                return;
+            }
+
+            if (player.outfitID == "" || player.outfitID == "0") {
+                log.warn(`Cannot add outfit by player: player ${player.name} is not in an outfit (in ${player.outfitID})`);
+                return;
+            }
+
+            this.loadingOutfit = true;
+            await this.core.addOutfitByID(player.outfitID);
+            this.loadingOutfit = false;
+            this.parameters.playerName = "";
+        },
+
+        addPlayer: async function(): Promise<void> {
+            if (this.parameters.playerName.trim().length == 0) {
+                return;
+            }
+
+            await this.core.addPlayer(this.parameters.playerName);
+            this.parameters.playerName = "";
         },
 
         updateLoggers: function(): void {
@@ -1389,15 +1530,18 @@ export const vm = new Vue({
 
         desoUrl: function(): string {
             //:value="'tide-op-tracker.ddns.net?deso=true&zoneID=' + relic.zoneID + '&serverID=' + relic.serverID">
-            let url: string = `tide-op-tracker.ddns.net?deso=true&zoneID=${this.relic.zoneID}&serverID=${this.relic.serverID}`;
-            if (this.relic.outfits.vs) {
-                url += `&vs_tag=${this.relic.outfits.vs}`;
+
+            //location.host;
+
+            let url: string = `${location.host}?deso=true&zoneID=${this.relic.zoneID}&serverID=${this.relic.serverID}`;
+            if (this.relic.vs_stats.tag) {
+                url += `&vs_tag=${this.relic.vs_stats.tag}`;
             }
-            if (this.relic.outfits.nc) {
-                url += `&nc_tag=${this.relic.outfits.nc}`;
+            if (this.relic.nc_stats.tag) {
+                url += `&nc_tag=${this.relic.nc_stats.tag}`;
             }
-            if (this.relic.outfits.tr) {
-                url += `&tr_tag=${this.relic.outfits.tr}`;
+            if (this.relic.nc_stats.tag) {
+                url += `&tr_tag=${this.relic.tr_stats.tag}`;
             }
 
             if (this.relic.elements.stats == true) {
@@ -1408,6 +1552,9 @@ export const vm = new Vue({
             }
             if (this.relic.elements.scoreboard == true) {
                 url += `&el_scoreboard=true`;
+            }
+            if (this.relic.elements.table_scoreboard == true) {
+                url += `&el_table_scoreboard=true`;
             }
 
             return url;

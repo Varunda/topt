@@ -360,7 +360,7 @@ class Core {
      *
      * @returns An ApiResponse that will resolve when the outfit has been loaded
      */
-    addOutfit(tag) {
+    addOutfitByTag(tag) {
         return __awaiter(this, void 0, void 0, function* () {
             if (this.connected == false) {
                 throw `Cannot track outfit ${tag}: Core is not connected`;
@@ -371,6 +371,24 @@ class Core {
                     this.outfits.push(outfit);
                 }
                 const chars = yield OutfitAPI_1.OutfitAPI.getCharactersByTag(tag);
+                this.subscribeToEvents(chars);
+            }
+            catch (err) {
+                log.error(err);
+            }
+        });
+    }
+    addOutfitByID(ID) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (this.connected == false) {
+                throw ``;
+            }
+            try {
+                const outfit = yield OutfitAPI_1.OutfitAPI.getByID(ID);
+                if (outfit != null) {
+                    this.outfits.push(outfit);
+                }
+                const chars = yield OutfitAPI_1.OutfitAPI.getCharactersByID(ID);
                 this.subscribeToEvents(chars);
             }
             catch (err) {
@@ -5602,6 +5620,76 @@ CharacterAPI._pendingResolveID = 0;
 
 /***/ }),
 
+/***/ "../topt-core/build/core/census/CharacterEventsApi.js":
+/*!************************************************************!*\
+  !*** ../topt-core/build/core/census/CharacterEventsApi.js ***!
+  \************************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.CharacterEventAPI = exports.CharEventKill = void 0;
+const CensusAPI_1 = __webpack_require__(/*! ./CensusAPI */ "../topt-core/build/core/census/CensusAPI.js");
+const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
+const log = Loggers_1.Logger.getLogger("CharacterEventsAPI");
+class CharEventKill {
+    constructor() {
+        this.attackerID = "";
+        this.characterID = "";
+        this.zoneID = "";
+        this.worldID = "";
+        this.timestamp = 0;
+    }
+}
+exports.CharEventKill = CharEventKill;
+class CharacterEventAPI {
+    static parseKill(ev) {
+        return {
+            attackerID: ev.attacker_character_id,
+            characterID: ev.character_id,
+            zoneID: ev.zone_id,
+            worldID: ev.world_id,
+            timestamp: Number.parseInt(ev.timestamp) * 1000
+        };
+    }
+    static getKillsByCharacterID(charID) {
+        const url = `/characters_event/?character_id=${charID}&type=KILL&c:limit=1000`;
+        return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+            try {
+                const request = yield CensusAPI_1.default.get(url).promise();
+                if (request.code == 200) {
+                    const ev = [];
+                    for (const datum of request.data.characters_event_list) {
+                        ev.push(CharacterEventAPI.parseKill(datum));
+                    }
+                    return resolve(ev);
+                }
+                else {
+                    return reject(`API call failed:\n\t${url}\n\t${request.code} ${request.data}`);
+                }
+            }
+            catch (err) {
+                return reject(err);
+            }
+        }));
+    }
+}
+exports.CharacterEventAPI = CharacterEventAPI;
+
+
+/***/ }),
+
 /***/ "../topt-core/build/core/census/EventAPI.js":
 /*!**************************************************!*\
   !*** ../topt-core/build/core/census/EventAPI.js ***!
@@ -6006,6 +6094,35 @@ class OutfitAPI {
             }
         }));
     }
+    static getCharactersByID(outfitID) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const url = `/outfit/?outfit_id=${outfitID}&c:resolve=member_character,member_online_status`;
+            return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+                try {
+                    const request = yield CensusAPI_1.default.get(url).promise();
+                    if (request.code == 200) {
+                        if (request.data.returned != 1) {
+                            return reject(`Got ${request.data.returned} results when getting outfit ID ${outfitID}`);
+                        }
+                        const chars = request.data.outfit_list[0].members
+                            .filter((elem) => elem.name != undefined)
+                            .map((elem) => {
+                            return CharacterAPI_1.CharacterAPI.parseCharacter(Object.assign({ outfit: {
+                                    alias: request.data.outfit_list[0].alias
+                                } }, elem));
+                        });
+                        return resolve(chars);
+                    }
+                    else {
+                        return reject(`API call failed>\n\t${url}\n\t${request.code} ${request.data}`);
+                    }
+                }
+                catch (err) {
+                    return reject(err);
+                }
+            }));
+        });
+    }
     static getCharactersByTag(outfitTag) {
         return __awaiter(this, void 0, void 0, function* () {
             const url = `/outfit/?alias_lower=${outfitTag.toLowerCase()}&c:resolve=member_character,member_online_status`;
@@ -6099,6 +6216,7 @@ PsLoadout.default = {
     type: "unknown"
 };
 exports.PsLoadouts = new Map([
+    // NC
     ["1", {
             ID: 1,
             faction: "NC",
@@ -6132,7 +6250,7 @@ exports.PsLoadouts = new Map([
             type: "engineer"
         }],
     ["6", {
-            ID: 5,
+            ID: 6,
             faction: "NC",
             longName: "Heavy Assault",
             shortName: "HA",
@@ -6147,6 +6265,7 @@ exports.PsLoadouts = new Map([
             singleName: "W",
             type: "max"
         }],
+    // TR
     ["8", {
             ID: 8,
             faction: "TR",
@@ -6195,6 +6314,7 @@ exports.PsLoadouts = new Map([
             singleName: "W",
             type: "max"
         }],
+    // VS
     ["15", {
             ID: 15,
             faction: "VS",
@@ -6243,6 +6363,7 @@ exports.PsLoadouts = new Map([
             singleName: "W",
             type: "max"
         }],
+    // NS
     ["28", {
             ID: 28,
             faction: "NS",
@@ -6621,6 +6742,7 @@ __exportStar(__webpack_require__(/*! ./census/PsLoadout */ "../topt-core/build/c
 __exportStar(__webpack_require__(/*! ./census/VehicleAPI */ "../topt-core/build/core/census/VehicleAPI.js"), exports);
 __exportStar(__webpack_require__(/*! ./census/WeaponAPI */ "../topt-core/build/core/census/WeaponAPI.js"), exports);
 __exportStar(__webpack_require__(/*! ./census/MapAPI */ "../topt-core/build/core/census/MapAPI.js"), exports);
+__exportStar(__webpack_require__(/*! ./census/CharacterEventsApi */ "../topt-core/build/core/census/CharacterEventsApi.js"), exports);
 __exportStar(__webpack_require__(/*! ./objects/index */ "../topt-core/build/core/objects/index.js"), exports);
 __exportStar(__webpack_require__(/*! ./events/index */ "../topt-core/build/core/events/index.js"), exports);
 __exportStar(__webpack_require__(/*! ./reports/OutfitReport */ "../topt-core/build/core/reports/OutfitReport.js"), exports);
@@ -72766,6 +72888,7 @@ class DesoOutfit {
     constructor() {
         this.tag = "";
         this.count = 0;
+        this.players = [];
         this.kills = 0;
         this.deaths = 0;
         this.revives = 0;
@@ -72783,6 +72906,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
     data: {
         coreObject: null,
         view: "setup",
+        connecting: false,
         // Field related to settings about how TOPT runs
         settings: {
             serviceToken: "",
@@ -72796,13 +72920,15 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
         },
         relic: {
             connected: true,
+            showUI: true,
+            loadPrevious: false,
             zoneID: "",
             serverID: "",
-            showUI: true,
             elements: {
                 stats: true,
                 map: true,
-                scoreboard: true
+                scoreboard: true,
+                table_scoreboard: false
             },
             warnings: {
                 missingZone: false,
@@ -72811,11 +72937,6 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             tr_stats: new DesoOutfit(),
             nc_stats: new DesoOutfit(),
             vs_stats: new DesoOutfit(),
-            outfits: {
-                tr: "",
-                nc: "",
-                vs: ""
-            },
             vs_rate: 0,
             nc_rate: 0,
             tr_rate: 0,
@@ -72953,19 +73074,24 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             }, 20 * 1000);
             const vsTag = params.get("vs_tag");
             if (vsTag) {
-                this.relic.outfits.vs = vsTag;
+                this.relic.vs_stats.tag = vsTag;
             }
             const ncTag = params.get("nc_tag");
             if (ncTag) {
-                this.relic.outfits.nc = ncTag;
+                this.relic.nc_stats.tag = ncTag;
             }
             const trTag = params.get("tr_tag");
             if (trTag) {
-                this.relic.outfits.tr = trTag;
+                this.relic.tr_stats.tag = trTag;
             }
             this.relic.elements.stats = params.get("el_stats") != null;
             this.relic.elements.map = params.get("el_map") != null;
             this.relic.elements.scoreboard = params.get("el_scoreboard") != null;
+            this.relic.elements.table_scoreboard = params.get("el_table_scoreboard") != null;
+            this.relic.loadPrevious = (params.get("skip_load") || "true") == "false";
+            if (this.relic.loadPrevious == false) {
+                log.debug(`Loading previous stats stored`);
+            }
             this.startMap();
         }
     },
@@ -72998,12 +73124,14 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             if (this.canConnect == false) {
                 return console.warn(`Cannot connect: service ID is empty`);
             }
+            this.connecting = true;
             if (this.coreObject != null) {
                 this.coreObject.disconnect();
                 this.coreObject = null;
             }
             this.coreObject = new tcore__WEBPACK_IMPORTED_MODULE_23___default.a(this.settings.serviceToken, this.settings.serverID);
             this.coreObject.connect().ok(() => {
+                this.connecting = false;
                 this.view = "realtime";
             });
         },
@@ -73017,14 +73145,23 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             this.coreObject.connect().ok(() => {
                 this.view = "map";
                 this.core.start();
-                if (this.relic.outfits.vs != "") {
-                    this.core.addOutfit(this.relic.outfits.vs);
+                if (this.relic.loadPrevious == true && this.storage.enabled == true) {
+                    //this.loadDesoStats();
                 }
-                if (this.relic.outfits.nc != "") {
-                    this.core.addOutfit(this.relic.outfits.nc);
+                if (this.relic.vs_stats.tag != "") {
+                    this.core.addOutfitByTag(this.relic.vs_stats.tag).then(() => {
+                        log.debug(`Successfully subscribed to VS ${this.relic.vs_stats.tag}`);
+                    });
                 }
-                if (this.relic.outfits.tr != "") {
-                    this.core.addOutfit(this.relic.outfits.tr);
+                if (this.relic.nc_stats.tag != "") {
+                    this.core.addOutfitByTag(this.relic.nc_stats.tag).then(() => {
+                        log.debug(`Successfully subscribed to NC ${this.relic.nc_stats.tag}`);
+                    });
+                }
+                if (this.relic.tr_stats.tag != "") {
+                    this.core.addOutfitByTag(this.relic.tr_stats.tag).then(() => {
+                        log.debug(`Successfully subscribed to TR ${this.relic.tr_stats.tag}`);
+                    });
                 }
                 setTimeout(() => {
                     this.core.subscribe({
@@ -73035,20 +73172,29 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 }, 1000);
                 this.core.on("kill", (ev) => {
                     if (ev.zoneID != this.relic.zoneID) {
+                        log.debug(`skipping kill in zone ${ev.zoneID}, didn't match ${this.relic.zoneID}`);
                         return;
                     }
                     const char = this.core.characters.find(i => i.ID == ev.sourceID);
                     if (!char) {
                         return;
                     }
+                    let stats;
                     if (char.faction == "1") {
-                        ++this.relic.vs_stats.kills;
+                        stats = this.relic.vs_stats;
                     }
                     else if (char.faction == "2") {
-                        ++this.relic.nc_stats.kills;
+                        stats = this.relic.nc_stats;
                     }
                     else if (char.faction == "3") {
-                        ++this.relic.tr_stats.kills;
+                        stats = this.relic.tr_stats;
+                    }
+                    else {
+                        return;
+                    }
+                    ++stats.kills;
+                    if (stats.players.find(iter => iter == char.name) == null) {
+                        stats.players.push(char.name);
                     }
                 });
                 this.core.on("death", (ev) => {
@@ -73059,14 +73205,22 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                     if (!char) {
                         return;
                     }
+                    let stats;
                     if (char.faction == "1") {
-                        ++this.relic.vs_stats.deaths;
+                        stats = this.relic.vs_stats;
                     }
                     else if (char.faction == "2") {
-                        ++this.relic.nc_stats.deaths;
+                        stats = this.relic.nc_stats;
                     }
                     else if (char.faction == "3") {
-                        ++this.relic.tr_stats.deaths;
+                        stats = this.relic.tr_stats;
+                    }
+                    else {
+                        return;
+                    }
+                    ++stats.deaths;
+                    if (stats.players.find(iter => iter == char.name) == null) {
+                        stats.players.push(char.name);
                     }
                 });
                 this.core.on("exp", (ev) => {
@@ -73090,6 +73244,9 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                     else {
                         return;
                     }
+                    if (stats.players.find(iter => iter == char.name) == null) {
+                        stats.players.push(char.name);
+                    }
                     if (ev.expID == tcore__WEBPACK_IMPORTED_MODULE_23__["PsEvent"].revive || ev.expID == tcore__WEBPACK_IMPORTED_MODULE_23__["PsEvent"].squadRevive) {
                         ++stats.revives;
                     }
@@ -73110,6 +73267,9 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                     if (ev.zoneID != this.relic.zoneID) {
                         return;
                     }
+                    if (ev.sourceID == "" || (ev.sourceID == ev.targetID)) {
+                        return;
+                    }
                     const char = this.core.characters.find(i => i.ID == ev.sourceID);
                     if (!char) {
                         return;
@@ -73126,6 +73286,9 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                     }
                     else {
                         return;
+                    }
+                    if (stats.players.find(iter => iter == char.name) == null) {
+                        stats.players.push(char.name);
                     }
                     if (ev.vehicleID == tcore__WEBPACK_IMPORTED_MODULE_23__["Vehicles"].mosquito || ev.vehicleID == tcore__WEBPACK_IMPORTED_MODULE_23__["Vehicles"].reaver || ev.vehicleID == tcore__WEBPACK_IMPORTED_MODULE_23__["Vehicles"].scythe
                         || ev.vehicleID == tcore__WEBPACK_IMPORTED_MODULE_23__["Vehicles"].valkyrie || ev.vehicleID == tcore__WEBPACK_IMPORTED_MODULE_23__["Vehicles"].galaxy || ev.vehicleID == tcore__WEBPACK_IMPORTED_MODULE_23__["Vehicles"].liberator) {
@@ -73156,7 +73319,31 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             });
             setInterval(() => __awaiter(this, void 0, void 0, function* () {
                 this.refreshDesoMap();
+                //this.saveDesoStats();
             }), 5000);
+        },
+        processDesoElements: function () {
+            const params = new URLSearchParams(location.search);
+            const stats = params.get("el_stats");
+            if (stats) {
+                const parts = stats.split(';');
+                for (const part of parts) {
+                    const comp = part.split("=");
+                    if (comp.length != 2) {
+                        log.warn(`Invalid componenet ${part} from ${stats}`);
+                        continue;
+                    }
+                    const opt = comp[0];
+                    const val = comp[1];
+                    if (opt == "show") {
+                    }
+                    else if (opt == "pos") {
+                    }
+                }
+            }
+            this.relic.elements.stats = params.get("el_stats") != null;
+            this.relic.elements.map = params.get("el_map") != null;
+            this.relic.elements.scoreboard = params.get("el_scoreboard") != null;
         },
         copyDesoUrl: function () {
             var _a;
@@ -73169,6 +73356,41 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 log.warn(`failed to copy URL`);
             }
             (_a = window.getSelection()) === null || _a === void 0 ? void 0 : _a.removeAllRanges();
+        },
+        saveDesoStats: function () {
+            if (this.storage.enabled == true) {
+                localStorage.setItem(`deso-match-stats-${this.relic.zoneID}-${this.relic.serverID}`, JSON.stringify({
+                    tr: this.relic.tr_stats,
+                    nc: this.relic.nc_stats,
+                    vs: this.relic.vs_stats
+                }));
+            }
+        },
+        loadDesoStats: function () {
+            const itemStr = `deso-match-stats-${this.relic.zoneID}-${this.relic.serverID}`;
+            log.debug(`loading match stats from ${itemStr}`);
+            const desoStatsStr = localStorage.getItem(itemStr);
+            if (desoStatsStr != null) {
+                try {
+                    const desoStats = JSON.parse(desoStatsStr);
+                    log.debug(desoStats);
+                    if (desoStats.vs && desoStats.vs.tag && desoStats.vs.tag == this.relic.vs_stats.tag) {
+                        log.debug(`Copied vs stats`);
+                        this.relic.vs_stats = desoStats.vs;
+                    }
+                    if (desoStats.nc && desoStats.nc.tag && desoStats.nc.tag == this.relic.nc_stats.tag) {
+                        log.debug(`Copied nc stats`);
+                        this.relic.nc_stats = desoStats.nc;
+                    }
+                    if (desoStats.tr && desoStats.tr.tag && desoStats.tr.tag == this.relic.tr_stats.tag) {
+                        log.debug(`Copied tr stats`);
+                        this.relic.tr_stats = desoStats.tr;
+                    }
+                }
+                catch (err) {
+                    log.error(`Failed to parse desolation stats: ${err}`);
+                }
+            }
         },
         validateStartTime: function (ev) {
             const value = ev.target.value;
@@ -73794,16 +74016,39 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                     this.showFrog = true;
                 }
                 this.loadingOutfit = true;
-                yield this.core.addOutfit(this.parameters.outfitTag);
+                yield this.core.addOutfitByTag(this.parameters.outfitTag);
                 this.loadingOutfit = false;
                 this.parameters.outfitTag = "";
             });
         },
+        addOutfitByPlayer: function () {
+            return __awaiter(this, void 0, void 0, function* () {
+                if (this.parameters.playerName.trim().length == 0) {
+                    return;
+                }
+                const player = yield tcore__WEBPACK_IMPORTED_MODULE_23__["CharacterAPI"].getByName(this.parameters.playerName);
+                if (player == null) {
+                    log.warn(`Cannot add outfit by players: player ${this.parameters.playerName} returned null`);
+                    return;
+                }
+                if (player.outfitID == "" || player.outfitID == "0") {
+                    log.warn(`Cannot add outfit by player: player ${player.name} is not in an outfit (in ${player.outfitID})`);
+                    return;
+                }
+                this.loadingOutfit = true;
+                yield this.core.addOutfitByID(player.outfitID);
+                this.loadingOutfit = false;
+                this.parameters.playerName = "";
+            });
+        },
         addPlayer: function () {
-            if (this.parameters.playerName.trim().length == 0) {
-                return;
-            }
-            this.core.addPlayer(this.parameters.playerName);
+            return __awaiter(this, void 0, void 0, function* () {
+                if (this.parameters.playerName.trim().length == 0) {
+                    return;
+                }
+                yield this.core.addPlayer(this.parameters.playerName);
+                this.parameters.playerName = "";
+            });
         },
         updateLoggers: function () {
             const loggers = tcore__WEBPACK_IMPORTED_MODULE_23__["Logger"].getLoggerNames();
@@ -73869,15 +74114,16 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
         },
         desoUrl: function () {
             //:value="'tide-op-tracker.ddns.net?deso=true&zoneID=' + relic.zoneID + '&serverID=' + relic.serverID">
-            let url = `tide-op-tracker.ddns.net?deso=true&zoneID=${this.relic.zoneID}&serverID=${this.relic.serverID}`;
-            if (this.relic.outfits.vs) {
-                url += `&vs_tag=${this.relic.outfits.vs}`;
+            //location.host;
+            let url = `${location.host}?deso=true&zoneID=${this.relic.zoneID}&serverID=${this.relic.serverID}`;
+            if (this.relic.vs_stats.tag) {
+                url += `&vs_tag=${this.relic.vs_stats.tag}`;
             }
-            if (this.relic.outfits.nc) {
-                url += `&nc_tag=${this.relic.outfits.nc}`;
+            if (this.relic.nc_stats.tag) {
+                url += `&nc_tag=${this.relic.nc_stats.tag}`;
             }
-            if (this.relic.outfits.tr) {
-                url += `&tr_tag=${this.relic.outfits.tr}`;
+            if (this.relic.nc_stats.tag) {
+                url += `&tr_tag=${this.relic.tr_stats.tag}`;
             }
             if (this.relic.elements.stats == true) {
                 url += `&el_stats=true`;
@@ -73887,6 +74133,9 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             }
             if (this.relic.elements.scoreboard == true) {
                 url += `&el_scoreboard=true`;
+            }
+            if (this.relic.elements.table_scoreboard == true) {
+                url += `&el_table_scoreboard=true`;
             }
             return url;
         },
