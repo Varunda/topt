@@ -221,7 +221,7 @@ class Core {
         this.serviceID = serviceID;
         this.serverID = serverID;
         this.socketMessageQueue.length = 5;
-        CensusAPI_1.default.init(this.serviceID);
+        CensusAPI_1.CensusAPI.init(this.serviceID);
         this.squadInit();
         log.info(`Using Promise core`);
     }
@@ -4781,7 +4781,7 @@ class AchievementAPI {
                 return resolve(AchievementAPI._cache.get(achivID));
             }
             try {
-                const request = yield CensusAPI_1.default.get(url).promise();
+                const request = yield CensusAPI_1.CensusAPI.get(url).promise();
                 if (request.code == 200) {
                     if (request.data.returned != 1) {
                         return resolve(null);
@@ -4817,7 +4817,7 @@ class AchievementAPI {
             }
             if (requestIDs.length > 0) {
                 const url = `achievement?achievement_id=${requestIDs.join(",")}`;
-                const request = yield CensusAPI_1.default.get(url).promise();
+                const request = yield CensusAPI_1.CensusAPI.get(url).promise();
                 if (request.code == 200) {
                     for (const datum of request.data.achievement_list) {
                         const ach = AchievementAPI.parse(datum);
@@ -5395,6 +5395,7 @@ exports.APIWrapper = APIWrapper;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.CensusAPI = void 0;
 const ApiWrapper_1 = __webpack_require__(/*! ./ApiWrapper */ "../topt-core/build/core/census/ApiWrapper.js");
 const axios = __webpack_require__(/*! axios */ "../topt-core/node_modules/axios/index.js");
 const Loggers_1 = __webpack_require__(/*! ../Loggers */ "../topt-core/build/core/Loggers.js");
@@ -5426,7 +5427,7 @@ class CensusAPI {
         return new ApiWrapper_1.ApiResponse(axios.default.get(`https://census.daybreakgames.com/s:${CensusAPI.serviceID}/get/ps2:v2${url}`), ((elem) => elem));
     }
 }
-exports.default = CensusAPI;
+exports.CensusAPI = CensusAPI;
 CensusAPI.serviceID = "";
 CensusAPI.requestCount = 0;
 
@@ -5506,7 +5507,7 @@ class CharacterAPI {
                 return resolve(CharacterAPI._cache.get(charID));
             }
             try {
-                const request = yield CensusAPI_1.default.get(url).promise();
+                const request = yield CensusAPI_1.CensusAPI.get(url).promise();
                 if (request.code == 200) {
                     if (request.data.returned != 1) {
                         return resolve(null);
@@ -5566,7 +5567,7 @@ class CharacterAPI {
                     log.info(`Slice ${i}: ${i} - ${i + sliceSize - 1}: [${slice.join(",")}]`);
                     try {
                         const url = `/character/?character_id=${slice.join(",")}&c:resolve=outfit,online_status`;
-                        const request = yield CensusAPI_1.default.get(url).promise();
+                        const request = yield CensusAPI_1.CensusAPI.get(url).promise();
                         if (request.code == 200) {
                             for (const datum of request.data.character_list) {
                                 const char = CharacterAPI.parseCharacter(datum);
@@ -5593,7 +5594,7 @@ class CharacterAPI {
         const url = `/character/?name.first_lower=${name.toLowerCase()}&c:resolve=outfit,online_status`;
         return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
             try {
-                const request = yield CensusAPI_1.default.get(url).promise();
+                const request = yield CensusAPI_1.CensusAPI.get(url).promise();
                 if (request.code == 200) {
                     if (request.data.returned != 1) {
                         return resolve(null);
@@ -5667,7 +5668,7 @@ class CharacterEventAPI {
         const url = `/characters_event/?character_id=${charID}&type=KILL&c:limit=1000`;
         return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
             try {
-                const request = yield CensusAPI_1.default.get(url).promise();
+                const request = yield CensusAPI_1.CensusAPI.get(url).promise();
                 if (request.code == 200) {
                     const ev = [];
                     for (const datum of request.data.characters_event_list) {
@@ -5686,6 +5687,74 @@ class CharacterEventAPI {
     }
 }
 exports.CharacterEventAPI = CharacterEventAPI;
+
+
+/***/ }),
+
+/***/ "../topt-core/build/core/census/CharacterItemAPI.js":
+/*!**********************************************************!*\
+  !*** ../topt-core/build/core/census/CharacterItemAPI.js ***!
+  \**********************************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.CharacterItemAPI = exports.CharacterItem = void 0;
+const CensusAPI_1 = __webpack_require__(/*! ./CensusAPI */ "../topt-core/build/core/census/CensusAPI.js");
+class CharacterItem {
+    constructor() {
+        this.characterID = "";
+        this.itemID = "";
+        this.accountLevel = false;
+    }
+}
+exports.CharacterItem = CharacterItem;
+class CharacterItemAPI {
+    static parse(elem) {
+        return {
+            characterID: elem.character_id,
+            itemID: elem.item_id,
+            accountLevel: !!elem.account_level
+        };
+    }
+    static getByCharacterID(charID) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const url = `characters_item?character_id=${charID}`;
+            return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
+                try {
+                    const request = yield CensusAPI_1.CensusAPI.get(url).promise();
+                    if (request.code == 200) {
+                        if (request.data.returned != 1) {
+                        }
+                        const arr = [];
+                        for (const elem of request.data.characters_item_list) {
+                            arr.push(CharacterItemAPI.parse(elem));
+                        }
+                        return resolve(arr);
+                    }
+                    else {
+                        return reject(`API call failed>\n\t${url}\n\t${request.code} ${request.data}`);
+                    }
+                }
+                catch (err) {
+                    return reject(err);
+                }
+            }));
+        });
+    }
+}
+exports.CharacterItemAPI = CharacterItemAPI;
 
 
 /***/ }),
@@ -5789,7 +5858,7 @@ class FacilityAPI {
             else {
                 try {
                     FacilityAPI._pending.set(facilityID, prom);
-                    const request = yield CensusAPI_1.default.get(url).promise();
+                    const request = yield CensusAPI_1.CensusAPI.get(url).promise();
                     FacilityAPI._pending.delete(facilityID);
                     if (request.code == 200) {
                         if (request.data.returned != 1) {
@@ -5831,7 +5900,7 @@ class FacilityAPI {
             const url = `/map_region?facility_id=${requestIDs.join(",")}&c:limit=100`;
             if (requestIDs.length > 0) {
                 try {
-                    const request = yield CensusAPI_1.default.get(url).promise();
+                    const request = yield CensusAPI_1.CensusAPI.get(url).promise();
                     if (request.code == 200) {
                         if (request.data.returned == 0) {
                             log.warn(``);
@@ -5868,7 +5937,7 @@ class FacilityAPI {
         return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
             const facilities = [];
             try {
-                const request = yield CensusAPI_1.default.get(`/map_region?&c:limit=10000`).promise();
+                const request = yield CensusAPI_1.CensusAPI.get(`/map_region?&c:limit=10000`).promise();
                 if (request.code == 200) {
                     for (const datum of request.data.map_region_list) {
                         const fac = FacilityAPI.parse(datum);
@@ -5933,7 +6002,7 @@ class MapAPI {
         const url = `/map/?world_id=${serverID}&zone_ids=${zoneID}`;
         return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
             try {
-                const request = yield CensusAPI_1.default.get(url).promise();
+                const request = yield CensusAPI_1.CensusAPI.get(url).promise();
                 if (request.code == 200) {
                     if (request.data.returned != 1) {
                         return resolve([]);
@@ -6007,7 +6076,7 @@ class OutfitAPI {
         const url = `/outfit/?outfit_id=${ID}&c:resolve=leader`;
         return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
             try {
-                const request = yield CensusAPI_1.default.get(url).promise();
+                const request = yield CensusAPI_1.CensusAPI.get(url).promise();
                 if (request.code == 200) {
                     if (request.data.returned != 1) {
                         return resolve(null);
@@ -6041,7 +6110,7 @@ class OutfitAPI {
                 log.trace(`slice: [${slice.join(", ")}]`);
                 const url = `/outfit/?outfit_id=${slice.join(",")}&c:resolve=leader`;
                 try {
-                    const request = yield CensusAPI_1.default.get(url).promise();
+                    const request = yield CensusAPI_1.CensusAPI.get(url).promise();
                     if (request.code == 200) {
                         if (request.data.returned == 0) {
                             log.warn(`Didn't get any outfits in slice [${slice.join(", ")}]`);
@@ -6077,7 +6146,7 @@ class OutfitAPI {
                 return resolve(null);
             }
             try {
-                const request = yield CensusAPI_1.default.get(url).promise();
+                const request = yield CensusAPI_1.CensusAPI.get(url).promise();
                 if (request.code == 200) {
                     if (request.data.returned != 1) {
                         return resolve(null);
@@ -6099,7 +6168,7 @@ class OutfitAPI {
             const url = `/outfit/?outfit_id=${outfitID}&c:resolve=member_character,member_online_status`;
             return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
                 try {
-                    const request = yield CensusAPI_1.default.get(url).promise();
+                    const request = yield CensusAPI_1.CensusAPI.get(url).promise();
                     if (request.code == 200) {
                         if (request.data.returned != 1) {
                             return reject(`Got ${request.data.returned} results when getting outfit ID ${outfitID}`);
@@ -6128,7 +6197,7 @@ class OutfitAPI {
             const url = `/outfit/?alias_lower=${outfitTag.toLowerCase()}&c:resolve=member_character,member_online_status`;
             return new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
                 try {
-                    const request = yield CensusAPI_1.default.get(url).promise();
+                    const request = yield CensusAPI_1.CensusAPI.get(url).promise();
                     if (request.code == 200) {
                         if (request.data.returned != 1) {
                             return reject(`Got ${request.data.returned} results when getting ${outfitTag}`);
@@ -6503,7 +6572,7 @@ class VehicleAPI {
                 VehicleAPI._cache = new Promise((resolve, reject) => __awaiter(this, void 0, void 0, function* () {
                     const vehicles = [];
                     try {
-                        const request = yield CensusAPI_1.default.get(`vehicle?c:limit=100`).promise();
+                        const request = yield CensusAPI_1.CensusAPI.get(`vehicle?c:limit=100`).promise();
                         if (request.code == 200) {
                             for (const datum of request.data.vehicle_list) {
                                 vehicles.push(VehicleAPI.parse(datum));
@@ -6617,7 +6686,7 @@ class WeaponAPI {
                 const url = `item?item_id=${weaponID}&c:hide=description,max_stack_size,image_path&c:lang=en&c:join=item_category^inject_at:category`;
                 try {
                     WeaponAPI._pendingRequests.set(weaponID, prom);
-                    const request = yield CensusAPI_1.default.get(url).promise();
+                    const request = yield CensusAPI_1.CensusAPI.get(url).promise();
                     WeaponAPI._pendingRequests.delete(weaponID);
                     if (request.code == 200) {
                         if (request.data.returned != 1) {
@@ -6661,7 +6730,7 @@ class WeaponAPI {
             if (requestIDs.length > 0) {
                 const url = `item?item_id=${requestIDs.join(",")}&c:hide=description,max_stack_size,image_path&c:lang=en&c:join=item_category^inject_at:category`;
                 try {
-                    const request = yield CensusAPI_1.default.get(url).promise();
+                    const request = yield CensusAPI_1.CensusAPI.get(url).promise();
                     if (request.code == 200) {
                         for (const datum of request.data.item_list) {
                             const wep = WeaponAPI.parse(datum);
@@ -6743,6 +6812,7 @@ __exportStar(__webpack_require__(/*! ./census/VehicleAPI */ "../topt-core/build/
 __exportStar(__webpack_require__(/*! ./census/WeaponAPI */ "../topt-core/build/core/census/WeaponAPI.js"), exports);
 __exportStar(__webpack_require__(/*! ./census/MapAPI */ "../topt-core/build/core/census/MapAPI.js"), exports);
 __exportStar(__webpack_require__(/*! ./census/CharacterEventsApi */ "../topt-core/build/core/census/CharacterEventsApi.js"), exports);
+__exportStar(__webpack_require__(/*! ./census/CharacterItemAPI */ "../topt-core/build/core/census/CharacterItemAPI.js"), exports);
 __exportStar(__webpack_require__(/*! ./objects/index */ "../topt-core/build/core/objects/index.js"), exports);
 __exportStar(__webpack_require__(/*! ./events/index */ "../topt-core/build/core/events/index.js"), exports);
 __exportStar(__webpack_require__(/*! ./reports/OutfitReport */ "../topt-core/build/core/reports/OutfitReport.js"), exports);
@@ -73133,6 +73203,34 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             this.coreObject.connect().ok(() => {
                 this.connecting = false;
                 this.view = "realtime";
+                const params = new URLSearchParams(location.search);
+                const autoOutfit = params.get("auto");
+                if (autoOutfit) {
+                    const outfitsStr = params.get("outfits");
+                    if (!outfitsStr) {
+                        return;
+                    }
+                    setTimeout(() => __awaiter(this, void 0, void 0, function* () {
+                        const outfits = outfitsStr.split(",");
+                        log.info(`Adding these outfits: ${outfits.join(", ")}`);
+                        for (const outfit of outfits) {
+                            this.parameters.outfitTag = outfit;
+                            log.debug(`Adding ${outfit}`);
+                            yield this.addOutfit();
+                            log.debug(`Added ${outfit}`);
+                        }
+                    }), 0);
+                }
+                this.core.desolationFilter = !!params.get("deso_filter");
+                const startTime = params.get("start_time");
+                if (startTime) {
+                    this.parameters.autoStartTime = startTime;
+                    this.validateStartTime({
+                        target: {
+                            value: startTime
+                        }
+                    });
+                }
             });
         },
         startMap: function () {
@@ -74019,6 +74117,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 yield this.core.addOutfitByTag(this.parameters.outfitTag);
                 this.loadingOutfit = false;
                 this.parameters.outfitTag = "";
+                this.updateTitle();
             });
         },
         addOutfitByPlayer: function () {
@@ -74039,6 +74138,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 yield this.core.addOutfitByID(player.outfitID);
                 this.loadingOutfit = false;
                 this.parameters.playerName = "";
+                this.updateTitle();
             });
         },
         addPlayer: function () {
@@ -74049,6 +74149,9 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 yield this.core.addPlayer(this.parameters.playerName);
                 this.parameters.playerName = "";
             });
+        },
+        updateTitle: function () {
+            document.title = `TOPT: ${this.settings.serverID}; ${this.core.outfits.map(iter => iter.tag).join(", ")}`;
         },
         updateLoggers: function () {
             const loggers = tcore__WEBPACK_IMPORTED_MODULE_23__["Logger"].getLoggerNames();

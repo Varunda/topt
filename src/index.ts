@@ -445,6 +445,39 @@ export const vm = new Vue({
             this.coreObject.connect().ok(() => {
                 this.connecting = false;
                 this.view = "realtime";
+
+                const params: URLSearchParams = new URLSearchParams(location.search);
+
+                const autoOutfit: string | null = params.get("auto");
+                if (autoOutfit) {
+                    const outfitsStr: string | null = params.get("outfits");
+                    if (!outfitsStr) {
+                        return;
+                    }
+
+                    setTimeout(async () => {
+                        const outfits: string[] = outfitsStr.split(",");
+                        log.info(`Adding these outfits: ${outfits.join(", ")}`);
+                        for (const outfit of outfits) {
+                            this.parameters.outfitTag = outfit;
+                            log.debug(`Adding ${outfit}`);
+                            await this.addOutfit();
+                            log.debug(`Added ${outfit}`);
+                        }
+                    }, 0);
+                }
+
+                this.core.desolationFilter = !!params.get("deso_filter");
+
+                const startTime: string | null = params.get("start_time");
+                if (startTime) {
+                    this.parameters.autoStartTime = startTime;
+                    this.validateStartTime({
+                        target: {
+                            value: startTime
+                        }
+                    } as any);
+                }
             });
         },
 
@@ -1415,6 +1448,8 @@ export const vm = new Vue({
             await this.core.addOutfitByTag(this.parameters.outfitTag);
             this.loadingOutfit = false;
             this.parameters.outfitTag = "";
+
+            this.updateTitle();
         },
 
         addOutfitByPlayer: async function(): Promise<void> {
@@ -1437,6 +1472,8 @@ export const vm = new Vue({
             await this.core.addOutfitByID(player.outfitID);
             this.loadingOutfit = false;
             this.parameters.playerName = "";
+
+            this.updateTitle();
         },
 
         addPlayer: async function(): Promise<void> {
@@ -1446,6 +1483,10 @@ export const vm = new Vue({
 
             await this.core.addPlayer(this.parameters.playerName);
             this.parameters.playerName = "";
+        },
+
+        updateTitle: function(): void {
+            document.title = `TOPT: ${this.settings.serverID}; ${this.core.outfits.map(iter => iter.tag).join(", ")}`;
         },
 
         updateLoggers: function(): void {
