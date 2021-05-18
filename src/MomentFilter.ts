@@ -99,7 +99,7 @@ Vue.filter("faction", (input: string): string => {
     }
 });
 
-Vue.filter("duration", (input: string | number): string => {
+Vue.filter("duration", (input: string | number, format: string): string => {
     const val = (typeof(input) == "string") ? Number.parseInt(input) : input;
     if (Number.isNaN(val)) {
         return `NaN ${val}`;
@@ -109,30 +109,70 @@ Vue.filter("duration", (input: string | number): string => {
         return "Never";
     }
 
+    const parts = {
+        seconds: 0 as number,
+        minutes: 0 as number,
+        hour: 0 as number
+    };
+
     if (val == 1) {
+        parts.seconds = 1;
         return "1 second";
     }
 
     if (val < 60) {
+        parts.seconds = val % 60;
         return `${val % 60} seconds`;
     }
 
     if (val == 0) {
+        parts.minutes = 1;
         return `1 minute`;
     }
 
     if (val < (60 * 60)) {
-        return `${Math.round(val / 60)} minutes ${val % 60} seconds`;
+        parts.minutes = Math.round(val / 60);
+        parts.seconds = val % 60;
+        return `${Math.round(val / 60)} minutes ${(val % 60).toFixed(0)} seconds`;
     }
 
     if (val == 60 * 60) {
+        parts.hour = 1;
         return `1 hour`;
     }
 
     const hours = Math.floor(val / 3600);
     const mins = Math.floor((val - (3600 * hours)) / 60);
+    const secs = val % 60;
+
+    parts.hour = hours;
+    parts.minutes = mins;
+    parts.seconds = secs;
 
     return `${hours} hours ${mins} minutes ${val % 60} seconds`;
+});
+
+Vue.filter("duration_short", (input: string | number) => {
+    const val = (typeof(input) == "string") ? Number.parseInt(input) : input;
+    if (Number.isNaN(val)) {
+        return `NaN ${val}`;
+    }
+
+    const hours = Math.floor(val / 3600);
+    const mins = Math.floor((val - (3600 * hours)) / 60);
+    const secs = val % 60;
+
+    const parts = {
+        hours: hours as number,
+        minutes: mins,
+        seconds: secs
+    };
+
+    if (hours > 0) {
+        return `${hours.toFixed(0)}:${mins.toFixed(0)}:${mins.toFixed(0)}`;
+    }
+
+    return `${mins.toFixed(0)}:${secs.toFixed(0)}`;
 });
 
 Vue.filter("minutes", (input: string | number): string => {

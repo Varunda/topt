@@ -1,6 +1,8 @@
 <head>
     <meta charset="UTF-8">
 
+    <link href="./data/speedrun/PlanetSide2.ttf" rel="font-face">
+
     <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"
         integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo"
         crossorigin="anonymous">
@@ -71,6 +73,38 @@
             white-space: nowrap;
         }
 
+        .table td {
+            border-top: unset !important;
+        }
+
+        .sr-player {
+            position: absolute;
+            font-family: ps2;
+            border: 3px solid #e8b55c;
+            border-radius: 6px;
+            background-color: #373737;
+        }
+
+        .sr-player-header {
+            font-size: 52pt;
+            color: #e8b55c;
+        }
+
+        .sr-left-align {
+            text-align: start;
+        }
+
+        .sr-right-align {
+            text-align: end;
+        }
+
+        .sr-player-table {
+            margin-bottom: 0;
+            font-size: 24pt;
+            color: #e8b55c !important;
+            width: unset !important;
+        }
+
         @-moz-keyframes spin {
             from { -moz-transform: rotate(0deg); }
             to { -moz-transform: rotate(360deg); }
@@ -82,6 +116,11 @@
         @keyframes spin {
             from {transform:rotate(0deg);}
             to {transform:rotate(360deg);}
+        }
+
+        @font-face {
+            font-family: ps2;
+            src: url("/data/speedrun/PlanetSide2.ttf");
         }
 
         .loading {
@@ -182,6 +221,11 @@
 
         <div v-if="view == 'setup' && relic.showUI != false" class="d-flex" style="flex-direction: column;">
             <div class="w-25 align-self-center pt-5">
+
+                <div style="font-family: ps2">
+                    Tide OPs Tracker: TOPT
+                </div>
+
                 <div class="input-group">
                     <div class="input-group-prepend">
                         <span class="input-group-text">

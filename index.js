@@ -9101,11 +9101,12 @@ class WinterMetricIndex {
 exports.WinterMetricIndex = WinterMetricIndex;
 WinterMetricIndex.KILLS = 0;
 WinterMetricIndex.KD = 1;
-WinterMetricIndex.REVIVES = 2;
-WinterMetricIndex.HEALS = 3;
-WinterMetricIndex.RESUPPLIES = 4;
-WinterMetricIndex.REPAIRS = 5;
-WinterMetricIndex.SHIELDS = 6;
+WinterMetricIndex.KPM = 2;
+WinterMetricIndex.REVIVES = 3;
+WinterMetricIndex.HEALS = 4;
+WinterMetricIndex.RESUPPLIES = 5;
+WinterMetricIndex.REPAIRS = 6;
+WinterMetricIndex.SHIELDS = 7;
 class WinterReportGenerator {
     static generate(parameters) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -9122,6 +9123,7 @@ class WinterReportGenerator {
             report.essential[WinterMetricIndex.REPAIRS] = this.repairs(parameters);
             report.essential[WinterMetricIndex.RESUPPLIES] = this.resupplies(parameters);
             report.essential[WinterMetricIndex.SHIELDS] = this.shieldRepairs(parameters);
+            report.essential[WinterMetricIndex.KPM] = this.kpm(parameters);
             log.debug(`Loaded ${report.essential.length} essential metrics`);
             report.fun.push(this.mostRevived(parameters));
             report.fun.push(this.mostTransportAssists(parameters));
@@ -9225,6 +9227,19 @@ class WinterReportGenerator {
             name: "K/D",
             funName: "K/D",
             description: "Highest K/D",
+            entries: []
+        }, (value) => value.toFixed(2));
+    }
+    static kpm(parameters) {
+        return this.value(parameters, (player) => {
+            if (player.stats.get(PsEvent_1.PsEvent.kill) < 25) {
+                return 0;
+            }
+            return player.events.filter(iter => iter.type == "kill").length / (player.secondsOnline / 60);
+        }, {
+            name: "KPM",
+            funName: "Speed Gunner",
+            description: "Highest KPM",
             entries: []
         }, (value) => value.toFixed(2));
     }
@@ -71413,6 +71428,7 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("breakdown-chart", {
         ShowPercent: { type: Boolean, required: false, default: false },
         PercentPrecision: { type: Number, required: false, default: 0 },
         ShowTotal: { type: Boolean, required: false, default: false },
+        FontFamily: { type: String, required: false }
     },
     template: `
         <canvas :id="'breakdown-chart-' + ID"></canvas>
@@ -71499,6 +71515,7 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].component("breakdown-chart", {
                             position: "right",
                             align: "center",
                             labels: {
+                                fontFamily: (!!this.FontFamily) ? this.FontFamily : undefined,
                                 generateLabels: (chart) => {
                                     var _a, _b;
                                     const dataset = chart.data.datasets[0];
@@ -72312,7 +72329,7 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].filter("faction", (input) => {
         default: return `${input}`;
     }
 });
-vue__WEBPACK_IMPORTED_MODULE_0__["default"].filter("duration", (input) => {
+vue__WEBPACK_IMPORTED_MODULE_0__["default"].filter("duration", (input, format) => {
     const val = (typeof (input) == "string") ? Number.parseInt(input) : input;
     if (Number.isNaN(val)) {
         return `NaN ${val}`;
@@ -72320,24 +72337,57 @@ vue__WEBPACK_IMPORTED_MODULE_0__["default"].filter("duration", (input) => {
     if (val == 0) {
         return "Never";
     }
+    const parts = {
+        seconds: 0,
+        minutes: 0,
+        hour: 0
+    };
     if (val == 1) {
+        parts.seconds = 1;
         return "1 second";
     }
     if (val < 60) {
+        parts.seconds = val % 60;
         return `${val % 60} seconds`;
     }
     if (val == 0) {
+        parts.minutes = 1;
         return `1 minute`;
     }
     if (val < (60 * 60)) {
-        return `${Math.round(val / 60)} minutes ${val % 60} seconds`;
+        parts.minutes = Math.round(val / 60);
+        parts.seconds = val % 60;
+        return `${Math.round(val / 60)} minutes ${(val % 60).toFixed(0)} seconds`;
     }
     if (val == 60 * 60) {
+        parts.hour = 1;
         return `1 hour`;
     }
     const hours = Math.floor(val / 3600);
     const mins = Math.floor((val - (3600 * hours)) / 60);
+    const secs = val % 60;
+    parts.hour = hours;
+    parts.minutes = mins;
+    parts.seconds = secs;
     return `${hours} hours ${mins} minutes ${val % 60} seconds`;
+});
+vue__WEBPACK_IMPORTED_MODULE_0__["default"].filter("duration_short", (input) => {
+    const val = (typeof (input) == "string") ? Number.parseInt(input) : input;
+    if (Number.isNaN(val)) {
+        return `NaN ${val}`;
+    }
+    const hours = Math.floor(val / 3600);
+    const mins = Math.floor((val - (3600 * hours)) / 60);
+    const secs = val % 60;
+    const parts = {
+        hours: hours,
+        minutes: mins,
+        seconds: secs
+    };
+    if (hours > 0) {
+        return `${hours.toFixed(0)}:${mins.toFixed(0)}:${mins.toFixed(0)}`;
+    }
+    return `${mins.toFixed(0)}:${secs.toFixed(0)}`;
 });
 vue__WEBPACK_IMPORTED_MODULE_0__["default"].filter("minutes", (input) => {
     const val = (typeof (input) == "string") ? Number.parseInt(input) : input;
@@ -73158,10 +73208,6 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             this.relic.elements.map = params.get("el_map") != null;
             this.relic.elements.scoreboard = params.get("el_scoreboard") != null;
             this.relic.elements.table_scoreboard = params.get("el_table_scoreboard") != null;
-            this.relic.loadPrevious = (params.get("skip_load") || "true") == "false";
-            if (this.relic.loadPrevious == false) {
-                log.debug(`Loading previous stats stored`);
-            }
             this.startMap();
         }
     },
@@ -73204,6 +73250,10 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                 this.connecting = false;
                 this.view = "realtime";
                 const params = new URLSearchParams(location.search);
+                const viewRaw = params.get("view");
+                if (viewRaw) {
+                    this.view = viewRaw;
+                }
                 const autoOutfit = params.get("auto");
                 if (autoOutfit) {
                     const outfitsStr = params.get("outfits");
@@ -73222,6 +73272,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
                     }), 0);
                 }
                 this.core.desolationFilter = !!params.get("deso_filter");
+                this.settings.darkMode = !!params.get("dark_mode");
                 const startTime = params.get("start_time");
                 if (startTime) {
                     this.parameters.autoStartTime = startTime;

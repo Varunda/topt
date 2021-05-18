@@ -51,7 +51,7 @@ import Core, {
     Region, MapAPI,
     Facility, FacilityAPI,
     TEvent, TBaseEvent,
-    PsEvent, PsEventType, PsEvents
+    PsEvent, PsEventType, PsEvents, BreakdownArray
 } from "tcore";
 
 import { PersonalReportGenerator } from "PersonalReportGenerator";
@@ -59,7 +59,7 @@ import { PersonalReportGenerator } from "PersonalReportGenerator";
 import { SquadAddon } from "addons/SquadAddon";
 import { StorageHelper } from "Storage";
 import { LoggerMetadata, LoggerMetadataLevel } from "LoggerMetadata";
-import { OutfitReportParameters, PsLoadouts, TDeathEvent, TExpEvent, TKillEvent, TVehicleKillEvent, Vehicle, Vehicles } from "../../topt-core/build/core/index.js";
+import { Breakdown, OutfitReportParameters, PsLoadouts, TDeathEvent, TExpEvent, TKillEvent, TVehicleKillEvent, Vehicle, Vehicles } from "../../topt-core/build/core/index.js";
 
 (window as any).CharacterAPI = CharacterAPI;
 (window as any).Playback = Playback;
@@ -164,7 +164,7 @@ export const vm = new Vue({
     data: {
         coreObject: null as (Core | null),
 
-        view: "setup" as "setup" | "realtime" | "ops" | "killfeed" | "winter" | "example" | "battle" | "deso" | "map",
+        view: "setup" as "setup" | "realtime" | "ops" | "killfeed" | "winter" | "example" | "battle" | "deso" | "map" | "speedrun" | "speedrun_setup",
 
         connecting: false as boolean,
 
@@ -388,11 +388,6 @@ export const vm = new Vue({
             this.relic.elements.scoreboard = params.get("el_scoreboard") != null;
             this.relic.elements.table_scoreboard = params.get("el_table_scoreboard") != null;
 
-            this.relic.loadPrevious = (params.get("skip_load") || "true") == "false";
-            if (this.relic.loadPrevious == false) {
-                log.debug(`Loading previous stats stored`);
-            }
-
             this.startMap();
         }
     },
@@ -448,6 +443,11 @@ export const vm = new Vue({
 
                 const params: URLSearchParams = new URLSearchParams(location.search);
 
+                const viewRaw: string | null = params.get("view");
+                if (viewRaw) {
+                    this.view = viewRaw as any;
+                }
+
                 const autoOutfit: string | null = params.get("auto");
                 if (autoOutfit) {
                     const outfitsStr: string | null = params.get("outfits");
@@ -468,6 +468,8 @@ export const vm = new Vue({
                 }
 
                 this.core.desolationFilter = !!params.get("deso_filter");
+
+                this.settings.darkMode = !!params.get("dark_mode");
 
                 const startTime: string | null = params.get("start_time");
                 if (startTime) {

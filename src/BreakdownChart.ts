@@ -9,8 +9,9 @@ Vue.component("breakdown-chart", {
         ShowAll: { type: Boolean, required: false, default: false },
         ClippedAmount: { type: Number, required: false, default: 8 },
         ShowPercent: { type: Boolean, required: false, default: false },
-        PercentPrecision: { type: Number, required: false, default: 0},
+        PercentPrecision: { type: Number, required: false, default: 0 },
         ShowTotal: { type: Boolean, required: false, default: false },
+        FontFamily: { type: String, required: false }
     },
 
     template: `
@@ -111,6 +112,7 @@ Vue.component("breakdown-chart", {
                             position: "right",
                             align: "center",
                             labels: {
+                                fontFamily: (!!this.FontFamily) ? this.FontFamily : undefined,
                                 generateLabels: (chart: Chart): Chart.ChartLegendLabelItem[] => {
                                     const dataset = chart.data.datasets![0];
                                     let sum: number = 0;
