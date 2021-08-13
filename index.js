@@ -9175,7 +9175,7 @@ class WinterReportGenerator {
         });
     }
     static revives(parameters) {
-        return this.metric(parameters, [PsEvent_1.PsEvent.revive, PsEvent_1.PsEvent.squadResupply], {
+        return this.metric(parameters, [PsEvent_1.PsEvent.revive, PsEvent_1.PsEvent.squadRevive], {
             name: "Revives",
             funName: "Necromancer",
             description: "Most revives",
@@ -9463,7 +9463,7 @@ class WinterReportGenerator {
         return metric;
     }
     static mostESFSKills(parameters) {
-        return this.vehicle(parameters, [VehicleAPI_1.Vehicles.mosquito, VehicleAPI_1.Vehicles.reaver, VehicleAPI_1.Vehicles.scythe], {
+        return this.metric(parameters, ["64", "66", "67", "1565"], {
             name: "ESFs destroyed",
             funName: "Fly Swatter",
             description: "Most ESFs destroyed",
@@ -9471,7 +9471,7 @@ class WinterReportGenerator {
         });
     }
     static mostValkKills(parameters) {
-        return this.vehicle(parameters, [VehicleAPI_1.Vehicles.valkyrie], {
+        return this.metric(parameters, ["501"], {
             name: "Valks destroyed",
             funName: "Valhalla wrecker",
             description: "Most valks destroyed",
@@ -9479,7 +9479,7 @@ class WinterReportGenerator {
         });
     }
     static mostLibKills(parameters) {
-        return this.vehicle(parameters, [VehicleAPI_1.Vehicles.liberator], {
+        return this.metric(parameters, ["61"], {
             name: "Libs destroyed",
             funName: "Gunships crashed",
             description: "Most libs destroyed",
@@ -9487,7 +9487,7 @@ class WinterReportGenerator {
         });
     }
     static mostGalaxyKills(parameters) {
-        return this.vehicle(parameters, [VehicleAPI_1.Vehicles.galaxy], {
+        return this.metric(parameters, ["60"], {
             name: "Galaxies destroyed",
             funName: "Quasar tsunami",
             description: "Most galaxies destroyed",
@@ -9495,7 +9495,7 @@ class WinterReportGenerator {
         });
     }
     static mostMBTKills(parameters) {
-        return this.vehicle(parameters, [VehicleAPI_1.Vehicles.vanguard, VehicleAPI_1.Vehicles.prowler, VehicleAPI_1.Vehicles.magrider], {
+        return this.metric(parameters, ["63", "65", "69", "1635"], {
             name: "MBTs destroyed",
             funName: "Heavy Hitter",
             description: "Most MBTs destroyed",
@@ -9503,7 +9503,7 @@ class WinterReportGenerator {
         });
     }
     static mostHarasserKills(parameters) {
-        return this.vehicle(parameters, [VehicleAPI_1.Vehicles.harasser], {
+        return this.metric(parameters, ["301"], {
             name: "Harassers destroyed",
             funName: "Rasser Harasser",
             description: "Most harassers destroyed",
@@ -9511,7 +9511,7 @@ class WinterReportGenerator {
         });
     }
     static mostLightningKills(parameters) {
-        return this.vehicle(parameters, [VehicleAPI_1.Vehicles.lightning], {
+        return this.metric(parameters, ["62"], {
             name: "Lightnings destroyed",
             funName: "Thunder Struck",
             description: "Most lightnings destroyed",
@@ -9519,7 +9519,7 @@ class WinterReportGenerator {
         });
     }
     static mostSunderersKilled(parameters) {
-        return this.vehicle(parameters, [VehicleAPI_1.Vehicles.sunderer], {
+        return this.metric(parameters, ["68"], {
             name: "Sunderers killed",
             funName: "Bus Bully",
             description: "Most sundies destroyed",
