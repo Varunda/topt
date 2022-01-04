@@ -219,6 +219,20 @@
             <link rel="stylesheet" href="./dark-theme.min.css">
         </template>
 
+        <div v-if="showNewUrl" class="text-center alert alert-warning">
+            <h2 class="alert-heading">
+                TOPT is moving to <a href="https://topt.honu.pw/">https://topt.honu.pw</a>
+                <button type="button" class="close" @click="showNewUrl = false">
+                    &times;
+                </button>
+            </h2>
+
+            <p>
+                BWAE was nice enough to host TOPT until I hosted TOPT myself, now that I have my own server, TOPT will be hosted there 
+            </p>
+        </div>
+
+
         <div v-if="view == 'setup' && relic.showUI != false" class="d-flex" style="flex-direction: column;">
             <div class="w-25 align-self-center pt-5">
 

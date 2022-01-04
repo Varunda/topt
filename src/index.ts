@@ -181,6 +181,8 @@ export const vm = new Vue({
             debug: false as boolean
         },
 
+        showNewUrl: true as boolean,
+
         relic: {
             connected: true as boolean,
             showUI: true as boolean,
@@ -328,6 +330,8 @@ export const vm = new Vue({
             console.log(`Loaded ${data.length} facilities`);
             FacilityAPI.setCache(data);
         });
+
+        this.showNewUrl = location.host != "topt.honu.pw";
 
         this.settings.fromStorage = false;
 

@@ -712,6 +712,7 @@ function setupAddedSocket(core) {
     core.sockets.added.onmessage = core.onmessage.bind(core);
     return response;
 }
+window.w3cwebsocket = websocket_1.w3cwebsocket;
 function setupLogisticsSocket(core) {
     const response = new ApiWrapper_1.ApiResponse();
     core.sockets.logistics = new websocket_1.w3cwebsocket(`wss://push.planetside2.com/streaming?environment=ps2&service-id=s:${core.serviceID}`);
@@ -73038,6 +73039,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             darkMode: false,
             debug: false
         },
+        showNewUrl: true,
         relic: {
             connected: true,
             showUI: true,
@@ -73153,6 +73155,7 @@ const vm = new vue__WEBPACK_IMPORTED_MODULE_3__["default"]({
             console.log(`Loaded ${data.length} facilities`);
             tcore__WEBPACK_IMPORTED_MODULE_23__["FacilityAPI"].setCache(data);
         });
+        this.showNewUrl = location.host != "topt.honu.pw";
         this.settings.fromStorage = false;
         if (this.storage.enabled == true) {
             const loggerMeta = Storage__WEBPACK_IMPORTED_MODULE_26__["StorageHelper"].getLoggers();
